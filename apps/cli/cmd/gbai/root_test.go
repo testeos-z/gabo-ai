@@ -84,3 +84,19 @@ func TestReviewNotifyNeedsNoConfig(t *testing.T) {
 		t.Fatalf("Execute() error = %v, want validation error without config", err)
 	}
 }
+
+func TestRepoSetupDryRunFromExampleConfig(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetOut(&out)
+	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "repo", "setup", "--dry-run"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, want := range []string{"POST repos/cappy-lab/vulcam/rulesets", "refs/heads/dev", "admins"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("plan missing %q:\n%s", want, out.String())
+		}
+	}
+}

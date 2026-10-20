@@ -15,6 +15,8 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/railwayssh"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision"
 	provisionadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision/adapters"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/repo"
+	repoadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/repo/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/review"
 	reviewadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/review/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/secrets"
@@ -75,6 +77,16 @@ func newRootCommand(d deps) *cobra.Command {
 		}), nil
 	}, os.Executable))
 	root.AddCommand(review.NewCommand(reviewFactories(d.runner, loadConfig)))
+	root.AddCommand(repo.NewCommand(func(context.Context) (*repo.UseCase, error) {
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, err
+		}
+		return repo.NewUseCase(repoadapters.NewAPI(d.runner), repo.Settings{
+			Repo:        cfg.Repo.Name,
+			Integration: cfg.Repo.IntegrationBranch,
+		}), nil
+	}))
 	return root
 }
 
