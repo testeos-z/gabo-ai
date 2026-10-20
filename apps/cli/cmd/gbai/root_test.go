@@ -16,7 +16,7 @@ func TestRootHelpListsVersion(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor", "mcp", "init"} {
+	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor", "mcp", "init", "plan"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help output does not list %s command:\n%s", name, out.String())
 		}

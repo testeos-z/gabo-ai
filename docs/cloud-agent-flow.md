@@ -27,32 +27,34 @@ OS users on the server:
 | User | Home | Purpose |
 |---|---|---|
 | `orca` | `/data/home` | Runs both Claude Code sessions and the coder's work. Cannot read the reviewer's token. |
-| `reviewer` (UID 2000) | `/data/reviewer` (0700) | Holds the **vulcambot** GitHub credentials (0600) and the reviewer env file (Claude OAuth token, settings). Reachable from `orca` only through one sudo rule that runs `reviewer.sh`. |
-| `reviewer-ci` (UID 2001) | `/data/reviewer-ci` (0700) | Runs untrusted PR code (checks) and the review model, with a scrubbed environment and no GitHub credentials. |
+| `reviewer` (UID 2000) | `/data/reviewer` (0700) | Holds the **vulcambot** GitHub credentials (0600) and the model credential files. Reachable from `orca` only through one sudo rule that runs the root-owned `/usr/local/libexec/gbai/review-run`. |
+| `reviewer-ci` (UID 2001) | `/data/reviewer-ci` (0700) | Runs untrusted PR code (checks) and the review model, with a scrubbed environment and no GitHub credentials. Reachable from `reviewer` only through `/usr/local/libexec/gbai/review-ci`. |
 
-Long-lived Claude Code sessions (named, in Orca terminals, user `orca`):
+Long-lived agent sessions (Orca terminals, user `orca`, started by `gbai sessions start`; runtime `claude` or `pi` per role from `gbai.yaml`, defaults coder=claude, reviewer=pi, assistant=claude):
 
-- **vulcam-coder** — coordinator. Computes eligible roadmap issues, launches up to 4 short coder sessions in parallel (one per issue, each in its own git worktree), and relays work to the reviewer.
-- **vulcam-reviewer** — messenger. Receives "PR ready" messages, runs the reviewer script through sudo, and messages the verdict back.
+- **gbai-coder** — coordinator. Computes eligible roadmap issues, launches up to 4 short coder sessions in parallel (one per issue, each in its own git worktree) following the `gbai-cycle` and `gbai-coder` skills.
+- **gbai-reviewer** — reviewer-side session; the review itself runs in detached terminals opened by `gbai review request`.
+- **gbai-assistant** — planning orchestrator (`gbai-assistant` skill) that keeps the six product docs current.
 
-They talk with Claude Code's **native cross-session messaging** (SendMessage/ListAgents), which only works between sessions of the same OS user — hence both run as `orca`.
+Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, see the `gbai-orca-inbox` skill), never through terminal handles. Messages are notifications only.
 
 ## Flow of one issue
 
-1. **vulcam-coder** picks an eligible issue: open, listed in the roadmap manifest, all `blockedBy` closed, not `needs-user`, not a decision issue, not claimed by another runner.
+1. **gbai-coder** picks an eligible issue: open, listed in the roadmap manifest, all `blockedBy` closed, not `needs-user`, not a decision issue, not claimed by another runner.
 2. It claims the issue (label + marker comment), creates a worktree, and launches a **coder session**.
-3. The coder session implements test-first, runs local checks, pushes, opens/updates the PR to `dev`, and ends as `HANDED`.
-4. vulcam-coder messages **vulcam-reviewer**: `PR #<n> head <sha> ready for review`.
-5. vulcam-reviewer runs `sudo -n -u reviewer .../reviewer.sh head <n> <sha>`. The script, as `reviewer`:
+3. The coder session implements test-first, runs local checks, pushes, opens/updates the PR to `dev` with label `mode:cloud` or `mode:local` (from `GBAI_MODE`).
+4. After **every push** the coder runs `gbai review request --pr <n> --sha <head> --notify <own mailbox>`. There is no webhook: this one command opens a detached Orca terminal and returns immediately.
+5. That terminal runs `sudo -n -u reviewer /usr/local/libexec/gbai/review-run head <n> <sha>`, a root-owned wrapper that execs `gbai review run` with a clean environment. As `reviewer`, gbai:
    - re-reads the PR from GitHub and skips it if the head moved;
-   - checks out the head in its own worktree;
-   - as `reviewer-ci`: runs the CI-equivalent checks (install, build, check-types, lint, affected tests, formatting);
-   - runs the review engine (default **Claude Code**, read-only, `--setting-sources user --strict-mcp-config`, same review prompt as the old OpenCode GitHub Action; `opencode` and `gga` are selectable via `REVIEWER_ENGINE`);
-   - posts, as **vulcambot**: commit statuses `reviewer/tests` and `reviewer/review`, and one comment whose first line is exactly `No blocking issues found.` or a blocking verdict with findings (failure logs in a collapsed `<details>`);
-   - if clean and `REVIEWER_AUTO_MERGE=true`: approves and merges (`--merge --match-head-commit <sha>`).
-6. vulcam-reviewer messages vulcam-coder: `PR #<n> head <sha> verdict=<clean|blocking|error> merge=<merged|needs-human-merge|skipped|...>`.
-7. If blocking: vulcam-coder launches a fix session that reads vulcambot's findings on the PR, fixes, pushes, and goes back to step 4 (max 4 rounds, then `BLOCKED` + `needs-user`).
-8. If merged: vulcam-coder recomputes eligibility (the merge may unblock other issues) and starts the next wave. With nothing eligible it sleeps until a message arrives.
+   - in its own clone, adds a per-review worktree and makes a **local test merge** of the pinned head into a fresh `origin/dev`; a conflict is a blocking verdict;
+   - streams the merged tree (`git archive`) into a fresh `reviewer-ci` workspace through `sudo -n -u reviewer-ci /usr/local/libexec/gbai/review-ci`;
+   - as `reviewer-ci`, runs the configured checks (`review.checks`, argv only, no shell), then the read-only review engine (`claude` or `pi`, `runtimes.reviewer`) with the model credential piped over stdin;
+   - computes the verdict itself from that local evidence and posts, as **vulcambot**, the statuses `reviewer/tests` and `reviewer/review` and one comment whose first line is exactly `No blocking issues found.` or `Blocking issues found.`;
+   - if clean, `mode:cloud`, `review.auto_merge` and no human-only path: approves and merges pinned to the SHA;
+   - removes the worktree and the workspace, and prints one summary line.
+6. The terminal pipes that line to `gbai review notify`, which sends it to the coder's mailbox: `PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>`.
+7. If blocking: gbai-coder launches a fix session that reads vulcambot's findings on the PR, fixes, pushes, and goes back to step 4 (max 4 rounds, then `BLOCKED` + `needs-user`).
+8. If merged: gbai-coder recomputes eligibility (the merge may unblock other issues) and starts the next wave. With nothing eligible it ends its turn until a message arrives.
 
 ## Identities and credentials
 
@@ -67,14 +69,23 @@ They talk with Claude Code's **native cross-session messaging** (SendMessage/Lis
 - `sudo` is not in the image: it is installed at runtime and must be reinstalled after every redeploy, together with the users (the image's `/etc` is rebuilt). The image comes from another project's repo (testeos-z/gbai-alejandria `infra/orca-server`), which must stay untouched.
 - GitHub Actions on cappy-lab is blocked by billing (Free plan minutes exhausted); the reviewer replaces CI for merge decisions.
 
-## What the gbai-team CLI must automate
+## What the gbai CLI automates
 
-1. `provision` — on the server, as root: install sudo, create/repair users, sudoers, reviewer install (idempotent; also run at every boot via the service start command).
-2. `secrets set <github|claude>` — read a secret without echo and pipe it to the server (never in argv or env).
-3. `sessions start` — start vulcam-coder and vulcam-reviewer in Orca terminals with their prompts/settings; `sessions stop`.
-4. `status` — server health, sessions alive, claims, open PRs, last verdicts, pending `needs-user` issues.
-5. `audit` — cross-check the Engram log and GitHub (merges only by the reviewer identity, verdict statuses on merged heads, no coder merges).
-6. Pairing helpers for local Orca and a doctor command for the known gotchas below.
+| Need | Command (CLI / MCP tool) |
+|---|---|
+| Prepare the server as root, idempotently: packages, users, config, binary, review wrappers, sudoers, skills for `orca` | `gbai provision [--dry-run]` / `provision_plan`, `provision_apply` |
+| Store a secret without echo, piped over stdin only | `gbai secrets set <name>` (human terminal only; MCP `secret_instructions` returns the command) |
+| Labels and the integration ruleset | `gbai repo setup [--dry-run]` / `repo_setup_plan`, `repo_setup_apply` |
+| Start/stop the sessions | `gbai sessions start|stop [--role] [--mode]` / `sessions_start`, `sessions_stop` |
+| Request a review after a push; reviewer side | `gbai review request` / `review_request`; `gbai review run`, `review ci`, `review notify` |
+| Status: server, sessions, open PRs, verdicts, needs-user | `gbai status` / `status` |
+| Audit merges (bot only, verdict status on merged heads, no coder merges) | `gbai audit` / `audit` |
+| Known gotchas | `gbai doctor` / `doctor` |
+| Local agent setup: skills and MCP registration | `gbai init [--runtime] [--scope] [--dry-run]` |
+| Product docs for the planning agents | `gbai plan new|status` |
+| MCP server for the local agent | `gbai mcp` |
+
+The Engram cross-check of `audit` and pairing helpers for local Orca are not automated yet. See `docs/architecture.md` for the code layout.
 
 ## Gotchas learned
 
