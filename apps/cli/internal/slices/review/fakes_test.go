@@ -9,7 +9,9 @@ import (
 // trace records port calls across fakes in order.
 type trace struct{ calls []string }
 
-func (t *trace) add(format string, args ...any) { t.calls = append(t.calls, fmt.Sprintf(format, args...)) }
+func (t *trace) add(format string, args ...any) {
+	t.calls = append(t.calls, fmt.Sprintf(format, args...))
+}
 
 func (t *trace) has(prefix string) bool {
 	for _, c := range t.calls {

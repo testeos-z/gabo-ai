@@ -31,3 +31,28 @@ repo:
 
 bot:
   login: vulcambot
+
+# `gbai review run` (as reviewer) and its reviewer-ci side.
+review:
+  # Run in order inside the merged tree as reviewer-ci; split on whitespace, no shell.
+  checks:
+    - bun install --frozen-lockfile
+    - bun run build
+    - bun run check-types
+    - bun run lint
+    - bun run test
+  # Merge clean mode:cloud PRs into the integration branch, pinned to the reviewed head.
+  auto_merge: true
+  # Never merged automatically. Entries ending in "/" are root directories;
+  # others are file names matched at any depth.
+  human_only_paths:
+    - .claude/
+    - .github/
+    - .opencode/
+    - AGENTS.md
+    - CLAUDE.md
+    - docs/policies/
+    - tools/hook-tests/
+    - agents/
+  # Env var that receives the pi model credential (claude uses CLAUDE_CODE_OAUTH_TOKEN).
+  pi_credential_env: ANTHROPIC_API_KEY

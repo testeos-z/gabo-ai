@@ -184,13 +184,13 @@ func TestRunInfraFailuresAreErrorsAndAlwaysCleanUp(t *testing.T) {
 	t.Parallel()
 	boom := errors.New("boom")
 	for name, mutate := range map[string]func(*harness){
-		"prepare":         func(h *harness) { h.git.prepareErr = boom },
-		"add worktree":    func(h *harness) { h.git.addErr = boom },
-		"merge":           func(h *harness) { h.git.mergeErr = boom },
-		"snapshot":        func(h *harness) { h.git.snapshotErr = boom },
-		"checks prepare":  func(h *harness) { h.checks.prepareErr = boom },
-		"engine":          func(h *harness) { h.engine.err = boom },
-		"status post":     func(h *harness) { h.gh.statusErr = boom },
+		"prepare":        func(h *harness) { h.git.prepareErr = boom },
+		"add worktree":   func(h *harness) { h.git.addErr = boom },
+		"merge":          func(h *harness) { h.git.mergeErr = boom },
+		"snapshot":       func(h *harness) { h.git.snapshotErr = boom },
+		"checks prepare": func(h *harness) { h.checks.prepareErr = boom },
+		"engine":         func(h *harness) { h.engine.err = boom },
+		"status post":    func(h *harness) { h.gh.statusErr = boom },
 	} {
 		h := newHarness()
 		mutate(h)

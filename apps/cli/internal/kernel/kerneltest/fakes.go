@@ -14,10 +14,12 @@ type RunnerCall struct {
 	Stdin   string
 }
 
-// Runner is a fake kernel.Runner returning Result or Err for every call.
+// Runner is a fake kernel.Runner. When Handle is set it decides every
+// outcome; otherwise Result or Err is returned for every call.
 type Runner struct {
 	Result kernel.Result
 	Err    error
+	Handle func(kernel.Command) (kernel.Result, error)
 	Calls  []RunnerCall
 }
 
@@ -34,6 +36,9 @@ func (r *Runner) Run(_ context.Context, cmd kernel.Command) (kernel.Result, erro
 		call.Stdin = string(b)
 	}
 	r.Calls = append(r.Calls, call)
+	if r.Handle != nil {
+		return r.Handle(cmd)
+	}
 	return r.Result, r.Err
 }
 

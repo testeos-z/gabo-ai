@@ -15,7 +15,7 @@ func TestRootHelpListsVersion(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, name := range []string{"version", "secrets", "provision"} {
+	for _, name := range []string{"version", "secrets", "provision", "review"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help output does not list %s command:\n%s", name, out.String())
 		}
@@ -58,5 +58,29 @@ func TestProvisionDryRunPrintsPlanFromExampleConfig(t *testing.T) {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("plan missing %q:\n%s", want, out.String())
 		}
+	}
+}
+
+func TestResolveConfigPath(t *testing.T) {
+	t.Parallel()
+	if got := resolveConfigPath("custom.yaml", true); got != "custom.yaml" {
+		t.Errorf("explicit = %q", got)
+	}
+	if got := resolveConfigPath(defaultConfigPath, true); got != defaultConfigPath {
+		t.Errorf("explicit default = %q", got)
+	}
+	// The package directory has no gbai.yaml, so the server config is used.
+	if got := resolveConfigPath(defaultConfigPath, false); got != "/etc/gbai/gbai.yaml" {
+		t.Errorf("fallback = %q", got)
+	}
+}
+
+func TestReviewNotifyNeedsNoConfig(t *testing.T) {
+	t.Parallel()
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetArgs([]string{"review", "notify", "--to", "bad", "--pr", "1", "--sha", "x"})
+	err := root.Execute()
+	if err == nil || strings.Contains(err.Error(), "config") {
+		t.Fatalf("Execute() error = %v, want validation error without config", err)
 	}
 }
