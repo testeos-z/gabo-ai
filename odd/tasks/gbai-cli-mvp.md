@@ -32,15 +32,17 @@ Today the cloud agent flow is wired by hand over `railway ssh` (users, sudoers, 
 
 Route per task is recorded in brackets.
 
-- [ ] T1 Scaffold: Go module, cobra root + `version`, Turbo wiring, AGENTS.md stack update, test harness. [delegated: 2+ non-trivial files]
-- [ ] T2 Shared kernel ports + adapters: command runner (exec), remote shell over `railway ssh` with stdin, config (`gbai.yaml`: server ids, users, runtimes per role, repo). [delegated]
-- [ ] T3 `secrets set <name>` slice: no-echo read, refuse argv/env values, pipe via remote stdin into a 0600 file owned by the target OS user. [delegated]
-- [ ] T4 `provision` slice: idempotent remote plan (sudo, users orca/reviewer/reviewer-ci, sudoers drop-in, dirs, review script install, gentle-ai `--persona neutral`, skills per user), `--dry-run` prints the plan. [delegated]
-- [ ] T5 `review` slice: `review request` (launch detached Orca terminal with the sudo command, record coder mailbox) and `review run` (reviewer side: test merge worktree, checks, engine claude|pi read-only, verdict parse, gh post as bot, cleanup, summary line). [delegated]
-- [ ] T6 `repo setup` slice: labels `mode:cloud`/`mode:local`, `dev` ruleset (bot approval + checks, no bypass) via gh. [delegated]
-- [ ] T7 `sessions start|stop`, `status`, `audit`, `doctor` slices. [delegated]
-- [ ] T8 `mcp` driving adapter (stdio) exposing the slices as tools (never secrets) + `init` slice (install embedded skills, register MCP for Claude/Pi) + embedded skills content. [delegated]
-- [ ] T9 `plan` slice: scaffold the six product docs (PRD, TRD, implementation plan, DB schema + data, UX/UI, app flow) and docs update. [delegated]
+- [x] T1 Scaffold: Go module, cobra root + `version`, Turbo wiring, AGENTS.md stack update, test harness. [delegated: 2+ non-trivial files]
+- [x] T2 Shared kernel ports + adapters: command runner (exec), remote shell over `railway ssh` with stdin, config (`gbai.yaml`: server ids, users, runtimes per role, repo). [delegated]
+- [x] T3 `secrets set <name>` slice: no-echo read, refuse argv/env values, pipe via remote stdin into a 0600 file owned by the target OS user. [delegated]
+- [x] T4 `provision` slice: idempotent remote plan (sudo, users orca/reviewer/reviewer-ci, sudoers drop-in, dirs, review script install, gentle-ai `--persona neutral`, skills per user), `--dry-run` prints the plan. [delegated]
+- [x] T5 `review` slice: `review request` (launch detached Orca terminal with the sudo command, record coder mailbox) and `review run` (reviewer side: test merge worktree, checks, engine claude|pi read-only, verdict parse, gh post as bot, cleanup, summary line). [delegated]
+- [x] T6 `repo setup` slice: labels `mode:cloud`/`mode:local`, `dev` ruleset (bot approval + checks, no bypass) via gh. [delegated]
+- [x] T7 `sessions start|stop`, `status`, `audit`, `doctor` slices. [delegated]
+- [x] T8 `mcp` driving adapter (stdio) exposing the slices as tools (never secrets) + `init` slice (install embedded skills, register MCP for Claude/Pi) + embedded skills content. [delegated]
+- [x] T9 `plan` slice: scaffold the six product docs (PRD, TRD, implementation plan, DB schema + data, UX/UI, app flow) and docs update. [delegated]
+
+- [x] T10 Hardening: kill leftover reviewer-ci processes before the engine runs and keep the model credential out of reach of PR code (follow-up from T5 risk). [delegated]
 
 ## Acceptance criteria
 
@@ -61,6 +63,18 @@ Strategy `ask-on-risk`; forecast > 400 lines ⇒ chain strategy `feature-branch-
 
 - 2026-10-20: feature document created; branch `feat/gbai-cli-mvp`. RDD effective mode: on (global).
 
+- T1 done: 608c956 (delegated). T2 done: a7bc1ec (delegated). T3 done: 0227e87 (delegated). 44 Go tests green; bun test/build pass; parent spot check `go test ./...` passed.
+- Plan doc committed: eb70380.
+- RDD: assess c0070ae..eb70380 = high (process_boundary, 1775 lines); START returned consent_required (lineage review-cea200fdbc22e543) — waiting for owner decision.
+- Open notes: `secrets` paths are edit-blocked by a permission rule (help example still shows an env-var pipe); railway ssh single-line argument assumption untested.
+- T4 done: 8af7a7b. T5 done: 1c5304d + 180d5ef (checks run in a reviewer-ci workspace fed by git archive over stdin; model credential via stdin). 147 Go tests green; parent spot check passed.
+- Untested assumptions: claude/pi stdin prompt, pi json shape, orca terminal/orchestration flags, gh credential helper, tool PATHs on reviewer users.
+- T6 done: f15d326. T7 done: dbc5f38. 197 Go tests green; parent spot check passed. Untested: orca terminal list JSON shape, runtimes taking prompt as positional arg, gh search merged filter; bare `orca` may be GNOME screen reader locally (config sessions.local_orca).
+- T8 done: a1e77b7 + 47a0bc3 (mcp, 11 tools, apply needs confirm, no secret tool), 87607e5 (10 embedded skills + init + provision skills step). T9 done: ba11ce1 (plan new/status, docs/architecture.md, flow doc updated). T10 done: 4261681 (reviewer-ci process sweep via pidfd, clean engine env, review run serialized with flock, engine PATH excludes reviewer-ci home).
+- Final local checks: `go test ./...` 244 passed in 28 packages; `go vet` clean; `bun run build` ok. 14 commits, 145 files, +12333/-28 since c0070ae.
+- Untested against real tools (needs server authorization): railway ssh arg handling, orca terminal/orchestration flags and JSON, claude/pi headless prompt input and empty-HOME behavior, pi MCP config shape, gh credential helper, tool PATHs for reviewer/reviewer-ci, setpriv/GNU tar/pidfd on the container.
+- Delivery: branch exceeds the ~400-line budget; chain strategy default feature-branch-chain; no push/PR yet (owner decision).
+
 ## Next step
 
-T1 scaffold.
+All MVP tasks implemented locally. Next: owner RDD decisions, owner authorization to run `gbai doctor`/`provision --dry-run` then apply against vulcam cloud, push + PR decision.
