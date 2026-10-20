@@ -258,3 +258,38 @@ func TestRunRejectsInvalidInputBeforeIO(t *testing.T) {
 		t.Fatalf("calls = %v", h.t.calls)
 	}
 }
+
+type fakeLock struct {
+	t   *trace
+	err error
+}
+
+func (f *fakeLock) Acquire(context.Context) (func(), error) {
+	f.t.add("lock.acquire")
+	if f.err != nil {
+		return nil, f.err
+	}
+	return func() { f.t.add("lock.release") }, nil
+}
+
+func TestRunIsSerializedByTheLock(t *testing.T) {
+	t.Parallel()
+	h := newHarness()
+	uc := NewRunUseCase(h.gh, h.git, h.checks, h.engine, h.cfg).WithLock(&fakeLock{t: h.t})
+	if _, err := uc.Run(context.Background(), 12, sha); err != nil {
+		t.Fatal(err)
+	}
+	if h.t.calls[0] != "lock.acquire" || h.t.calls[1] != "gh.pr 12" || h.t.calls[len(h.t.calls)-1] != "lock.release" {
+		t.Fatalf("calls = %v", h.t.calls)
+	}
+}
+
+func TestRunLockFailureIsAnErrorVerdictWithoutIO(t *testing.T) {
+	t.Parallel()
+	h := newHarness()
+	uc := NewRunUseCase(h.gh, h.git, h.checks, h.engine, h.cfg).WithLock(&fakeLock{t: h.t, err: errors.New("busy")})
+	r, err := uc.Run(context.Background(), 12, sha)
+	if err != nil || r.Summary.Verdict != VerdictError || len(h.t.calls) != 1 {
+		t.Fatalf("report %+v err %v calls %v", r, err, h.t.calls)
+	}
+}

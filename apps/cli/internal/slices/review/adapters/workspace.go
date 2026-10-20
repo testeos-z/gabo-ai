@@ -73,13 +73,33 @@ func (w DirWorkspace) Dir(name string) (string, error) {
 	return dir, nil
 }
 
-// Remove deletes the workspace; a missing one is not an error.
+// Home replaces the workspace's HOME, a sibling of its tree, with a fresh
+// empty 0700 directory.
+func (w DirWorkspace) Home(name string) (string, error) {
+	dir, err := w.path(name)
+	if err != nil {
+		return "", err
+	}
+	home := dir + ".home"
+	if err := os.MkdirAll(w.root, 0o700); err != nil {
+		return "", err
+	}
+	if err := os.RemoveAll(home); err != nil {
+		return "", err
+	}
+	if err := os.Mkdir(home, 0o700); err != nil {
+		return "", err
+	}
+	return home, nil
+}
+
+// Remove deletes the workspace and its HOME; missing ones are not an error.
 func (w DirWorkspace) Remove(name string) error {
 	dir, err := w.path(name)
 	if err != nil {
 		return err
 	}
-	return os.RemoveAll(dir)
+	return errors.Join(os.RemoveAll(dir), os.RemoveAll(dir+".home"))
 }
 
 func extract(dir string, r io.Reader) error {

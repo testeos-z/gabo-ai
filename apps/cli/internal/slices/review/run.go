@@ -43,6 +43,7 @@ func (r *Report) note(format string, args ...any) {
 
 // RunUseCase reviews one pinned PR head inside the reviewer boundary.
 type RunUseCase struct {
+	lock   Lock
 	gh     GitHub
 	git    Git
 	checks Checks
@@ -58,6 +59,12 @@ func NewRunUseCase(gh GitHub, git Git, checks Checks, engine Engine, cfg RunConf
 	return &RunUseCase{gh: gh, git: git, checks: checks, engine: engine, cfg: cfg}
 }
 
+// WithLock serializes runs through l; without it runs are not serialized.
+func (u *RunUseCase) WithLock(l Lock) *RunUseCase {
+	u.lock = l
+	return u
+}
+
 // WorkspaceName names the worktree and the reviewer-ci workspace of a review.
 func WorkspaceName(number int, sha string) string {
 	return fmt.Sprintf("pr-%d-%s", number, sha[:7])
@@ -70,6 +77,14 @@ func (u *RunUseCase) Run(ctx context.Context, number int, sha string) (Report, e
 		return Report{}, err
 	}
 	r := Report{Summary: Summary{PR: number, SHA: sha, Verdict: VerdictError, Merge: MergeNone}}
+	if u.lock != nil {
+		release, err := u.lock.Acquire(ctx)
+		if err != nil {
+			r.note("acquire review lock: %v", err)
+			return r, nil
+		}
+		defer release()
+	}
 
 	pr, err := u.gh.PullRequest(ctx, number)
 	if err != nil {

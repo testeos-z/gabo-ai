@@ -124,20 +124,26 @@ func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, err
 						HumanOnlyPaths: cfg.Review.HumanOnlyPaths,
 					},
 				},
-			), nil
+			).WithLock(reviewadapters.NewFileLock(path.Join(rv.Home, ".gbai-review.lock"))), nil
 		},
 		CI: func(context.Context) (*review.CIUseCase, error) {
 			cfg, err := loadConfig()
 			if err != nil {
 				return nil, err
 			}
+			ciHome := cfg.Users.ReviewerCI.Home
 			return review.NewCIUseCase(
-				reviewadapters.NewDirWorkspace(path.Join(cfg.Users.ReviewerCI.Home, "work")),
+				reviewadapters.NewDirWorkspace(path.Join(ciHome, "work")),
 				runner,
-				review.CIConfig{CredentialEnv: map[string]string{
-					review.RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN",
-					review.RuntimePi:     cfg.Review.PiCredentialEnv,
-				}},
+				reviewadapters.NewProcFS("/proc", 2*time.Second),
+				review.CIConfig{
+					CredentialEnv: map[string]string{
+						review.RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN",
+						review.RuntimePi:     cfg.Review.PiCredentialEnv,
+					},
+					Path:          os.Getenv("PATH"),
+					UntrustedHome: ciHome,
+				},
 			), nil
 		},
 	}

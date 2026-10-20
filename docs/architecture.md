@@ -30,7 +30,7 @@ Ports shared by several slices live in `internal/kernel` (`Runner`, `RemoteShell
 | secrets | cobra | `RemoteShell`; secret reader → no-echo terminal stdin |
 | provision | cobra, MCP | `RemoteShell`; `BinarySource` → local file; skills tar from `internal/skills` |
 | repo | cobra, MCP | GitHub `API` → `gh api` |
-| review | cobra, MCP (`review_request`) | `GitHub` → `gh` as the bot; `Git` → private clone; `Checks`/`Engine` → `sudo review-ci`; `Workspace` → reviewer-ci dir; `Orca` → orca CLI |
+| review | cobra, MCP (`review_request`) | `GitHub` → `gh` as the bot; `Git` → private clone; `Checks`/`Engine` → `sudo review-ci`; `Workspace` → reviewer-ci dir; `Processes` → `/proc` + pidfds; `Lock` → flock; `Orca` → orca CLI |
 | sessions | cobra, MCP | `Terminals` |
 | status | cobra, MCP | `RemoteShell`, `Terminals`, GitHub → `gh` |
 | audit | cobra, MCP | GitHub → `gh` |

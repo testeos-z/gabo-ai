@@ -23,7 +23,10 @@ func New() Runner { return Runner{} }
 // Run executes cmd and waits for it. A non-zero exit is not an error.
 func (Runner) Run(ctx context.Context, cmd kernel.Command) (kernel.Result, error) {
 	c := exec.CommandContext(ctx, cmd.Name, cmd.Args...)
-	if len(cmd.Env) > 0 {
+	switch {
+	case cmd.CleanEnv:
+		c.Env = append([]string{}, cmd.Env...)
+	case len(cmd.Env) > 0:
 		c.Env = append(os.Environ(), cmd.Env...)
 	}
 	c.Dir = cmd.Dir

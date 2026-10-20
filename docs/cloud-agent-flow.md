@@ -48,7 +48,7 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, 
    - re-reads the PR from GitHub and skips it if the head moved;
    - in its own clone, adds a per-review worktree and makes a **local test merge** of the pinned head into a fresh `origin/dev`; a conflict is a blocking verdict;
    - streams the merged tree (`git archive`) into a fresh `reviewer-ci` workspace through `sudo -n -u reviewer-ci /usr/local/libexec/gbai/review-ci`;
-   - as `reviewer-ci`, runs the configured checks (`review.checks`, argv only, no shell), then the read-only review engine (`claude` or `pi`, `runtimes.reviewer`) with the model credential piped over stdin;
+   - as `reviewer-ci`, runs the configured checks (`review.checks`, argv only, no shell), then the read-only review engine (`claude` or `pi`, `runtimes.reviewer`) with the model credential piped over stdin, a fresh empty HOME, only PATH (minus directories inside the reviewer-ci home) and no other inherited environment; leftover `reviewer-ci` processes outside the current process tree are killed (TERM, one bounded wait, KILL) before each check and before the engine, and reviews are serialized by a lock in the reviewer home;
    - computes the verdict itself from that local evidence and posts, as **vulcambot**, the statuses `reviewer/tests` and `reviewer/review` and one comment whose first line is exactly `No blocking issues found.` or `Blocking issues found.`;
    - if clean, `mode:cloud`, `review.auto_merge` and no human-only path: approves and merges pinned to the SHA;
    - removes the worktree and the workspace, and prints one summary line.

@@ -10,11 +10,13 @@ import (
 // Command is a local process invocation. Stdin, when set, is streamed to the
 // process; secrets must travel only through Stdin, never through Args or Env.
 type Command struct {
-	Name  string
-	Args  []string
-	Env   []string // extra KEY=VALUE pairs appended to the inherited environment
-	Dir   string   // working directory; empty means the current one
-	Stdin io.Reader
+	Name string
+	Args []string
+	Env  []string // extra KEY=VALUE pairs appended to the inherited environment
+	// CleanEnv makes Env the whole environment: nothing is inherited.
+	CleanEnv bool
+	Dir      string // working directory; empty means the current one
+	Stdin    io.Reader
 }
 
 // Result is the outcome of a process that ran to completion.

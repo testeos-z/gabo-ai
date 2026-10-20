@@ -15,6 +15,54 @@ import (
 type fakeWorkspace struct {
 	created map[string]string
 	removed []string
+	homes   []string
+}
+
+// fakeProcesses is an in-memory process table.
+type fakeProcesses struct {
+	t          *trace
+	self       Process
+	table      []Process
+	listErr    error
+	termErr    error
+	terminated [][]int
+}
+
+func (f *fakeProcesses) Self() Process { return f.self }
+
+func (f *fakeProcesses) List() ([]Process, error) { return f.table, f.listErr }
+
+func (f *fakeProcesses) Terminate(_ context.Context, pids []int) error {
+	f.t.add("procs.terminate %v", pids)
+	f.terminated = append(f.terminated, pids)
+	return f.termErr
+}
+
+// tracingRunner records runner calls in the shared trace.
+type tracingRunner struct {
+	*kerneltest.Runner
+	t *trace
+}
+
+func (r tracingRunner) Run(ctx context.Context, c kernel.Command) (kernel.Result, error) {
+	r.t.add("run %s", c.Name)
+	return r.Runner.Run(ctx, c)
+}
+
+func procTable() *fakeProcesses {
+	return &fakeProcesses{
+		t:    &trace{},
+		self: Process{PID: 100, PPID: 90, UID: 2001},
+		table: []Process{
+			{PID: 1, PPID: 0, UID: 0},
+			{PID: 90, PPID: 1, UID: 0},       // sudo, our parent
+			{PID: 100, PPID: 90, UID: 2001},  // ourselves
+			{PID: 101, PPID: 100, UID: 2001}, // our own child
+			{PID: 200, PPID: 1, UID: 2001},   // leftover from a previous check
+			{PID: 201, PPID: 200, UID: 2001}, // its child
+			{PID: 300, PPID: 1, UID: 2000},   // another user
+		},
+	}
 }
 
 func (f *fakeWorkspace) Create(name string, r io.Reader) (string, error) {
@@ -36,14 +84,28 @@ func (f *fakeWorkspace) Dir(name string) (string, error) {
 	return "/ci/work/" + name, nil
 }
 
+func (f *fakeWorkspace) Home(name string) (string, error) {
+	f.homes = append(f.homes, name)
+	return "/ci/work/" + name + ".home", nil
+}
+
 func (f *fakeWorkspace) Remove(name string) error {
 	f.removed = append(f.removed, name)
 	return nil
 }
 
 func newCI(r *kerneltest.Runner) (*CIUseCase, *fakeWorkspace) {
+	uc, ws, _ := newCIWith(r, &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 2001}})
+	return uc, ws
+}
+
+func newCIWith(r *kerneltest.Runner, p *fakeProcesses) (*CIUseCase, *fakeWorkspace, *trace) {
 	ws := &fakeWorkspace{}
-	return NewCIUseCase(ws, r, CIConfig{CredentialEnv: map[string]string{RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN", RuntimePi: "ANTHROPIC_API_KEY"}}), ws
+	cfg := CIConfig{
+		CredentialEnv: map[string]string{RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN", RuntimePi: "ANTHROPIC_API_KEY"},
+		Path:          "/usr/bin:/bin",
+	}
+	return NewCIUseCase(ws, tracingRunner{Runner: r, t: p.t}, p, cfg), ws, p.t
 }
 
 func TestCIRunExecsPlainArgvInWorkspace(t *testing.T) {
@@ -110,7 +172,8 @@ func TestCIEngineUsesReadOnlyArgvAndCredentialFromStdin(t *testing.T) {
 		if got := append([]string{c.Command.Name}, c.Command.Args...); !slices.Equal(got, tt.argv) {
 			t.Errorf("%s: argv = %q", tt.runtime, got)
 		}
-		if !slices.Equal(c.Command.Env, []string{tt.env}) || c.Stdin != "the prompt\nline 2" || c.Command.Dir != "/ci/work/"+wsName {
+		wantEnv := []string{"PATH=/usr/bin:/bin", "HOME=/ci/work/" + wsName + ".home", tt.env}
+		if !c.Command.CleanEnv || !slices.Equal(c.Command.Env, wantEnv) || c.Stdin != "the prompt\nline 2" || c.Command.Dir != "/ci/work/"+wsName {
 			t.Errorf("%s: env %q stdin %q dir %q", tt.runtime, c.Command.Env, c.Stdin, c.Command.Dir)
 		}
 		for _, a := range c.Command.Args {
@@ -142,5 +205,85 @@ func TestCICleanupRemovesWorkspace(t *testing.T) {
 	ci, ws := newCI(&kerneltest.Runner{})
 	if err := ci.Cleanup(wsName); err != nil || !slices.Equal(ws.removed, []string{wsName}) {
 		t.Fatalf("Cleanup() = %v, removed %v", err, ws.removed)
+	}
+}
+
+func TestCIKillsLeftoversOutsideOwnTreeBeforeEachCheckAndEngine(t *testing.T) {
+	t.Parallel()
+	procs := procTable()
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("{}")}}
+	ci, ws, tr := newCIWith(r, procs)
+	if err := ci.Prepare(wsName, strings.NewReader("")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ci.Run(context.Background(), wsName, []string{"bun", "test"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ci.Engine(context.Background(), wsName, RuntimeClaude, strings.NewReader("tok\np")); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"procs.terminate [200 201]", "run bun", "procs.terminate [200 201]", "run claude"}
+	if !slices.Equal(tr.calls, want) {
+		t.Fatalf("calls = %v, want %v", tr.calls, want)
+	}
+	if !slices.Equal(ws.homes, []string{wsName}) {
+		t.Fatalf("fresh homes = %v", ws.homes)
+	}
+}
+
+func TestCISkipsTerminateWithoutLeftovers(t *testing.T) {
+	t.Parallel()
+	procs := procTable()
+	procs.table = procs.table[:4]
+	ci, _, tr := newCIWith(&kerneltest.Runner{}, procs)
+	_ = ci.Prepare(wsName, strings.NewReader(""))
+	if _, err := ci.Run(context.Background(), wsName, []string{"true"}); err != nil || !slices.Equal(tr.calls, []string{"run true"}) {
+		t.Fatalf("err %v calls %v", err, tr.calls)
+	}
+}
+
+func TestCIRefusesToRunWhenCleanupFails(t *testing.T) {
+	t.Parallel()
+	for name, mutate := range map[string]func(*fakeProcesses){
+		"root":      func(p *fakeProcesses) { p.self.UID = 0 },
+		"list":      func(p *fakeProcesses) { p.listErr = errors.New("no /proc") },
+		"terminate": func(p *fakeProcesses) { p.termErr = errors.New("EPERM") },
+	} {
+		procs := procTable()
+		mutate(procs)
+		r := &kerneltest.Runner{}
+		ci, _, _ := newCIWith(r, procs)
+		_ = ci.Prepare(wsName, strings.NewReader(""))
+		if _, err := ci.Run(context.Background(), wsName, []string{"true"}); err == nil {
+			t.Errorf("%s: Run error = nil", name)
+		}
+		if _, err := ci.Engine(context.Background(), wsName, RuntimeClaude, strings.NewReader("tok\np")); err == nil {
+			t.Errorf("%s: Engine error = nil", name)
+		}
+		if len(r.Calls) != 0 {
+			t.Errorf("%s: commands ran: %v", name, r.Calls)
+		}
+		if name == "root" && len(procs.terminated) != 0 {
+			t.Errorf("root: terminated %v", procs.terminated)
+		}
+	}
+}
+
+func TestCIEngineDropsPathEntriesInsideTheUntrustedHome(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{}
+	ws := &fakeWorkspace{}
+	procs := &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 2001}}
+	ci := NewCIUseCase(ws, r, procs, CIConfig{
+		CredentialEnv: map[string]string{RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN"},
+		Path:          "/data/reviewer-ci/.local/bin:/usr/local/bin:bin:/data/reviewer-ci:/usr/bin",
+		UntrustedHome: "/data/reviewer-ci",
+	})
+	_ = ci.Prepare(wsName, strings.NewReader(""))
+	if _, err := ci.Engine(context.Background(), wsName, RuntimeClaude, strings.NewReader("tok\np")); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Calls[0].Command.Env[0]; got != "PATH=/usr/local/bin:/usr/bin" {
+		t.Fatalf("engine %s", got)
 	}
 }

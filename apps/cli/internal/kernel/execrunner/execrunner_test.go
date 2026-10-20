@@ -50,3 +50,16 @@ func TestRunUsesWorkingDirectory(t *testing.T) {
 		t.Fatalf("pwd = %q, want %q", got, dir)
 	}
 }
+
+func TestRunCleanEnvPassesOnlyGivenVariables(t *testing.T) {
+	t.Setenv("GBAI_LEAK_CHECK", "leaked")
+	res, err := New().Run(context.Background(), kernel.Command{
+		Name: "/usr/bin/env", Env: []string{"ONLY=1"}, CleanEnv: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(res.Stdout)); got != "ONLY=1" {
+		t.Fatalf("env = %q", got)
+	}
+}

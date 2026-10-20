@@ -83,5 +83,28 @@ type Workspace interface {
 	// Create replaces the named workspace with the tar archive read from r.
 	Create(name string, r io.Reader) (dir string, err error)
 	Dir(name string) (string, error)
+	// Home replaces the workspace's private HOME with a fresh empty directory.
+	Home(name string) (string, error)
+	// Remove deletes the workspace and its HOME.
 	Remove(name string) error
+}
+
+// Process is one entry of the process table.
+type Process struct {
+	PID, PPID, UID int
+}
+
+// Processes reads the process table and stops processes.
+type Processes interface {
+	Self() Process
+	List() ([]Process, error)
+	// Terminate sends TERM, waits once for a bounded grace period, then KILLs
+	// the survivors. Processes that are already gone are not an error.
+	Terminate(ctx context.Context, pids []int) error
+}
+
+// Lock serializes reviews: a review's checks may only kill leftovers when no
+// other review is running.
+type Lock interface {
+	Acquire(ctx context.Context) (release func(), err error)
 }

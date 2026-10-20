@@ -97,3 +97,35 @@ func TestWorkspaceRejectsEscapes(t *testing.T) {
 		}
 	}
 }
+
+func TestWorkspaceHomeIsFreshAndRemovedWithWorkspace(t *testing.T) {
+	t.Parallel()
+	ws := NewDirWorkspace(filepath.Join(t.TempDir(), "work"))
+	name := "pr-1-0123456"
+	if _, err := ws.Create(name, tarOf(t)); err != nil {
+		t.Fatal(err)
+	}
+	home, err := ws.Home(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ".planted"), []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if home, err = ws.Home(name); err != nil {
+		t.Fatal(err)
+	}
+	entries, err := os.ReadDir(home)
+	if err != nil || len(entries) != 0 {
+		t.Fatalf("home not fresh: %v, %v", entries, err)
+	}
+	if info, err := os.Stat(home); err != nil || info.Mode().Perm() != 0o700 {
+		t.Fatalf("home mode %v, %v", info, err)
+	}
+	if err := ws.Remove(name); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(home); !os.IsNotExist(err) {
+		t.Fatalf("home survived Remove: %v", err)
+	}
+}
