@@ -58,3 +58,11 @@ type Terminals interface {
 	Create(ctx context.Context, title, command string) (string, error)
 	Close(ctx context.Context, handle string) error
 }
+
+// FileSystem reads and writes local files. ReadFile reports a missing file
+// with an error matching fs.ErrNotExist.
+type FileSystem interface {
+	ReadFile(name string) ([]byte, error)
+	// WriteFile creates missing parent directories (0755) and writes data (0644).
+	WriteFile(name string, data []byte) error
+}

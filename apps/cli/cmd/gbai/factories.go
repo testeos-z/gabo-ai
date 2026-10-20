@@ -2,12 +2,17 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"os"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
 	auditadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor"
 	doctoradapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor/adapters"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision"
 	provisionadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/repo"
@@ -31,6 +36,7 @@ type factories struct {
 	status    status.Factory
 	audit     audit.Factory
 	doctor    doctor.Factory
+	init      initcmd.Factory
 }
 
 func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
@@ -56,11 +62,16 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			if err != nil {
 				return nil, err
 			}
+			skillsTar, err := skills.Tar()
+			if err != nil {
+				return nil, err
+			}
 			return provision.NewUseCase(newRemoteShell(d.runner, cfg), provisionadapters.FileBinary{}, provision.Settings{
 				Orca:       provisionAccount(cfg.Users.Orca),
 				Reviewer:   provisionAccount(cfg.Users.Reviewer),
 				ReviewerCI: provisionAccount(cfg.Users.ReviewerCI),
 				Config:     doc,
+				SkillsTar:  skillsTar,
 			}), nil
 		},
 		review: reviewFactories(d.runner, loadConfig),
@@ -104,6 +115,29 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 				Bot:         cfg.Bot.Login,
 				Coder:       cfg.Coder.Login,
 			}), nil
+		},
+		init: func(context.Context) (*initcmd.UseCase, error) {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return nil, err
+			}
+			wd, err := os.Getwd()
+			if err != nil {
+				return nil, err
+			}
+			bin, err := os.Executable()
+			if err != nil {
+				return nil, fmt.Errorf("resolve running executable: %w", err)
+			}
+			embedded, err := skills.Files()
+			if err != nil {
+				return nil, err
+			}
+			files := make([]initcmd.File, 0, len(embedded))
+			for _, f := range embedded {
+				files = append(files, initcmd.File{Path: f.Path, Data: f.Data})
+			}
+			return initcmd.NewUseCase(osfs.FS{}, d.runner, files, initcmd.Settings{Home: home, ProjectDir: wd, Binary: bin}), nil
 		},
 		doctor: func(context.Context) (*doctor.UseCase, error) {
 			cfg, err := loadConfig()

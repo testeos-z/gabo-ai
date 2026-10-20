@@ -4,6 +4,7 @@ package kerneltest
 import (
 	"context"
 	"io"
+	"io/fs"
 	"strconv"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
@@ -131,5 +132,36 @@ func (t *Terminals) Close(_ context.Context, handle string) error {
 			break
 		}
 	}
+	return nil
+}
+
+// FS is a fake kernel.FileSystem over an in-memory map of path to content.
+type FS struct {
+	Files    map[string]string
+	WriteErr error
+	Writes   []string
+}
+
+var _ kernel.FileSystem = (*FS)(nil)
+
+// ReadFile returns the content or an error matching fs.ErrNotExist.
+func (f *FS) ReadFile(name string) ([]byte, error) {
+	s, ok := f.Files[name]
+	if !ok {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	return []byte(s), nil
+}
+
+// WriteFile records the write and stores the content.
+func (f *FS) WriteFile(name string, data []byte) error {
+	f.Writes = append(f.Writes, name)
+	if f.WriteErr != nil {
+		return f.WriteErr
+	}
+	if f.Files == nil {
+		f.Files = map[string]string{}
+	}
+	f.Files[name] = string(data)
 	return nil
 }

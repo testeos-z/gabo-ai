@@ -17,6 +17,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/railwayssh"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/mcp"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/repo"
@@ -61,6 +62,7 @@ func newRootCommand(d deps) *cobra.Command {
 	root.AddCommand(status.NewCommand(f.status))
 	root.AddCommand(audit.NewCommand(f.audit, time.Now))
 	root.AddCommand(doctor.NewCommand(f.doctor))
+	root.AddCommand(initcmd.NewCommand(f.init))
 	root.AddCommand(mcp.NewCommand(mcp.NewTools(mcpPorts(f), secrets.Names(), time.Now), serverVersion(d.version)))
 	return root
 }

@@ -105,3 +105,25 @@ visudo -cf "$tmp"
 mv -f "$tmp" {{q .SudoersPath}}
 trap - EXIT
 {{end}}
+
+{{define "skills" -}}
+# step: skills
+set -eu
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+tar -x --no-same-owner --no-same-permissions -C "$tmp" -f -
+chmod -R u=rwX,go=rX "$tmp"
+# Copy as the orca user so root never writes through paths orca controls.
+setpriv --reuid={{q .Orca.Name}} --regid="$(id -g {{q .Orca.Name}})" --init-groups env HOME={{q .Orca.Home}} sh -eu -c '
+src=$1; shift
+for dest in "$@"; do
+  mkdir -p "$dest"
+  for d in "$src"/*/; do
+    n=$(basename "$d")
+    rm -rf "$dest/.$n.gbai-new"
+    cp -R "$d" "$dest/.$n.gbai-new"
+    rm -rf "$dest/$n"
+    mv "$dest/.$n.gbai-new" "$dest/$n"
+  done
+done' gbai-skills "$tmp" {{range .SkillDirs}}{{q .}} {{end}}
+{{end}}

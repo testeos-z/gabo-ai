@@ -47,7 +47,7 @@ func TestCommandDefaultsToRunningExecutable(t *testing.T) {
 	if len(bin.calls) != 1 || bin.calls[0] != "/proc/self/exe" {
 		t.Fatalf("ReadBinary calls = %v", bin.calls)
 	}
-	if !strings.HasSuffix(out, "ok sudoers\n") {
+	if !strings.HasSuffix(out, "ok sudoers\nok skills\n") {
 		t.Fatalf("output = %q", out)
 	}
 }

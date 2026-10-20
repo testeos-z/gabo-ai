@@ -23,7 +23,8 @@ func NewCommand(factory Factory, defaultBinary DefaultBinary) *cobra.Command {
 		Long: "Prepare the server for the reviewer flow, as root and idempotently:\n" +
 			"packages (sudo, git), the reviewer and reviewer-ci users, " + ConfigPath + ",\n" +
 			"the gbai binary at " + BinaryPath + ", the review wrappers under /usr/local/libexec/gbai\n" +
-			"and the sudoers drop-in " + SudoersPath + " (validated with visudo before install).\n\n" +
+			"the sudoers drop-in " + SudoersPath + " (validated with visudo before install) and the\n" +
+			"embedded gbai skills for the orca user (claude and pi skill dirs; gbai-owned skills are replaced).\n\n" +
 			"Secrets are not handled here: use `gbai secrets set`.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

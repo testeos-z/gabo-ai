@@ -39,7 +39,7 @@ var (
 	scripts    = template.Must(template.New("").Funcs(template.FuncMap{"q": shellQuote}).ParseFS(templateFS, "provision.sh.tmpl"))
 	userName   = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 	safePath   = regexp.MustCompile(`^/[A-Za-z0-9._/'-]*$`)
-	stepOrder  = []string{"packages", "users", "config", "binary", "wrappers", "sudoers"}
+	stepOrder  = []string{"packages", "users", "config", "binary", "wrappers", "sudoers", "skills"}
 )
 
 // Account is an OS user on the server. Path entries are prepended to the system PATH.
@@ -56,6 +56,7 @@ type Settings struct {
 	Reviewer   Account
 	ReviewerCI Account
 	Config     []byte // gbai.yaml installed at ConfigPath; must not contain secrets
+	SkillsTar  []byte // tar of the embedded skills, installed for the orca user
 }
 
 // Input selects the binary to install and whether to only print the plan.
@@ -106,8 +107,11 @@ func (u *UseCase) Run(ctx context.Context, in Input) (Output, error) {
 	out := Output{}
 	for _, s := range steps {
 		script := kernel.Script{User: kernel.RootUser, Body: s.body}
-		if s.name == "binary" {
+		switch s.name {
+		case "binary":
 			script.Stdin = bytes.NewReader(bin)
+		case "skills":
+			script.Stdin = bytes.NewReader(u.settings.SkillsTar)
 		}
 		res, err := u.shell.Exec(ctx, script)
 		if err != nil {
@@ -140,6 +144,7 @@ type view struct {
 	BinaryPath, ConfigPath     string
 	ReviewRun, ReviewCI        string
 	SudoersPath                string
+	SkillDirs                  []string
 }
 
 func render(s Settings) ([]step, error) {
@@ -166,6 +171,7 @@ func render(s Settings) ([]step, error) {
 		ReviewRun: ReviewRun, ReviewCI: ReviewCI, SudoersPath: SudoersPath,
 	}
 	v.Managed = []account{v.Reviewer, v.ReviewerCI}
+	v.SkillDirs = []string{path.Join(s.Orca.Home, ".claude", "skills"), path.Join(s.Orca.Home, ".pi", "agent", "skills")}
 
 	steps := make([]step, 0, len(stepOrder))
 	for _, name := range stepOrder {

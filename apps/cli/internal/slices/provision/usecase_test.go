@@ -29,6 +29,7 @@ func settings() Settings {
 		Reviewer:   Account{Name: "reviewer", Home: "/data/reviewer", UID: 2000},
 		ReviewerCI: Account{Name: "reviewer-ci", Home: "/data/reviewer-ci", UID: 2001, Path: []string{"/data/reviewer-ci/.local/bin"}},
 		Config:     []byte("repo:\n  name: o/r\n"),
+		SkillsTar:  []byte("SKILLS-TAR"),
 	}
 }
 
@@ -70,7 +71,7 @@ func TestRunExecutesEveryStepAsRootInOrder(t *testing.T) {
 	t.Parallel()
 	shell := &kerneltest.RemoteShell{}
 	out := run(t, shell, &fakeBinary{data: linuxELF(t)}, Input{BinaryPath: "/tmp/gbai"})
-	want := []string{"packages", "users", "config", "binary", "wrappers", "sudoers"}
+	want := []string{"packages", "users", "config", "binary", "wrappers", "sudoers", "skills"}
 	if len(shell.Calls) != len(want) {
 		t.Fatalf("calls = %d, want %d", len(shell.Calls), len(want))
 	}
@@ -143,8 +144,9 @@ func TestBinaryIsStreamedOverStdinAndInstalledAtomically(t *testing.T) {
 		}
 	}
 	for _, c := range shell.Calls {
-		if c.Script.Body != script(t, shell, "binary").Script.Body && c.Stdin != "" {
-			t.Errorf("only the binary step may read stdin")
+		streams := c.Script.Body == script(t, shell, "binary").Script.Body || c.Script.Body == script(t, shell, "skills").Script.Body
+		if !streams && c.Stdin != "" {
+			t.Errorf("only the binary and skills steps may read stdin")
 		}
 	}
 }
@@ -222,7 +224,7 @@ func TestDryRunPrintsPlanWithoutReadingOrExecuting(t *testing.T) {
 		t.Fatalf("dry run touched remote (%d) or binary (%d)", len(shell.Calls), len(bin.calls))
 	}
 	text := strings.Join(out.Lines, "\n")
-	for _, name := range []string{"packages", "users", "config", "binary", "wrappers", "sudoers"} {
+	for _, name := range []string{"packages", "users", "config", "binary", "wrappers", "sudoers", "skills"} {
 		if !strings.Contains(text, "# step: "+name) {
 			t.Errorf("plan missing step %s", name)
 		}
@@ -270,5 +272,33 @@ func TestQuotesValuesFromConfig(t *testing.T) {
 	}
 	if body := script(t, shell, "users").Script.Body; !strings.Contains(body, `'/data/it'\''s'`) {
 		t.Fatalf("home not shell-quoted:\n%s", body)
+	}
+}
+
+func TestSkillsAreStreamedAndCopiedAsOrca(t *testing.T) {
+	t.Parallel()
+	shell := &kerneltest.RemoteShell{}
+	run(t, shell, &fakeBinary{data: linuxELF(t)}, Input{BinaryPath: "/tmp/gbai"})
+	call := script(t, shell, "skills")
+	if call.Stdin != "SKILLS-TAR" {
+		t.Fatalf("stdin = %q", call.Stdin)
+	}
+	body := call.Script.Body
+	for _, want := range []string{
+		"tmp=$(mktemp -d)", "tar -x --no-same-owner --no-same-permissions -C \"$tmp\" -f -",
+		"setpriv --reuid='orca' --regid=\"$(id -g 'orca')\" --init-groups",
+		"'/data/home/.claude/skills' '/data/home/.pi/agent/skills'",
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("skills script missing %q:\n%s", want, body)
+		}
+	}
+	if strings.Contains(body, "chown -R") {
+		t.Errorf("root must not chown into the orca home:\n%s", body)
+	}
+	for _, c := range shell.Calls {
+		if c.Stdin == "SKILLS-TAR" && !strings.HasPrefix(c.Script.Body, "# step: skills") {
+			t.Errorf("skills tar sent to another step")
+		}
 	}
 }
