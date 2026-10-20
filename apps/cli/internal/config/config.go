@@ -121,6 +121,15 @@ func Parse(b []byte) (Config, error) {
 	return cfg, nil
 }
 
+// Marshal encodes the validated config, defaults included, as YAML.
+func (c Config) Marshal() ([]byte, error) {
+	b, err := yaml.Marshal(c)
+	if err != nil {
+		return nil, fmt.Errorf("encode config: %w", err)
+	}
+	return b, nil
+}
+
 func (c *Config) applyDefaults() {
 	defaultUser(&c.Users.Orca, User{Name: "orca", Home: "/data/home", ExtraPath: []string{"/data/home/.local/bin"}})
 	defaultUser(&c.Users.Reviewer, User{Name: "reviewer", Home: "/data/reviewer", UID: 2000})

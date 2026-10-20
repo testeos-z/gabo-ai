@@ -15,7 +15,7 @@ func TestRootHelpListsVersion(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, name := range []string{"version", "secrets"} {
+	for _, name := range []string{"version", "secrets", "provision"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help output does not list %s command:\n%s", name, out.String())
 		}
@@ -42,5 +42,21 @@ func TestSecretsSetFailsWithoutConfigBeforeReadingValue(t *testing.T) {
 	root.SetArgs([]string{"--config", t.TempDir() + "/missing.yaml", "secrets", "set", "reviewer-pi"})
 	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "config") {
 		t.Fatalf("Execute() error = %v, want config error", err)
+	}
+}
+
+func TestProvisionDryRunPrintsPlanFromExampleConfig(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetOut(&out)
+	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "provision", "--dry-run"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	for _, want := range []string{"# step: packages", "orca ALL=(reviewer) NOPASSWD: /usr/local/libexec/gbai/review-run"} {
+		if !strings.Contains(out.String(), want) {
+			t.Fatalf("plan missing %q:\n%s", want, out.String())
+		}
 	}
 }

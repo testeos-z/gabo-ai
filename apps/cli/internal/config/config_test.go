@@ -119,3 +119,22 @@ func TestLoadMissingFile(t *testing.T) {
 		t.Fatalf("Load() error = %v, want not-exist", err)
 	}
 }
+
+func TestMarshalRoundTrips(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := cfg.Marshal()
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	again, err := Parse(b)
+	if err != nil {
+		t.Fatalf("Parse(Marshal()) error = %v\n%s", err, b)
+	}
+	if again.Repo != cfg.Repo || again.Users.Reviewer.UID != cfg.Users.Reviewer.UID {
+		t.Fatalf("round trip = %+v, want %+v", again, cfg)
+	}
+}

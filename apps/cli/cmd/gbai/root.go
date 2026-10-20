@@ -10,6 +10,8 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/railwayssh"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision"
+	provisionadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/secrets"
 	secretsadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/secrets/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/version"
@@ -48,7 +50,27 @@ func newRootCommand(d deps) *cobra.Command {
 			secrets.Account{Name: reviewer.Name, Home: reviewer.Home},
 		), nil
 	}))
+	root.AddCommand(provision.NewCommand(func(context.Context) (*provision.UseCase, error) {
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, err
+		}
+		doc, err := cfg.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		return provision.NewUseCase(newRemoteShell(d.runner, cfg), provisionadapters.FileBinary{}, provision.Settings{
+			Orca:       provisionAccount(cfg.Users.Orca),
+			Reviewer:   provisionAccount(cfg.Users.Reviewer),
+			ReviewerCI: provisionAccount(cfg.Users.ReviewerCI),
+			Config:     doc,
+		}), nil
+	}, os.Executable))
 	return root
+}
+
+func provisionAccount(u config.User) provision.Account {
+	return provision.Account{Name: u.Name, Home: u.Home, UID: u.UID, Path: u.ExtraPath}
 }
 
 func newRemoteShell(runner kernel.Runner, cfg config.Config) *railwayssh.Shell {
