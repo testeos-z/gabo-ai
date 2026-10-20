@@ -6,9 +6,17 @@ Read `docs/cloud-agent-flow.md` before any change: it defines the agent flow, th
 
 ## Stack
 
-- Bun workspaces + Turborepo (`apps/*`, `packages/*`); root scripts only delegate via `turbo run`.
-- TypeScript, single latest version repo-wide; `tsconfig.base.json` is the shared base.
+- Codebase is Go: one module at `apps/cli` (`github.com/testeos-z/gbai-team/apps/cli`) producing a single binary `gbai` that is both the CLI and the MCP server.
+- Bun workspaces + Turborepo (`apps/*`, `packages/*`) only orchestrate tasks; root scripts delegate via `turbo run`, and each workspace `package.json` delegates `build`, `test`, `lint` and `check-types` to the Go toolchain.
+- `tsconfig.base.json` stays as the shared base for any future TypeScript package.
 - No OpenTUI for now.
+
+## Layout (hexagonal, vertical slices)
+
+- `cmd/gbai/main.go` is the only composition root: it builds driven adapters, injects them into slice use cases and registers the driving adapters (cobra commands, MCP tools).
+- `internal/kernel/`: ports shared by several slices (our own types), with driven adapters in subpackages and hand-written fakes in `internal/kernel/kerneltest`.
+- `internal/config/`: loads and validates `gbai.yaml`.
+- `internal/slices/<name>/`: `usecase.go` (core logic and domain types), `ports.go` (slice-specific ports), `command.go` (driving adapter), `adapters/` (slice-specific driven adapters). The core never imports cobra, `os/exec` or adapters; use-case tests use hand-written in-memory fakes.
 
 ## Conventions
 

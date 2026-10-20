@@ -1,0 +1,10 @@
+{
+  "name": "@gbai-team/cli",
+  "private": true,
+  "scripts": {
+    "build": "go build -o dist/gbai ./cmd/gbai",
+    "test": "go test ./...",
+    "lint": "go vet ./... && test -z \"$(gofmt -l .)\"",
+    "check-types": "go build ./..."
+  }
+}
