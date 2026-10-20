@@ -7,13 +7,20 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/execrunner"
 )
 
 // buildVersion is injected at build time with -ldflags "-X main.buildVersion=<v>".
 var buildVersion = ""
 
 func main() {
-	root := newRootCommand(deps{version: buildVersion})
+	root := newRootCommand(deps{
+		version: buildVersion,
+		runner:  execrunner.New(),
+		stdin:   os.Stdin,
+		stderr:  os.Stderr,
+	})
 	if err := root.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, "gbai:", err)
 		os.Exit(1)
