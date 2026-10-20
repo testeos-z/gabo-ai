@@ -1,0 +1,33 @@
+# gbai configuration for the vulcam cloud server (Railway "vulcam cloud").
+# Copy to gbai.yaml. Secrets never go here: use `gbai secrets set`.
+server:
+  railway:
+    project_id: 21669483-8aa3-4bc9-8b1c-63d1785a857b
+    environment_id: 5bea8b6f-afec-471f-a757-fc57979b7a24
+    service_id: fb7c97ca-82e3-4554-8463-1d00e95fa57f
+
+users:
+  orca:
+    name: orca
+    home: /data/home
+    extra_path: [/data/home/.local/bin]
+  reviewer:
+    name: reviewer
+    home: /data/reviewer
+    uid: 2000
+  reviewer_ci:
+    name: reviewer-ci
+    home: /data/reviewer-ci
+    uid: 2001
+
+runtimes:
+  coder: claude
+  reviewer: pi
+  assistant: claude
+
+repo:
+  name: cappy-lab/vulcam
+  integration_branch: dev
+
+bot:
+  login: vulcambot
