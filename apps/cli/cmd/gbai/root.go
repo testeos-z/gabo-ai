@@ -16,20 +16,15 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/orcacli"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/railwayssh"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
-	auditadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor"
-	doctoradapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor/adapters"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/mcp"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision"
-	provisionadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/repo"
-	repoadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/repo/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/review"
 	reviewadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/review/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/secrets"
-	secretsadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/secrets/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/sessions"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/status"
-	statusadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/status/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/version"
 )
 
@@ -56,94 +51,17 @@ func newRootCommand(d deps) *cobra.Command {
 		return config.Load(resolveConfigPath(configPath, root.PersistentFlags().Changed("config")))
 	}
 
+	f := newFactories(d, loadConfig)
 	root.AddCommand(version.NewCommand(version.NewUseCase(d.version)))
-	root.AddCommand(secrets.NewCommand(func(context.Context) (*secrets.UseCase, error) {
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, err
-		}
-		reviewer := cfg.Users.Reviewer
-		return secrets.NewUseCase(
-			newRemoteShell(d.runner, cfg),
-			secretsadapters.NewStdinReader(d.stdin, d.stderr),
-			secrets.Account{Name: reviewer.Name, Home: reviewer.Home},
-		), nil
-	}))
-	root.AddCommand(provision.NewCommand(func(context.Context) (*provision.UseCase, error) {
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, err
-		}
-		doc, err := cfg.Marshal()
-		if err != nil {
-			return nil, err
-		}
-		return provision.NewUseCase(newRemoteShell(d.runner, cfg), provisionadapters.FileBinary{}, provision.Settings{
-			Orca:       provisionAccount(cfg.Users.Orca),
-			Reviewer:   provisionAccount(cfg.Users.Reviewer),
-			ReviewerCI: provisionAccount(cfg.Users.ReviewerCI),
-			Config:     doc,
-		}), nil
-	}, os.Executable))
-	root.AddCommand(review.NewCommand(reviewFactories(d.runner, loadConfig)))
-	root.AddCommand(repo.NewCommand(func(context.Context) (*repo.UseCase, error) {
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, err
-		}
-		return repo.NewUseCase(repoadapters.NewAPI(d.runner), repo.Settings{
-			Repo:        cfg.Repo.Name,
-			Integration: cfg.Repo.IntegrationBranch,
-		}), nil
-	}))
-	root.AddCommand(sessions.NewCommand(func(_ context.Context, mode sessions.Mode) (*sessions.UseCase, error) {
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, err
-		}
-		return sessions.NewUseCase(newTerminals(d.runner, cfg, string(mode)), sessions.Settings{
-			sessions.RoleCoder:     {Runtime: string(cfg.Runtimes.Coder), PromptFile: cfg.Sessions.Coder.PromptFile},
-			sessions.RoleReviewer:  {Runtime: string(cfg.Runtimes.Reviewer), PromptFile: cfg.Sessions.Reviewer.PromptFile},
-			sessions.RoleAssistant: {Runtime: string(cfg.Runtimes.Assistant), PromptFile: cfg.Sessions.Assistant.PromptFile},
-		}), nil
-	}))
-	root.AddCommand(status.NewCommand(func(_ context.Context, mode string) (*status.UseCase, error) {
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, err
-		}
-		return status.NewUseCase(newRemoteShell(d.runner, cfg), newTerminals(d.runner, cfg, mode),
-			statusadapters.NewGitHub(d.runner, cfg.Repo.Name),
-			status.Settings{Integration: cfg.Repo.IntegrationBranch, Bot: cfg.Bot.Login}), nil
-	}))
-	root.AddCommand(audit.NewCommand(func(context.Context) (*audit.UseCase, error) {
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, err
-		}
-		return audit.NewUseCase(auditadapters.NewGitHub(d.runner, cfg.Repo.Name), audit.Settings{
-			Integration: cfg.Repo.IntegrationBranch,
-			Bot:         cfg.Bot.Login,
-			Coder:       cfg.Coder.Login,
-		}), nil
-	}, time.Now))
-	root.AddCommand(doctor.NewCommand(func(context.Context) (*doctor.UseCase, error) {
-		cfg, err := loadConfig()
-		if err != nil {
-			return nil, err
-		}
-		users := make([]doctor.User, 0, 3)
-		for _, u := range cfg.Users.All() {
-			users = append(users, doctor.User{Name: u.Name, UID: u.UID})
-		}
-		return doctor.NewUseCase(doctoradapters.Path{}, d.runner, newRemoteShell(d.runner, cfg), doctor.Settings{
-			LocalOrca:    cfg.Sessions.LocalOrca,
-			Remote:       cfg.Server.Railway.ServiceID != "",
-			Users:        users,
-			OrcaUser:     cfg.Users.Orca.Name,
-			ReviewerHome: cfg.Users.Reviewer.Home,
-		}), nil
-	}))
+	root.AddCommand(secrets.NewCommand(f.secrets))
+	root.AddCommand(provision.NewCommand(f.provision, os.Executable))
+	root.AddCommand(review.NewCommand(f.review))
+	root.AddCommand(repo.NewCommand(f.repo))
+	root.AddCommand(sessions.NewCommand(f.sessions))
+	root.AddCommand(status.NewCommand(f.status))
+	root.AddCommand(audit.NewCommand(f.audit, time.Now))
+	root.AddCommand(doctor.NewCommand(f.doctor))
+	root.AddCommand(mcp.NewCommand(mcp.NewTools(mcpPorts(f), secrets.Names(), time.Now), serverVersion(d.version)))
 	return root
 }
 
@@ -235,4 +153,12 @@ func newRemoteShell(runner kernel.Runner, cfg config.Config) *railwayssh.Shell {
 		EnvironmentID: r.EnvironmentID,
 		ServiceID:     r.ServiceID,
 	}, users)
+}
+
+// serverVersion is the version announced by the MCP server.
+func serverVersion(v string) string {
+	if v == "" {
+		return "dev"
+	}
+	return v
 }
