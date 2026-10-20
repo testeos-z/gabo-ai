@@ -44,3 +44,17 @@ type Script struct {
 type RemoteShell interface {
 	Exec(ctx context.Context, s Script) (Result, error)
 }
+
+// Terminal is a live Orca-managed terminal.
+type Terminal struct {
+	Handle string `json:"handle"`
+	Title  string `json:"title"`
+}
+
+// Terminals manages Orca terminals on the host that runs the sessions.
+type Terminals interface {
+	List(ctx context.Context) ([]Terminal, error)
+	// Create opens a terminal running command and returns orca's raw output.
+	Create(ctx context.Context, title, command string) (string, error)
+	Close(ctx context.Context, handle string) error
+}

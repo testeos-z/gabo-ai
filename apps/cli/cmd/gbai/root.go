@@ -7,12 +7,18 @@ import (
 	"io/fs"
 	"os"
 	"path"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/orcacli"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/railwayssh"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
+	auditadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit/adapters"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor"
+	doctoradapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision"
 	provisionadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/provision/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/repo"
@@ -21,6 +27,9 @@ import (
 	reviewadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/review/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/secrets"
 	secretsadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/secrets/adapters"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/sessions"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/status"
+	statusadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/status/adapters"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/version"
 )
 
@@ -87,7 +96,63 @@ func newRootCommand(d deps) *cobra.Command {
 			Integration: cfg.Repo.IntegrationBranch,
 		}), nil
 	}))
+	root.AddCommand(sessions.NewCommand(func(_ context.Context, mode sessions.Mode) (*sessions.UseCase, error) {
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, err
+		}
+		return sessions.NewUseCase(newTerminals(d.runner, cfg, string(mode)), sessions.Settings{
+			sessions.RoleCoder:     {Runtime: string(cfg.Runtimes.Coder), PromptFile: cfg.Sessions.Coder.PromptFile},
+			sessions.RoleReviewer:  {Runtime: string(cfg.Runtimes.Reviewer), PromptFile: cfg.Sessions.Reviewer.PromptFile},
+			sessions.RoleAssistant: {Runtime: string(cfg.Runtimes.Assistant), PromptFile: cfg.Sessions.Assistant.PromptFile},
+		}), nil
+	}))
+	root.AddCommand(status.NewCommand(func(_ context.Context, mode string) (*status.UseCase, error) {
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, err
+		}
+		return status.NewUseCase(newRemoteShell(d.runner, cfg), newTerminals(d.runner, cfg, mode),
+			statusadapters.NewGitHub(d.runner, cfg.Repo.Name),
+			status.Settings{Integration: cfg.Repo.IntegrationBranch, Bot: cfg.Bot.Login}), nil
+	}))
+	root.AddCommand(audit.NewCommand(func(context.Context) (*audit.UseCase, error) {
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, err
+		}
+		return audit.NewUseCase(auditadapters.NewGitHub(d.runner, cfg.Repo.Name), audit.Settings{
+			Integration: cfg.Repo.IntegrationBranch,
+			Bot:         cfg.Bot.Login,
+			Coder:       cfg.Coder.Login,
+		}), nil
+	}, time.Now))
+	root.AddCommand(doctor.NewCommand(func(context.Context) (*doctor.UseCase, error) {
+		cfg, err := loadConfig()
+		if err != nil {
+			return nil, err
+		}
+		users := make([]doctor.User, 0, 3)
+		for _, u := range cfg.Users.All() {
+			users = append(users, doctor.User{Name: u.Name, UID: u.UID})
+		}
+		return doctor.NewUseCase(doctoradapters.Path{}, d.runner, newRemoteShell(d.runner, cfg), doctor.Settings{
+			LocalOrca:    cfg.Sessions.LocalOrca,
+			Remote:       cfg.Server.Railway.ServiceID != "",
+			Users:        users,
+			OrcaUser:     cfg.Users.Orca.Name,
+			ReviewerHome: cfg.Users.Reviewer.Home,
+		}), nil
+	}))
 	return root
+}
+
+// newTerminals reaches Orca on the server as the orca user (cloud) or on this machine (local).
+func newTerminals(runner kernel.Runner, cfg config.Config, mode string) kernel.Terminals {
+	if mode == "local" {
+		return orcacli.NewLocal(runner, cfg.Sessions.LocalOrca)
+	}
+	return orcacli.NewRemote(newRemoteShell(runner, cfg), cfg.Users.Orca.Name)
 }
 
 const defaultConfigPath = "gbai.yaml"

@@ -30,6 +30,31 @@ type Config struct {
 	Repo     Repo     `yaml:"repo"`
 	Bot      Bot      `yaml:"bot"`
 	Review   Review   `yaml:"review"`
+	Coder    Coder    `yaml:"coder"`
+	Sessions Sessions `yaml:"sessions"`
+}
+
+// Coder is the GitHub identity the coder pushes with; it must never merge.
+// An empty Login skips the coder-merge audit rule.
+type Coder struct {
+	Login string `yaml:"login"`
+}
+
+// Sessions configures the long-lived Orca agent sessions.
+type Sessions struct {
+	// LocalOrca is the Orca CLI used in local mode (orca-ide on Linux
+	// desktops where orca is the screen reader).
+	LocalOrca string  `yaml:"local_orca"`
+	Coder     Session `yaml:"coder"`
+	Reviewer  Session `yaml:"reviewer"`
+	Assistant Session `yaml:"assistant"`
+}
+
+// Session configures one role's session.
+type Session struct {
+	// PromptFile, when set, is read on the session host and passed as the
+	// startup prompt.
+	PromptFile string `yaml:"prompt_file"`
 }
 
 // Server locates the cloud server.
@@ -114,6 +139,7 @@ var (
 	repoPattern   = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 	branchPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 	loginPattern  = regexp.MustCompile(`^[A-Za-z0-9-]+(\[bot\])?$`)
+	filePattern   = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 )
 
 // Load reads and validates the config file at path.
@@ -168,6 +194,7 @@ func (c *Config) applyDefaults() {
 		c.Review.HumanOnlyPaths = []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}
 	}
 	defaultString(&c.Review.PiCredentialEnv, "ANTHROPIC_API_KEY")
+	defaultString(&c.Sessions.LocalOrca, "orca")
 }
 
 func defaultUser(u *User, d User) {
@@ -229,5 +256,10 @@ func (c Config) validate() error {
 		check(ok, "review.human_only_paths", fmt.Sprintf("entry %q must be a relative repository path", p))
 	}
 	check(envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
+	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")
+	check(filePattern.MatchString(c.Sessions.LocalOrca), "sessions.local_orca", "must be a command name or path")
+	for key, s := range map[string]Session{"coder": c.Sessions.Coder, "reviewer": c.Sessions.Reviewer, "assistant": c.Sessions.Assistant} {
+		check(s.PromptFile == "" || filePattern.MatchString(s.PromptFile), "sessions."+key+".prompt_file", "must be a path of safe characters")
+	}
 	return errors.Join(errs...)
 }

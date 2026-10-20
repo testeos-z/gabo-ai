@@ -190,3 +190,30 @@ func TestParseReviewValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestParseSessionsAndCoder(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if cfg.Sessions.LocalOrca != "orca" || cfg.Coder.Login != "" {
+		t.Fatalf("defaults: sessions = %+v coder = %+v", cfg.Sessions, cfg.Coder)
+	}
+	cfg, err = Parse([]byte(minimal + "coder:\n  login: vulcam-coder\nsessions:\n  local_orca: orca-ide\n  coder:\n    prompt_file: /data/home/prompts/coder.md\n"))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if cfg.Coder.Login != "vulcam-coder" || cfg.Sessions.LocalOrca != "orca-ide" || cfg.Sessions.Coder.PromptFile != "/data/home/prompts/coder.md" {
+		t.Fatalf("explicit: sessions = %+v coder = %+v", cfg.Sessions, cfg.Coder)
+	}
+	for name, doc := range map[string]string{
+		"sessions.coder.prompt_file": minimal + "sessions:\n  coder:\n    prompt_file: \"a;b\"\n",
+		"sessions.local_orca":        minimal + "sessions:\n  local_orca: \"orca ide\"\n",
+		"coder.login":                minimal + "coder:\n  login: \"bad login\"\n",
+	} {
+		if _, err := Parse([]byte(doc)); err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s: error = %v", name, err)
+		}
+	}
+}

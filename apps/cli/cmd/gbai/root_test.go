@@ -15,7 +15,7 @@ func TestRootHelpListsVersion(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, name := range []string{"version", "secrets", "provision", "review"} {
+	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help output does not list %s command:\n%s", name, out.String())
 		}
@@ -98,5 +98,28 @@ func TestRepoSetupDryRunFromExampleConfig(t *testing.T) {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("plan missing %q:\n%s", want, out.String())
 		}
+	}
+}
+
+func TestAuditHelpSaysOnlyGitHubIsAudited(t *testing.T) {
+	t.Parallel()
+	var out bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetOut(&out)
+	root.SetArgs([]string{"audit", "--help"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "Only GitHub is audited") {
+		t.Fatalf("help:\n%s", out.String())
+	}
+}
+
+func TestSessionsRejectsBadModeWithoutConfig(t *testing.T) {
+	t.Parallel()
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetArgs([]string{"--config", t.TempDir() + "/missing.yaml", "sessions", "start", "--mode", "hybrid"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "mode") {
+		t.Fatalf("Execute() error = %v", err)
 	}
 }

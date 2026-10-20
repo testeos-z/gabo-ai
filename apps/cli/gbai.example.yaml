@@ -56,3 +56,15 @@ review:
     - agents/
   # Env var that receives the pi model credential (claude uses CLAUDE_CODE_OAUTH_TOKEN).
   pi_credential_env: ANTHROPIC_API_KEY
+
+# GitHub login the coder pushes with; `gbai audit` flags any merge by it.
+# coder:
+#   login: vulcam-coder
+
+# `gbai sessions start|stop` (Orca terminals gbai-coder, gbai-reviewer, gbai-assistant).
+sessions:
+  # Orca CLI for --mode local; use orca-ide on Linux desktops where orca is the screen reader.
+  local_orca: orca
+  # Optional startup prompt files, read on the host that runs the session.
+  # coder:
+  #   prompt_file: /data/home/prompts/coder.md
