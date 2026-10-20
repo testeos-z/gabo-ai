@@ -20,9 +20,12 @@ func fakePorts(c *calls) Ports {
 		return func(context.Context) (any, error) { c.add(name); return name + "-data", nil }
 	}
 	return Ports{
-		Status:         func(_ context.Context, mode string) (any, error) { c.add("status " + mode); return "snap", nil },
-		Doctor:         ret("doctor"),
-		Audit:          func(_ context.Context, since time.Time) (any, error) { c.add("audit " + since.Format("2006-01-02")); return "rep", nil },
+		Status: func(_ context.Context, mode string) (any, error) { c.add("status " + mode); return "snap", nil },
+		Doctor: ret("doctor"),
+		Audit: func(_ context.Context, since time.Time) (any, error) {
+			c.add("audit " + since.Format("2006-01-02"))
+			return "rep", nil
+		},
 		ProvisionPlan:  ret("provision-plan"),
 		ProvisionApply: ret("provision-apply"),
 		RepoSetupPlan:  ret("repo-plan"),

@@ -3,8 +3,8 @@ package mcp
 import (
 	"bufio"
 	"context"
-	"io"
 	"encoding/json"
+	"io"
 	"slices"
 	"strings"
 	"testing"
