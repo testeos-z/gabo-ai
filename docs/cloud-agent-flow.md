@@ -16,7 +16,7 @@ gbai-team is the CLI and harness that provisions and operates autonomous coding 
 3. **The reviewer's verdict is computed inside the reviewer boundary**, from the PR head it checks out. Messages are notifications only and can never decide a verdict.
 4. **Secrets never live in service-wide environment variables** that the coding agent can read. The reviewer's GitHub token lives in a 0600 file owned by a separate OS user.
 5. Merges go to `dev` only, never `main`, pinned to the reviewed head SHA, never for human-only paths (`.claude/`, `.github/`, `.opencode/`, `AGENTS.md`, `CLAUDE.md`, `docs/policies/`, `tools/hook-tests/`, `agents/`).
-6. Never delete anything (branches, files, data). Never force-push.
+6. Clean up, never lose work: merged branches and finished worktrees (coder and reviewer) are removed by the wrk prune step or the review cleanup; unmerged branches, data and history are never deleted. In cloud mode this is automatic: reviewer worktrees are removed right after the verdict is posted, and coder branches and worktrees only once GitHub confirms the PR is merged; local mode keeps the human approval of the prune step. Never force-push.
 
 ## Components
 

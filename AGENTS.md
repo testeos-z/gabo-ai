@@ -2,7 +2,7 @@
 
 CLI and harness to provision and operate autonomous cloud coding agents (first target: cappy-lab/vulcam).
 
-Read `docs/cloud-agent-flow.md` before any change: it defines the agent flow, the hard rules (no polling loops, separation of duties, secrets via stdin only, never delete), the server layout, and what the CLI must automate.
+Read `docs/cloud-agent-flow.md` before any change: it defines the agent flow, the hard rules (no polling loops, separation of duties, secrets via stdin only, cleanup of merged branches and finished worktrees only), the server layout, and what the CLI must automate.
 
 ## Stack
 
