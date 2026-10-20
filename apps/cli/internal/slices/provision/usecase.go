@@ -22,10 +22,10 @@ import (
 
 // Fixed install locations on the server.
 const (
-	BinaryPath  = "/usr/local/bin/gbai"
-	ConfigPath  = "/etc/gbai/gbai.yaml"
-	ReviewRun   = "/usr/local/libexec/gbai/review-run"
-	ReviewCI    = "/usr/local/libexec/gbai/review-ci"
+	BinaryPath  = kernel.ServerBinaryPath
+	ConfigPath  = kernel.ServerConfigPath
+	ReviewRun   = kernel.ReviewRunPath
+	ReviewCI    = kernel.ReviewCIPath
 	SudoersPath = "/etc/sudoers.d/gbai-reviewer"
 	systemPath  = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 )

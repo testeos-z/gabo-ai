@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -28,6 +29,7 @@ type Config struct {
 	Runtimes Runtimes `yaml:"runtimes"`
 	Repo     Repo     `yaml:"repo"`
 	Bot      Bot      `yaml:"bot"`
+	Review   Review   `yaml:"review"`
 }
 
 // Server locates the cloud server.
@@ -84,7 +86,28 @@ type Bot struct {
 	Login string `yaml:"login"`
 }
 
+// Review configures `gbai review run` and its reviewer-ci side.
+type Review struct {
+	// Checks are run in order inside the merged tree as reviewer-ci. Each is
+	// split on whitespace into argv; no shell is involved.
+	Checks         []string `yaml:"checks"`
+	AutoMerge      bool     `yaml:"auto_merge"`
+	HumanOnlyPaths []string `yaml:"human_only_paths"`
+	// PiCredentialEnv names the env var that receives the pi model credential.
+	PiCredentialEnv string `yaml:"pi_credential_env"`
+}
+
+// CheckArgv returns each check split into argv.
+func (r Review) CheckArgv() [][]string {
+	out := make([][]string, 0, len(r.Checks))
+	for _, c := range r.Checks {
+		out = append(out, strings.Fields(c))
+	}
+	return out
+}
+
 var (
+	envPattern    = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
 	idPattern     = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
 	userPattern   = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 	pathPattern   = regexp.MustCompile(`^/[A-Za-z0-9._/-]*$`)
@@ -138,6 +161,13 @@ func (c *Config) applyDefaults() {
 	defaultString(&c.Runtimes.Reviewer, RuntimePi)
 	defaultString(&c.Runtimes.Assistant, RuntimeClaude)
 	defaultString(&c.Repo.IntegrationBranch, "dev")
+	if c.Review.Checks == nil {
+		c.Review.Checks = []string{"bun install --frozen-lockfile", "bun run build", "bun run check-types", "bun run lint", "bun run test"}
+	}
+	if c.Review.HumanOnlyPaths == nil {
+		c.Review.HumanOnlyPaths = []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}
+	}
+	defaultString(&c.Review.PiCredentialEnv, "ANTHROPIC_API_KEY")
 }
 
 func defaultUser(u *User, d User) {
@@ -188,5 +218,16 @@ func (c Config) validate() error {
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")
 	check(loginPattern.MatchString(c.Bot.Login), "bot.login", "required GitHub login")
+
+	check(len(c.Review.Checks) > 0, "review.checks", "at least one check is required")
+	for _, ch := range c.Review.Checks {
+		check(strings.TrimSpace(ch) != "", "review.checks", "entries must not be blank")
+	}
+	check(len(c.Review.HumanOnlyPaths) > 0, "review.human_only_paths", "must not be empty")
+	for _, p := range c.Review.HumanOnlyPaths {
+		ok := p != "" && !strings.HasPrefix(p, "/") && !slices.Contains(strings.Split(strings.TrimSuffix(p, "/"), "/"), "..")
+		check(ok, "review.human_only_paths", fmt.Sprintf("entry %q must be a relative repository path", p))
+	}
+	check(envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
 	return errors.Join(errs...)
 }

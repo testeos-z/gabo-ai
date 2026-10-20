@@ -38,3 +38,15 @@ func TestRunMissingBinaryIsAnError(t *testing.T) {
 		t.Fatal("Run() error = nil, want error for missing binary")
 	}
 }
+
+func TestRunUsesWorkingDirectory(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	res, err := New().Run(context.Background(), kernel.Command{Name: "pwd", Dir: dir})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if got := strings.TrimSpace(string(res.Stdout)); got != dir {
+		t.Fatalf("pwd = %q, want %q", got, dir)
+	}
+}

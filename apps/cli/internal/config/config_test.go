@@ -138,3 +138,55 @@ func TestMarshalRoundTrips(t *testing.T) {
 		t.Fatalf("round trip = %+v, want %+v", again, cfg)
 	}
 }
+
+func TestParseReviewDefaults(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := cfg.Review
+	if len(r.Checks) != 5 || r.Checks[0] != "bun install --frozen-lockfile" || r.Checks[4] != "bun run test" {
+		t.Errorf("checks = %q", r.Checks)
+	}
+	if r.AutoMerge {
+		t.Error("auto_merge must default to false")
+	}
+	if strings.Join(r.HumanOnlyPaths, ",") != ".claude/,.github/,.opencode/,AGENTS.md,CLAUDE.md,docs/policies/,tools/hook-tests/,agents/" {
+		t.Errorf("human_only_paths = %q", r.HumanOnlyPaths)
+	}
+	if r.PiCredentialEnv != "ANTHROPIC_API_KEY" {
+		t.Errorf("pi_credential_env = %q", r.PiCredentialEnv)
+	}
+}
+
+func TestParseReviewExplicit(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal + "review:\n  checks: [\"go test ./...\"]\n  auto_merge: true\n  human_only_paths: [secret/]\n  pi_credential_env: OPENAI_API_KEY\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := cfg.Review
+	if len(r.Checks) != 1 || !r.AutoMerge || r.HumanOnlyPaths[0] != "secret/" || r.PiCredentialEnv != "OPENAI_API_KEY" {
+		t.Fatalf("review = %+v", r)
+	}
+	if argv := r.CheckArgv(); len(argv) != 1 || strings.Join(argv[0], "|") != "go|test|./..." {
+		t.Fatalf("CheckArgv() = %q", argv)
+	}
+}
+
+func TestParseReviewValidation(t *testing.T) {
+	t.Parallel()
+	for name, tt := range map[string]struct{ yaml, want string }{
+		"empty checks":    {"review:\n  checks: []\n", "review.checks"},
+		"blank check":     {"review:\n  checks: [\"  \"]\n", "review.checks"},
+		"absolute path":   {"review:\n  human_only_paths: [/etc/]\n", "review.human_only_paths"},
+		"traversal path":  {"review:\n  human_only_paths: [../x]\n", "review.human_only_paths"},
+		"empty path list": {"review:\n  human_only_paths: []\n", "review.human_only_paths"},
+		"bad env":         {"review:\n  pi_credential_env: \"A=B\"\n", "review.pi_credential_env"},
+	} {
+		if _, err := Parse([]byte(minimal + tt.yaml)); err == nil || !strings.Contains(err.Error(), tt.want) {
+			t.Errorf("%s: error = %v, want %q", name, err, tt.want)
+		}
+	}
+}

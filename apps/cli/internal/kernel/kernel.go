@@ -13,6 +13,7 @@ type Command struct {
 	Name  string
 	Args  []string
 	Env   []string // extra KEY=VALUE pairs appended to the inherited environment
+	Dir   string   // working directory; empty means the current one
 	Stdin io.Reader
 }
 

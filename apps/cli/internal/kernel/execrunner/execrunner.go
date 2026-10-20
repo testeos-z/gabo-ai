@@ -26,6 +26,7 @@ func (Runner) Run(ctx context.Context, cmd kernel.Command) (kernel.Result, error
 	if len(cmd.Env) > 0 {
 		c.Env = append(os.Environ(), cmd.Env...)
 	}
+	c.Dir = cmd.Dir
 	c.Stdin = cmd.Stdin
 	var stdout, stderr bytes.Buffer
 	c.Stdout, c.Stderr = &stdout, &stderr
