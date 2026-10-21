@@ -73,8 +73,9 @@ Strategy `ask-on-risk`; forecast > 400 lines ⇒ chain strategy `feature-branch-
 - T8 done: a1e77b7 + 47a0bc3 (mcp, 11 tools, apply needs confirm, no secret tool), 87607e5 (10 embedded skills + init + provision skills step). T9 done: ba11ce1 (plan new/status, docs/architecture.md, flow doc updated). T10 done: 4261681 (reviewer-ci process sweep via pidfd, clean engine env, review run serialized with flock, engine PATH excludes reviewer-ci home).
 - Final local checks: `go test ./...` 244 passed in 28 packages; `go vet` clean; `bun run build` ok. 14 commits, 145 files, +12333/-28 since c0070ae.
 - Untested against real tools (needs server authorization): railway ssh arg handling, orca terminal/orchestration flags and JSON, claude/pi headless prompt input and empty-HOME behavior, pi MCP config shape, gh credential helper, tool PATHs for reviewer/reviewer-ci, setpriv/GNU tar/pidfd on the container.
+- RDD: whole-branch START (lineage review-652c07e1ce9b44d5) failed lens_context_budget_exceeded, no authority created. Owner decision 2026-10-20: skip gentle-ai review for this branch this time; the gbai reviewer covers it at PR time. RDD mode unchanged (on).
 - Delivery: branch exceeds the ~400-line budget; chain strategy default feature-branch-chain; no push/PR yet (owner decision).
 
 ## Next step
 
-All MVP tasks implemented locally. Next: owner RDD decisions, owner authorization to run `gbai doctor`/`provision --dry-run` then apply against vulcam cloud, push + PR decision.
+All MVP tasks implemented locally. Next: owner authorization to run `gbai doctor`/`provision --dry-run` then apply against vulcam cloud, push + PR decision.
