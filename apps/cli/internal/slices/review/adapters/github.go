@@ -1,9 +1,12 @@
 package adapters
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -68,10 +71,24 @@ func (g *GitHub) Comment(ctx context.Context, n int, body string) error {
 	return err
 }
 
-// Approve approves the PR.
-func (g *GitHub) Approve(ctx context.Context, n int, sha string) error {
-	_, err := g.gh(ctx, "", "pr", "review", strconv.Itoa(n), "--repo", g.repo, "--approve", "--body", "Approved by the gbai reviewer at "+sha+".")
-	return err
+// Comments lists the bodies of the PR's issue comments, oldest first. Each
+// page prints one JSON array, so the output is decoded as a stream.
+func (g *GitHub) Comments(ctx context.Context, n int) ([]string, error) {
+	res, err := g.gh(ctx, "", "api", "--paginate", "repos/"+g.repo+"/issues/"+strconv.Itoa(n)+"/comments", "--jq", "[.[].body]")
+	if err != nil {
+		return nil, err
+	}
+	var bodies []string
+	dec := json.NewDecoder(bytes.NewReader(res.Stdout))
+	for {
+		var page []string
+		if err := dec.Decode(&page); errors.Is(err, io.EOF) {
+			return bodies, nil
+		} else if err != nil {
+			return nil, fmt.Errorf("decode gh api comments: %w", err)
+		}
+		bodies = append(bodies, page...)
+	}
 }
 
 // Merge merges the PR with a merge commit, only if its head is still sha.

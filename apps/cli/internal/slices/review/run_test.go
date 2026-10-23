@@ -67,13 +67,14 @@ func TestRunCleanCloudPRMergesPinnedToSHA(t *testing.T) {
 	if got := r.Summary.String(); got != "PR #12 head "+sha+" verdict=clean merge=merged" {
 		t.Fatalf("summary = %q", got)
 	}
-	if h.gh.approvedAt != sha || h.gh.mergedAt != sha {
-		t.Fatalf("approve/merge at %q/%q", h.gh.approvedAt, h.gh.mergedAt)
+	if h.gh.mergedAt != sha || h.t.has("gh.approve") {
+		t.Fatalf("merged at %q, calls %v; want a pinned merge and no approve", h.gh.mergedAt, h.t.calls)
 	}
 	if string(h.checks.tree) != "TAR" {
 		t.Fatalf("checks got tree %q", h.checks.tree)
 	}
-	if len(h.gh.comments) != 1 || !strings.HasPrefix(h.gh.comments[0], "No blocking issues found.\n") {
+	if len(h.gh.comments) != 1 || !strings.HasPrefix(h.gh.comments[0], "No blocking issues found.\n") ||
+		!strings.HasSuffix(h.gh.comments[0], "\n"+Marker(sha)+"\n") {
 		t.Fatalf("comments = %q", h.gh.comments)
 	}
 	want := []Status{{Context: "reviewer/tests", State: StatusSuccess}, {Context: "reviewer/review", State: StatusSuccess}}
@@ -83,7 +84,7 @@ func TestRunCleanCloudPRMergesPinnedToSHA(t *testing.T) {
 		}
 	}
 	order := strings.Join(h.t.calls, "\n")
-	for _, pair := range [][2]string{{"git.merge", "checks.prepare"}, {"gh.status", "gh.approve"}, {"gh.approve", "gh.merge"}, {"gh.comment", "gh.merge"}} {
+	for _, pair := range [][2]string{{"git.merge", "checks.prepare"}, {"gh.status", "gh.merge"}, {"gh.comment ", "gh.list-comments"}, {"gh.list-comments", "gh.merge"}} {
 		if strings.Index(order, pair[0]) > strings.Index(order, pair[1]) {
 			t.Errorf("%s must happen before %s:\n%s", pair[0], pair[1], order)
 		}
@@ -218,6 +219,26 @@ func TestRunMergeFailureNeedsHuman(t *testing.T) {
 	r := h.run(t)
 	if r.Summary.Verdict != VerdictClean || r.Summary.Merge != MergeNeedsHuman {
 		t.Fatalf("summary = %s", r.Summary)
+	}
+}
+
+func TestRunMergeDependsOnTheNewestMarkerComment(t *testing.T) {
+	t.Parallel()
+	staleClean := CommentBody(old, "dev", Evidence{}, VerdictClean)
+	for name, mutate := range map[string]func(*harness){
+		"list fails":        func(h *harness) { h.gh.listErr = errors.New("HTTP 502") },
+		"no marker comment": func(h *harness) { h.gh.listed = []string{"No blocking issues found.\n"} },
+		"newest marker is old": func(h *harness) {
+			h.gh.listed = []string{CommentBody(sha, "dev", Evidence{}, VerdictClean), staleClean}
+		},
+		"newest marker blocks": func(h *harness) { h.gh.listed = []string{CommentBody(sha, "dev", Evidence{}, VerdictBlocking)} },
+	} {
+		h := newHarness()
+		mutate(h)
+		r := h.run(t)
+		if r.Summary.Verdict != VerdictClean || r.Summary.Merge != MergeNeedsHuman || h.t.has("gh.merge") {
+			t.Errorf("%s: summary = %s, calls %v", name, r.Summary, h.t.calls)
+		}
 	}
 }
 

@@ -46,6 +46,48 @@ const (
 // CloudLabel marks PRs the reviewer may merge on its own.
 const CloudLabel = "mode:cloud"
 
+// Verdict comment lines. The reviewer posts with the owner's account, which
+// GitHub forbids from approving, so the verdict travels in a comment: its
+// first line is CommentClean or CommentBlocking, and it ends with the visible
+// CommentFooter followed by the hidden Marker of the reviewed head.
+const (
+	CommentClean    = "No blocking issues found."
+	CommentBlocking = "Blocking issues found."
+	CommentFooter   = "🤖 gbai reviewer"
+)
+
+var markerPattern = regexp.MustCompile(`^<!-- gbai-reviewer-bot sha=([0-9a-f]{40}) -->$`)
+
+// Marker returns the hidden line that signs a verdict comment for sha.
+func Marker(sha string) string {
+	return fmt.Sprintf("<!-- gbai-reviewer-bot sha=%s -->", sha)
+}
+
+// MarkerSHA returns the head sha signed by the marker on the last non-empty
+// line of body, if that line is a marker.
+func MarkerSHA(body string) (string, bool) {
+	lines := strings.Split(strings.TrimRight(strings.ReplaceAll(body, "\r\n", "\n"), "\n"), "\n")
+	m := markerPattern.FindStringSubmatch(strings.TrimSpace(lines[len(lines)-1]))
+	if m == nil {
+		return "", false
+	}
+	return m[1], true
+}
+
+// CleanVerdictFor reports whether the newest marker comment in comments
+// (oldest first) signs head and opens with CommentClean.
+func CleanVerdictFor(comments []string, head string) bool {
+	for i := len(comments) - 1; i >= 0; i-- {
+		signed, ok := MarkerSHA(comments[i])
+		if !ok {
+			continue
+		}
+		first, _, _ := strings.Cut(comments[i], "\n")
+		return signed == head && strings.TrimRight(first, "\r") == CommentClean
+	}
+	return false
+}
+
 // Finding is one review comment from the engine (or the merge step).
 type Finding struct {
 	Severity Severity `json:"severity"`
@@ -114,8 +156,9 @@ func DefaultHumanOnlyPaths() []string {
 }
 
 // DecideMerge returns merged only for a clean cloud PR into the integration
-// branch with auto merge enabled and no human-only path changed.
-func DecideMerge(v Verdict, pr PullRequest, files []string, p MergePolicy) Merge {
+// branch with auto merge enabled, no human-only path changed and the newest
+// marker comment (comments are oldest first) clean for the PR head.
+func DecideMerge(v Verdict, pr PullRequest, files, comments []string, p MergePolicy) Merge {
 	switch v {
 	case VerdictSkipped:
 		return MergeSkipped
@@ -130,6 +173,9 @@ func DecideMerge(v Verdict, pr PullRequest, files []string, p MergePolicy) Merge
 		if IsHumanOnly(f, p.HumanOnlyPaths) {
 			return MergeNeedsHuman
 		}
+	}
+	if !CleanVerdictFor(comments, pr.HeadSHA) {
+		return MergeNeedsHuman
 	}
 	return MergeMerged
 }

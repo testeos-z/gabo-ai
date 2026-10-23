@@ -23,12 +23,14 @@ type Status struct {
 	Description string
 }
 
-// GitHub reads the PR and posts the review as the bot identity.
+// GitHub reads the PR and posts the review as the owner's identity. It never
+// approves: the verdict lives in the marker comment.
 type GitHub interface {
 	PullRequest(ctx context.Context, number int) (PullRequest, error)
 	SetStatus(ctx context.Context, sha string, s Status) error
 	Comment(ctx context.Context, number int, body string) error
-	Approve(ctx context.Context, number int, sha string) error
+	// Comments returns the bodies of the PR's comments, oldest first.
+	Comments(ctx context.Context, number int) ([]string, error)
 	Merge(ctx context.Context, number int, sha string) error
 }
 

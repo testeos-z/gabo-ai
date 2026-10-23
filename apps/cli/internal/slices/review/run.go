@@ -107,7 +107,14 @@ func (u *RunUseCase) Run(ctx context.Context, number int, sha string) (Report, e
 		return r, nil
 	}
 	r.Summary.Verdict = verdict
-	r.Summary.Merge = DecideMerge(verdict, pr, files, u.cfg.Policy)
+	var comments []string
+	if verdict == VerdictClean {
+		if comments, err = u.gh.Comments(ctx, number); err != nil {
+			r.note("list comments: %v", err)
+			comments = nil // an unreadable thread never opens the merge gate
+		}
+	}
+	r.Summary.Merge = DecideMerge(verdict, pr, files, comments, u.cfg.Policy)
 	if r.Summary.Merge == MergeMerged {
 		if err := u.merge(ctx, number, sha); err != nil {
 			r.note("merge: %v", err)
@@ -213,9 +220,6 @@ func (u *RunUseCase) publish(ctx context.Context, number int, sha string, ev Evi
 }
 
 func (u *RunUseCase) merge(ctx context.Context, number int, sha string) error {
-	if err := u.gh.Approve(ctx, number, sha); err != nil {
-		return fmt.Errorf("approve: %w", err)
-	}
 	if err := u.gh.Merge(ctx, number, sha); err != nil {
 		return fmt.Errorf("merge pinned to %s: %w", sha, err)
 	}
@@ -260,13 +264,14 @@ func anyFailed(cs []CheckResult) bool {
 }
 
 // CommentBody renders the single review comment. Its first line is exactly
-// "No blocking issues found." for a clean verdict and "Blocking issues found." otherwise.
+// CommentClean for a clean verdict and CommentBlocking otherwise; it ends with
+// CommentFooter and the Marker of sha.
 func CommentBody(sha, integration string, ev Evidence, v Verdict) string {
 	var b strings.Builder
 	if v == VerdictClean {
-		b.WriteString("No blocking issues found.\n")
+		b.WriteString(CommentClean + "\n")
 	} else {
-		b.WriteString("Blocking issues found.\n")
+		b.WriteString(CommentBlocking + "\n")
 	}
 	fmt.Fprintf(&b, "\nReviewed head `%s` merged onto `%s`; verdict `%s`.\n", sha, integration, v)
 	if ev.Infra != nil {
@@ -307,6 +312,7 @@ func CommentBody(sha, integration string, ev Evidence, v Verdict) string {
 		fmt.Fprintf(&b, "\n<details><summary>Failed check: <code>%s</code> (last %d lines)</summary>\n\n%s\n%s\n%s\n\n</details>\n",
 			template.HTMLEscapeString(c.Command), checkTailLines, fence, c.Tail, fence)
 	}
+	fmt.Fprintf(&b, "\n%s\n%s\n", CommentFooter, Marker(sha))
 	return b.String()
 }
 

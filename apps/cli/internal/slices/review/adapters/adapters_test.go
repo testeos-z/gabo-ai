@@ -54,16 +54,12 @@ func TestGitHubPostsWithoutInterpolation(t *testing.T) {
 	if err := gh.Comment(ctx, 12, body); err != nil {
 		t.Fatal(err)
 	}
-	if err := gh.Approve(ctx, 12, sha); err != nil {
-		t.Fatal(err)
-	}
 	if err := gh.Merge(ctx, 12, sha); err != nil {
 		t.Fatal(err)
 	}
 	want := [][]string{
 		{"gh", "api", "--method", "POST", "repos/o/r/statuses/" + sha, "-f", "state=failure", "-f", "context=reviewer/tests", "-f", "description=a; b"},
 		{"gh", "pr", "comment", "12", "--repo", "o/r", "--body-file", "-"},
-		{"gh", "pr", "review", "12", "--repo", "o/r", "--approve", "--body", "Approved by the gbai reviewer at " + sha + "."},
 		{"gh", "pr", "merge", "12", "--repo", "o/r", "--merge", "--match-head-commit", sha},
 	}
 	for i, w := range want {
@@ -73,6 +69,26 @@ func TestGitHubPostsWithoutInterpolation(t *testing.T) {
 	}
 	if r.Calls[1].Stdin != body {
 		t.Errorf("comment stdin = %q", r.Calls[1].Stdin)
+	}
+}
+
+func TestGitHubCommentsDecodesEveryPageInOrder(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("[\"a\",\"b\\nc\"]\n[\"d\"]\n")}}
+	got, err := NewGitHub(r, "o/r").Comments(context.Background(), 12)
+	if err != nil {
+		t.Fatalf("Comments() error = %v", err)
+	}
+	if !slices.Equal(got, []string{"a", "b\nc", "d"}) {
+		t.Fatalf("Comments() = %q", got)
+	}
+	want := []string{"gh", "api", "--paginate", "repos/o/r/issues/12/comments", "--jq", "[.[].body]"}
+	if got := argv(r.Calls[0]); !slices.Equal(got, want) {
+		t.Fatalf("argv = %q", got)
+	}
+	r.Result.Stdout = []byte("not json")
+	if _, err := NewGitHub(r, "o/r").Comments(context.Background(), 12); err == nil {
+		t.Fatal("Comments() on garbage error = nil")
 	}
 }
 

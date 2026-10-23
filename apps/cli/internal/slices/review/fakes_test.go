@@ -23,15 +23,16 @@ func (t *trace) has(prefix string) bool {
 }
 
 type fakeGitHub struct {
-	t          *trace
-	pr         PullRequest
-	prErr      error
-	statusErr  error
-	mergeErr   error
-	statuses   []Status
-	comments   []string
-	approvedAt string
-	mergedAt   string
+	t         *trace
+	pr        PullRequest
+	prErr     error
+	statusErr error
+	mergeErr  error
+	listErr   error
+	statuses  []Status
+	comments  []string
+	listed    []string // when set, Comments returns it instead of the posted comments
+	mergedAt  string
 }
 
 func (f *fakeGitHub) PullRequest(_ context.Context, n int) (PullRequest, error) {
@@ -51,10 +52,12 @@ func (f *fakeGitHub) Comment(_ context.Context, n int, body string) error {
 	return nil
 }
 
-func (f *fakeGitHub) Approve(_ context.Context, n int, sha string) error {
-	f.t.add("gh.approve %d %s", n, sha)
-	f.approvedAt = sha
-	return nil
+func (f *fakeGitHub) Comments(_ context.Context, n int) ([]string, error) {
+	f.t.add("gh.list-comments %d", n)
+	if f.listed != nil {
+		return f.listed, f.listErr
+	}
+	return f.comments, f.listErr
 }
 
 func (f *fakeGitHub) Merge(_ context.Context, n int, sha string) error {

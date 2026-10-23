@@ -6,7 +6,10 @@ import (
 	"testing"
 )
 
-const sha = "0123456789abcdef0123456789abcdef01234567"
+const (
+	sha = "0123456789abcdef0123456789abcdef01234567"
+	old = "fedcba9876543210fedcba9876543210fedcba98"
+)
 
 func TestDecideVerdict(t *testing.T) {
 	t.Parallel()
@@ -40,39 +43,46 @@ func TestDecideVerdict(t *testing.T) {
 func TestDecideMerge(t *testing.T) {
 	t.Parallel()
 	policy := MergePolicy{AutoMerge: true, Integration: "dev", HumanOnlyPaths: DefaultHumanOnlyPaths()}
-	cloud := PullRequest{BaseBranch: "dev", Labels: []string{"bug", CloudLabel}}
-	local := PullRequest{BaseBranch: "dev", Labels: []string{"mode:local"}}
+	cloud := PullRequest{HeadSHA: sha, BaseBranch: "dev", Labels: []string{"bug", CloudLabel}}
+	local := PullRequest{HeadSHA: sha, BaseBranch: "dev", Labels: []string{"mode:local"}}
 	files := []string{"apps/web/src/a.ts", "README.md"}
+	clean := []string{CommentBody(sha, "dev", Evidence{}, VerdictClean)}
 	tests := []struct {
-		name    string
-		verdict Verdict
-		pr      PullRequest
-		files   []string
-		policy  MergePolicy
-		want    Merge
+		name     string
+		verdict  Verdict
+		pr       PullRequest
+		files    []string
+		policy   MergePolicy
+		comments []string
+		want     Merge
 	}{
-		{"clean cloud auto merge", VerdictClean, cloud, files, policy, MergeMerged},
-		{"clean without cloud label", VerdictClean, local, files, policy, MergeNeedsHuman},
-		{"clean with auto merge off", VerdictClean, cloud, files, MergePolicy{Integration: "dev", HumanOnlyPaths: DefaultHumanOnlyPaths()}, MergeNeedsHuman},
-		{"base is not integration", VerdictClean, PullRequest{BaseBranch: "main", Labels: []string{CloudLabel}}, files, policy, MergeNeedsHuman},
-		{"workflow change", VerdictClean, cloud, []string{"a.ts", ".github/workflows/ci.yml"}, policy, MergeNeedsHuman},
-		{"claude settings", VerdictClean, cloud, []string{".claude/settings.json"}, policy, MergeNeedsHuman},
-		{"opencode", VerdictClean, cloud, []string{".opencode/x"}, policy, MergeNeedsHuman},
-		{"root AGENTS.md", VerdictClean, cloud, []string{"AGENTS.md"}, policy, MergeNeedsHuman},
-		{"nested CLAUDE.md", VerdictClean, cloud, []string{"apps/web/CLAUDE.md"}, policy, MergeNeedsHuman},
-		{"policies", VerdictClean, cloud, []string{"docs/policies/merge.md"}, policy, MergeNeedsHuman},
-		{"hook tests", VerdictClean, cloud, []string{"tools/hook-tests/a.sh"}, policy, MergeNeedsHuman},
-		{"agents dir", VerdictClean, cloud, []string{"agents/pr-reviewer/run.sh"}, policy, MergeNeedsHuman},
-		{"similar names are not human-only", VerdictClean, cloud, []string{"docs/policies-old.md", "src/agents/x.ts", "AGENTS.md.bak"}, policy, MergeMerged},
-		{"no changed files is suspicious", VerdictClean, cloud, nil, policy, MergeNeedsHuman},
-		{"blocking", VerdictBlocking, cloud, files, policy, MergeNone},
-		{"error", VerdictError, cloud, files, policy, MergeNone},
-		{"skipped", VerdictSkipped, cloud, files, policy, MergeSkipped},
+		{"clean cloud auto merge", VerdictClean, cloud, files, policy, clean, MergeMerged},
+		{"clean without cloud label", VerdictClean, local, files, policy, clean, MergeNeedsHuman},
+		{"clean with auto merge off", VerdictClean, cloud, files, MergePolicy{Integration: "dev", HumanOnlyPaths: DefaultHumanOnlyPaths()}, clean, MergeNeedsHuman},
+		{"base is not integration", VerdictClean, PullRequest{BaseBranch: "main", Labels: []string{CloudLabel}}, files, policy, clean, MergeNeedsHuman},
+		{"workflow change", VerdictClean, cloud, []string{"a.ts", ".github/workflows/ci.yml"}, policy, clean, MergeNeedsHuman},
+		{"claude settings", VerdictClean, cloud, []string{".claude/settings.json"}, policy, clean, MergeNeedsHuman},
+		{"opencode", VerdictClean, cloud, []string{".opencode/x"}, policy, clean, MergeNeedsHuman},
+		{"root AGENTS.md", VerdictClean, cloud, []string{"AGENTS.md"}, policy, clean, MergeNeedsHuman},
+		{"nested CLAUDE.md", VerdictClean, cloud, []string{"apps/web/CLAUDE.md"}, policy, clean, MergeNeedsHuman},
+		{"policies", VerdictClean, cloud, []string{"docs/policies/merge.md"}, policy, clean, MergeNeedsHuman},
+		{"hook tests", VerdictClean, cloud, []string{"tools/hook-tests/a.sh"}, policy, clean, MergeNeedsHuman},
+		{"agents dir", VerdictClean, cloud, []string{"agents/pr-reviewer/run.sh"}, policy, clean, MergeNeedsHuman},
+		{"similar names are not human-only", VerdictClean, cloud, []string{"docs/policies-old.md", "src/agents/x.ts", "AGENTS.md.bak"}, policy, clean, MergeMerged},
+		{"no changed files is suspicious", VerdictClean, cloud, nil, policy, clean, MergeNeedsHuman},
+		{"blocking", VerdictBlocking, cloud, files, policy, clean, MergeNone},
+		{"error", VerdictError, cloud, files, policy, clean, MergeNone},
+		{"skipped", VerdictSkipped, cloud, files, policy, clean, MergeSkipped},
+		{"no marker comment", VerdictClean, cloud, files, policy, []string{"No blocking issues found.\n"}, MergeNeedsHuman},
+		{"newest marker is for an older head", VerdictClean, cloud, files, policy, []string{clean[0], CommentBody(old, "dev", Evidence{}, VerdictClean)}, MergeNeedsHuman},
+		{"newest marker is blocking", VerdictClean, cloud, files, policy, []string{clean[0], CommentBody(sha, "dev", Evidence{}, VerdictBlocking)}, MergeNeedsHuman},
+		{"older blocking marker, newest clean for head", VerdictClean, cloud, files, policy, []string{CommentBody(sha, "dev", Evidence{}, VerdictBlocking), clean[0], "thanks!"}, MergeMerged},
+		{"no comments", VerdictClean, cloud, files, policy, nil, MergeNeedsHuman},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if got := DecideMerge(tt.verdict, tt.pr, tt.files, tt.policy); got != tt.want {
+			if got := DecideMerge(tt.verdict, tt.pr, tt.files, tt.comments, tt.policy); got != tt.want {
 				t.Fatalf("DecideMerge() = %s, want %s", got, tt.want)
 			}
 		})
@@ -137,5 +147,52 @@ func TestTailKeepsLastLines(t *testing.T) {
 	got := Tail([]byte(b.String()), 60)
 	if lines := strings.Split(got, "\n"); len(lines) != 60 || lines[59] != "last" {
 		t.Fatalf("Tail() has %d lines, last %q", len(lines), lines[len(lines)-1])
+	}
+}
+
+func TestCommentBodyIsSignedWithFooterAndMarker(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		verdict Verdict
+		first   string
+	}{{VerdictClean, "No blocking issues found."}, {VerdictBlocking, "Blocking issues found."}, {VerdictError, "Blocking issues found."}} {
+		body := CommentBody(sha, "dev", Evidence{Findings: []Finding{{Severity: SeverityMinor, Title: "nit"}}}, tt.verdict)
+		lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
+		if lines[0] != tt.first {
+			t.Errorf("%s: first line = %q, want %q", tt.verdict, lines[0], tt.first)
+		}
+		n := len(lines)
+		if lines[n-2] != "🤖 gbai reviewer" || lines[n-1] != "<!-- gbai-reviewer-bot sha="+sha+" -->" {
+			t.Errorf("%s: body does not end with footer and marker:\n%s", tt.verdict, body)
+		}
+		if got, ok := MarkerSHA(body); !ok || got != sha {
+			t.Errorf("%s: MarkerSHA() = %q, %v", tt.verdict, got, ok)
+		}
+	}
+}
+
+func TestMarkerSHA(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		body string
+		want string
+		ok   bool
+	}{
+		{"marker last", "x\n" + Marker(sha), sha, true},
+		{"marker with trailing newline and CRLF", "x\r\n" + Marker(sha) + "\r\n", sha, true},
+		{"no marker", "No blocking issues found.\n", "", false},
+		{"marker not on the last line", Marker(sha) + "\nquoted", "", false},
+		{"short sha", "<!-- gbai-reviewer-bot sha=0123456 -->", "", false},
+		{"uppercase sha", Marker(strings.ToUpper(sha)), "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, ok := MarkerSHA(tt.body)
+			if got != tt.want || ok != tt.ok {
+				t.Fatalf("MarkerSHA() = %q, %v; want %q, %v", got, ok, tt.want, tt.ok)
+			}
+		})
 	}
 }
