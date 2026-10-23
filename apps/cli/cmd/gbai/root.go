@@ -104,7 +104,7 @@ func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, err
 		Notify: func(context.Context) (*review.NotifyUseCase, error) {
 			return review.NewNotifyUseCase(reviewadapters.NewOrca(runner)), nil
 		},
-		Run: func(context.Context) (*review.RunUseCase, error) {
+		Run: func(_ context.Context, keepWorktree bool) (*review.RunUseCase, error) {
 			cfg, err := loadConfig()
 			if err != nil {
 				return nil, err
@@ -123,6 +123,7 @@ func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, err
 						Integration:    cfg.Repo.IntegrationBranch,
 						HumanOnlyPaths: cfg.Review.HumanOnlyPaths,
 					},
+					KeepWorktree: keepWorktree,
 				},
 			).WithLock(reviewadapters.NewFileLock(path.Join(rv.Home, ".gbai-review.lock"))), nil
 		},

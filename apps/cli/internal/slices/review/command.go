@@ -15,7 +15,7 @@ import (
 type Factories struct {
 	Request func(context.Context) (*RequestUseCase, error)
 	Notify  func(context.Context) (*NotifyUseCase, error)
-	Run     func(context.Context) (*RunUseCase, error)
+	Run     func(ctx context.Context, keepWorktree bool) (*RunUseCase, error)
 	CI      func(context.Context) (*CIUseCase, error)
 }
 
@@ -83,7 +83,8 @@ func newNotifyCommand(f Factories) *cobra.Command {
 }
 
 func newRunCommand(f Factories) *cobra.Command {
-	return &cobra.Command{
+	var keep bool
+	cmd := &cobra.Command{
 		Use:   "run head <pr-number> <sha>",
 		Short: "Review a pinned PR head as the reviewer and print one summary line",
 		Args: cobra.MatchAll(cobra.ExactArgs(3), func(_ *cobra.Command, args []string) error {
@@ -98,7 +99,7 @@ func newRunCommand(f Factories) *cobra.Command {
 		}),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			n, _ := strconv.Atoi(args[1])
-			uc, err := f.Run(cmd.Context())
+			uc, err := f.Run(cmd.Context(), keep)
 			if err != nil {
 				return err
 			}
@@ -106,13 +107,17 @@ func newRunCommand(f Factories) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Notes may carry check or engine output: quoting every line keeps
+			// the summary the only line that can parse as one.
 			for _, note := range report.Notes {
-				fmt.Fprintln(cmd.ErrOrStderr(), "gbai review:", note)
+				fmt.Fprintln(cmd.ErrOrStderr(), Quote("gbai review: "+note))
 			}
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), report.Summary)
 			return err
 		},
 	}
+	cmd.Flags().BoolVar(&keep, "keep-worktree", false, "keep the worktree and reviewer-ci workspace for debugging")
+	return cmd
 }
 
 func newCICommand(f Factories) *cobra.Command {

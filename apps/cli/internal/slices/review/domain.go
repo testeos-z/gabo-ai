@@ -74,18 +74,71 @@ func MarkerSHA(body string) (string, bool) {
 	return m[1], true
 }
 
-// CleanVerdictFor reports whether the newest marker comment in comments
-// (oldest first) signs head and opens with CommentClean.
-func CleanVerdictFor(comments []string, head string) bool {
+// Comment is one PR comment and the login that posted it.
+type Comment struct {
+	Author string
+	Body   string
+}
+
+// newestSigned returns the newest comment in comments (oldest first) that
+// reviewer posted and that carries a marker, plus the head it signs. Marker
+// comments from anyone else are ignored, and an empty reviewer matches none.
+func newestSigned(comments []Comment, reviewer string) (Comment, string, bool) {
+	if reviewer == "" {
+		return Comment{}, "", false
+	}
 	for i := len(comments) - 1; i >= 0; i-- {
-		signed, ok := MarkerSHA(comments[i])
-		if !ok {
+		if comments[i].Author != reviewer {
 			continue
 		}
-		first, _, _ := strings.Cut(comments[i], "\n")
-		return signed == head && strings.TrimRight(first, "\r") == CommentClean
+		if signed, ok := MarkerSHA(comments[i].Body); ok {
+			return comments[i], signed, true
+		}
 	}
-	return false
+	return Comment{}, "", false
+}
+
+// commentLines splits a comment body into lines without carriage returns.
+func commentLines(body string) []string {
+	return strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
+}
+
+// CleanVerdictFor reports whether the newest marker comment reviewer posted
+// in comments (oldest first) signs head and opens with CommentClean.
+func CleanVerdictFor(comments []Comment, reviewer, head string) bool {
+	c, signed, ok := newestSigned(comments, reviewer)
+	return ok && signed == head && commentLines(c.Body)[0] == CommentClean
+}
+
+// ConflictNoticeFor reports whether the newest marker comment reviewer posted
+// in comments already reports that head conflicts with integration, so the
+// same conflict is not posted again on every run.
+func ConflictNoticeFor(comments []Comment, reviewer, head, integration string) bool {
+	c, signed, ok := newestSigned(comments, reviewer)
+	if !ok || signed != head {
+		return false
+	}
+	lines := commentLines(c.Body)
+	return len(lines) > 2 && lines[2] == conflictLine(head, integration)
+}
+
+// conflictLine is the fixed third line of a conflict verdict comment. It is
+// written only by CommentBody, never from engine or check output.
+func conflictLine(sha, integration string) string {
+	return fmt.Sprintf("Head `%s` does not merge cleanly onto `%s`; verdict `%s`.", sha, integration, VerdictBlocking)
+}
+
+// EchoPrefix starts every echoed line of diagnostic output, so no output a PR
+// can influence ever starts with a summary line.
+const EchoPrefix = "| "
+
+// Quote prefixes every line of s with EchoPrefix.
+func Quote(s string) string {
+	lines := strings.Split(strings.ReplaceAll(s, "\r", ""), "\n")
+	for i, l := range lines {
+		lines[i] = EchoPrefix + l
+	}
+	return strings.Join(lines, "\n")
 }
 
 // Finding is one review comment from the engine (or the merge step).
@@ -157,8 +210,9 @@ func DefaultHumanOnlyPaths() []string {
 
 // DecideMerge returns merged only for a clean cloud PR into the integration
 // branch with auto merge enabled, no human-only path changed and the newest
-// marker comment (comments are oldest first) clean for the PR head.
-func DecideMerge(v Verdict, pr PullRequest, files, comments []string, p MergePolicy) Merge {
+// marker comment posted by reviewer (comments are oldest first) clean for the
+// PR head. An empty reviewer login never merges.
+func DecideMerge(v Verdict, pr PullRequest, files []string, comments []Comment, reviewer string, p MergePolicy) Merge {
 	switch v {
 	case VerdictSkipped:
 		return MergeSkipped
@@ -174,7 +228,7 @@ func DecideMerge(v Verdict, pr PullRequest, files, comments []string, p MergePol
 			return MergeNeedsHuman
 		}
 	}
-	if !CleanVerdictFor(comments, pr.HeadSHA) {
+	if !CleanVerdictFor(comments, reviewer, pr.HeadSHA) {
 		return MergeNeedsHuman
 	}
 	return MergeMerged

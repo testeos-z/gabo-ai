@@ -29,8 +29,11 @@ type GitHub interface {
 	PullRequest(ctx context.Context, number int) (PullRequest, error)
 	SetStatus(ctx context.Context, sha string, s Status) error
 	Comment(ctx context.Context, number int, body string) error
-	// Comments returns the bodies of the PR's comments, oldest first.
-	Comments(ctx context.Context, number int) ([]string, error)
+	// Comments returns the PR's comments with their authors, oldest first.
+	Comments(ctx context.Context, number int) ([]Comment, error)
+	// Login returns the login the reviewer posts as; only its marker
+	// comments count.
+	Login(ctx context.Context) (string, error)
 	Merge(ctx context.Context, number int, sha string) error
 }
 

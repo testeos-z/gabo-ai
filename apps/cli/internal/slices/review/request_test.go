@@ -53,13 +53,13 @@ func TestRequestReportsOrcaFailure(t *testing.T) {
 	}
 }
 
-func TestNotifySendsLastMatchingSummaryOnly(t *testing.T) {
+func TestNotifySendsTheOnlyMatchingSummary(t *testing.T) {
 	t.Parallel()
 	o := &fakeOrca{t: &trace{}}
 	var echo strings.Builder
 	stdin := strings.Join([]string{
 		"progress: secret-looking text",
-		"PR #12 head " + sha + " verdict=blocking merge=none",
+		"| PR #12 head " + sha + " verdict=clean merge=merged",
 		"PR #13 head " + sha + " verdict=clean merge=merged",
 		"PR #12 head " + sha + " verdict=clean merge=needs-human-merge",
 		"trailing noise",
@@ -74,6 +74,16 @@ func TestNotifySendsLastMatchingSummaryOnly(t *testing.T) {
 	}
 	if echo.String() != stdin+"\n" {
 		t.Errorf("echo = %q", echo.String())
+	}
+}
+
+func TestNotifyWithTwoMatchingSummariesSendsError(t *testing.T) {
+	t.Parallel()
+	o := &fakeOrca{t: &trace{}}
+	stdin := "PR #12 head " + sha + " verdict=blocking merge=none\nPR #12 head " + sha + " verdict=clean merge=merged\n"
+	s, err := NewNotifyUseCase(o).Notify(context.Background(), NotifyInput{To: "run:abc", PR: 12, SHA: sha, Stdin: strings.NewReader(stdin), Echo: &strings.Builder{}})
+	if err != nil || s.Verdict != VerdictError || o.subjects[0] != "PR #12 head "+sha+" verdict=error merge=none" {
+		t.Fatalf("summary %s, sent %q, err %v", s, o.subjects, err)
 	}
 }
 

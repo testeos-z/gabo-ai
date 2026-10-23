@@ -2,7 +2,9 @@ package review
 
 import (
 	"context"
+	"crypto/rand"
 	_ "embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -28,6 +30,9 @@ type RunConfig struct {
 	Checks       [][]string // argv of each check, run in order until one fails
 	Policy       MergePolicy
 	MaxDiffBytes int // diff budget in the prompt; 0 means the default
+	// KeepWorktree leaves the worktree and the reviewer-ci workspace in place
+	// for debugging; by default both are removed.
+	KeepWorktree bool
 }
 
 // Report is the outcome of a run: the summary line plus diagnostic notes
@@ -102,19 +107,29 @@ func (u *RunUseCase) Run(ctx context.Context, number int, sha string) (Report, e
 	if ev.Infra != nil {
 		r.note("review error: %v", ev.Infra)
 	}
-	if err := u.publish(ctx, number, sha, ev, verdict); err != nil {
+	post := true
+	if ev.Conflict {
+		if login, comments, err := u.thread(ctx, number); err != nil {
+			r.note("read review thread: %v", err)
+		} else if ConflictNoticeFor(comments, login, sha, u.cfg.Policy.Integration) {
+			post = false
+			r.note("conflict for %s already reported; comment not repeated", sha)
+		}
+	}
+	if err := u.publish(ctx, number, sha, ev, verdict, post); err != nil {
 		r.note("publish review: %v", err)
 		return r, nil
 	}
 	r.Summary.Verdict = verdict
-	var comments []string
+	var login string
+	var comments []Comment
 	if verdict == VerdictClean {
-		if comments, err = u.gh.Comments(ctx, number); err != nil {
-			r.note("list comments: %v", err)
-			comments = nil // an unreadable thread never opens the merge gate
+		if login, comments, err = u.thread(ctx, number); err != nil {
+			r.note("read review thread: %v", err)
+			login, comments = "", nil // an unknown author or thread never opens the merge gate
 		}
 	}
-	r.Summary.Merge = DecideMerge(verdict, pr, files, comments, u.cfg.Policy)
+	r.Summary.Merge = DecideMerge(verdict, pr, files, comments, login, u.cfg.Policy)
 	if r.Summary.Merge == MergeMerged {
 		if err := u.merge(ctx, number, sha); err != nil {
 			r.note("merge: %v", err)
@@ -132,11 +147,15 @@ func (u *RunUseCase) evaluate(ctx context.Context, number int, sha string, r *Re
 	if err := u.git.Prepare(ctx, number, integration); err != nil {
 		return Evidence{Infra: fmt.Errorf("prepare clone: %w", err)}, nil
 	}
-	defer func() {
-		if err := u.git.RemoveWorktree(cleanupCtx, name); err != nil {
-			r.note("remove worktree %s: %v", name, err)
-		}
-	}()
+	if u.cfg.KeepWorktree {
+		r.note("keeping worktree and reviewer-ci workspace %s", name)
+	} else {
+		defer func() {
+			if err := u.git.RemoveWorktree(cleanupCtx, name); err != nil {
+				r.note("remove worktree %s: %v", name, err)
+			}
+		}()
+	}
 	if err := u.git.AddWorktree(ctx, name, integration); err != nil {
 		return Evidence{Infra: fmt.Errorf("add worktree: %w", err)}, nil
 	}
@@ -155,11 +174,13 @@ func (u *RunUseCase) evaluate(ctx context.Context, number int, sha string, r *Re
 		return Evidence{Infra: fmt.Errorf("snapshot: %w", err)}, nil
 	}
 
-	defer func() {
-		if err := u.checks.Cleanup(cleanupCtx, name); err != nil {
-			r.note("clean workspace %s: %v", name, err)
-		}
-	}()
+	if !u.cfg.KeepWorktree {
+		defer func() {
+			if err := u.checks.Cleanup(cleanupCtx, name); err != nil {
+				r.note("clean workspace %s: %v", name, err)
+			}
+		}()
+	}
 	if err := u.checks.Prepare(ctx, name, snap.Tree); err != nil {
 		return Evidence{Infra: fmt.Errorf("prepare checks workspace: %w", err)}, snap.Files
 	}
@@ -196,10 +217,14 @@ func (u *RunUseCase) prompt(number int, snap Snapshot) (string, error) {
 			diff = diff[:len(diff)-1]
 		}
 	}
+	nonce, err := newNonce()
+	if err != nil {
+		return "", err
+	}
 	var b strings.Builder
-	err := promptTemplate.Execute(&b, map[string]any{
+	err = promptTemplate.Execute(&b, map[string]any{
 		"Number": number, "Integration": u.cfg.Policy.Integration, "Files": snap.Files,
-		"Diff": diff, "Truncated": truncated, "MaxBytes": u.cfg.MaxDiffBytes,
+		"Diff": diff, "Truncated": truncated, "MaxBytes": u.cfg.MaxDiffBytes, "Nonce": nonce,
 	})
 	if err != nil {
 		return "", fmt.Errorf("render prompt: %w", err)
@@ -207,11 +232,38 @@ func (u *RunUseCase) prompt(number int, snap Snapshot) (string, error) {
 	return b.String(), nil
 }
 
-func (u *RunUseCase) publish(ctx context.Context, number int, sha string, ev Evidence, v Verdict) error {
+// newNonce returns 128 random bits in hex. It names the diff delimiters of
+// one prompt, so a diff cannot close them: it would have to guess the nonce.
+func newNonce() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("diff nonce: %w", err)
+	}
+	return hex.EncodeToString(b), nil
+}
+
+// thread reads the reviewer's own login and the PR comments, oldest first.
+func (u *RunUseCase) thread(ctx context.Context, number int) (string, []Comment, error) {
+	login, err := u.gh.Login(ctx)
+	if err != nil {
+		return "", nil, fmt.Errorf("reviewer login: %w", err)
+	}
+	comments, err := u.gh.Comments(ctx, number)
+	if err != nil {
+		return "", nil, fmt.Errorf("list comments: %w", err)
+	}
+	return login, comments, nil
+}
+
+// publish sets both statuses and, when post is set, the verdict comment.
+func (u *RunUseCase) publish(ctx context.Context, number int, sha string, ev Evidence, v Verdict, post bool) error {
 	for _, s := range []Status{testsStatus(ev, len(u.cfg.Checks)), reviewStatus(v)} {
 		if err := u.gh.SetStatus(ctx, sha, s); err != nil {
 			return fmt.Errorf("status %s: %w", s.Context, err)
 		}
+	}
+	if !post {
+		return nil
 	}
 	if err := u.gh.Comment(ctx, number, CommentBody(sha, u.cfg.Policy.Integration, ev, v)); err != nil {
 		return fmt.Errorf("comment: %w", err)
@@ -264,8 +316,9 @@ func anyFailed(cs []CheckResult) bool {
 }
 
 // CommentBody renders the single review comment. Its first line is exactly
-// CommentClean for a clean verdict and CommentBlocking otherwise; it ends with
-// CommentFooter and the Marker of sha.
+// CommentClean for a clean verdict and CommentBlocking otherwise, its third
+// line names the head (and the conflict, if any); it ends with CommentFooter
+// and the Marker of sha.
 func CommentBody(sha, integration string, ev Evidence, v Verdict) string {
 	var b strings.Builder
 	if v == VerdictClean {
@@ -273,7 +326,11 @@ func CommentBody(sha, integration string, ev Evidence, v Verdict) string {
 	} else {
 		b.WriteString(CommentBlocking + "\n")
 	}
-	fmt.Fprintf(&b, "\nReviewed head `%s` merged onto `%s`; verdict `%s`.\n", sha, integration, v)
+	if ev.Conflict {
+		b.WriteString("\n" + conflictLine(sha, integration) + "\n")
+	} else {
+		fmt.Fprintf(&b, "\nReviewed head `%s` merged onto `%s`; verdict `%s`.\n", sha, integration, v)
+	}
 	if ev.Infra != nil {
 		b.WriteString("\nThe review could not complete; the reviewer logged the cause on the server.\n")
 	}

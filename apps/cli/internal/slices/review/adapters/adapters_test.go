@@ -74,21 +74,43 @@ func TestGitHubPostsWithoutInterpolation(t *testing.T) {
 
 func TestGitHubCommentsDecodesEveryPageInOrder(t *testing.T) {
 	t.Parallel()
-	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("[\"a\",\"b\\nc\"]\n[\"d\"]\n")}}
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte(`[{"author":"owner","body":"a"},{"author":"bob","body":"b\nc"}]` + "\n" + `[{"author":"owner","body":"d"}]` + "\n")}}
 	got, err := NewGitHub(r, "o/r").Comments(context.Background(), 12)
 	if err != nil {
 		t.Fatalf("Comments() error = %v", err)
 	}
-	if !slices.Equal(got, []string{"a", "b\nc", "d"}) {
+	if !slices.Equal(got, []review.Comment{{Author: "owner", Body: "a"}, {Author: "bob", Body: "b\nc"}, {Author: "owner", Body: "d"}}) {
 		t.Fatalf("Comments() = %q", got)
 	}
-	want := []string{"gh", "api", "--paginate", "repos/o/r/issues/12/comments", "--jq", "[.[].body]"}
+	want := []string{"gh", "api", "--paginate", "repos/o/r/issues/12/comments", "--jq", "[.[] | {author: .user.login, body: .body}]"}
 	if got := argv(r.Calls[0]); !slices.Equal(got, want) {
 		t.Fatalf("argv = %q", got)
 	}
 	r.Result.Stdout = []byte("not json")
 	if _, err := NewGitHub(r, "o/r").Comments(context.Background(), 12); err == nil {
 		t.Fatal("Comments() on garbage error = nil")
+	}
+}
+
+func TestGitHubLogin(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("owner\n")}}
+	got, err := NewGitHub(r, "o/r").Login(context.Background())
+	if err != nil || got != "owner" {
+		t.Fatalf("Login() = %q, %v", got, err)
+	}
+	if want := []string{"gh", "api", "user", "--jq", ".login"}; !slices.Equal(argv(r.Calls[0]), want) {
+		t.Fatalf("argv = %q", argv(r.Calls[0]))
+	}
+	for name, res := range map[string]kernel.Result{
+		"empty login": {Stdout: []byte("\n")},
+		"two lines":   {Stdout: []byte("owner\nmallory\n")},
+		"gh fails":    {ExitCode: 1, Stderr: []byte("not logged in")},
+	} {
+		r := &kerneltest.Runner{Result: res}
+		if got, err := NewGitHub(r, "o/r").Login(context.Background()); err == nil {
+			t.Errorf("%s: Login() = %q, want an error", name, got)
+		}
 	}
 }
 
