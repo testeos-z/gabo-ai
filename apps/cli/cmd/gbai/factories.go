@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
+	"strings"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
@@ -46,11 +48,13 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			if err != nil {
 				return nil, err
 			}
-			reviewer := cfg.Users.Reviewer
+			// Single-user mode: the reviewer runs as the orca user, so its
+			// credentials belong to that user.
+			owner := cfg.Users.Orca
 			return secrets.NewUseCase(
 				newRemoteShell(d.runner, cfg),
 				secretsadapters.NewStdinReader(d.stdin, d.stderr),
-				secrets.Account{Name: reviewer.Name, Home: reviewer.Home},
+				secrets.Account{Name: owner.Name, Home: owner.Home},
 			), nil
 		},
 		provision: func(context.Context) (*provision.UseCase, error) {
@@ -67,11 +71,9 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 				return nil, err
 			}
 			return provision.NewUseCase(newRemoteShell(d.runner, cfg), provisionadapters.FileBinary{}, provision.Settings{
-				Orca:       provisionAccount(cfg.Users.Orca),
-				Reviewer:   provisionAccount(cfg.Users.Reviewer),
-				ReviewerCI: provisionAccount(cfg.Users.ReviewerCI),
-				Config:     doc,
-				SkillsTar:  skillsTar,
+				Orca:      provisionAccount(cfg.Users.Orca),
+				Config:    doc,
+				SkillsTar: skillsTar,
 			}), nil
 		},
 		review: reviewFactories(d.runner, loadConfig),
@@ -96,23 +98,34 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 				sessions.RoleAssistant: {Runtime: string(cfg.Runtimes.Assistant), PromptFile: cfg.Sessions.Assistant.PromptFile},
 			}), nil
 		},
-		status: func(_ context.Context, mode string) (*status.UseCase, error) {
+		status: func(ctx context.Context, mode string) (*status.UseCase, error) {
 			cfg, err := loadConfig()
+			if err != nil {
+				return nil, err
+			}
+			login, err := ownerLogin(ctx, d.runner, cfg.Bot.Login)
 			if err != nil {
 				return nil, err
 			}
 			return status.NewUseCase(newRemoteShell(d.runner, cfg), newTerminals(d.runner, cfg, mode),
 				statusadapters.NewGitHub(d.runner, cfg.Repo.Name),
-				status.Settings{Integration: cfg.Repo.IntegrationBranch, Bot: cfg.Bot.Login}), nil
+				status.Settings{Integration: cfg.Repo.IntegrationBranch, Bot: login}), nil
 		},
-		audit: func(context.Context) (*audit.UseCase, error) {
+		audit: func(ctx context.Context) (*audit.UseCase, error) {
 			cfg, err := loadConfig()
 			if err != nil {
 				return nil, err
 			}
+			login, err := ownerLogin(ctx, d.runner, cfg.Bot.Login)
+			if err != nil {
+				return nil, err
+			}
+			if strings.EqualFold(cfg.Coder.Login, login) {
+				return nil, fmt.Errorf("coder.login %s is the owner login the reviewer merges with; unset it in single-user mode", cfg.Coder.Login)
+			}
 			return audit.NewUseCase(auditadapters.NewGitHub(d.runner, cfg.Repo.Name), audit.Settings{
 				Integration: cfg.Repo.IntegrationBranch,
-				Bot:         cfg.Bot.Login,
+				Bot:         login,
 				Coder:       cfg.Coder.Login,
 			}), nil
 		},
@@ -144,16 +157,16 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			if err != nil {
 				return nil, err
 			}
-			users := make([]doctor.User, 0, 3)
+			users := make([]doctor.User, 0, 1)
 			for _, u := range cfg.Users.All() {
 				users = append(users, doctor.User{Name: u.Name, UID: u.UID})
 			}
 			return doctor.NewUseCase(doctoradapters.Path{}, d.runner, newRemoteShell(d.runner, cfg), doctor.Settings{
-				LocalOrca:    cfg.Sessions.LocalOrca,
-				Remote:       cfg.Server.Railway.ServiceID != "",
-				Users:        users,
-				OrcaUser:     cfg.Users.Orca.Name,
-				ReviewerHome: cfg.Users.Reviewer.Home,
+				LocalOrca:  cfg.Sessions.LocalOrca,
+				Remote:     cfg.Server.Railway.ServiceID != "",
+				Users:      users,
+				OrcaUser:   cfg.Users.Orca.Name,
+				SecretsDir: path.Join(cfg.Users.Orca.Home, "secrets"),
 			}), nil
 		},
 	}

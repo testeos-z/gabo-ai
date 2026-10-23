@@ -84,6 +84,7 @@ func (f *fakeGitHub) Merge(_ context.Context, n int, sha string) error {
 
 type fakeGit struct {
 	t           *trace
+	guardErr    error
 	prepareErr  error
 	addErr      error
 	conflict    bool
@@ -92,6 +93,11 @@ type fakeGit struct {
 	snapshotErr error
 	removeErr   error
 	removed     []string
+}
+
+func (f *fakeGit) Guard(_ context.Context, integration string) error {
+	f.t.add("git.guard %s", integration)
+	return f.guardErr
 }
 
 func (f *fakeGit) Prepare(_ context.Context, n int, integration string) error {

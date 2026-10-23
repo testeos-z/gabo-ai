@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"regexp"
 	"slices"
 	"strings"
@@ -69,15 +70,14 @@ type Railway struct {
 	ServiceID     string `yaml:"service_id"`
 }
 
-// Users lists the OS users on the server.
+// Users lists the OS users on the server. Single-user mode: the reviewer
+// runs as the orca user, the same OS user as the agent sessions.
 type Users struct {
-	Orca       User `yaml:"orca"`
-	Reviewer   User `yaml:"reviewer"`
-	ReviewerCI User `yaml:"reviewer_ci"`
+	Orca User `yaml:"orca"`
 }
 
 // All returns the users in a stable order.
-func (u Users) All() []User { return []User{u.Orca, u.Reviewer, u.ReviewerCI} }
+func (u Users) All() []User { return []User{u.Orca} }
 
 // User is one OS user on the server. UID 0 means the uid is not managed.
 type User struct {
@@ -106,20 +106,41 @@ func (r Repo) Owner() string { o, _, _ := strings.Cut(r.Name, "/"); return o }
 // Repo returns the repository part of Name.
 func (r Repo) Repo() string { _, n, _ := strings.Cut(r.Name, "/"); return n }
 
-// Bot is the GitHub identity the reviewer posts as.
+// Bot is the owner's GitHub login: in single-user mode the reviewer posts,
+// sets statuses and merges with the owner's own gh login. Empty means the
+// login gh is authenticated as; when set it must equal that login.
 type Bot struct {
 	Login string `yaml:"login"`
 }
 
-// Review configures `gbai review run` and its reviewer-ci side.
+// Review configures `gbai review run` and its checks side.
 type Review struct {
-	// Checks are run in order inside the merged tree as reviewer-ci. Each is
-	// split on whitespace into argv; no shell is involved.
+	// Checks are run in order inside a copy of the merged tree, without
+	// GitHub credentials. Each is split on whitespace into argv; no shell is
+	// involved.
 	Checks         []string `yaml:"checks"`
 	AutoMerge      bool     `yaml:"auto_merge"`
 	HumanOnlyPaths []string `yaml:"human_only_paths"`
 	// PiCredentialEnv names the env var that receives the pi model credential.
 	PiCredentialEnv string `yaml:"pi_credential_env"`
+	// StateDir holds the reviewer's own clone, worktrees and check
+	// workspaces. Empty means $XDG_STATE_HOME/gbai/reviewer, else
+	// ~/.local/state/gbai/reviewer, resolved on the host that runs the review.
+	StateDir string `yaml:"state_dir,omitempty"`
+}
+
+// StateDirFrom resolves the reviewer state dir with getenv (os.Getenv).
+func (r Review) StateDirFrom(getenv func(string) string) (string, error) {
+	if r.StateDir != "" {
+		return r.StateDir, nil
+	}
+	if xdg := getenv("XDG_STATE_HOME"); path.IsAbs(xdg) {
+		return path.Join(xdg, "gbai", "reviewer"), nil
+	}
+	if home := getenv("HOME"); path.IsAbs(home) {
+		return path.Join(home, ".local", "state", "gbai", "reviewer"), nil
+	}
+	return "", errors.New("reviewer state dir: set review.state_dir, XDG_STATE_HOME or HOME")
 }
 
 // CheckArgv returns each check split into argv.
@@ -181,8 +202,6 @@ func (c Config) Marshal() ([]byte, error) {
 
 func (c *Config) applyDefaults() {
 	defaultUser(&c.Users.Orca, User{Name: "orca", Home: "/data/home", ExtraPath: []string{"/data/home/.local/bin"}})
-	defaultUser(&c.Users.Reviewer, User{Name: "reviewer", Home: "/data/reviewer", UID: 2000})
-	defaultUser(&c.Users.ReviewerCI, User{Name: "reviewer-ci", Home: "/data/reviewer-ci", UID: 2001})
 	defaultString(&c.Runtimes.Coder, RuntimeClaude)
 	defaultString(&c.Runtimes.Reviewer, RuntimePi)
 	defaultString(&c.Runtimes.Assistant, RuntimeClaude)
@@ -226,17 +245,12 @@ func (c Config) validate() error {
 	check(idPattern.MatchString(r.EnvironmentID), "server.railway.environment_id", "required id")
 	check(idPattern.MatchString(r.ServiceID), "server.railway.service_id", "required id")
 
-	seen := map[string]bool{}
-	for key, u := range map[string]User{"orca": c.Users.Orca, "reviewer": c.Users.Reviewer, "reviewer_ci": c.Users.ReviewerCI} {
-		field := "users." + key
-		check(userPattern.MatchString(u.Name), field+".name", "must be a lowercase POSIX user name")
-		check(pathPattern.MatchString(u.Home), field+".home", "must be an absolute path of safe characters")
-		check(u.UID >= 0, field+".uid", "must not be negative")
-		for _, p := range u.ExtraPath {
-			check(pathPattern.MatchString(p), field+".extra_path", "entries must be absolute paths of safe characters")
-		}
-		check(!seen[u.Name], field+".name", fmt.Sprintf("duplicate user name %q", u.Name))
-		seen[u.Name] = true
+	u := c.Users.Orca
+	check(userPattern.MatchString(u.Name), "users.orca.name", "must be a lowercase POSIX user name")
+	check(pathPattern.MatchString(u.Home), "users.orca.home", "must be an absolute path of safe characters")
+	check(u.UID >= 0, "users.orca.uid", "must not be negative")
+	for _, p := range u.ExtraPath {
+		check(pathPattern.MatchString(p), "users.orca.extra_path", "entries must be absolute paths of safe characters")
 	}
 
 	for field, rt := range map[string]Runtime{"runtimes.coder": c.Runtimes.Coder, "runtimes.reviewer": c.Runtimes.Reviewer, "runtimes.assistant": c.Runtimes.Assistant} {
@@ -244,7 +258,7 @@ func (c Config) validate() error {
 	}
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")
-	check(loginPattern.MatchString(c.Bot.Login), "bot.login", "required GitHub login")
+	check(c.Bot.Login == "" || loginPattern.MatchString(c.Bot.Login), "bot.login", "must be the owner's GitHub login")
 
 	check(len(c.Review.Checks) > 0, "review.checks", "at least one check is required")
 	for _, ch := range c.Review.Checks {
@@ -257,6 +271,9 @@ func (c Config) validate() error {
 	}
 	check(envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
 	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")
+	check(c.Coder.Login == "" || !strings.EqualFold(c.Coder.Login, c.Bot.Login), "coder.login",
+		"must differ from bot.login: the audit flags every merge by the coder login")
+	check(c.Review.StateDir == "" || pathPattern.MatchString(c.Review.StateDir), "review.state_dir", "must be an absolute path of safe characters")
 	check(filePattern.MatchString(c.Sessions.LocalOrca), "sessions.local_orca", "must be a command name or path")
 	for key, s := range map[string]Session{"coder": c.Sessions.Coder, "reviewer": c.Sessions.Reviewer, "assistant": c.Sessions.Assistant} {
 		check(s.PromptFile == "" || filePattern.MatchString(s.PromptFile), "sessions."+key+".prompt_file", "must be a path of safe characters")

@@ -44,9 +44,16 @@ type Snapshot struct {
 	Tree  []byte   // tar archive of the merged tree
 }
 
+// ErrDirtyClone means the reviewer's own state clone is not a clean checkout
+// of the integration branch; the run refuses to start.
+var ErrDirtyClone = errors.New("reviewer state clone is not a clean checkout of the integration branch")
+
 // Git manages the reviewer's private clone and per-review worktrees.
 // Worktrees are addressed by name; RemoveWorktree of a missing one is a no-op.
 type Git interface {
+	// Guard returns an error wrapping ErrDirtyClone unless the state clone
+	// is missing (a fresh state) or a clean checkout of integration.
+	Guard(ctx context.Context, integration string) error
 	Prepare(ctx context.Context, number int, integration string) error
 	AddWorktree(ctx context.Context, name, integration string) error
 	// MergePinned merges sha into the worktree without committing.
@@ -61,8 +68,8 @@ type CheckOutcome struct {
 	Output []byte
 }
 
-// Checks runs untrusted commands as reviewer-ci in a workspace holding a
-// copy of the merged tree. Cleanup of a missing workspace is a no-op.
+// Checks runs untrusted commands, without GitHub credentials, in a workspace
+// holding a copy of the merged tree. Cleanup of a missing workspace is a no-op.
 type Checks interface {
 	Prepare(ctx context.Context, workspace string, tree []byte) error
 	Run(ctx context.Context, workspace string, argv []string) (CheckOutcome, error)
@@ -83,7 +90,7 @@ type Orca interface {
 	Send(ctx context.Context, to, subject string) error
 }
 
-// Workspace stores reviewer-ci copies of merged trees.
+// Workspace stores the checks' copies of merged trees.
 type Workspace interface {
 	// Create replaces the named workspace with the tar archive read from r.
 	Create(name string, r io.Reader) (dir string, err error)
@@ -94,9 +101,10 @@ type Workspace interface {
 	Remove(name string) error
 }
 
-// Process is one entry of the process table.
+// Process is one entry of the process table. Cwd is empty when unreadable.
 type Process struct {
 	PID, PPID, UID int
+	Cwd            string
 }
 
 // Processes reads the process table and stops processes.

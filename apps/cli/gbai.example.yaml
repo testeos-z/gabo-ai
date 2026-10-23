@@ -6,19 +6,13 @@ server:
     environment_id: 5bea8b6f-afec-471f-a757-fc57979b7a24
     service_id: fb7c97ca-82e3-4554-8463-1d00e95fa57f
 
+# Single-user mode: the agent sessions and the reviewer all run as this OS
+# user, with the owner's own gh login. There are no reviewer users or sudo rules.
 users:
   orca:
     name: orca
     home: /data/home
     extra_path: [/data/home/.local/bin]
-  reviewer:
-    name: reviewer
-    home: /data/reviewer
-    uid: 2000
-  reviewer_ci:
-    name: reviewer-ci
-    home: /data/reviewer-ci
-    uid: 2001
 
 runtimes:
   coder: claude
@@ -29,12 +23,16 @@ repo:
   name: cappy-lab/vulcam
   integration_branch: dev
 
+# The owner's GitHub login: the reviewer posts, sets statuses and merges with
+# it, and `gbai audit` / `gbai status` count only its verdict comments.
+# Leave empty to use the login gh is authenticated as; when set it must match it.
 bot:
-  login: vulcambot
+  login: ""
 
-# `gbai review run` (as reviewer) and its reviewer-ci side.
+# `gbai review run` (as the orca user) and its checks side.
 review:
-  # Run in order inside the merged tree as reviewer-ci; split on whitespace, no shell.
+  # Run in order inside a copy of the merged tree, with GitHub credentials
+  # stripped from the environment; split on whitespace, no shell.
   checks:
     - bun install --frozen-lockfile
     - bun run build
@@ -56,8 +54,12 @@ review:
     - agents/
   # Env var that receives the pi model credential (claude uses CLAUDE_CODE_OAUTH_TOKEN).
   pi_credential_env: ANTHROPIC_API_KEY
+  # Reviewer state (its own clone/, worktrees/ and ci/ workspaces), 0700.
+  # Default: $XDG_STATE_HOME/gbai/reviewer, else ~/.local/state/gbai/reviewer.
+  # state_dir: /data/home/.local/state/gbai/reviewer
 
-# GitHub login the coder pushes with; `gbai audit` flags any merge by it.
+# GitHub login the coder pushes with, only when it differs from the owner's;
+# `gbai audit` flags any merge by it. In single-user mode it is usually unset.
 # coder:
 #   login: vulcam-coder
 

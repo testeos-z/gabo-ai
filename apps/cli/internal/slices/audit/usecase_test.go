@@ -185,3 +185,22 @@ func TestAuditWithoutCoderLoginSkipsCoderRule(t *testing.T) {
 		t.Fatalf("Audit() = %+v, %v", rep, err)
 	}
 }
+
+// R3-002: normalizing comment authors must not write into the slice the port
+// returned.
+func TestAuditDoesNotMutateThePortsComments(t *testing.T) {
+	t.Parallel()
+	listed := []verdict.Comment{signed("VulcamBot[bot]", verdict.Clean, head('1'))}
+	gh := &fakeGitHub{
+		merged:   []MergedPR{{Number: 1, MergedBy: "vulcambot", HeadSHA: head('1')}},
+		statuses: map[string][]CommitStatus{head('1'): good()},
+		comments: map[int][]verdict.Comment{1: listed},
+	}
+	rep, err := NewUseCase(gh, settings).Audit(context.Background(), time.Time{})
+	if err != nil || len(rep.Violations) != 0 {
+		t.Fatalf("Audit() = %+v, %v", rep, err)
+	}
+	if listed[0].Author != "VulcamBot[bot]" {
+		t.Fatalf("port slice mutated: author = %q", listed[0].Author)
+	}
+}

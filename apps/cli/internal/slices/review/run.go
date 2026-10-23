@@ -30,9 +30,12 @@ type RunConfig struct {
 	Checks       [][]string // argv of each check, run in order until one fails
 	Policy       MergePolicy
 	MaxDiffBytes int // diff budget in the prompt; 0 means the default
-	// KeepWorktree leaves the worktree and the reviewer-ci workspace in place
+	// KeepWorktree leaves the worktree and the checks workspace in place
 	// for debugging; by default both are removed.
 	KeepWorktree bool
+	// Login, when set, is the owner's configured GitHub login; the gh login
+	// the reviewer posts with must match it or the merge gate stays closed.
+	Login string
 }
 
 // Report is the outcome of a run: the summary line plus diagnostic notes
@@ -70,13 +73,15 @@ func (u *RunUseCase) WithLock(l Lock) *RunUseCase {
 	return u
 }
 
-// WorkspaceName names the worktree and the reviewer-ci workspace of a review.
+// WorkspaceName names the worktree and the checks workspace of a review.
 func WorkspaceName(number int, sha string) string {
 	return fmt.Sprintf("pr-%d-%s", number, sha[:7])
 }
 
-// Run reviews PR number at sha. It returns an error only for invalid input;
-// every other failure is reported as verdict=error in the summary.
+// Run reviews PR number at sha. It returns an error for invalid input and
+// when it refuses to run because its own state clone is not a clean checkout
+// of the integration branch (nothing is read or posted then); every other
+// failure is reported as verdict=error in the summary.
 func (u *RunUseCase) Run(ctx context.Context, number int, sha string) (Report, error) {
 	if err := errors.Join(ValidatePR(number), ValidateSHA(sha)); err != nil {
 		return Report{}, err
@@ -89,6 +94,9 @@ func (u *RunUseCase) Run(ctx context.Context, number int, sha string) (Report, e
 			return r, nil
 		}
 		defer release()
+	}
+	if err := u.git.Guard(ctx, u.cfg.Policy.Integration); err != nil {
+		return Report{}, fmt.Errorf("refusing to review: %w", err)
 	}
 
 	pr, err := u.gh.PullRequest(ctx, number)
@@ -148,7 +156,7 @@ func (u *RunUseCase) evaluate(ctx context.Context, number int, sha string, r *Re
 		return Evidence{Infra: fmt.Errorf("prepare clone: %w", err)}, nil
 	}
 	if u.cfg.KeepWorktree {
-		r.note("keeping worktree and reviewer-ci workspace %s", name)
+		r.note("keeping worktree and checks workspace %s", name)
 	} else {
 		defer func() {
 			if err := u.git.RemoveWorktree(cleanupCtx, name); err != nil {
@@ -247,6 +255,9 @@ func (u *RunUseCase) thread(ctx context.Context, number int) (string, []Comment,
 	login, err := u.gh.Login(ctx)
 	if err != nil {
 		return "", nil, fmt.Errorf("reviewer login: %w", err)
+	}
+	if u.cfg.Login != "" && !strings.EqualFold(login, u.cfg.Login) {
+		return "", nil, fmt.Errorf("gh is logged in as %s, but bot.login is the owner %s", login, u.cfg.Login)
 	}
 	comments, err := u.gh.Comments(ctx, number)
 	if err != nil {

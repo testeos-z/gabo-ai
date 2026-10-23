@@ -2,9 +2,13 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
 )
 
 func TestRootHelpListsVersion(t *testing.T) {
@@ -55,9 +59,14 @@ func TestProvisionDryRunPrintsPlanFromExampleConfig(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, want := range []string{"# step: packages", "orca ALL=(reviewer) NOPASSWD: /usr/local/libexec/gbai/review-run"} {
+	for _, want := range []string{"# step: packages", "# step: legacy", "id -u 'orca'"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("plan missing %q:\n%s", want, out.String())
+		}
+	}
+	for _, banned := range []string{"NOPASSWD", "useradd", "reviewer-ci"} {
+		if strings.Contains(out.String(), banned) {
+			t.Fatalf("single-user plan contains %q:\n%s", banned, out.String())
 		}
 	}
 }
@@ -142,5 +151,30 @@ func TestInitDryRunChangesNothing(t *testing.T) {
 	}
 	if entries, _ := os.ReadDir(home); len(entries) != 0 {
 		t.Fatalf("dry run wrote %v", entries)
+	}
+}
+
+func TestOwnerLoginDefaultsToTheGhLogin(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("Owner\n")}}
+	got, err := ownerLogin(context.Background(), r, "")
+	if err != nil || got != "Owner" {
+		t.Fatalf("ownerLogin() = %q, %v", got, err)
+	}
+	if c := r.Calls[0].Command; c.Name != "gh" || strings.Join(c.Args, " ") != "api user --jq .login" {
+		t.Fatalf("command = %s %q", c.Name, c.Args)
+	}
+	r = &kerneltest.Runner{}
+	if got, err := ownerLogin(context.Background(), r, "configured"); err != nil || got != "configured" || len(r.Calls) != 0 {
+		t.Fatalf("configured login = %q, %v, calls %d", got, err, len(r.Calls))
+	}
+	for name, res := range map[string]kernel.Result{
+		"gh fails": {ExitCode: 1, Stderr: []byte("not logged in")},
+		"empty":    {Stdout: []byte("\n")},
+		"garbage":  {Stdout: []byte("a b")},
+	} {
+		if _, err := ownerLogin(context.Background(), &kerneltest.Runner{Result: res}, ""); err == nil {
+			t.Errorf("%s: error = nil", name)
+		}
 	}
 }

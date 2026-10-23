@@ -25,11 +25,9 @@ func (f *fakeBinary) ReadBinary(path string) ([]byte, error) {
 
 func settings() Settings {
 	return Settings{
-		Orca:       Account{Name: "orca", Home: "/data/home", Path: []string{"/data/home/.local/bin"}},
-		Reviewer:   Account{Name: "reviewer", Home: "/data/reviewer", UID: 2000},
-		ReviewerCI: Account{Name: "reviewer-ci", Home: "/data/reviewer-ci", UID: 2001, Path: []string{"/data/reviewer-ci/.local/bin"}},
-		Config:     []byte("repo:\n  name: o/r\n"),
-		SkillsTar:  []byte("SKILLS-TAR"),
+		Orca:      Account{Name: "orca", Home: "/data/home", Path: []string{"/data/home/.local/bin"}},
+		Config:    []byte("repo:\n  name: o/r\n"),
+		SkillsTar: []byte("SKILLS-TAR"),
 	}
 }
 
@@ -71,7 +69,7 @@ func TestRunExecutesEveryStepAsRootInOrder(t *testing.T) {
 	t.Parallel()
 	shell := &kerneltest.RemoteShell{}
 	out := run(t, shell, &fakeBinary{data: linuxELF(t)}, Input{BinaryPath: "/tmp/gbai"})
-	want := []string{"packages", "users", "config", "binary", "wrappers", "sudoers", "skills"}
+	want := []string{"packages", "user", "config", "binary", "legacy", "skills"}
 	if len(shell.Calls) != len(want) {
 		t.Fatalf("calls = %d, want %d", len(shell.Calls), len(want))
 	}
@@ -91,38 +89,28 @@ func TestPackagesInstallOnlyWhenMissing(t *testing.T) {
 	shell := &kerneltest.RemoteShell{}
 	run(t, shell, &fakeBinary{data: linuxELF(t)}, Input{})
 	body := script(t, shell, "packages").Script.Body
-	for _, want := range []string{"command -v sudo", "command -v git", "apt-get install", `if [ -n "$missing" ]`} {
+	for _, want := range []string{"command -v git", "apt-get install", `if [ -n "$missing" ]`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("packages script missing %q:\n%s", want, body)
 		}
 	}
+	if strings.Contains(body, "sudo") {
+		t.Errorf("single-user mode needs no sudo:\n%s", body)
+	}
 }
 
-func TestUsersAreIdempotentAndNeverModifyOrca(t *testing.T) {
+func TestUserStepOnlyChecksTheOrcaUser(t *testing.T) {
 	t.Parallel()
 	shell := &kerneltest.RemoteShell{}
 	run(t, shell, &fakeBinary{data: linuxELF(t)}, Input{})
-	body := script(t, shell, "users").Script.Body
-	for _, want := range []string{
-		"id -u 'reviewer' >/dev/null 2>&1 || useradd --uid '2000' --gid 'reviewer' --home-dir '/data/reviewer'",
-		"id -u 'reviewer-ci' >/dev/null 2>&1 || useradd --uid '2001' --gid 'reviewer-ci' --home-dir '/data/reviewer-ci'",
-		"getent group 'reviewer' >/dev/null || groupadd --gid '2000' 'reviewer'",
-		"chmod 700 '/data/reviewer'",
-		"chmod 700 '/data/reviewer-ci'",
-		"install -d -o 'reviewer' -g 'reviewer' -m 700 '/data/reviewer/work'",
-		"id -u 'orca' >/dev/null 2>&1 ||",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("users script missing %q:\n%s", want, body)
-		}
+	body := script(t, shell, "user").Script.Body
+	if !strings.Contains(body, "id -u 'orca' >/dev/null 2>&1 ||") {
+		t.Errorf("user script does not check orca:\n%s", body)
 	}
-	for _, line := range strings.Split(body, "\n") {
-		if strings.Contains(line, "'orca'") && !strings.HasPrefix(line, "id -u 'orca'") {
-			t.Errorf("orca touched beyond reading: %q", line)
+	for _, banned := range []string{"useradd", "groupadd", "chown", "chmod", "reviewer"} {
+		if strings.Contains(body, banned) {
+			t.Errorf("user script contains %q:\n%s", banned, body)
 		}
-	}
-	if strings.Contains(body, "/data/reviewer/secrets") {
-		t.Errorf("users script must not create secret dirs:\n%s", body)
 	}
 }
 
@@ -164,53 +152,33 @@ func TestConfigIsInstalledReadOnlyForUsers(t *testing.T) {
 	}
 }
 
-func TestWrappersValidateArgumentsAndScrubEnvironment(t *testing.T) {
+func TestLegacyStepRemovesTheSudoPathOfTheThreeUserModel(t *testing.T) {
 	t.Parallel()
 	shell := &kerneltest.RemoteShell{}
 	run(t, shell, &fakeBinary{data: linuxELF(t)}, Input{})
-	body := script(t, shell, "wrappers").Script.Body
+	body := script(t, shell, "legacy").Script.Body
 	for _, want := range []string{
-		"/usr/local/libexec/gbai/review-run",
-		"/usr/local/libexec/gbai/review-ci",
-		`[ "$#" -eq 3 ] && [ "$1" = head ]`,
-		`*[!0-9a-f]*`,
-		`exec env -i HOME='/data/reviewer' USER='reviewer'`,
-		`/usr/local/bin/gbai --config /etc/gbai/gbai.yaml review run head "$2" "$3"`,
-		`exec env -i HOME='/data/reviewer-ci' USER='reviewer-ci'`,
-		"PATH='/data/reviewer-ci/.local/bin:/usr/local/sbin:",
-		`/usr/local/bin/gbai --config /etc/gbai/gbai.yaml review ci "$@"`,
-		"chown root:root",
-		"chmod 755",
-		`sh -n "$tmp"`,
+		"rm -f '/etc/sudoers.d/gbai-reviewer' '/usr/local/libexec/gbai/review-run' '/usr/local/libexec/gbai/review-ci'",
+		"rmdir '/usr/local/libexec/gbai' 2>/dev/null || true",
 	} {
 		if !strings.Contains(body, want) {
-			t.Errorf("wrappers script missing %q:\n%s", want, body)
+			t.Errorf("legacy script missing %q:\n%s", want, body)
+		}
+	}
+	for _, banned := range []string{"userdel", "rm -rf", "visudo", "cat >"} {
+		if strings.Contains(body, banned) {
+			t.Errorf("legacy script contains %q:\n%s", banned, body)
 		}
 	}
 }
 
-func TestSudoersIsValidatedBeforeMove(t *testing.T) {
+func TestPlanHasNoReviewerUsersSudoersOrWrappers(t *testing.T) {
 	t.Parallel()
-	shell := &kerneltest.RemoteShell{}
-	run(t, shell, &fakeBinary{data: linuxELF(t)}, Input{})
-	body := script(t, shell, "sudoers").Script.Body
-	for _, want := range []string{
-		"\norca ALL=(reviewer) NOPASSWD: /usr/local/libexec/gbai/review-run\n",
-		"\nreviewer ALL=(reviewer-ci) NOPASSWD: /usr/local/libexec/gbai/review-ci\n",
-		"chmod 440",
-	} {
-		if !strings.Contains(body, want) {
-			t.Errorf("sudoers script missing %q:\n%s", want, body)
-		}
-	}
-	check, move := strings.Index(body, `visudo -cf "$tmp"`), strings.Index(body, `mv -f "$tmp" '/etc/sudoers.d/gbai-reviewer'`)
-	if check < 0 || move < 0 || move < check {
-		t.Fatalf("visudo -cf must run before the move:\n%s", body)
-	}
-	for _, line := range strings.Split(body, "\n") {
-		if strings.Contains(line, "/etc/sudoers") && !strings.Contains(line, "/etc/sudoers.d/") &&
-			!strings.HasPrefix(strings.TrimSpace(line), "grep -Eq") {
-			t.Errorf("line touches other sudoers files: %q", line)
+	out := run(t, &kerneltest.RemoteShell{}, &fakeBinary{}, Input{DryRun: true})
+	plan := strings.Join(out.Lines, "\n")
+	for _, banned := range []string{"useradd", "reviewer-ci", "NOPASSWD", "sudo -n", "install_wrapper", "/data/reviewer"} {
+		if strings.Contains(plan, banned) {
+			t.Errorf("plan contains %q:\n%s", banned, plan)
 		}
 	}
 }
@@ -224,7 +192,7 @@ func TestDryRunPrintsPlanWithoutReadingOrExecuting(t *testing.T) {
 		t.Fatalf("dry run touched remote (%d) or binary (%d)", len(shell.Calls), len(bin.calls))
 	}
 	text := strings.Join(out.Lines, "\n")
-	for _, name := range []string{"packages", "users", "config", "binary", "wrappers", "sudoers", "skills"} {
+	for _, name := range []string{"packages", "user", "config", "binary", "legacy", "skills"} {
 		if !strings.Contains(text, "# step: "+name) {
 			t.Errorf("plan missing step %s", name)
 		}
@@ -252,9 +220,9 @@ func TestRejectsNonELFBinaryBeforeRemote(t *testing.T) {
 
 func TestFailingStepStopsWithStderr(t *testing.T) {
 	t.Parallel()
-	shell := &kerneltest.RemoteShell{Results: []kernel.Result{{}, {ExitCode: 1, Stderr: []byte("useradd: boom")}}}
+	shell := &kerneltest.RemoteShell{Results: []kernel.Result{{}, {ExitCode: 1, Stderr: []byte("orca user is missing")}}}
 	_, err := NewUseCase(shell, &fakeBinary{data: linuxELF(t)}, settings()).Run(context.Background(), Input{})
-	if err == nil || !strings.Contains(err.Error(), "users") || !strings.Contains(err.Error(), "useradd: boom") {
+	if err == nil || !strings.Contains(err.Error(), "step user") || !strings.Contains(err.Error(), "orca user is missing") {
 		t.Fatalf("error = %v", err)
 	}
 	if len(shell.Calls) != 2 {
@@ -265,12 +233,12 @@ func TestFailingStepStopsWithStderr(t *testing.T) {
 func TestQuotesValuesFromConfig(t *testing.T) {
 	t.Parallel()
 	s := settings()
-	s.Reviewer.Home = "/data/it's"
+	s.Orca.Home = "/data/it's"
 	shell := &kerneltest.RemoteShell{}
 	if _, err := NewUseCase(shell, &fakeBinary{data: linuxELF(t)}, s).Run(context.Background(), Input{}); err != nil {
 		t.Fatal(err)
 	}
-	if body := script(t, shell, "users").Script.Body; !strings.Contains(body, `'/data/it'\''s'`) {
+	if body := script(t, shell, "skills").Script.Body; !strings.Contains(body, `'/data/it'\''s/.claude/skills'`) {
 		t.Fatalf("home not shell-quoted:\n%s", body)
 	}
 }

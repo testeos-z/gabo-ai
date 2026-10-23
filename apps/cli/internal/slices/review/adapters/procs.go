@@ -86,7 +86,9 @@ func (p ProcFS) read(pid int) (review.Process, bool) {
 			if err != nil {
 				break
 			}
-			return review.Process{PID: pid, PPID: ppid, UID: uid}, true
+			// cwd is readable only for our own processes; empty otherwise.
+			cwd, _ := os.Readlink(filepath.Join(dir, "cwd"))
+			return review.Process{PID: pid, PPID: ppid, UID: uid, Cwd: cwd}, true
 		}
 	}
 	return review.Process{}, false

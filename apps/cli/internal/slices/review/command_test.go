@@ -131,12 +131,21 @@ func TestRequestAndNotifyCommands(t *testing.T) {
 	t.Parallel()
 	o := &fakeOrca{t: &trace{}}
 	f := Factories{
-		Request: func(context.Context) (*RequestUseCase, error) { return NewRequestUseCase(o, "reviewer"), nil },
+		Request: func(context.Context) (*RequestUseCase, error) { return NewRequestUseCase(o), nil },
 		Notify:  func(context.Context) (*NotifyUseCase, error) { return NewNotifyUseCase(o), nil },
 	}
 	out, _, err := executeReview(t, f, "", "request", "--pr", "12", "--sha", sha, "--notify", "run:abc")
 	if err != nil || !strings.Contains(out, "gbai-review-12-0123456") {
 		t.Fatalf("request = %q, %v", out, err)
+	}
+	if strings.Contains(o.command, "--keep-worktree") {
+		t.Fatalf("keep-worktree forwarded without the flag: %q", o.command)
+	}
+	if _, _, err := executeReview(t, f, "", "request", "--pr", "12", "--sha", sha, "--notify", "run:abc", "--keep-worktree"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(o.command, sha+" --keep-worktree | ") {
+		t.Fatalf("request --keep-worktree not forwarded: %q", o.command)
 	}
 	line := "PR #12 head " + sha + " verdict=blocking merge=none"
 	out, _, err = executeReview(t, f, "noise\n"+line+"\n", "notify", "--to", "run:abc", "--pr", "12", "--sha", sha)

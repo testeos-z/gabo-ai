@@ -1,7 +1,9 @@
 // Package audit cross-checks GitHub: every PR merged into the integration
 // branch must have been merged by the bot, never by the coder, carry a
 // successful reviewer/review status set by the bot on its head commit, and
-// hold a clean verdict comment by the bot whose marker signs that head.
+// hold a clean verdict comment by the bot whose marker signs that head. In
+// single-user mode "the bot" is the owner's own GitHub login, the one the
+// reviewer posts and merges with.
 package audit
 
 import (
@@ -20,8 +22,9 @@ const ReviewContext = "reviewer/review"
 // ErrViolations is returned by the command when the report holds violations.
 var ErrViolations = errors.New("audit found violations")
 
-// Settings name the integration branch and the identities. An empty Coder
-// skips the coder-merge rule.
+// Settings name the integration branch and the identities. Bot is the
+// reviewer's login (the owner's in single-user mode). An empty Coder skips
+// the coder-merge rule.
 type Settings struct {
 	Integration string
 	Bot         string
@@ -101,13 +104,16 @@ func (u *UseCase) checkVerdict(ctx context.Context, pr MergedPR) []string {
 		return []string{fmt.Sprintf("could not read comments of PR %d: %v", pr.Number, err)}
 	}
 	// GitHub logins are case-insensitive and apps post as "<name>[bot]".
+	// Normalize a copy: the slice belongs to the port.
 	bot := u.s.Bot
+	normalized := make([]verdict.Comment, len(comments))
 	for i, c := range comments {
 		if sameLogin(c.Author, bot) {
-			comments[i].Author = bot
+			c.Author = bot
 		}
+		normalized[i] = c
 	}
-	c, signed, ok := verdict.NewestSigned(comments, bot)
+	c, signed, ok := verdict.NewestSigned(normalized, bot)
 	switch {
 	case !ok:
 		return []string{fmt.Sprintf("no reviewer verdict comment by %s on PR %d", orNobody(bot), pr.Number)}

@@ -19,47 +19,98 @@ import (
 // in the clone's config.
 var credentialFlags = []string{"-c", "credential.helper=", "-c", "credential.helper=!gh auth git-credential"}
 
-// Git implements review.Git with a private clone at <workDir>/repo and
-// worktrees at <workDir>/<name>.
+// Git implements review.Git under the reviewer's own state dir: a clone
+// checked out on the integration branch at <stateDir>/clone and per-review
+// worktrees at <stateDir>/worktrees/<name>.
 type Git struct {
 	runner    kernel.Runner
 	repo      string
-	workDir   string
+	stateDir  string
 	removeAll func(string) error
+	lstat     func(string) (os.FileInfo, error)
 }
 
 var _ review.Git = (*Git)(nil)
 
 // NewGit returns a git adapter. removeAll defaults to os.RemoveAll.
-func NewGit(r kernel.Runner, repo, workDir string, removeAll func(string) error) *Git {
+func NewGit(r kernel.Runner, repo, stateDir string, removeAll func(string) error) *Git {
 	if removeAll == nil {
 		removeAll = os.RemoveAll
 	}
-	return &Git{runner: r, repo: repo, workDir: workDir, removeAll: removeAll}
+	return &Git{runner: r, repo: repo, stateDir: stateDir, removeAll: removeAll, lstat: os.Lstat}
 }
 
-func (g *Git) clone() string { return path.Join(g.workDir, "repo") }
+func (g *Git) clone() string { return path.Join(g.stateDir, "clone") }
 
 func (g *Git) worktree(name string) (string, error) {
 	if err := review.ValidateWorkspace(name); err != nil {
 		return "", err
 	}
-	return path.Join(g.workDir, name), nil
+	return path.Join(g.stateDir, "worktrees", name), nil
+}
+
+// exists reports whether p exists; errors other than not-exist are returned.
+func (g *Git) exists(p string) (bool, error) {
+	_, err := g.lstat(p)
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// Guard refuses (ErrDirtyClone) a state clone that is not a clean checkout
+// of the integration branch: not its own repository, not on the branch, or
+// with any tracked, untracked or ignored change. A missing clone is a fresh
+// state that Prepare clones.
+func (g *Git) Guard(ctx context.Context, integration string) error {
+	clone := g.clone()
+	ok, err := g.exists(clone)
+	if err != nil {
+		return fmt.Errorf("stat state clone: %w", err)
+	}
+	if !ok {
+		return nil
+	}
+	// --git-dir is ".git" only at the top of a non-bare repository; a plain
+	// directory inside another repository resolves to that repository.
+	res, err := g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", clone, "rev-parse", "--git-dir"}})
+	if err != nil {
+		return err
+	}
+	if res.ExitCode != 0 || strings.TrimSpace(string(res.Stdout)) != ".git" {
+		return fmt.Errorf("%w: %s is not its own git checkout", review.ErrDirtyClone, clone)
+	}
+	res, err = g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", clone, "symbolic-ref", "--quiet", "--short", "HEAD"}})
+	if err != nil {
+		return err
+	}
+	if branch := strings.TrimSpace(string(res.Stdout)); res.ExitCode != 0 || branch != integration {
+		return fmt.Errorf("%w: %s is on %q, not %q", review.ErrDirtyClone, clone, branch, integration)
+	}
+	status, err := g.git(ctx, "-C", clone, "status", "--porcelain=v1", "--untracked-files=all", "--ignored")
+	if err != nil {
+		return err
+	}
+	if changed := strings.TrimSpace(string(status.Stdout)); changed != "" {
+		return fmt.Errorf("%w: %s has %d changed paths", review.ErrDirtyClone, clone, len(strings.Split(changed, "\n")))
+	}
+	return nil
 }
 
 func (g *Git) git(ctx context.Context, args ...string) (kernel.Result, error) {
 	return run(ctx, g.runner, kernel.Command{Name: "git", Args: args})
 }
 
-// Prepare clones the repository when missing and fetches the integration
-// branch and the PR head.
+// Prepare clones the repository on the integration branch when missing,
+// fetches the integration branch and the PR head, and fast-forwards the
+// checkout so the clone stays a clean mirror of the integration branch.
 func (g *Git) Prepare(ctx context.Context, n int, integration string) error {
 	res, err := g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", g.clone(), "rev-parse", "--git-dir"}})
 	if err != nil {
 		return err
 	}
 	if res.ExitCode != 0 {
-		args := append(slices.Clone(credentialFlags), "clone", "--no-checkout", "https://github.com/"+g.repo+".git", g.clone())
+		args := append(slices.Clone(credentialFlags), "clone", "--branch", integration, "https://github.com/"+g.repo+".git", g.clone())
 		if _, err := g.git(ctx, args...); err != nil {
 			return fmt.Errorf("clone: %w", err)
 		}
@@ -70,20 +121,31 @@ func (g *Git) Prepare(ctx context.Context, n int, integration string) error {
 	if _, err := g.git(ctx, args...); err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}
+	if _, err := g.git(ctx, "-C", g.clone(), "-c", "core.hooksPath=/dev/null", "merge", "--ff-only", "--quiet", "refs/remotes/origin/"+integration); err != nil {
+		return fmt.Errorf("fast-forward %s: %w", integration, err)
+	}
 	return nil
 }
 
 // AddWorktree creates a detached worktree at origin/<integration>. A worktree
 // of the same name left by a --keep-worktree run (or a crash) is removed
-// first, so a rerun for the same PR and sha does not collide with it; the
-// name is validated and resolved under the reviewer's own work dir.
+// first, so a rerun for the same PR and sha does not collide with it; on a
+// fresh state nothing is removed. The name is validated and resolved under
+// the reviewer's own worktrees dir. A registration whose directory is gone
+// is cleared by the prune.
 func (g *Git) AddWorktree(ctx context.Context, name, integration string) error {
 	wt, err := g.worktree(name)
 	if err != nil {
 		return err
 	}
-	if err := g.RemoveWorktree(ctx, name); err != nil {
-		return fmt.Errorf("remove stale worktree %s: %w", name, err)
+	stale, err := g.exists(wt)
+	if err != nil {
+		return fmt.Errorf("stat worktree %s: %w", name, err)
+	}
+	if stale {
+		if err := g.RemoveWorktree(ctx, name); err != nil {
+			return fmt.Errorf("remove stale worktree %s: %w", name, err)
+		}
 	}
 	if _, err := g.git(ctx, "-C", g.clone(), "worktree", "prune"); err != nil {
 		return err

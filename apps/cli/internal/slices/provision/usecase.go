@@ -1,6 +1,8 @@
-// Package provision prepares the server, as root, for the reviewer flow:
-// packages, OS users, the gbai binary and config, the root-owned review
-// wrappers and the sudoers drop-in. Every step is idempotent.
+// Package provision prepares the server, as root, for the reviewer flow in
+// single-user mode: packages, a check that the orca user exists, the gbai
+// binary and config, removal of the retired three-user sudo path and the
+// embedded skills. The reviewer runs as the orca user itself, so no OS user,
+// sudo rule or wrapper is created. Every step is idempotent.
 package provision
 
 import (
@@ -13,7 +15,6 @@ import (
 	"fmt"
 	"path"
 	"regexp"
-	"strconv"
 	"strings"
 	"text/template"
 
@@ -22,12 +23,8 @@ import (
 
 // Fixed install locations on the server.
 const (
-	BinaryPath  = kernel.ServerBinaryPath
-	ConfigPath  = kernel.ServerConfigPath
-	ReviewRun   = kernel.ReviewRunPath
-	ReviewCI    = kernel.ReviewCIPath
-	SudoersPath = "/etc/sudoers.d/gbai-reviewer"
-	systemPath  = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+	BinaryPath = kernel.ServerBinaryPath
+	ConfigPath = kernel.ServerConfigPath
 )
 
 // ErrNotLinuxBinary is returned when the binary to install is not a linux ELF executable.
@@ -39,10 +36,10 @@ var (
 	scripts    = template.Must(template.New("").Funcs(template.FuncMap{"q": shellQuote}).ParseFS(templateFS, "provision.sh.tmpl"))
 	userName   = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 	safePath   = regexp.MustCompile(`^/[A-Za-z0-9._/'-]*$`)
-	stepOrder  = []string{"packages", "users", "config", "binary", "wrappers", "sudoers", "skills"}
+	stepOrder  = []string{"packages", "user", "config", "binary", "legacy", "skills"}
 )
 
-// Account is an OS user on the server. Path entries are prepended to the system PATH.
+// Account is an OS user on the server.
 type Account struct {
 	Name string
 	Home string
@@ -52,11 +49,9 @@ type Account struct {
 
 // Settings are the values rendered into the provisioning scripts.
 type Settings struct {
-	Orca       Account
-	Reviewer   Account
-	ReviewerCI Account
-	Config     []byte // gbai.yaml installed at ConfigPath; must not contain secrets
-	SkillsTar  []byte // tar of the embedded skills, installed for the orca user
+	Orca      Account // runs the sessions and, in single-user mode, the reviewer
+	Config    []byte  // gbai.yaml installed at ConfigPath; must not contain secrets
+	SkillsTar []byte  // tar of the embedded skills, installed for the orca user
 }
 
 // Input selects the binary to install and whether to only print the plan.
@@ -130,49 +125,27 @@ type step struct {
 	body string
 }
 
-type account struct {
-	Account
-	UIDText  string
-	PathText string
-}
-
 type view struct {
-	Orca, Reviewer, ReviewerCI account
-	Managed                    []account
-	WorkDir                    string
-	ConfigBase64               string
-	BinaryPath, ConfigPath     string
-	ReviewRun, ReviewCI        string
-	SudoersPath                string
-	SkillDirs                  []string
+	Orca                   Account
+	ConfigBase64           string
+	BinaryPath, ConfigPath string
+	LegacyFiles            []string
+	LegacyDir              string
+	SkillDirs              []string
 }
 
 func render(s Settings) ([]step, error) {
-	for _, a := range []Account{s.Orca, s.Reviewer, s.ReviewerCI} {
-		if !userName.MatchString(a.Name) || !safePath.MatchString(a.Home) {
-			return nil, fmt.Errorf("unsafe account %q", a.Name)
-		}
-		for _, p := range a.Path {
-			if !safePath.MatchString(p) || strings.Contains(p, ":") {
-				return nil, fmt.Errorf("unsafe PATH entry for %q", a.Name)
-			}
-		}
-	}
-	for _, a := range []Account{s.Reviewer, s.ReviewerCI} {
-		if a.UID <= 0 {
-			return nil, fmt.Errorf("account %q needs a managed uid", a.Name)
-		}
+	if !userName.MatchString(s.Orca.Name) || !safePath.MatchString(s.Orca.Home) {
+		return nil, fmt.Errorf("unsafe account %q", s.Orca.Name)
 	}
 	v := view{
-		Orca: wrap(s.Orca), Reviewer: wrap(s.Reviewer), ReviewerCI: wrap(s.ReviewerCI),
-		WorkDir:      path.Join(s.Reviewer.Home, "work"),
+		Orca:         s.Orca,
 		ConfigBase64: base64.StdEncoding.EncodeToString(s.Config),
 		BinaryPath:   BinaryPath, ConfigPath: ConfigPath,
-		ReviewRun: ReviewRun, ReviewCI: ReviewCI, SudoersPath: SudoersPath,
+		LegacyFiles: kernel.LegacyReviewerFiles(),
+		LegacyDir:   kernel.LegacyLibexecDir,
+		SkillDirs:   []string{path.Join(s.Orca.Home, ".claude", "skills"), path.Join(s.Orca.Home, ".pi", "agent", "skills")},
 	}
-	v.Managed = []account{v.Reviewer, v.ReviewerCI}
-	v.SkillDirs = []string{path.Join(s.Orca.Home, ".claude", "skills"), path.Join(s.Orca.Home, ".pi", "agent", "skills")}
-
 	steps := make([]step, 0, len(stepOrder))
 	for _, name := range stepOrder {
 		var b strings.Builder
@@ -182,14 +155,6 @@ func render(s Settings) ([]step, error) {
 		steps = append(steps, step{name: name, body: b.String()})
 	}
 	return steps, nil
-}
-
-func wrap(a Account) account {
-	p := systemPath
-	if len(a.Path) > 0 {
-		p = strings.Join(a.Path, ":") + ":" + systemPath
-	}
-	return account{Account: a, UIDText: strconv.Itoa(a.UID), PathText: p}
 }
 
 func checkLinuxELF(b []byte) error {

@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -95,11 +97,10 @@ func resolveConfigPath(p string, explicit bool) string {
 func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, error)) review.Factories {
 	return review.Factories{
 		Request: func(context.Context) (*review.RequestUseCase, error) {
-			cfg, err := loadConfig()
-			if err != nil {
+			if _, err := loadConfig(); err != nil {
 				return nil, err
 			}
-			return review.NewRequestUseCase(reviewadapters.NewOrca(runner), cfg.Users.Reviewer.Name), nil
+			return review.NewRequestUseCase(reviewadapters.NewOrca(runner)), nil
 		},
 		Notify: func(context.Context) (*review.NotifyUseCase, error) {
 			return review.NewNotifyUseCase(reviewadapters.NewOrca(runner)), nil
@@ -109,13 +110,20 @@ func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, err
 			if err != nil {
 				return nil, err
 			}
-			rv := cfg.Users.Reviewer
-			ci := reviewadapters.NewCIClient(runner, cfg.Users.ReviewerCI.Name, string(cfg.Runtimes.Reviewer),
-				reviewadapters.CredentialReader(path.Join(rv.Home, "secrets")))
+			state, err := reviewerState(cfg)
+			if err != nil {
+				return nil, err
+			}
+			ci, err := newCIUseCase(runner, cfg, state)
+			if err != nil {
+				return nil, err
+			}
+			local := reviewadapters.NewLocalCI(ci, string(cfg.Runtimes.Reviewer),
+				reviewadapters.CredentialReader(path.Join(cfg.Users.Orca.Home, "secrets")))
 			return review.NewRunUseCase(
 				reviewadapters.NewGitHub(runner, cfg.Repo.Name),
-				reviewadapters.NewGit(runner, cfg.Repo.Name, path.Join(rv.Home, "work"), nil),
-				ci, ci,
+				reviewadapters.NewGit(runner, cfg.Repo.Name, state, nil),
+				local, local,
 				review.RunConfig{
 					Checks: cfg.Review.CheckArgv(),
 					Policy: review.MergePolicy{
@@ -124,30 +132,79 @@ func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, err
 						HumanOnlyPaths: cfg.Review.HumanOnlyPaths,
 					},
 					KeepWorktree: keepWorktree,
+					Login:        cfg.Bot.Login,
 				},
-			).WithLock(reviewadapters.NewFileLock(path.Join(rv.Home, ".gbai-review.lock"))), nil
+			).WithLock(reviewadapters.NewFileLock(path.Join(state, "review.lock"))), nil
 		},
 		CI: func(context.Context) (*review.CIUseCase, error) {
 			cfg, err := loadConfig()
 			if err != nil {
 				return nil, err
 			}
-			ciHome := cfg.Users.ReviewerCI.Home
-			return review.NewCIUseCase(
-				reviewadapters.NewDirWorkspace(path.Join(ciHome, "work")),
-				runner,
-				reviewadapters.NewProcFS("/proc", 2*time.Second),
-				review.CIConfig{
-					CredentialEnv: map[string]string{
-						review.RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN",
-						review.RuntimePi:     cfg.Review.PiCredentialEnv,
-					},
-					Path:          os.Getenv("PATH"),
-					UntrustedHome: ciHome,
-				},
-			), nil
+			state, err := reviewerState(cfg)
+			if err != nil {
+				return nil, err
+			}
+			return newCIUseCase(runner, cfg, state)
 		},
 	}
+}
+
+// reviewerState resolves the reviewer's own state dir (clone/, worktrees/,
+// ci/) and creates it private to the current user.
+func reviewerState(cfg config.Config) (string, error) {
+	state, err := cfg.Review.StateDirFrom(os.Getenv)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		return "", fmt.Errorf("create reviewer state dir: %w", err)
+	}
+	return state, nil
+}
+
+// newCIUseCase builds the checks side under <state>/ci: workspaces in work/,
+// a persistent HOME for the checks' caches in home/. In single-user mode it
+// runs as the owner; its environment is built from scratch so no GitHub
+// credential reaches the checks or the engine.
+func newCIUseCase(runner kernel.Runner, cfg config.Config, state string) (*review.CIUseCase, error) {
+	root := path.Join(state, "ci")
+	home := path.Join(root, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return nil, fmt.Errorf("create checks home: %w", err)
+	}
+	return review.NewCIUseCase(
+		reviewadapters.NewDirWorkspace(path.Join(root, "work")),
+		runner,
+		reviewadapters.NewProcFS("/proc", 2*time.Second),
+		review.CIConfig{
+			CredentialEnv: map[string]string{
+				review.RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN",
+				review.RuntimePi:     cfg.Review.PiCredentialEnv,
+			},
+			Path:          os.Getenv("PATH"),
+			Home:          home,
+			User:          os.Getenv("USER"),
+			UntrustedRoot: root,
+		},
+	), nil
+}
+
+// ownerLogin returns the owner's GitHub login: the configured bot.login, or
+// the login gh is authenticated as.
+func ownerLogin(ctx context.Context, runner kernel.Runner, configured string) (string, error) {
+	if configured != "" {
+		return configured, nil
+	}
+	res, err := kernel.RunChecked(ctx, runner, kernel.Command{Name: "gh", Args: []string{"api", "user", "--jq", ".login"}})
+	if err != nil {
+		return "", fmt.Errorf("owner login from gh (or set bot.login): %w", err)
+	}
+	login := strings.TrimSpace(string(res.Stdout))
+	if login == "" || strings.ContainsAny(login, " \t\n") {
+		return "", fmt.Errorf("owner login from gh: unexpected output %q", login)
+	}
+	return login, nil
 }
 
 func provisionAccount(u config.User) provision.Account {

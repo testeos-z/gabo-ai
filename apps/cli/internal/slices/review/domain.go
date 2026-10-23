@@ -1,6 +1,7 @@
 // Package review runs the reviewer flow: requesting a review from the coder's
-// pane, running it inside the reviewer boundary, executing untrusted checks
-// as reviewer-ci and notifying the coder's mailbox with one summary line.
+// pane, running it from the reviewer's own state dir as the owner (single-user
+// mode), executing untrusted checks without GitHub credentials and notifying
+// the coder's mailbox with one summary line.
 package review
 
 import (

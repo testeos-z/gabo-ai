@@ -3,7 +3,9 @@ package review
 import (
 	"context"
 	"errors"
+	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -116,8 +118,8 @@ func TestRunSkipsWhenHeadMovedOrClosed(t *testing.T) {
 		if r.Summary.Verdict != VerdictSkipped || r.Summary.Merge != MergeSkipped {
 			t.Errorf("%s: summary = %s", name, r.Summary)
 		}
-		if len(h.t.calls) != 1 {
-			t.Errorf("%s: calls = %v, want only the PR read", name, h.t.calls)
+		if want := []string{"git.guard dev", "gh.pr 12"}; !slices.Equal(h.t.calls, want) {
+			t.Errorf("%s: calls = %v, want only the guard and the PR read", name, h.t.calls)
 		}
 	}
 }
@@ -312,7 +314,7 @@ func TestRunIsSerializedByTheLock(t *testing.T) {
 	if _, err := uc.Run(context.Background(), 12, sha); err != nil {
 		t.Fatal(err)
 	}
-	if h.t.calls[0] != "lock.acquire" || h.t.calls[1] != "gh.pr 12" || h.t.calls[len(h.t.calls)-1] != "lock.release" {
+	if h.t.calls[0] != "lock.acquire" || h.t.calls[1] != "git.guard dev" || h.t.calls[2] != "gh.pr 12" || h.t.calls[len(h.t.calls)-1] != "lock.release" {
 		t.Fatalf("calls = %v", h.t.calls)
 	}
 }
@@ -404,5 +406,46 @@ func TestRunKeepWorktreeSkipsCleanup(t *testing.T) {
 	}
 	if !strings.Contains(strings.Join(r.Notes, "\n"), wsName) {
 		t.Errorf("notes %q do not name the kept worktree", r.Notes)
+	}
+}
+
+// Like vulcam's reviewer, a run refuses to start unless its own state clone
+// is a clean checkout of the integration branch: nothing is read or posted.
+func TestRunRefusesADirtyStateClone(t *testing.T) {
+	t.Parallel()
+	h := newHarness()
+	h.git.guardErr = fmt.Errorf("%w: 1 changed path", ErrDirtyClone)
+	_, err := NewRunUseCase(h.gh, h.git, h.checks, h.engine, h.cfg).Run(context.Background(), 12, sha)
+	if !errors.Is(err, ErrDirtyClone) || !strings.Contains(err.Error(), "refusing to review") {
+		t.Fatalf("Run() error = %v, want a refusal wrapping ErrDirtyClone", err)
+	}
+	if want := []string{"git.guard dev"}; !slices.Equal(h.t.calls, want) {
+		t.Fatalf("calls = %v, want %v", h.t.calls, want)
+	}
+}
+
+func TestRunGuardsTheCloneBeforeTouchingGitHub(t *testing.T) {
+	t.Parallel()
+	h := newHarness()
+	h.run(t)
+	if len(h.t.calls) == 0 || h.t.calls[0] != "git.guard dev" {
+		t.Fatalf("calls = %v, want the guard first", h.t.calls)
+	}
+}
+
+// A configured owner login must match the gh login the reviewer posts with;
+// otherwise the merge gate stays closed.
+func TestRunKeepsTheGateClosedWhenGhIsNotTheConfiguredOwner(t *testing.T) {
+	t.Parallel()
+	h := newHarness()
+	h.cfg.Login = "someone-else"
+	r := h.run(t)
+	if r.Summary.Merge == MergeMerged || h.t.has("gh.merge") {
+		t.Fatalf("merged with a mismatched login: %s, calls %v", r.Summary, h.t.calls)
+	}
+	h = newHarness()
+	h.cfg.Login = strings.ToUpper(reviewer)
+	if r := h.run(t); r.Summary.Merge != MergeMerged {
+		t.Fatalf("case-insensitive match did not merge: %s %v", r.Summary, r.Notes)
 	}
 }

@@ -20,11 +20,11 @@ func NewCommand(factory Factory, defaultBinary DefaultBinary) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "provision",
 		Short: "Prepare the server for the reviewer flow (idempotent, as root)",
-		Long: "Prepare the server for the reviewer flow, as root and idempotently:\n" +
-			"packages (sudo, git), the reviewer and reviewer-ci users, " + ConfigPath + ",\n" +
-			"the gbai binary at " + BinaryPath + ", the review wrappers under /usr/local/libexec/gbai\n" +
-			"the sudoers drop-in " + SudoersPath + " (validated with visudo before install) and the\n" +
-			"embedded gbai skills for the orca user (claude and pi skill dirs; gbai-owned skills are replaced).\n\n" +
+		Long: "Prepare the server for the reviewer flow, as root and idempotently, in single-user mode:\n" +
+			"packages (git), a check that the orca user exists, " + ConfigPath + ", the gbai binary at\n" +
+			BinaryPath + ", removal of the retired reviewer sudoers drop-in and wrappers, and the\n" +
+			"embedded gbai skills for the orca user (claude and pi skill dirs; gbai-owned skills are replaced).\n" +
+			"The reviewer runs as the orca user with the owner's gh login: no extra users, no sudo.\n\n" +
 			"Secrets are not handled here: use `gbai secrets set`.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

@@ -32,11 +32,8 @@ func TestParseAppliesDefaults(t *testing.T) {
 	if len(cfg.Users.Orca.ExtraPath) != 1 || cfg.Users.Orca.ExtraPath[0] != "/data/home/.local/bin" {
 		t.Errorf("orca extra path = %v", cfg.Users.Orca.ExtraPath)
 	}
-	if u := cfg.Users.Reviewer; u.Name != "reviewer" || u.Home != "/data/reviewer" || u.UID != 2000 {
-		t.Errorf("reviewer = %+v", u)
-	}
-	if u := cfg.Users.ReviewerCI; u.Name != "reviewer-ci" || u.Home != "/data/reviewer-ci" || u.UID != 2001 {
-		t.Errorf("reviewer-ci = %+v", u)
+	if all := cfg.Users.All(); len(all) != 1 || all[0].Name != "orca" {
+		t.Errorf("single-user mode: users = %+v, want only orca", all)
 	}
 	if r := cfg.Runtimes; r.Coder != RuntimeClaude || r.Reviewer != RuntimePi || r.Assistant != RuntimeClaude {
 		t.Errorf("runtimes = %+v", r)
@@ -56,8 +53,8 @@ runtimes:
   coder: pi
   reviewer: claude
 users:
-  reviewer:
-    home: /srv/reviewer
+  orca:
+    home: /srv/home
 `))
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
@@ -65,8 +62,8 @@ users:
 	if cfg.Runtimes.Coder != RuntimePi || cfg.Runtimes.Reviewer != RuntimeClaude {
 		t.Errorf("runtimes = %+v", cfg.Runtimes)
 	}
-	if cfg.Users.Reviewer.Home != "/srv/reviewer" || cfg.Users.Reviewer.UID != 2000 {
-		t.Errorf("reviewer = %+v", cfg.Users.Reviewer)
+	if cfg.Users.Orca.Home != "/srv/home" || cfg.Users.Orca.Name != "orca" {
+		t.Errorf("orca = %+v", cfg.Users.Orca)
 	}
 }
 
@@ -80,11 +77,13 @@ func TestParseValidationErrors(t *testing.T) {
 		{"missing project", strings.Replace(minimal, "project_id: p1", "project_id: \"\"", 1), "server.railway.project_id"},
 		{"missing service", strings.Replace(minimal, "service_id: s1", "service_id: \"\"", 1), "server.railway.service_id"},
 		{"bad repo", strings.Replace(minimal, "cappy-lab/vulcam", "vulcam", 1), "repo.name"},
-		{"missing bot", strings.Replace(minimal, "login: vulcambot", "login: \"\"", 1), "bot.login"},
+		{"bad bot", strings.Replace(minimal, "login: vulcambot", "login: \"bad login\"", 1), "bot.login"},
 		{"bad runtime", minimal + "runtimes:\n  coder: opencode\n", "runtimes.coder"},
 		{"relative home", minimal + "users:\n  orca:\n    home: data/home\n", "users.orca.home"},
-		{"unsafe user name", minimal + "users:\n  reviewer:\n    name: \"rev;id\"\n", "users.reviewer.name"},
-		{"duplicate user", minimal + "users:\n  reviewer_ci:\n    name: reviewer\n", "duplicate"},
+		{"unsafe user name", minimal + "users:\n  orca:\n    name: \"rev;id\"\n", "users.orca.name"},
+		{"removed reviewer user", minimal + "users:\n  reviewer:\n    name: reviewer\n", "reviewer"},
+		{"relative state dir", minimal + "review:\n  state_dir: state\n", "review.state_dir"},
+		{"coder is the owner", minimal + "coder:\n  login: VulcamBot\n", "coder.login"},
 		{"unknown field", minimal + "extra: 1\n", "extra"},
 	}
 	for _, tt := range tests {
@@ -134,7 +133,7 @@ func TestMarshalRoundTrips(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse(Marshal()) error = %v\n%s", err, b)
 	}
-	if again.Repo != cfg.Repo || again.Users.Reviewer.UID != cfg.Users.Reviewer.UID {
+	if again.Repo != cfg.Repo || again.Users.Orca.Home != cfg.Users.Orca.Home {
 		t.Fatalf("round trip = %+v, want %+v", again, cfg)
 	}
 }
@@ -214,6 +213,40 @@ func TestParseSessionsAndCoder(t *testing.T) {
 	} {
 		if _, err := Parse([]byte(doc)); err == nil || !strings.Contains(err.Error(), name) {
 			t.Errorf("%s: error = %v", name, err)
+		}
+	}
+}
+
+func TestParseBotLoginIsOptional(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(strings.Replace(minimal, "login: vulcambot", "login: \"\"", 1)))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if cfg.Bot.Login != "" {
+		t.Fatalf("bot.login = %q, want empty (defaults to the gh login at run time)", cfg.Bot.Login)
+	}
+}
+
+func TestReviewStateDir(t *testing.T) {
+	t.Parallel()
+	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
+	for name, tt := range map[string]struct {
+		review Review
+		env    map[string]string
+		want   string
+		err    bool
+	}{
+		"configured":    {Review{StateDir: "/srv/state"}, map[string]string{"XDG_STATE_HOME": "/x", "HOME": "/h"}, "/srv/state", false},
+		"xdg":           {Review{}, map[string]string{"XDG_STATE_HOME": "/x", "HOME": "/h"}, "/x/gbai/reviewer", false},
+		"home":          {Review{}, map[string]string{"HOME": "/data/home"}, "/data/home/.local/state/gbai/reviewer", false},
+		"relative xdg":  {Review{}, map[string]string{"XDG_STATE_HOME": "x", "HOME": "/h"}, "/h/.local/state/gbai/reviewer", false},
+		"no home":       {Review{}, map[string]string{}, "", true},
+		"relative home": {Review{}, map[string]string{"HOME": "h"}, "", true},
+	} {
+		got, err := tt.review.StateDirFrom(env(tt.env))
+		if got != tt.want || (err != nil) != tt.err {
+			t.Errorf("%s: StateDirFrom() = %q, %v; want %q (error %v)", name, got, err, tt.want, tt.err)
 		}
 	}
 }

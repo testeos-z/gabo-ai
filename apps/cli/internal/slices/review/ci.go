@@ -35,20 +35,25 @@ func EngineArgv(runtime string) ([]string, error) {
 	}
 }
 
-// CIConfig configures the reviewer-ci side.
+// CIConfig configures the checks side. In single-user mode it runs as the
+// owner, so its isolation is an environment built from scratch rather than
+// a separate OS user.
 type CIConfig struct {
 	CredentialEnv map[string]string // runtime -> env var receiving the model credential
-	Path          string            // PATH given to the engine, its only inherited variable
-	// UntrustedHome is writable by PR code; PATH entries inside it are dropped
-	// so checks cannot plant the engine binary.
-	UntrustedHome string
+	Path          string            // PATH given to checks and (filtered) to the engine
+	Home          string            // persistent HOME of the checks (caches), inside UntrustedRoot
+	User          string            // USER and LOGNAME of the checks; empty omits them
+	// UntrustedRoot holds the workspaces and the checks' HOME and is writable
+	// by PR code: engine PATH entries inside it are dropped so checks cannot
+	// plant the engine binary, and only processes whose cwd is inside it are
+	// treated as leftovers.
+	UntrustedRoot string
 }
 
 func (c CIConfig) enginePath() string {
 	var keep []string
 	for _, dir := range strings.Split(c.Path, ":") {
-		clean := path.Clean(dir)
-		if !path.IsAbs(dir) || (c.UntrustedHome != "" && (clean == c.UntrustedHome || strings.HasPrefix(clean, c.UntrustedHome+"/"))) {
+		if !path.IsAbs(dir) || within(dir, c.UntrustedRoot) {
 			continue
 		}
 		keep = append(keep, dir)
@@ -56,8 +61,18 @@ func (c CIConfig) enginePath() string {
 	return strings.Join(keep, ":")
 }
 
-// CIUseCase is the reviewer-ci side: it holds copies of merged trees and runs
-// untrusted commands and the engine in them. It never sees GitHub credentials.
+// within reports whether p is root or inside it; an empty root holds nothing.
+func within(p, root string) bool {
+	if root == "" || !path.IsAbs(p) {
+		return false
+	}
+	p, root = path.Clean(p), path.Clean(root)
+	return p == root || strings.HasPrefix(p, strings.TrimSuffix(root, "/")+"/")
+}
+
+// CIUseCase is the checks side: it holds copies of merged trees and runs
+// untrusted commands and the engine in them with an environment built from
+// scratch, so no GitHub credential reaches them.
 type CIUseCase struct {
 	ws     Workspace
 	runner kernel.Runner
@@ -65,18 +80,22 @@ type CIUseCase struct {
 	cfg    CIConfig
 }
 
-// NewCIUseCase wires the reviewer-ci use case.
+// NewCIUseCase wires the checks use case.
 func NewCIUseCase(ws Workspace, runner kernel.Runner, procs Processes, cfg CIConfig) *CIUseCase {
 	return &CIUseCase{ws: ws, runner: runner, procs: procs, cfg: cfg}
 }
 
-// killLeftovers stops every process of the current user outside the current
-// process tree, so nothing a previous check started survives into the next
-// check or the engine.
+// killLeftovers stops the processes a previous check left behind: those of
+// the current user, outside the current process tree, whose cwd is inside
+// the untrusted root. The owner's own sessions share the uid, so the cwd is
+// what tells them apart; a leftover that changed its cwd elsewhere survives.
 func (u *CIUseCase) killLeftovers(ctx context.Context) error {
 	self := u.procs.Self()
 	if self.UID == 0 {
 		return errors.New("review ci must not run as root")
+	}
+	if u.cfg.UntrustedRoot == "" {
+		return errors.New("review ci needs an untrusted root to scope leftover processes")
 	}
 	table, err := u.procs.List()
 	if err != nil {
@@ -85,7 +104,7 @@ func (u *CIUseCase) killLeftovers(ctx context.Context) error {
 	keep := processTree(table, self)
 	var stale []int
 	for _, p := range table {
-		if p.UID == self.UID && !keep[p.PID] {
+		if p.UID == self.UID && !keep[p.PID] && within(p.Cwd, u.cfg.UntrustedRoot) {
 			stale = append(stale, p.PID)
 		}
 	}
@@ -138,7 +157,9 @@ func (u *CIUseCase) Prepare(name string, tree io.Reader) error {
 	return nil
 }
 
-// Run executes argv as-is (no shell) inside the workspace.
+// Run executes argv as-is (no shell) inside the workspace. The environment
+// holds only PATH, HOME, USER, LOGNAME and GH_CONFIG_DIR, which points at a
+// fresh empty directory so gh never finds the owner's login.
 func (u *CIUseCase) Run(ctx context.Context, name string, argv []string) (kernel.Result, error) {
 	if err := ValidateWorkspace(name); err != nil {
 		return kernel.Result{}, err
@@ -153,7 +174,16 @@ func (u *CIUseCase) Run(ctx context.Context, name string, argv []string) (kernel
 	if err := u.killLeftovers(ctx); err != nil {
 		return kernel.Result{}, err
 	}
-	return u.runner.Run(ctx, kernel.Command{Name: argv[0], Args: argv[1:], Dir: dir})
+	ghConfig, err := u.ws.Home(name)
+	if err != nil {
+		return kernel.Result{}, fmt.Errorf("fresh gh config dir: %w", err)
+	}
+	env := []string{"PATH=" + u.cfg.Path, "HOME=" + u.cfg.Home}
+	if u.cfg.User != "" {
+		env = append(env, "USER="+u.cfg.User, "LOGNAME="+u.cfg.User)
+	}
+	env = append(env, "GH_CONFIG_DIR="+ghConfig)
+	return u.runner.Run(ctx, kernel.Command{Name: argv[0], Args: argv[1:], Dir: dir, CleanEnv: true, Env: env})
 }
 
 // Engine runs the review engine in the workspace. stdin carries the model
@@ -192,7 +222,7 @@ func (u *CIUseCase) Engine(ctx context.Context, name, runtime string, stdin io.R
 	}
 	return u.runner.Run(ctx, kernel.Command{
 		Name: argv[0], Args: argv[1:], Dir: dir, Stdin: r, CleanEnv: true,
-		Env: []string{"PATH=" + u.cfg.enginePath(), "HOME=" + home, env + "=" + cred},
+		Env: []string{"PATH=" + u.cfg.enginePath(), "HOME=" + home, "GH_CONFIG_DIR=" + home, env + "=" + cred},
 	})
 }
 

@@ -3,6 +3,7 @@ package adapters
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -150,12 +151,16 @@ func (g gitScript) handle(c kernel.Command) (kernel.Result, error) {
 func TestGitPrepareClonesWhenMissingThenFetchesPinnedRefs(t *testing.T) {
 	t.Parallel()
 	r := &kerneltest.Runner{Handle: gitScript{exit: map[string]int{"rev-parse --git-dir": 128}}.handle}
-	if err := NewGit(r, "o/r", "/data/reviewer/work", nil).Prepare(context.Background(), 12, "dev"); err != nil {
+	state := "/data/home/.local/state/gbai/reviewer"
+	if err := NewGit(r, "o/r", state, nil).Prepare(context.Background(), 12, "dev"); err != nil {
 		t.Fatalf("Prepare() error = %v", err)
 	}
 	calls := joined(r.Calls)
-	if len(calls) != 3 || !strings.Contains(calls[1], "clone --no-checkout https://github.com/o/r.git /data/reviewer/work/repo") {
+	if len(calls) != 4 || !strings.Contains(calls[1], "clone --branch dev https://github.com/o/r.git "+state+"/clone") {
 		t.Fatalf("calls = %q", calls)
+	}
+	if !strings.HasSuffix(calls[3], "-C "+state+"/clone -c core.hooksPath=/dev/null merge --ff-only --quiet refs/remotes/origin/dev") {
+		t.Fatalf("clone not fast-forwarded to the integration branch: %q", calls[3])
 	}
 	fetch := argv(r.Calls[2])
 	for _, want := range []string{"+refs/heads/dev:refs/remotes/origin/dev", "+refs/pull/12/head:refs/remotes/origin/pr/12", "credential.helper=!gh auth git-credential"} {
@@ -201,7 +206,7 @@ func TestGitMergePinnedDetectsConflicts(t *testing.T) {
 	r := &kerneltest.Runner{Handle: gitScript{}.handle}
 	_, _ = NewGit(r, "o/r", "/w", nil).MergePinned(context.Background(), "pr-12-0123456", sha)
 	merge := argv(r.Calls[len(r.Calls)-1])
-	for _, want := range []string{"/w/pr-12-0123456", "--no-ff", "--no-commit", sha, "core.hooksPath=/dev/null"} {
+	for _, want := range []string{"/w/worktrees/pr-12-0123456", "--no-ff", "--no-commit", sha, "core.hooksPath=/dev/null"} {
 		if !slices.Contains(merge, want) {
 			t.Errorf("merge argv %q lacks %q", merge, want)
 		}
@@ -221,7 +226,7 @@ func TestGitSnapshot(t *testing.T) {
 	if !slices.Equal(snap.Files, []string{"a.ts", "dir/b c.md"}) || snap.Diff != "DIFF" || string(snap.Tree) != "TAR" {
 		t.Fatalf("snapshot = %+v", snap)
 	}
-	if !slices.Contains(joined(r.Calls), "git -C /w/pr-12-0123456 archive --format=tar tree1") {
+	if !slices.Contains(joined(r.Calls), "git -C /w/worktrees/pr-12-0123456 archive --format=tar tree1") {
 		t.Fatalf("calls = %q", joined(r.Calls))
 	}
 }
@@ -234,8 +239,29 @@ func TestGitRemoveWorktreeFallsBackToRemoveAll(t *testing.T) {
 	if err := NewGit(r, "o/r", "/w", rm).RemoveWorktree(context.Background(), "pr-12-0123456"); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(removed, []string{"/w/pr-12-0123456"}) {
+	if !slices.Equal(removed, []string{"/w/worktrees/pr-12-0123456"}) {
 		t.Fatalf("removed = %v", removed)
+	}
+}
+
+// R3-001: a fresh run has no stale worktree; the stale-removal step must not
+// run, so a removal that would fail cannot fail the run.
+func TestGitAddWorktreeOnAFreshStateSkipsStaleRemoval(t *testing.T) {
+	t.Parallel()
+	rm := func(string) error { return errors.New("permission denied") }
+	r := &kerneltest.Runner{Handle: gitScript{exit: map[string]int{"worktree remove": 128}}.handle}
+	state := t.TempDir()
+	if err := NewGit(r, "o/r", state, rm).AddWorktree(context.Background(), "pr-12-0123456", "dev"); err != nil {
+		t.Fatalf("AddWorktree() on a fresh state error = %v", err)
+	}
+	calls := joined(r.Calls)
+	for _, c := range calls {
+		if strings.Contains(c, "worktree remove") {
+			t.Fatalf("fresh run tried to remove a worktree: %q", calls)
+		}
+	}
+	if last := calls[len(calls)-1]; !strings.HasSuffix(last, "worktree add --detach "+state+"/worktrees/pr-12-0123456 refs/remotes/origin/dev") {
+		t.Fatalf("calls = %q", calls)
 	}
 }
 
@@ -254,49 +280,75 @@ func TestGitRejectsUnsafeNames(t *testing.T) {
 	}
 }
 
-func TestCIClientRunsThroughSudoWrapper(t *testing.T) {
+// fakeCICore records the calls LocalCI makes into the CI use case.
+type fakeCICore struct {
+	res      kernel.Result
+	err      error
+	prepared map[string]string
+	ran      [][]string
+	engine   []string // dir, runtime, stdin
+	cleaned  []string
+}
+
+func (f *fakeCICore) Prepare(name string, tree io.Reader) error {
+	b, _ := io.ReadAll(tree)
+	if f.prepared == nil {
+		f.prepared = map[string]string{}
+	}
+	f.prepared[name] = string(b)
+	return f.err
+}
+
+func (f *fakeCICore) Run(_ context.Context, name string, argv []string) (kernel.Result, error) {
+	f.ran = append(f.ran, append([]string{name}, argv...))
+	return f.res, f.err
+}
+
+func (f *fakeCICore) Engine(_ context.Context, name, runtime string, stdin io.Reader) (kernel.Result, error) {
+	b, _ := io.ReadAll(stdin)
+	f.engine = []string{name, runtime, string(b)}
+	return f.res, f.err
+}
+
+func (f *fakeCICore) Cleanup(name string) error {
+	f.cleaned = append(f.cleaned, name)
+	return f.err
+}
+
+func TestLocalCIRunsChecksInProcessWithoutSudo(t *testing.T) {
 	t.Parallel()
-	r := &kerneltest.Runner{Result: kernel.Result{ExitCode: 1, Stdout: []byte("out\n"), Stderr: []byte("err\n")}}
-	c := NewCIClient(r, "reviewer-ci", review.RuntimePi, nil)
+	core := &fakeCICore{res: kernel.Result{ExitCode: 1, Stdout: []byte("out\n"), Stderr: []byte("err\n")}}
+	c := NewLocalCI(core, review.RuntimePi, nil)
 	ctx := context.Background()
-	if err := c.Prepare(ctx, "pr-12-0123456", []byte("TAR")); err == nil {
-		t.Fatal("Prepare() with failing sudo returned nil")
+	if err := c.Prepare(ctx, "pr-12-0123456", []byte("TAR")); err != nil || core.prepared["pr-12-0123456"] != "TAR" {
+		t.Fatalf("Prepare() = %v, prepared %v", err, core.prepared)
 	}
 	out, err := c.Run(ctx, "pr-12-0123456", []string{"bun", "run", "lint"})
 	if err != nil || out.Passed || string(out.Output) != "out\nerr\n" {
 		t.Fatalf("Run() = %+v, %v", out, err)
 	}
-	prefix := []string{"sudo", "-n", "-u", "reviewer-ci", kernel.ReviewCIPath}
-	want := [][]string{
-		append(slices.Clone(prefix), "prepare", "--dir", "pr-12-0123456"),
-		append(slices.Clone(prefix), "run", "--dir", "pr-12-0123456", "--", "bun", "run", "lint"),
+	if want := []string{"pr-12-0123456", "bun", "run", "lint"}; len(core.ran) != 1 || !slices.Equal(core.ran[0], want) {
+		t.Fatalf("ran = %q", core.ran)
 	}
-	for i, w := range want {
-		if got := argv(r.Calls[i]); !slices.Equal(got, w) {
-			t.Errorf("call %d = %q, want %q", i, got, w)
-		}
-	}
-	if r.Calls[0].Stdin != "TAR" {
-		t.Errorf("prepare stdin = %q", r.Calls[0].Stdin)
+	if err := c.Cleanup(ctx, "pr-12-0123456"); err != nil || !slices.Equal(core.cleaned, []string{"pr-12-0123456"}) {
+		t.Fatalf("Cleanup() = %v, cleaned %v", err, core.cleaned)
 	}
 }
 
-func TestCIClientReviewSendsCredentialOnStdinOnly(t *testing.T) {
+func TestLocalCIReviewSendsCredentialOnStdinOnly(t *testing.T) {
 	t.Parallel()
-	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte(`{"type":"result","is_error":false,"result":"{\"findings\":[]}"}`)}}
+	core := &fakeCICore{res: kernel.Result{Stdout: []byte(`{"type":"result","is_error":false,"result":"{\"findings\":[]}"}`)}}
 	cred := func(rt string) ([]byte, error) { return []byte("tok-123\n"), nil }
-	findings, err := NewCIClient(r, "reviewer-ci", review.RuntimeClaude, cred).Review(context.Background(), "pr-12-0123456", "PROMPT")
+	findings, err := NewLocalCI(core, review.RuntimeClaude, cred).Review(context.Background(), "pr-12-0123456", "PROMPT")
 	if err != nil || len(findings) != 0 {
 		t.Fatalf("Review() = %v, %v", findings, err)
 	}
-	c := r.Calls[0]
-	want := []string{"sudo", "-n", "-u", "reviewer-ci", kernel.ReviewCIPath, "engine", "--dir", "pr-12-0123456", "--runtime", "claude"}
-	if !slices.Equal(argv(c), want) || c.Stdin != "tok-123\nPROMPT" || len(c.Command.Env) != 0 {
-		t.Fatalf("call = %q stdin %q env %q", argv(c), c.Stdin, c.Command.Env)
+	if want := []string{"pr-12-0123456", "claude", "tok-123\nPROMPT"}; !slices.Equal(core.engine, want) {
+		t.Fatalf("engine = %q, want %q", core.engine, want)
 	}
 }
 
-func TestCIClientReviewFailures(t *testing.T) {
+func TestLocalCIReviewFailures(t *testing.T) {
 	t.Parallel()
 	ok := func(string) ([]byte, error) { return []byte("tok"), nil }
 	for name, tt := range map[string]struct {
@@ -304,12 +356,13 @@ func TestCIClientReviewFailures(t *testing.T) {
 		cred func(string) ([]byte, error)
 		want error
 	}{
-		"missing credential": {kernel.Result{}, func(string) ([]byte, error) { return nil, errors.New("no file") }, nil},
-		"engine exit":        {kernel.Result{ExitCode: 1}, ok, nil},
-		"garbage":            {kernel.Result{Stdout: []byte("I think it looks fine!")}, ok, review.ErrUnparseable},
+		"missing credential":    {kernel.Result{}, func(string) ([]byte, error) { return nil, errors.New("no file") }, nil},
+		"multi-line credential": {kernel.Result{}, func(string) ([]byte, error) { return []byte("a\nb"), nil }, nil},
+		"engine exit":           {kernel.Result{ExitCode: 1}, ok, nil},
+		"garbage":               {kernel.Result{Stdout: []byte("I think it looks fine!")}, ok, review.ErrUnparseable},
 	} {
-		r := &kerneltest.Runner{Result: tt.res}
-		_, err := NewCIClient(r, "reviewer-ci", review.RuntimeClaude, tt.cred).Review(context.Background(), "pr-12-0123456", "p")
+		core := &fakeCICore{res: tt.res}
+		_, err := NewLocalCI(core, review.RuntimeClaude, tt.cred).Review(context.Background(), "pr-12-0123456", "p")
 		if err == nil || (tt.want != nil && !errors.Is(err, tt.want)) {
 			t.Errorf("%s: error = %v", name, err)
 		}
@@ -320,7 +373,7 @@ func TestOrcaArgv(t *testing.T) {
 	t.Parallel()
 	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte(`{"id":"t1"}`)}}
 	o := NewOrca(r)
-	out, err := o.CreateTerminal(context.Background(), "gbai-review-1-0123456", "sudo x | gbai y")
+	out, err := o.CreateTerminal(context.Background(), "gbai-review-1-0123456", "gbai x | gbai y")
 	if err != nil || out != `{"id":"t1"}` {
 		t.Fatalf("CreateTerminal() = %q, %v", out, err)
 	}
@@ -328,7 +381,7 @@ func TestOrcaArgv(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := [][]string{
-		{"orca", "terminal", "create", "--title", "gbai-review-1-0123456", "--command", "sudo x | gbai y", "--json"},
+		{"orca", "terminal", "create", "--title", "gbai-review-1-0123456", "--command", "gbai x | gbai y", "--json"},
 		{"orca", "orchestration", "send", "--to", "run:abc", "--subject", "PR #1 head x verdict=clean merge=none", "--type", "status"},
 	}
 	for i, w := range want {
@@ -349,7 +402,7 @@ func TestGitAddWorktreeReplacesAKeptWorktree(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	work := t.TempDir()
-	clone := filepath.Join(work, "repo")
+	clone := filepath.Join(work, "clone")
 	for _, args := range [][]string{
 		{"init", "-q", clone},
 		{"-C", clone, "-c", "user.name=t", "-c", "user.email=t@localhost", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init"},
@@ -365,7 +418,7 @@ func TestGitAddWorktreeReplacesAKeptWorktree(t *testing.T) {
 	if err := g.AddWorktree(ctx, name, "dev"); err != nil {
 		t.Fatalf("first AddWorktree() error = %v", err)
 	}
-	leftover := filepath.Join(work, name, "leftover")
+	leftover := filepath.Join(work, "worktrees", name, "leftover")
 	if err := os.WriteFile(leftover, []byte("x"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -377,5 +430,79 @@ func TestGitAddWorktreeReplacesAKeptWorktree(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(clone, ".git")); err != nil {
 		t.Fatalf("clone damaged: %v", err)
+	}
+}
+
+// gitRepo runs git for test fixtures.
+func gitRepo(t *testing.T, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+// The reviewer refuses to work from a state clone that is not a clean
+// checkout of the integration branch, like vulcam's "clean dev" rule.
+func TestGitGuardRefusesADirtyOrMovedClone(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("runs the real git binary")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	commit := []string{"-c", "user.name=t", "-c", "user.email=t@localhost", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init"}
+	setup := map[string]func(t *testing.T, state, clone string){
+		"fresh state": func(*testing.T, string, string) {},
+		"clean":       func(*testing.T, string, string) {},
+		"untracked file": func(t *testing.T, _, clone string) {
+			if err := os.WriteFile(filepath.Join(clone, "x"), []byte("x"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"ignored file": func(t *testing.T, _, clone string) {
+			if err := os.WriteFile(filepath.Join(clone, ".git", "info", "exclude"), []byte("node_modules/\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.MkdirAll(filepath.Join(clone, "node_modules"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(clone, "node_modules", "y"), []byte("y"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"other branch": func(t *testing.T, _, clone string) { gitRepo(t, "-C", clone, "checkout", "-q", "-b", "feature") },
+		"detached":     func(t *testing.T, _, clone string) { gitRepo(t, "-C", clone, "checkout", "-q", "--detach") },
+		"not a repo inside another repo": func(t *testing.T, state, clone string) {
+			gitRepo(t, "init", "-q", "-b", "dev", state)
+			if err := os.MkdirAll(clone, 0o700); err != nil {
+				t.Fatal(err)
+			}
+		},
+	}
+	want := map[string]bool{"fresh state": true, "clean": true}
+	for name, prepare := range setup {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			state := t.TempDir()
+			clone := filepath.Join(state, "clone")
+			if name != "fresh state" && name != "not a repo inside another repo" {
+				gitRepo(t, "init", "-q", "-b", "dev", clone)
+				gitRepo(t, append([]string{"-C", clone}, commit...)...)
+			}
+			prepare(t, state, clone)
+			err := NewGit(execrunner.New(), "o/r", state, nil).Guard(context.Background(), "dev")
+			if want[name] {
+				if err != nil {
+					t.Fatalf("Guard() error = %v, want nil", err)
+				}
+				return
+			}
+			if !errors.Is(err, review.ErrDirtyClone) {
+				t.Fatalf("Guard() error = %v, want ErrDirtyClone", err)
+			}
+		})
 	}
 }
