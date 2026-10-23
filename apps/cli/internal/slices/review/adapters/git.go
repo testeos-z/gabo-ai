@@ -73,11 +73,17 @@ func (g *Git) Prepare(ctx context.Context, n int, integration string) error {
 	return nil
 }
 
-// AddWorktree creates a detached worktree at origin/<integration>.
+// AddWorktree creates a detached worktree at origin/<integration>. A worktree
+// of the same name left by a --keep-worktree run (or a crash) is removed
+// first, so a rerun for the same PR and sha does not collide with it; the
+// name is validated and resolved under the reviewer's own work dir.
 func (g *Git) AddWorktree(ctx context.Context, name, integration string) error {
 	wt, err := g.worktree(name)
 	if err != nil {
 		return err
+	}
+	if err := g.RemoveWorktree(ctx, name); err != nil {
+		return fmt.Errorf("remove stale worktree %s: %w", name, err)
 	}
 	if _, err := g.git(ctx, "-C", g.clone(), "worktree", "prune"); err != nil {
 		return err

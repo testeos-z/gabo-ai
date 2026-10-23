@@ -3,11 +3,15 @@ package adapters
 import (
 	"context"
 	"errors"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/execrunner"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/review"
 )
@@ -331,5 +335,47 @@ func TestOrcaArgv(t *testing.T) {
 		if got := argv(r.Calls[i]); !slices.Equal(got, w) {
 			t.Errorf("call %d = %q", i, got)
 		}
+	}
+}
+
+// A run with --keep-worktree leaves its worktree behind; a later run for the
+// same PR and sha must replace it instead of failing on the existing path.
+func TestGitAddWorktreeReplacesAKeptWorktree(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("runs the real git binary")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	work := t.TempDir()
+	clone := filepath.Join(work, "repo")
+	for _, args := range [][]string{
+		{"init", "-q", clone},
+		{"-C", clone, "-c", "user.name=t", "-c", "user.email=t@localhost", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m", "init"},
+		{"-C", clone, "update-ref", "refs/remotes/origin/dev", "HEAD"},
+	} {
+		if out, err := exec.Command("git", args...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	g := NewGit(execrunner.New(), "o/r", work, nil)
+	ctx := context.Background()
+	name := "pr-12-0123456"
+	if err := g.AddWorktree(ctx, name, "dev"); err != nil {
+		t.Fatalf("first AddWorktree() error = %v", err)
+	}
+	leftover := filepath.Join(work, name, "leftover")
+	if err := os.WriteFile(leftover, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.AddWorktree(ctx, name, "dev"); err != nil {
+		t.Fatalf("rerun AddWorktree() over a kept worktree error = %v", err)
+	}
+	if _, err := os.Stat(leftover); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("kept worktree content survived the rerun: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(clone, ".git")); err != nil {
+		t.Fatalf("clone damaged: %v", err)
 	}
 }

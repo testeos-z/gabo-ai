@@ -201,8 +201,11 @@ func rulesetBody(integration string) []byte {
 		"rules": []rule{
 			{Type: "deletion"},
 			{Type: "non_fast_forward"},
+			// The reviewer posts with the owner's account and can never
+			// approve, so no approving review is required: the gate is the two
+			// required statuses below plus the signed verdict comment.
 			{Type: "pull_request", Parameters: map[string]any{
-				"required_approving_review_count":   1,
+				"required_approving_review_count":   0,
 				"dismiss_stale_reviews_on_push":     true,
 				"require_code_owner_review":         false,
 				"require_last_push_approval":        false,

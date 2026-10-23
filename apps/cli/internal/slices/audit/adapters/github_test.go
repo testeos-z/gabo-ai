@@ -8,6 +8,7 @@ import (
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/verdict"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
 )
 
@@ -41,5 +42,25 @@ func TestStatuses(t *testing.T) {
 	}
 	if got := r.Calls[0].Command.Args; !slices.Equal(got, []string{"api", "repos/o/r/commits/abc/statuses?per_page=100"}) {
 		t.Fatalf("argv = %v", got)
+	}
+}
+
+func TestCommentsDecodesEveryPageInOrder(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte(`[{"author":"owner","body":"a"},{"author":"bob","body":"b\nc"}]` + "\n" + `[{"author":"owner","body":"d"}]` + "\n")}}
+	got, err := NewGitHub(r, "o/r").Comments(context.Background(), 12)
+	if err != nil {
+		t.Fatalf("Comments() error = %v", err)
+	}
+	if !slices.Equal(got, []verdict.Comment{{Author: "owner", Body: "a"}, {Author: "bob", Body: "b\nc"}, {Author: "owner", Body: "d"}}) {
+		t.Fatalf("Comments() = %q", got)
+	}
+	want := []string{"api", "--paginate", "repos/o/r/issues/12/comments", "--jq", "[.[] | {author: .user.login, body: .body}]"}
+	if got := r.Calls[0].Command.Args; !slices.Equal(got, want) {
+		t.Fatalf("argv = %q", got)
+	}
+	r.Result.Stdout = []byte("not json")
+	if _, err := NewGitHub(r, "o/r").Comments(context.Background(), 12); err == nil {
+		t.Fatal("Comments() on garbage error = nil")
 	}
 }

@@ -90,6 +90,7 @@ type fakeGit struct {
 	mergeErr    error
 	snapshot    Snapshot
 	snapshotErr error
+	removeErr   error
 	removed     []string
 }
 
@@ -116,7 +117,7 @@ func (f *fakeGit) Snapshot(_ context.Context, name, integration, sha string) (Sn
 func (f *fakeGit) RemoveWorktree(_ context.Context, name string) error {
 	f.t.add("git.remove %s", name)
 	f.removed = append(f.removed, name)
-	return nil
+	return f.removeErr
 }
 
 type fakeChecks struct {

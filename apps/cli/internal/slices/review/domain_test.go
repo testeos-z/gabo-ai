@@ -228,29 +228,3 @@ func TestCommentBodyIsSignedWithFooterAndMarker(t *testing.T) {
 		}
 	}
 }
-
-func TestMarkerSHA(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name string
-		body string
-		want string
-		ok   bool
-	}{
-		{"marker last", "x\n" + Marker(sha), sha, true},
-		{"marker with trailing newline and CRLF", "x\r\n" + Marker(sha) + "\r\n", sha, true},
-		{"no marker", "No blocking issues found.\n", "", false},
-		{"marker not on the last line", Marker(sha) + "\nquoted", "", false},
-		{"short sha", "<!-- gbai-reviewer-bot sha=0123456 -->", "", false},
-		{"uppercase sha", Marker(strings.ToUpper(sha)), "", false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got, ok := MarkerSHA(tt.body)
-			if got != tt.want || ok != tt.ok {
-				t.Fatalf("MarkerSHA() = %q, %v; want %q, %v", got, ok, tt.want, tt.ok)
-			}
-		})
-	}
-}

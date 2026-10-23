@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/verdict"
 )
 
 // Verdict is the outcome of one review.
@@ -46,79 +48,37 @@ const (
 // CloudLabel marks PRs the reviewer may merge on its own.
 const CloudLabel = "mode:cloud"
 
-// Verdict comment lines. The reviewer posts with the owner's account, which
-// GitHub forbids from approving, so the verdict travels in a comment: its
-// first line is CommentClean or CommentBlocking, and it ends with the visible
-// CommentFooter followed by the hidden Marker of the reviewed head.
+// Verdict comment lines; the format lives in kernel/verdict, shared with audit.
 const (
-	CommentClean    = "No blocking issues found."
-	CommentBlocking = "Blocking issues found."
-	CommentFooter   = "🤖 gbai reviewer"
+	CommentClean    = verdict.Clean
+	CommentBlocking = verdict.Blocking
+	CommentFooter   = verdict.Footer
 )
 
-var markerPattern = regexp.MustCompile(`^<!-- gbai-reviewer-bot sha=([0-9a-f]{40}) -->$`)
+// Comment is one PR comment and the login that posted it.
+type Comment = verdict.Comment
 
 // Marker returns the hidden line that signs a verdict comment for sha.
-func Marker(sha string) string {
-	return fmt.Sprintf("<!-- gbai-reviewer-bot sha=%s -->", sha)
-}
+func Marker(sha string) string { return verdict.Marker(sha) }
 
-// MarkerSHA returns the head sha signed by the marker on the last non-empty
-// line of body, if that line is a marker.
-func MarkerSHA(body string) (string, bool) {
-	lines := strings.Split(strings.TrimRight(strings.ReplaceAll(body, "\r\n", "\n"), "\n"), "\n")
-	m := markerPattern.FindStringSubmatch(strings.TrimSpace(lines[len(lines)-1]))
-	if m == nil {
-		return "", false
-	}
-	return m[1], true
-}
-
-// Comment is one PR comment and the login that posted it.
-type Comment struct {
-	Author string
-	Body   string
-}
-
-// newestSigned returns the newest comment in comments (oldest first) that
-// reviewer posted and that carries a marker, plus the head it signs. Marker
-// comments from anyone else are ignored, and an empty reviewer matches none.
-func newestSigned(comments []Comment, reviewer string) (Comment, string, bool) {
-	if reviewer == "" {
-		return Comment{}, "", false
-	}
-	for i := len(comments) - 1; i >= 0; i-- {
-		if comments[i].Author != reviewer {
-			continue
-		}
-		if signed, ok := MarkerSHA(comments[i].Body); ok {
-			return comments[i], signed, true
-		}
-	}
-	return Comment{}, "", false
-}
-
-// commentLines splits a comment body into lines without carriage returns.
-func commentLines(body string) []string {
-	return strings.Split(strings.ReplaceAll(body, "\r\n", "\n"), "\n")
-}
+// MarkerSHA returns the head sha signed by the marker on the last line of body.
+func MarkerSHA(body string) (string, bool) { return verdict.MarkerSHA(body) }
 
 // CleanVerdictFor reports whether the newest marker comment reviewer posted
 // in comments (oldest first) signs head and opens with CommentClean.
 func CleanVerdictFor(comments []Comment, reviewer, head string) bool {
-	c, signed, ok := newestSigned(comments, reviewer)
-	return ok && signed == head && commentLines(c.Body)[0] == CommentClean
+	return verdict.CleanFor(comments, reviewer, head)
 }
 
 // ConflictNoticeFor reports whether the newest marker comment reviewer posted
 // in comments already reports that head conflicts with integration, so the
 // same conflict is not posted again on every run.
 func ConflictNoticeFor(comments []Comment, reviewer, head, integration string) bool {
-	c, signed, ok := newestSigned(comments, reviewer)
+	c, signed, ok := verdict.NewestSigned(comments, reviewer)
 	if !ok || signed != head {
 		return false
 	}
-	lines := commentLines(c.Body)
+	lines := verdict.Lines(c.Body)
 	return len(lines) > 2 && lines[2] == conflictLine(head, integration)
 }
 

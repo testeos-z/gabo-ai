@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/verdict"
 )
 
 // Factory builds the use case lazily, so help never needs configuration.
@@ -24,7 +26,9 @@ func NewCommand(factory Factory, now func() time.Time) *cobra.Command {
 		Short: "Check that every merge into the integration branch went through the reviewer",
 		Long: "For every PR merged into the integration branch since --since, check that it was\n" +
 			"merged by the bot login, never by the coder login, and that its head commit has a\n" +
-			"successful " + ReviewContext + " status set by the bot. Exits 1 when violations exist.\n\n" +
+			"successful " + ReviewContext + " status set by the bot, and that the newest verdict comment\n" +
+			"the bot posted on the PR signs that head and starts with \"" + verdict.Clean + "\".\n" +
+			"Exits 1 when violations exist.\n\n" +
 			"Only GitHub is audited; the Engram per-step log is not cross-checked yet.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
