@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -20,7 +21,7 @@ func TestRootHelpListsVersion(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor", "mcp", "init", "plan", "worktree"} {
+	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor", "mcp", "init", "plan", "worktree", "config"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help output does not list %s command:\n%s", name, out.String())
 		}
@@ -71,17 +72,42 @@ func TestProvisionDryRunPrintsPlanFromExampleConfig(t *testing.T) {
 	}
 }
 
-func TestResolveConfigPath(t *testing.T) {
+func TestConfigCommandWithFlagShowsOnlyThatFile(t *testing.T) {
 	t.Parallel()
-	if got := resolveConfigPath("custom.yaml", true); got != "custom.yaml" {
-		t.Errorf("explicit = %q", got)
+	var out bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetOut(&out)
+	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "config"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := resolveConfigPath(defaultConfigPath, true); got != defaultConfigPath {
-		t.Errorf("explicit default = %q", got)
+	got := out.String()
+	for _, want := range []string{"flag", "../../gbai.example.yaml", "resolved config:", "name: cappy-lab/vulcam"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("output missing %q:\n%s", want, got)
+		}
 	}
-	// The package directory has no gbai.yaml, so the server config is used.
-	if got := resolveConfigPath(defaultConfigPath, false); got != "/etc/gbai/gbai.yaml" {
-		t.Errorf("fallback = %q", got)
+	for _, banned := range []string{"/etc/gbai/gbai.yaml", "config.yaml"} {
+		if strings.Contains(got, banned) {
+			t.Fatalf("--config must not layer, output has %q:\n%s", banned, got)
+		}
+	}
+}
+
+func TestConfigLayersUseTheGitTopLevel(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("/src/p\n")}}
+	env := map[string]string{"XDG_CONFIG_HOME": "/x"}
+	got := configLayers(context.Background(), r, func(k string) string { return env[k] }, func() (string, error) { return "/src/p/sub", nil })
+	want := []string{"/etc/gbai/gbai.yaml", "/x/gbai/config.yaml", "/src/p/gbai.yaml"}
+	for i, l := range got {
+		if l.Path != want[i] {
+			t.Fatalf("layer %d = %+v, want path %s", i, l, want[i])
+		}
+	}
+	got = configLayers(context.Background(), r, func(string) string { return "" }, func() (string, error) { return "", errors.New("gone") })
+	if got[2].Path != "" {
+		t.Fatalf("project layer without a cwd = %+v", got[2])
 	}
 }
 

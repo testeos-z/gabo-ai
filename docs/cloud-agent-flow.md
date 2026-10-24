@@ -32,7 +32,7 @@ The reviewer keeps its own state in `$XDG_STATE_HOME/gbai/reviewer` (default `~/
 
 **This is weaker than the former three-user model** (`reviewer` and `reviewer-ci` OS users behind sudo), and the owner accepted it as trust-based, like vulcam: the coder sessions run as the same OS user, so they can read the owner's `gh` login and the model credential files, and PR code run by the checks can write anywhere the owner can (including the owner's home and the reviewer state). What remains: checks and the engine get an environment built from scratch (only `PATH`, `HOME`, `USER`, `LOGNAME`, `GH_CONFIG_DIR` pointed at a fresh empty directory, plus the model credential for the engine), so no `GH_TOKEN`/`GITHUB_TOKEN` or gh login reaches them by default; the checks' and the engine's `PATH` drop entries inside the reviewer's `ci/` dir and relative entries; leftover processes are killed only when their cwd is inside `ci/` (a leftover that moved elsewhere survives, and the owner's own sessions are never touched). `gbai provision` removes the retired sudoers drop-in and wrappers; the old `reviewer`/`reviewer-ci` users and homes are left for the owner to delete (`userdel`) once their credentials are no longer needed.
 
-Long-lived agent sessions (Orca terminals, user `orca`, started by `gbai sessions start`; runtime `claude` or `pi` per role from `gbai.yaml`, defaults coder=claude, reviewer=pi, assistant=claude):
+Long-lived agent sessions (Orca terminals, user `orca`, started by `gbai sessions start`; runtime `claude` or `pi` per role from the gbai config, defaults coder=claude, reviewer=pi, assistant=claude):
 
 - **gbai-coder** — coordinator. Computes eligible roadmap issues, launches up to 4 short coder sessions in parallel (one per issue, each in its own git worktree) following the `gbai-cycle` and `gbai-coder` skills.
 - **gbai-reviewer** — reviewer-side session; the review itself runs in detached terminals opened by `gbai review request`.
@@ -85,6 +85,7 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, 
 | Close an approved coder worktree (under `<main checkout>-worktrees/`, not the main one or on `worktree.keep`, clean, pushed, no ignored secrets, worked on, no open PR, merged into the integration branch or by a merged PR holding its HEAD); never `--force`; deletes the merged local branch with `git branch -d` | `gbai worktree close <path>` (one line: `CLOSED <path> branch=<b> reason=<in-base\|merged-pr>` or `REFUSED <path> <reason>`) |
 | Audit merges (owner login only, verdict status and signed marker comment on merged heads, no coder merges) | `gbai audit` / `audit` |
 | Known gotchas | `gbai doctor` / `doctor` |
+| Which config files are read (system `/etc/gbai/gbai.yaml` → user `$XDG_CONFIG_HOME/gbai/config.yaml`, else `~/.config/gbai/config.yaml` → project `gbai.yaml` at the git top-level; each overrides only the keys it sets; `--config <file>` reads exactly one file) and the resolved values, credential-looking values redacted | `gbai config` |
 | Local agent setup: skills and MCP registration | `gbai init [--runtime] [--scope] [--dry-run]` |
 | Product docs for the planning agents | `gbai plan new|status` |
 | MCP server for the local agent | `gbai mcp` |

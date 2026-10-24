@@ -39,10 +39,11 @@ Ports shared by several slices live in `internal/kernel` (`Runner`, `RemoteShell
 | init | cobra | `FileSystem`, `Runner` (`claude mcp`) |
 | plan | cobra | `FileSystem`; templates embedded |
 | mcp | MCP over stdio | function ports onto the other slices' use cases |
+| configcmd | cobra (`config`, read-only) | the composition root's config resolver (layers + merged config); credential-looking values redacted |
 
 ## Composition root
 
-`cmd/gbai` is the only place that builds adapters and wires them into use cases. `factories.go` builds each use case lazily from `gbai.yaml` (so `--help` never needs configuration); the cobra commands and the MCP tools (`mcp.go`) share those factories.
+`cmd/gbai` is the only place that builds adapters and wires them into use cases. `factories.go` builds each use case lazily from `gbai.yaml` (so `--help` never needs configuration); the cobra commands and the MCP tools (`mcp.go`) share those factories. The config comes from `internal/config`: without `--config`, `LoadLayers` merges the system (`/etc/gbai/gbai.yaml`), user (`$XDG_CONFIG_HOME/gbai/config.yaml`, else `~/.config/gbai/config.yaml`) and project (`gbai.yaml` at the git top-level, found with `git rev-parse --show-toplevel` through the `Runner`, else the working directory) layers; `Merge` is pure (mappings merge key by key, scalars and lists replace), unknown keys fail per file, and defaults and validation run once on the result. `--config <file>` loads exactly that file (`LoadFile`), which is how the server's `review run` is invoked.
 
 ## Users and boundaries
 

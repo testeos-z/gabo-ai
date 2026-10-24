@@ -1,5 +1,16 @@
 # gbai configuration for the vulcam cloud server (Railway "vulcam cloud").
-# Copy to gbai.yaml. Secrets never go here: use `gbai secrets set`.
+# Secrets never go here, in any layer: use `gbai secrets set`.
+#
+# Without --config, gbai merges up to three layers, lowest to highest precedence:
+#   1. system:  /etc/gbai/gbai.yaml (written by `gbai provision` on the server)
+#   2. user:    $XDG_CONFIG_HOME/gbai/config.yaml, else ~/.config/gbai/config.yaml
+#   3. project: gbai.yaml at the git top-level of the current directory
+#               (the current directory itself outside a git repository)
+# A higher layer overrides only the keys it sets: mappings merge key by key,
+# scalars and lists replace the lower value, `key: null` resets it to the default.
+# Missing files are skipped; an unknown key fails and names its file. Defaults
+# and validation run once on the merged result. `--config <file>` reads exactly
+# that one file. `gbai config` shows the files used and the resolved values.
 server:
   railway:
     project_id: 21669483-8aa3-4bc9-8b1c-63d1785a857b

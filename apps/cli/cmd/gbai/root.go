@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"strings"
@@ -19,6 +17,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/railwayssh"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/configcmd"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/mcp"
@@ -50,11 +49,20 @@ func newRootCommand(d deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.PersistentFlags().StringVar(&configPath, "config", defaultConfigPath,
-		"gbai config file; when not set and ./"+defaultConfigPath+" is missing, "+kernel.ServerConfigPath+" is used")
+	root.PersistentFlags().StringVar(&configPath, "config", "",
+		"load exactly this config file; when not set the layers "+kernel.ServerConfigPath+
+			", the user config ($XDG_CONFIG_HOME/gbai/config.yaml) and the project "+config.ProjectFile+
+			" are merged (see `gbai config`)")
 
+	resolveConfig := func(ctx context.Context) (config.Resolution, error) {
+		if root.PersistentFlags().Changed("config") {
+			return config.LoadFile(osfs.FS{}, configPath)
+		}
+		return config.LoadLayers(osfs.FS{}, configLayers(ctx, d.runner, os.Getenv, os.Getwd))
+	}
 	loadConfig := func() (config.Config, error) {
-		return config.Load(resolveConfigPath(configPath, root.PersistentFlags().Changed("config")))
+		res, err := resolveConfig(context.Background())
+		return res.Config, err
 	}
 
 	f := newFactories(d, loadConfig)
@@ -69,6 +77,7 @@ func newRootCommand(d deps) *cobra.Command {
 	root.AddCommand(doctor.NewCommand(f.doctor))
 	root.AddCommand(worktree.NewCommand(f.worktree))
 	root.AddCommand(initcmd.NewCommand(f.init))
+	root.AddCommand(configcmd.NewCommand(resolveConfig))
 	root.AddCommand(plan.NewCommand(plan.NewUseCase(osfs.FS{})))
 	root.AddCommand(mcp.NewCommand(mcp.NewTools(mcpPorts(f), secrets.Names(), time.Now), serverVersion(d.version)))
 	return root
@@ -82,18 +91,14 @@ func newTerminals(runner kernel.Runner, cfg config.Config, mode string) kernel.T
 	return orcacli.NewRemote(newRemoteShell(runner, cfg), cfg.Users.Orca.Name)
 }
 
-const defaultConfigPath = "gbai.yaml"
-
-// resolveConfigPath uses the server config when no flag is given and there is
-// no gbai.yaml in the working directory.
-func resolveConfigPath(p string, explicit bool) string {
-	if explicit || p != defaultConfigPath {
-		return p
+// configLayers returns the system, user and project layers; the project root
+// is the git top-level of the working directory, or the directory itself.
+func configLayers(ctx context.Context, runner kernel.Runner, getenv func(string) string, getwd func() (string, error)) []config.Layer {
+	root := ""
+	if cwd, err := getwd(); err == nil {
+		root = config.ProjectRoot(ctx, runner, cwd)
 	}
-	if _, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
-		return kernel.ServerConfigPath
-	}
-	return p
+	return config.LayerPaths(getenv, root)
 }
 
 func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, error)) review.Factories {
