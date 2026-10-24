@@ -246,3 +246,80 @@ func TestPathsRealAndSymlink(t *testing.T) {
 		t.Fatalf("IsSymlink(dir) = %v, %v", ok, err)
 	}
 }
+
+// Unpushed must not read a git failure as "no upstream": only a detached
+// HEAD, a branch without a configured upstream, or an upstream whose remote
+// branch is gone count as no upstream; anything else is an error.
+func TestGitUnpushedFailsClosedAndReadsAGoneUpstream(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("runs the real git binary")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	dir := t.TempDir()
+	origin := filepath.Join(dir, "origin.git")
+	main := filepath.Join(dir, "repo")
+	wt := filepath.Join(dir, "repo-worktrees", "12-x")
+	gitIn(t, "init", "-q", "--bare", origin)
+	gitIn(t, "init", "-q", "-b", "dev", main)
+	gitIn(t, "-C", main, "commit", "-q", "--allow-empty", "-m", "init")
+	gitIn(t, "-C", main, "remote", "add", "origin", origin)
+	gitIn(t, "-C", main, "push", "-q", "-u", "origin", "dev")
+	gitIn(t, "-C", main, "worktree", "add", "-q", "-b", "feat/x", wt)
+	gitIn(t, "-C", wt, "commit", "-q", "--allow-empty", "-m", "work")
+	gitIn(t, "-C", wt, "push", "-q", "-u", "origin", "feat/x")
+
+	g := NewGit(execrunner.New())
+	ctx := context.Background()
+	gitIn(t, "-C", wt, "commit", "-q", "--allow-empty", "-m", "unpushed")
+	if has, ahead, err := g.Unpushed(ctx, wt); err != nil || !has || ahead != 1 {
+		t.Fatalf("Unpushed() = %v, %d, %v", has, ahead, err)
+	}
+	gitIn(t, "-C", wt, "push", "-q")
+	if _, _, err := g.Unpushed(ctx, filepath.Join(dir, "not-a-repo")); err == nil {
+		t.Fatal("Unpushed() outside a repository must fail, not report no upstream")
+	}
+
+	// The remote branch is deleted after the merge and pruned locally.
+	gitIn(t, "-C", main, "push", "-q", "origin", "--delete", "feat/x")
+	gitIn(t, "-C", main, "fetch", "-q", "--prune", "origin")
+	if has, ahead, err := g.Unpushed(ctx, wt); err != nil || has || ahead != 0 {
+		t.Fatalf("Unpushed() with a gone upstream = %v, %d, %v", has, ahead, err)
+	}
+
+	gitIn(t, "-C", wt, "checkout", "-q", "--detach")
+	if has, _, err := g.Unpushed(ctx, wt); err != nil || has {
+		t.Fatalf("Unpushed() detached = %v, %v", has, err)
+	}
+}
+
+// OwnCommits with no branch reads the worktree's own HEAD reflog, so a fresh
+// detached worktree counts as never worked.
+func TestGitOwnCommitsOfADetachedWorktree(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("runs the real git binary")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	dir := t.TempDir()
+	main := filepath.Join(dir, "repo")
+	wt := filepath.Join(dir, "repo-worktrees", "12-x")
+	gitIn(t, "init", "-q", "-b", "dev", main)
+	gitIn(t, "-C", main, "commit", "-q", "--allow-empty", "-m", "a")
+	gitIn(t, "-C", main, "commit", "-q", "--allow-empty", "-m", "b")
+	gitIn(t, "-C", main, "worktree", "add", "-q", "--detach", wt, "HEAD~1")
+
+	g := NewGit(execrunner.New())
+	ctx := context.Background()
+	if own, err := g.OwnCommits(ctx, wt, ""); err != nil || own {
+		t.Fatalf("fresh detached OwnCommits() = %v, %v", own, err)
+	}
+	gitIn(t, "-C", wt, "commit", "-q", "--allow-empty", "-m", "work")
+	if own, err := g.OwnCommits(ctx, wt, ""); err != nil || !own {
+		t.Fatalf("worked detached OwnCommits() = %v, %v", own, err)
+	}
+}

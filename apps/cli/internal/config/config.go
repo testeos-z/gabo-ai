@@ -34,6 +34,9 @@ type Config struct {
 	Coder    Coder    `yaml:"coder"`
 	Sessions Sessions `yaml:"sessions"`
 	Worktree Worktree `yaml:"worktree"`
+	// Parallelism is the most coder sessions the cycle runs at once; it
+	// already leaves room for the reviewer's checks. 0 means the default, 3.
+	Parallelism int `yaml:"parallelism"`
 }
 
 // Worktree configures `gbai worktree close`.
@@ -221,6 +224,9 @@ func (c *Config) applyDefaults() {
 	}
 	defaultString(&c.Review.PiCredentialEnv, "ANTHROPIC_API_KEY")
 	defaultString(&c.Sessions.LocalOrca, "orca")
+	if c.Parallelism == 0 {
+		c.Parallelism = 3
+	}
 }
 
 func defaultUser(u *User, d User) {
@@ -285,6 +291,7 @@ func (c Config) validate() error {
 	for key, s := range map[string]Session{"coder": c.Sessions.Coder, "reviewer": c.Sessions.Reviewer, "assistant": c.Sessions.Assistant} {
 		check(s.PromptFile == "" || filePattern.MatchString(s.PromptFile), "sessions."+key+".prompt_file", "must be a path of safe characters")
 	}
+	check(c.Parallelism > 0, "parallelism", "must be a positive number of coder sessions")
 	for _, k := range c.Worktree.Keep {
 		ok := k != "" && !strings.ContainsAny(k, "\n\r") && (path.IsAbs(k) || !strings.Contains(k, "/")) && k != ".." && k != "."
 		check(ok, "worktree.keep", fmt.Sprintf("entry %q must be a worktree name or an absolute path", k))

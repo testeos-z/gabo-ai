@@ -77,6 +77,8 @@ func (p fakePaths) Real(path string) (string, error) {
 	switch path {
 	case mainDir, mainDir + "-worktrees", target, "/src/repo-worktrees/13-y":
 		return path, nil
+	case "/alias/repo-worktrees/12-x": // a symlinked spelling of target
+		return target, nil
 	}
 	return "", nil
 }
@@ -171,6 +173,7 @@ func TestCloseRefusals(t *testing.T) {
 		{"unregistered", "/src/repo-worktrees/13-y", nil, "not a worktree of this repository"},
 		{"symlink", target, func(_ *fakeGit, _ *fakeGitHub, p *fakePaths) { p.symlinks = map[string]bool{target: true} }, "symlink"},
 		{"kept", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) {}, ""},
+		{"kept by a symlinked path", target, nil, "keep list"},
 		{"foreign origin", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.origin = "https://github.com/evil/vulcam.git" }, "is not cappy-lab/vulcam"},
 		{"fetch fails", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.fetchErr = errors.New("offline") }, "could not fetch origin/dev"},
 		{"ignored unreadable", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.ignoredErr = errors.New("x") }, "cannot list the ignored files"},
@@ -180,6 +183,7 @@ func TestCloseRefusals(t *testing.T) {
 		{"secret", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.ignored = []string{"dist/.env"} }, "dist/.env"},
 		{"unpushed", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.ahead = 1 }, "1 unpushed"},
 		{"never worked", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.own = false }, "never worked"},
+		{"detached never worked", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.list[1].Branch, g.own = "", false }, "never worked"},
 		{"not merged", target, func(g *fakeGit, _ *fakeGitHub, _ *fakePaths) { g.inBase = nil }, "not merged"},
 	}
 	for _, tt := range tests {
@@ -187,9 +191,12 @@ func TestCloseRefusals(t *testing.T) {
 			t.Parallel()
 			git, gh, paths := approvedGit(), &fakeGitHub{}, &fakePaths{}
 			s := settings
-			if tt.name == "kept" {
+			switch tt.name {
+			case "kept":
 				s.Keep = []string{"12-x"}
 				tt.want = "keep list"
+			case "kept by a symlinked path":
+				s.Keep = []string{"/alias/repo-worktrees/12-x"}
 			}
 			if tt.setup != nil {
 				tt.setup(git, gh, paths)

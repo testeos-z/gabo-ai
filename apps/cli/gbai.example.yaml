@@ -71,6 +71,10 @@ sessions:
   # coder:
   #   prompt_file: /data/home/prompts/coder.md
 
+# Most coder sessions the cycle runs at once. The default, 3, leaves room
+# for the reviewer's checks on the same server; lower it on a smaller one.
+parallelism: 3
+
 # `gbai worktree close <path>` closes approved coder worktrees under
 # <main checkout>-worktrees/ and deletes their merged local branch.
 worktree:

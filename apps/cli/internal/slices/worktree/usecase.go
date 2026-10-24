@@ -3,6 +3,8 @@ package worktree
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -115,8 +117,23 @@ func (u *UseCase) Close(ctx context.Context, arg string) Result {
 }
 
 func (u *UseCase) pathFacts(ctx context.Context, arg string, list []Worktree) (PathFacts, Worktree, error) {
-	f := PathFacts{Arg: arg, Keep: u.s.Keep}
+	f := PathFacts{Arg: arg, Keep: slices.Clone(u.s.Keep)}
 	var err error
+	// An absolute keep entry may be spelled through a symlink (for example
+	// /home -> /var/home); match it by its real path too, so a kept
+	// worktree is never closed because of how its path was written.
+	for _, k := range u.s.Keep {
+		if !filepath.IsAbs(k) {
+			continue
+		}
+		real, err := u.paths.Real(k)
+		if err != nil {
+			return f, Worktree{}, fmt.Errorf("resolve worktree.keep entry %s: %w", k, err)
+		}
+		if real != "" {
+			f.Keep = append(f.Keep, real)
+		}
+	}
 	if f.Main, err = u.paths.Real(list[0].Path); err != nil {
 		return f, Worktree{}, err
 	}
@@ -171,6 +188,9 @@ func (u *UseCase) stateFacts(ctx context.Context, label, main, dir, head, branch
 		return fail("cannot compare with origin/"+u.s.Integration, err)
 	}
 	if branch == "" {
+		if f.OwnCommits, err = u.git.OwnCommits(ctx, dir, ""); err != nil {
+			return fail("cannot read the HEAD reflog of the worktree", err)
+		}
 		return f, nil
 	}
 	if f.OwnCommits, err = u.git.OwnCommits(ctx, main, branch); err != nil {

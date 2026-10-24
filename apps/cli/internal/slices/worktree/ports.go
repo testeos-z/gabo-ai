@@ -32,7 +32,8 @@ type Git interface {
 	// IsAncestor reports whether commit a is an ancestor of (or equal to) b;
 	// an unknown commit is not an ancestor.
 	IsAncestor(ctx context.Context, dir, a, b string) (bool, error)
-	// OwnCommits reports whether the branch's reflog holds more than its creation.
+	// OwnCommits reports whether the branch's reflog holds more than its
+	// creation; with branch "" it reads the HEAD reflog of the worktree dir.
 	OwnCommits(ctx context.Context, dir, branch string) (bool, error)
 	// Changed counts tracked changes and untracked files (ignored excluded).
 	Changed(ctx context.Context, dir string) (int, error)

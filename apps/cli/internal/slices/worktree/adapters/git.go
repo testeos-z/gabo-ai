@@ -130,12 +130,17 @@ func (g *Git) IsAncestor(ctx context.Context, dir, a, b string) (bool, error) {
 }
 
 // OwnCommits reports whether the branch's reflog holds more than its
-// creation entry. A missing reflog counts as no commits of its own.
+// creation entry; with branch "" it reads the HEAD reflog of the worktree
+// dir (a detached worktree). A missing reflog counts as no commits of its own.
 func (g *Git) OwnCommits(ctx context.Context, dir, branch string) (bool, error) {
-	if err := safeArg(branch); err != nil {
-		return false, err
+	ref := "HEAD"
+	if branch != "" {
+		if err := safeArg(branch); err != nil {
+			return false, err
+		}
+		ref = "refs/heads/" + branch
 	}
-	res, err := g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", dir, "reflog", "show", "--format=%H", "refs/heads/" + branch, "--"}})
+	res, err := g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", dir, "reflog", "show", "--format=%H", ref, "--"}})
 	if err != nil {
 		return false, err
 	}
@@ -192,13 +197,38 @@ func (g *Git) Ignored(ctx context.Context, dir string) ([]string, error) {
 	return out, nil
 }
 
-// Unpushed reports whether HEAD has an upstream and how far ahead of it it is.
+// Unpushed reports whether HEAD has an upstream and how far ahead of it it
+// is. Only a detached HEAD, a branch without a configured upstream or an
+// upstream whose remote branch is gone (deleted after the merge) count as no
+// upstream; any other git failure is an error, never "no upstream".
 func (g *Git) Unpushed(ctx context.Context, dir string) (bool, int, error) {
-	res, err := g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", dir, "rev-parse", "--verify", "--quiet", "--symbolic-full-name", "@{upstream}"}})
+	res, err := g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", dir, "symbolic-ref", "-q", "HEAD"}})
 	if err != nil {
 		return false, 0, err
 	}
-	if res.ExitCode != 0 || strings.TrimSpace(string(res.Stdout)) == "" {
+	switch res.ExitCode {
+	case 0:
+	case 1: // detached HEAD
+		return false, 0, nil
+	default:
+		return false, 0, fmt.Errorf("git symbolic-ref exited %d: %s", res.ExitCode, kernel.StderrTail(res.Stderr))
+	}
+	ref := strings.TrimSpace(string(res.Stdout))
+	if err := safeArg(ref); err != nil {
+		return false, 0, err
+	}
+	// for-each-ref takes patterns, so read only the row of the exact ref.
+	up, err := g.git(ctx, "-C", dir, "for-each-ref", "--format=%(refname)%00%(upstream)%00%(upstream:track)", ref)
+	if err != nil {
+		return false, 0, err
+	}
+	var upstream, track string
+	for _, row := range strings.Split(string(up.Stdout), "\n") {
+		if name, rest, ok := strings.Cut(row, "\x00"); ok && name == ref {
+			upstream, track, _ = strings.Cut(rest, "\x00")
+		}
+	}
+	if upstream == "" || track == "[gone]" {
 		return false, 0, nil
 	}
 	count, err := g.git(ctx, "-C", dir, "rev-list", "--count", "@{upstream}..HEAD")

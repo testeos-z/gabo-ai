@@ -267,3 +267,18 @@ func TestParseWorktreeKeep(t *testing.T) {
 		}
 	}
 }
+
+func TestParseParallelism(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal))
+	if err != nil || cfg.Parallelism != 3 {
+		t.Fatalf("default parallelism = %d, %v; want 3", cfg.Parallelism, err)
+	}
+	cfg, err = Parse([]byte(minimal + "parallelism: 5\n"))
+	if err != nil || cfg.Parallelism != 5 {
+		t.Fatalf("parallelism = %d, %v; want 5", cfg.Parallelism, err)
+	}
+	if _, err := Parse([]byte(minimal + "parallelism: -1\n")); err == nil || !strings.Contains(err.Error(), "parallelism") {
+		t.Fatalf("negative parallelism: error = %v", err)
+	}
+}

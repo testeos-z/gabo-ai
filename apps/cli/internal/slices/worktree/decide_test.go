@@ -38,6 +38,7 @@ func TestCheckPath(t *testing.T) {
 		{"kept by name", func(f *PathFacts) { f.Keep = []string{"pr-399", "12-x"} }, "keep list"},
 		{"kept by path", func(f *PathFacts) { f.Keep = []string{"/src/repo-worktrees/12-x"} }, "keep list"},
 		{"other kept", func(f *PathFacts) { f.Keep = []string{"13-y"} }, ""},
+		{"kept by path with trailing slash", func(f *PathFacts) { f.Keep = []string{"/src/repo-worktrees/12-x/"} }, "keep list"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -76,7 +77,8 @@ func TestDecide(t *testing.T) {
 		{"merged pr", func(f *StateFacts) { f.InBase, f.MergedPR = false, 41 }, true, ReasonMergedPR},
 		{"merged pr without upstream", func(f *StateFacts) { f.InBase, f.MergedPR, f.HasUpstream = false, 41, false }, true, ReasonMergedPR},
 		{"in base without upstream", func(f *StateFacts) { f.HasUpstream = false }, true, ReasonInBase},
-		{"detached in base", func(f *StateFacts) { f.Branch, f.OwnCommits = "", false }, true, ReasonInBase},
+		{"detached worked in base", func(f *StateFacts) { f.Branch = "" }, true, ReasonInBase},
+		{"detached never worked behind the base tip", func(f *StateFacts) { f.Branch, f.OwnCommits = "", false }, false, "never worked: the detached HEAD"},
 		{"merged pr at the base tip", func(f *StateFacts) { f.Head, f.OwnCommits, f.MergedPR = "b1", false, 41 }, true, ReasonInBase},
 		{"dirty", func(f *StateFacts) { f.Changed = 2 }, false, "not clean"},
 		{"ignored env", func(f *StateFacts) { f.Ignored = []string{"node_modules/", "apps/web/.env.local"} }, false, "apps/web/.env.local"},

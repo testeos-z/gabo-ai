@@ -28,7 +28,9 @@ type PathFacts struct {
 	WorktreesDir string // <main>-worktrees, the sibling of the main checkout
 	Current      string // the worktree the command runs in
 	Registered   bool   // a linked (non-main) worktree of this repository
-	Keep         []string
+	// Keep holds worktree names and absolute paths that are never closed;
+	// the use case adds the symlink-free form of every absolute entry.
+	Keep []string
 }
 
 // CheckPath returns why the target may not be closed, or "".
@@ -54,6 +56,9 @@ func CheckPath(f PathFacts) string {
 		return "not a worktree of this repository"
 	}
 	for _, k := range f.Keep {
+		if filepath.IsAbs(k) {
+			k = filepath.Clean(k)
+		}
 		if k == filepath.Base(f.Real) || k == f.Real || k == filepath.Clean(f.Arg) {
 			return "on the keep list (worktree.keep)"
 		}
@@ -68,7 +73,7 @@ type StateFacts struct {
 	Branch      string // short name; "" when detached
 	Head        string
 	BaseTip     string // origin/<Integration>
-	OwnCommits  bool   // the branch's reflog holds more than its creation
+	OwnCommits  bool   // the branch's reflog (the worktree's HEAD reflog when detached) holds more than its creation
 	Changed     int    // tracked changes and untracked files
 	Ignored     []string
 	HasUpstream bool
@@ -108,8 +113,14 @@ func Decide(f StateFacts) Decision {
 		if f.Head == f.BaseTip {
 			return refuse("never worked: HEAD is the origin/%s tip (a worker may be starting in it)", f.Integration)
 		}
-		if f.Branch != "" && !f.OwnCommits {
-			return refuse("never worked: %s has no commits of its own (a worker may be starting in it)", f.Branch)
+		// A worktree created from an older base commit is behind the tip
+		// but still fresh; only its own reflog proves work was done.
+		if !f.OwnCommits {
+			name := f.Branch
+			if name == "" {
+				name = "the detached HEAD"
+			}
+			return refuse("never worked: %s has no commits of its own (a worker may be starting in it)", name)
 		}
 	}
 	switch {
