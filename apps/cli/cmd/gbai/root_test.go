@@ -20,7 +20,7 @@ func TestRootHelpListsVersion(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor", "mcp", "init", "plan"} {
+	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor", "mcp", "init", "plan", "worktree"} {
 		if !strings.Contains(out.String(), name) {
 			t.Fatalf("help output does not list %s command:\n%s", name, out.String())
 		}
@@ -176,5 +176,19 @@ func TestOwnerLoginDefaultsToTheGhLogin(t *testing.T) {
 		if _, err := ownerLogin(context.Background(), &kerneltest.Runner{Result: res}, ""); err == nil {
 			t.Errorf("%s: error = nil", name)
 		}
+	}
+}
+
+func TestWorktreeCloseNeedsConfigAndRejectsForce(t *testing.T) {
+	t.Parallel()
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetArgs([]string{"--config", t.TempDir() + "/missing.yaml", "worktree", "close", "/src/repo-worktrees/x"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "config") {
+		t.Fatalf("Execute() error = %v, want config error", err)
+	}
+	root = newRootCommand(deps{version: "1.2.3"})
+	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "worktree", "close", "--force", "/src/repo-worktrees/x"})
+	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "force") {
+		t.Fatalf("Execute(--force) error = %v", err)
 	}
 }

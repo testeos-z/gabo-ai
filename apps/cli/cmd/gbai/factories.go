@@ -25,6 +25,8 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/sessions"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/status"
 	statusadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/status/adapters"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/worktree"
+	worktreeadapters "github.com/testeos-z/gbai-team/apps/cli/internal/slices/worktree/adapters"
 )
 
 // factories build each slice's use case lazily from the config, so help and
@@ -39,6 +41,7 @@ type factories struct {
 	audit     audit.Factory
 	doctor    doctor.Factory
 	init      initcmd.Factory
+	worktree  worktree.Factory
 }
 
 func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
@@ -103,12 +106,14 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			if err != nil {
 				return nil, err
 			}
+			// status is read-only: a failed owner login lookup degrades the
+			// verdict lookups to unknown instead of failing the snapshot.
+			var gh status.GitHub = statusadapters.NewGitHub(d.runner, cfg.Repo.Name)
 			login, err := ownerLogin(ctx, d.runner, cfg.Bot.Login)
 			if err != nil {
-				return nil, err
+				gh = loginlessGitHub{GitHub: gh, err: err}
 			}
-			return status.NewUseCase(newRemoteShell(d.runner, cfg), newTerminals(d.runner, cfg, mode),
-				statusadapters.NewGitHub(d.runner, cfg.Repo.Name),
+			return status.NewUseCase(newRemoteShell(d.runner, cfg), newTerminals(d.runner, cfg, mode), gh,
 				status.Settings{Integration: cfg.Repo.IntegrationBranch, Bot: login}), nil
 		},
 		audit: func(ctx context.Context) (*audit.UseCase, error) {
@@ -128,6 +133,18 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 				Bot:         login,
 				Coder:       cfg.Coder.Login,
 			}), nil
+		},
+		worktree: func(context.Context) (*worktree.UseCase, error) {
+			cfg, err := loadConfig()
+			if err != nil {
+				return nil, err
+			}
+			return worktree.NewUseCase(worktreeadapters.NewGit(d.runner), worktreeadapters.NewGitHub(d.runner, cfg.Repo.Name),
+				worktreeadapters.Paths{}, worktree.Settings{
+					Repo:        cfg.Repo.Name,
+					Integration: cfg.Repo.IntegrationBranch,
+					Keep:        cfg.Worktree.Keep,
+				}), nil
 		},
 		init: func(context.Context) (*initcmd.UseCase, error) {
 			home, err := os.UserHomeDir()
@@ -170,4 +187,15 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			}), nil
 		},
 	}
+}
+
+// loginlessGitHub answers every verdict lookup with the owner login error, so
+// status reports the verdicts as unknown and keeps its other probes.
+type loginlessGitHub struct {
+	status.GitHub
+	err error
+}
+
+func (g loginlessGitHub) LastVerdict(context.Context, int, string) (string, error) {
+	return "", g.err
 }

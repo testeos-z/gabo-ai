@@ -350,3 +350,41 @@ func TestCIEngineDropsPathEntriesInsideTheUntrustedRoot(t *testing.T) {
 		t.Fatalf("engine %s", got)
 	}
 }
+
+// The checks' HOME is persistent and inside the untrusted root, so a PR can
+// plant binaries there; relative PATH entries resolve against the PR's own
+// workspace. Neither may reach the PATH of a later check, like the engine's.
+func TestCIChecksDropPathEntriesInsideTheUntrustedRoot(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{}
+	ws := &fakeWorkspace{}
+	procs := &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 1000}}
+	ci := NewCIUseCase(ws, r, procs, CIConfig{
+		Path:          "/s/ci/home/.local/bin:/usr/local/bin::bin:/s/ci:/data/home/.local/bin:/usr/bin",
+		Home:          "/s/ci/home",
+		UntrustedRoot: "/s/ci",
+	})
+	_ = ci.Prepare(wsName, strings.NewReader(""))
+	if _, err := ci.Run(context.Background(), wsName, []string{"bun", "test"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Calls[0].Command.Env[0]; got != "PATH=/usr/local/bin:/data/home/.local/bin:/usr/bin" {
+		t.Fatalf("checks %s", got)
+	}
+}
+
+// A checks HOME outside the untrusted root would be the owner's real home
+// (or an empty HOME that tools resolve to it): refuse instead of running.
+func TestCIRunRefusesAHomeOutsideTheUntrustedRoot(t *testing.T) {
+	t.Parallel()
+	for name, home := range map[string]string{"empty": "", "owner home": "/data/home", "relative": "ci/home"} {
+		r := &kerneltest.Runner{}
+		ws := &fakeWorkspace{}
+		procs := &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 1000}}
+		ci := NewCIUseCase(ws, r, procs, CIConfig{Path: "/usr/bin", Home: home, UntrustedRoot: "/s/ci"})
+		_ = ci.Prepare(wsName, strings.NewReader(""))
+		if _, err := ci.Run(context.Background(), wsName, []string{"bun", "test"}); err == nil || len(r.Calls) != 0 {
+			t.Errorf("%s: error = %v, calls %d", name, err, len(r.Calls))
+		}
+	}
+}

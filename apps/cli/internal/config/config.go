@@ -33,6 +33,13 @@ type Config struct {
 	Review   Review   `yaml:"review"`
 	Coder    Coder    `yaml:"coder"`
 	Sessions Sessions `yaml:"sessions"`
+	Worktree Worktree `yaml:"worktree"`
+}
+
+// Worktree configures `gbai worktree close`.
+type Worktree struct {
+	// Keep lists worktree names (or absolute paths) that are never closed.
+	Keep []string `yaml:"keep,omitempty"`
 }
 
 // Coder is the GitHub identity the coder pushes with; it must never merge.
@@ -277,6 +284,10 @@ func (c Config) validate() error {
 	check(filePattern.MatchString(c.Sessions.LocalOrca), "sessions.local_orca", "must be a command name or path")
 	for key, s := range map[string]Session{"coder": c.Sessions.Coder, "reviewer": c.Sessions.Reviewer, "assistant": c.Sessions.Assistant} {
 		check(s.PromptFile == "" || filePattern.MatchString(s.PromptFile), "sessions."+key+".prompt_file", "must be a path of safe characters")
+	}
+	for _, k := range c.Worktree.Keep {
+		ok := k != "" && !strings.ContainsAny(k, "\n\r") && (path.IsAbs(k) || !strings.Contains(k, "/")) && k != ".." && k != "."
+		check(ok, "worktree.keep", fmt.Sprintf("entry %q must be a worktree name or an absolute path", k))
 	}
 	return errors.Join(errs...)
 }

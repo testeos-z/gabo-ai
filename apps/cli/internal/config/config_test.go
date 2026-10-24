@@ -250,3 +250,20 @@ func TestReviewStateDir(t *testing.T) {
 		}
 	}
 }
+
+func TestParseWorktreeKeep(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal))
+	if err != nil || len(cfg.Worktree.Keep) != 0 {
+		t.Fatalf("default keep = %q, %v", cfg.Worktree.Keep, err)
+	}
+	cfg, err = Parse([]byte(minimal + "worktree:\n  keep: [pr-399, /src/repo-worktrees/demo]\n"))
+	if err != nil || strings.Join(cfg.Worktree.Keep, ",") != "pr-399,/src/repo-worktrees/demo" {
+		t.Fatalf("keep = %q, %v", cfg.Worktree.Keep, err)
+	}
+	for _, bad := range []string{`""`, "a/b", "../x", `"a\nb"`} {
+		if _, err := Parse([]byte(minimal + "worktree:\n  keep: [" + bad + "]\n")); err == nil || !strings.Contains(err.Error(), "worktree.keep") {
+			t.Errorf("keep %s: error = %v", bad, err)
+		}
+	}
+}

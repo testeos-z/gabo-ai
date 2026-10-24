@@ -49,7 +49,7 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, 
 5. That terminal runs `gbai --config /etc/gbai/gbai.yaml review run head <n> <sha>` as `orca` (no sudo; `gbai review request --keep-worktree` forwards `--keep-worktree`). gbai:
    - takes the review lock in its state dir and **refuses to run** (non-zero exit, nothing read or posted) unless its own clone is missing (a fresh state) or a clean checkout of the integration branch: on the branch, no tracked, untracked or ignored changes;
    - re-reads the PR from GitHub and skips it if the head moved;
-   - fast-forwards its clone, adds a per-review worktree and makes a **local test merge** of the pinned head into a fresh `origin/dev`; a conflict is a blocking verdict;
+   - resets its clean clone to the fetched `origin/dev` (a rewritten branch is followed, not refused), adds a per-review worktree and makes a **local test merge** of the pinned head into a fresh `origin/dev`; a conflict is a blocking verdict;
    - copies the merged tree (`git archive`) into a fresh workspace under its `ci/` dir;
    - runs the configured checks there (`review.checks`, argv only, no shell), then the read-only review engine (`claude` or `pi`, `runtimes.reviewer`) with the model credential piped over stdin and a fresh empty HOME, both with an environment built from scratch (no GitHub credentials, empty `GH_CONFIG_DIR`); leftover processes whose cwd is inside `ci/` are killed (TERM, one bounded wait, KILL) before each check and before the engine;
    - computes the verdict itself from that local evidence and posts, with the owner's `gh` login, the statuses `reviewer/tests` and `reviewer/review` and one comment whose first line is exactly `No blocking issues found.` or `Blocking issues found.`, ending with a visible footer and a hidden marker that signs the head;
@@ -81,7 +81,8 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, 
 | Labels and the integration ruleset | `gbai repo setup [--dry-run]` / `repo_setup_plan`, `repo_setup_apply` |
 | Start/stop the sessions | `gbai sessions start|stop [--role] [--mode]` / `sessions_start`, `sessions_stop` |
 | Request a review after a push; reviewer side | `gbai review request [--keep-worktree]` / `review_request`; `gbai review run`, `review ci`, `review notify` |
-| Status: server, sessions, open PRs, verdicts, needs-user | `gbai status` / `status` |
+| Status: server, sessions, open PRs, verdicts, needs-user | `gbai status` / `status` (a failed owner login lookup only turns the verdicts unknown) |
+| Close an approved coder worktree (under `<main checkout>-worktrees/`, not the main one or on `worktree.keep`, clean, pushed, no ignored secrets, worked on, no open PR, merged into the integration branch or by a merged PR holding its HEAD); never `--force`; deletes the merged local branch with `git branch -d` | `gbai worktree close <path>` (one line: `CLOSED <path> branch=<b> reason=<in-base\|merged-pr>` or `REFUSED <path> <reason>`) |
 | Audit merges (owner login only, verdict status and signed marker comment on merged heads, no coder merges) | `gbai audit` / `audit` |
 | Known gotchas | `gbai doctor` / `doctor` |
 | Local agent setup: skills and MCP registration | `gbai init [--runtime] [--scope] [--dry-run]` |

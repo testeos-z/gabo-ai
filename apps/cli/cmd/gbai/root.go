@@ -31,6 +31,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/sessions"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/status"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/version"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/worktree"
 )
 
 // deps holds everything the composition root wires into the slices.
@@ -66,6 +67,7 @@ func newRootCommand(d deps) *cobra.Command {
 	root.AddCommand(status.NewCommand(f.status))
 	root.AddCommand(audit.NewCommand(f.audit, time.Now))
 	root.AddCommand(doctor.NewCommand(f.doctor))
+	root.AddCommand(worktree.NewCommand(f.worktree))
 	root.AddCommand(initcmd.NewCommand(f.init))
 	root.AddCommand(plan.NewCommand(plan.NewUseCase(osfs.FS{})))
 	root.AddCommand(mcp.NewCommand(mcp.NewTools(mcpPorts(f), secrets.Names(), time.Now), serverVersion(d.version)))

@@ -159,8 +159,8 @@ func TestGitPrepareClonesWhenMissingThenFetchesPinnedRefs(t *testing.T) {
 	if len(calls) != 4 || !strings.Contains(calls[1], "clone --branch dev https://github.com/o/r.git "+state+"/clone") {
 		t.Fatalf("calls = %q", calls)
 	}
-	if !strings.HasSuffix(calls[3], "-C "+state+"/clone -c core.hooksPath=/dev/null merge --ff-only --quiet refs/remotes/origin/dev") {
-		t.Fatalf("clone not fast-forwarded to the integration branch: %q", calls[3])
+	if !strings.HasSuffix(calls[3], "-C "+state+"/clone -c core.hooksPath=/dev/null reset --hard --quiet refs/remotes/origin/dev") {
+		t.Fatalf("clone not synced to the integration branch: %q", calls[3])
 	}
 	fetch := argv(r.Calls[2])
 	for _, want := range []string{"+refs/heads/dev:refs/remotes/origin/dev", "+refs/pull/12/head:refs/remotes/origin/pr/12", "credential.helper=!gh auth git-credential"} {
@@ -504,5 +504,45 @@ func TestGitGuardRefusesADirtyOrMovedClone(t *testing.T) {
 				t.Fatalf("Guard() error = %v, want ErrDirtyClone", err)
 			}
 		})
+	}
+}
+
+// A force-pushed (rewritten) integration branch cannot be fast-forwarded;
+// the reviewer's own clean mirror must follow it instead of failing every
+// later review on the same refusal.
+func TestGitPrepareFollowsARewrittenIntegrationBranch(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("runs the real git binary")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	work := t.TempDir()
+	origin := filepath.Join(work, "origin.git")
+	seed := filepath.Join(work, "seed")
+	state := filepath.Join(work, "state")
+	commit := []string{"-c", "user.name=t", "-c", "user.email=t@localhost", "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty", "-m"}
+	gitRepo(t, "init", "-q", "--bare", origin)
+	gitRepo(t, "init", "-q", "-b", "dev", seed)
+	gitRepo(t, append([]string{"-C", seed}, append(commit, "one")...)...)
+	gitRepo(t, "-C", seed, "push", "-q", origin, "dev:refs/heads/dev", "dev:refs/pull/12/head")
+	gitRepo(t, "clone", "-q", "--branch", "dev", origin, filepath.Join(state, "clone"))
+
+	// Rewrite dev on the origin with an unrelated history.
+	gitRepo(t, "-C", seed, "checkout", "-q", "--orphan", "rewritten")
+	gitRepo(t, append([]string{"-C", seed}, append(commit, "rewritten")...)...)
+	gitRepo(t, "-C", seed, "push", "-q", "--force", origin, "rewritten:refs/heads/dev", "rewritten:refs/pull/12/head")
+
+	g := NewGit(execrunner.New(), "o/r", state, nil)
+	if err := g.Prepare(context.Background(), 12, "dev"); err != nil {
+		t.Fatalf("Prepare() after a force push error = %v", err)
+	}
+	head, err := exec.Command("git", "-C", filepath.Join(state, "clone"), "log", "-1", "--format=%s").Output()
+	if err != nil || strings.TrimSpace(string(head)) != "rewritten" {
+		t.Fatalf("clone HEAD = %q, %v; want the rewritten dev", head, err)
+	}
+	if err := g.Guard(context.Background(), "dev"); err != nil {
+		t.Fatalf("Guard() after following the rewrite = %v", err)
 	}
 }

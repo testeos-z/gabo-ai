@@ -40,17 +40,19 @@ func EngineArgv(runtime string) ([]string, error) {
 // a separate OS user.
 type CIConfig struct {
 	CredentialEnv map[string]string // runtime -> env var receiving the model credential
-	Path          string            // PATH given to checks and (filtered) to the engine
+	Path          string            // PATH given (filtered) to checks and the engine
 	Home          string            // persistent HOME of the checks (caches), inside UntrustedRoot
 	User          string            // USER and LOGNAME of the checks; empty omits them
 	// UntrustedRoot holds the workspaces and the checks' HOME and is writable
-	// by PR code: engine PATH entries inside it are dropped so checks cannot
-	// plant the engine binary, and only processes whose cwd is inside it are
-	// treated as leftovers.
+	// by PR code: PATH entries inside it are dropped so one PR's checks cannot
+	// plant binaries for a later check or the engine, and only processes whose
+	// cwd is inside it are treated as leftovers.
 	UntrustedRoot string
 }
 
-func (c CIConfig) enginePath() string {
+// trustedPath keeps only absolute PATH entries outside the untrusted root;
+// empty and relative entries would resolve against the PR's workspace.
+func (c CIConfig) trustedPath() string {
 	var keep []string
 	for _, dir := range strings.Split(c.Path, ":") {
 		if !path.IsAbs(dir) || within(dir, c.UntrustedRoot) {
@@ -158,8 +160,10 @@ func (u *CIUseCase) Prepare(name string, tree io.Reader) error {
 }
 
 // Run executes argv as-is (no shell) inside the workspace. The environment
-// holds only PATH, HOME, USER, LOGNAME and GH_CONFIG_DIR, which points at a
-// fresh empty directory so gh never finds the owner's login.
+// holds only PATH (without entries in the untrusted root), HOME (the
+// persistent checks HOME, required inside the untrusted root), USER, LOGNAME
+// and GH_CONFIG_DIR, which points at a fresh empty directory so gh never
+// finds the owner's login.
 func (u *CIUseCase) Run(ctx context.Context, name string, argv []string) (kernel.Result, error) {
 	if err := ValidateWorkspace(name); err != nil {
 		return kernel.Result{}, err
@@ -174,11 +178,16 @@ func (u *CIUseCase) Run(ctx context.Context, name string, argv []string) (kernel
 	if err := u.killLeftovers(ctx); err != nil {
 		return kernel.Result{}, err
 	}
+	// The persistent checks HOME must sit inside the untrusted root: an empty
+	// or outside HOME would hand the checks the owner's real home.
+	if u.cfg.Home == "" || !within(u.cfg.Home, u.cfg.UntrustedRoot) {
+		return kernel.Result{}, fmt.Errorf("checks home %q is not inside the untrusted root %q", u.cfg.Home, u.cfg.UntrustedRoot)
+	}
 	ghConfig, err := u.ws.Home(name)
 	if err != nil {
 		return kernel.Result{}, fmt.Errorf("fresh gh config dir: %w", err)
 	}
-	env := []string{"PATH=" + u.cfg.Path, "HOME=" + u.cfg.Home}
+	env := []string{"PATH=" + u.cfg.trustedPath(), "HOME=" + u.cfg.Home}
 	if u.cfg.User != "" {
 		env = append(env, "USER="+u.cfg.User, "LOGNAME="+u.cfg.User)
 	}
@@ -222,7 +231,7 @@ func (u *CIUseCase) Engine(ctx context.Context, name, runtime string, stdin io.R
 	}
 	return u.runner.Run(ctx, kernel.Command{
 		Name: argv[0], Args: argv[1:], Dir: dir, Stdin: r, CleanEnv: true,
-		Env: []string{"PATH=" + u.cfg.enginePath(), "HOME=" + home, "GH_CONFIG_DIR=" + home, env + "=" + cred},
+		Env: []string{"PATH=" + u.cfg.trustedPath(), "HOME=" + home, "GH_CONFIG_DIR=" + home, env + "=" + cred},
 	})
 }
 

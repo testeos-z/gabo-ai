@@ -102,8 +102,8 @@ func (g *Git) git(ctx context.Context, args ...string) (kernel.Result, error) {
 }
 
 // Prepare clones the repository on the integration branch when missing,
-// fetches the integration branch and the PR head, and fast-forwards the
-// checkout so the clone stays a clean mirror of the integration branch.
+// fetches the integration branch and the PR head, and resets the checkout
+// to origin so the clone stays a clean mirror of the integration branch.
 func (g *Git) Prepare(ctx context.Context, n int, integration string) error {
 	res, err := g.runner.Run(ctx, kernel.Command{Name: "git", Args: []string{"-C", g.clone(), "rev-parse", "--git-dir"}})
 	if err != nil {
@@ -121,8 +121,12 @@ func (g *Git) Prepare(ctx context.Context, n int, integration string) error {
 	if _, err := g.git(ctx, args...); err != nil {
 		return fmt.Errorf("fetch: %w", err)
 	}
-	if _, err := g.git(ctx, "-C", g.clone(), "-c", "core.hooksPath=/dev/null", "merge", "--ff-only", "--quiet", "refs/remotes/origin/"+integration); err != nil {
-		return fmt.Errorf("fast-forward %s: %w", integration, err)
+	// The clone is the reviewer's own mirror and Guard has already refused
+	// any local change, so it follows origin with a hard reset: a force-pushed
+	// (rewritten) integration branch cannot be fast-forwarded and would fail
+	// every later review.
+	if _, err := g.git(ctx, "-C", g.clone(), "-c", "core.hooksPath=/dev/null", "reset", "--hard", "--quiet", "refs/remotes/origin/"+integration); err != nil {
+		return fmt.Errorf("sync %s: %w", integration, err)
 	}
 	return nil
 }

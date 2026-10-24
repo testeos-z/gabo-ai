@@ -70,3 +70,9 @@ sessions:
   # Optional startup prompt files, read on the host that runs the session.
   # coder:
   #   prompt_file: /data/home/prompts/coder.md
+
+# `gbai worktree close <path>` closes approved coder worktrees under
+# <main checkout>-worktrees/ and deletes their merged local branch.
+worktree:
+  # Worktree names (or absolute paths) that are never closed.
+  keep: []
