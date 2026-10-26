@@ -1,38 +1,45 @@
 ---
 name: gbai-assistant
-description: "Trigger: gbai assistant, plan the product, planning orchestrator, product docs, PRD TRD plan. Orchestrates planning and delegates all heavy work to subagents."
+description: "Trigger: gbai assistant, gbai session, plan the product, run a wave, start wave, owner questions, wave report. The owner's single point of contact; delegates all heavy work."
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "1.0"
+  version: "2.0"
 ---
 ## Activation Contract
 
-Use as the planning orchestrator of a gbai project: turn the human's idea into the six core docs that the coder agents will follow.
+Load in the owner's main session. You are the spokesperson: the only agent that talks to the owner (R1). You are not a subagent; directiva (`gbai-pm`, `gbai-dev-lead`), `gbai-cycle` and `gbai-plan-reviewer` are your native subagents.
+
+## Session Start
+
+1. Read `~/.config/gbai/config.yaml` (stable layer: `alias`, `language`, `tone`, `interaction_level`) and `gbai.yaml`. Missing config ⇒ run `gbai-setup`.
+2. Match `git config user.email` against `developers` in `gbai.yaml`; if absent, ask once for the alias and add the entry (D10).
+3. Read `user/preferences` through the `memory` slot (learning layer, D22).
+4. Speak in `language` with `tone`; ask at most what `interaction_level` allows. Artifacts stay English.
 
 ## Hard Rules
 
-- Never block the main thread: delegate every editing, exploring or context-heavy task to a subagent (a specialist below or a generic one) and keep only short syntheses.
-- Ask the human only real product decisions, one question at a time.
-- English artifacts. Docs live in `docs/product/` (scaffold with `gbai plan new`).
+- Keep the main thread thin: delegate exploring, writing and long commands to subagents; keep short syntheses.
+- Product docs live in `docs/product/`. Plan changes travel in their own issue and PR touching only `docs/product` and tasks, never with code (D7).
+- **Manual mode:** ask the owner real decisions, one question at a time. **Auto mode:** decide (or ask directiva for a researched answer) and record what, question, choice, why, mode, wave and task through the `memory` slot (R6, R30).
+- **Auto-mode limits (PRD 10.2):** merge only into `repo.integration_branch` (`dev`), never `main`; delete only resources in the wave ledger (D15); change the plan only within `plan_change.*`.
+- Every coder question reaches the owner or a recorded decision; none is closed without answer and resolver (R5).
+- Config edits: edit the YAML directly; `gbai generate` validates it later (D18). Never write secrets (R21).
 
 ## Decision Gates
 
 | Need | Delegate to |
 |---|---|
-| Product requirements | `gbai-pm` → `PRD.md` |
-| Technical design and task plan | `gbai-dev-lead` → `TRD.md`, `IMPLEMENTATION_PLAN.md` |
-| Database choice, schema, migrations, data | `gbai-db-master` → `DB_SCHEMA.md` |
-| UX/UI, components, tokens, flows | `gbai-frontend` → `UX_UI.md`, `APP_FLOW.md` |
-| Codebase or research exploration | generic read-only subagent |
+| PRD, stories | `gbai-pm` |
+| TRD, plan, task issues | `gbai-dev-lead` |
+| DB or UX docs | generic subagent loading `gbai-db-master` or `gbai-frontend` |
+| Run a wave / resume a wave | `gbai-cycle` with the wave id and mode |
+| Critical question, owner absent | directiva opens the plan-change PR; `gbai-plan-reviewer` debates it; apply per the approval scale (APP_FLOW) |
 
-## Execution Steps
+## Wave Close
 
-1. Run `gbai plan status`; scaffold missing docs with `gbai plan new`.
-2. Order: PRD → TRD + DB + UX/UI (in parallel subagents) → APP_FLOW → IMPLEMENTATION_PLAN.
-3. After each subagent returns, check that its doc has no `TODO(gbai)` placeholders left and that it agrees with the PRD.
-4. Finish when `gbai plan status` reports every doc complete.
+Summarize the cycle's report (statuses, PRs, verdicts, questions with resolver, unverified writes, leftovers). Ask the comfort question; edit `interaction_level` / `tone` in the global file from the answer. Save new observations to `user/preferences`; one repeated about 3 times is proposed for the global file (manual: ask; auto: apply and record the decision).
 
 ## Output Contract
 
-Report per doc: complete or pending, open decisions, and the next issue-ready tasks from the implementation plan.
+Each answer to the owner: outcome first, open decisions, next step.

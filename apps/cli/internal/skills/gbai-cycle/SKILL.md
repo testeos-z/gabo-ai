@@ -1,36 +1,34 @@
 ---
 name: gbai-cycle
-description: "Trigger: gbai cycle, cloud cycle, run waves, parent issue cycle, autonomous coding cycle. Cloud variant of pilot-cycle: one parent issue per cycle, event-driven."
+description: "Trigger: gbai cycle, run wave, resume wave, wave close, launch coders, wave ledger, wave report. Runs one wave of unblocked tasks with coder subagents and cleans up."
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "1.0"
+  version: "2.0"
 ---
 ## Activation Contract
 
-Use in the cloud coordinator session to run one cycle per parent issue until nothing is eligible.
+Load in the `gbai-cycle` subagent. The assistant gives you a wave id and the mode; you run that one wave and return the wave report. You use the `tasks`, `repository_host` and `memory` slot adapters.
 
 ## Hard Rules
 
-- One parent issue per cycle, chained with the wrk skills in order: purpose → scope (declared ODD/SDD track per sub-issue) → implementation → pr → advance → prune. Stop the chain on any gate failure.
-- Event-driven only: react to Orca inbox messages. No timers, no sleep, no polling. A one-shot reconcile at startup is allowed.
-- Target the integration branch from config; never `main`.
-- The agent runtime is fixed by config; never ask which agent to use per worker.
-- Human gates are rules: ambiguous scope or a merge conflict you cannot resolve ⇒ label `needs-user`, comment why, continue with the next eligible issue.
-- Cleanup: only after GitHub confirms the PR is merged. Close a coder worktree only with `gbai worktree close <absolute path>` (one line `CLOSED ...` or `REFUSED ...`); it also deletes the merged local branch. Never `git worktree remove` directly, never `--force`, never delete unmerged work. A `REFUSED` worktree stays as is and goes to the owner block.
-- Board moves are never skipped silently. A subagent denied the board write never retries another way; it returns the exact `issue -> Ready` list with item ids, and the coordinator applies it and re-reads the board.
-- Launch at most `parallelism` coder sessions (config). It already leaves room for the reviewer's checks; never exceed it while a review runs.
+- Target `repo.integration_branch` (`dev`); never `main`.
+- Launch at most `parallelism` coder subagents at once (`gbai-coder`), one per task, each in its own worktree. Never exceed it while a review runs.
+- Resource ledger (D15): every worktree, branch, container or test database a coder reports goes into `gbai/ledger/<wave>` through the `memory` slot as soon as the outcome arrives.
+- Cleanup only from the ledger, only after the host confirms the PR merged: `git worktree remove <path>` (never `--force`), `git branch -d <branch>`, `docker rm` for ledger containers. Skip `worktree.keep` entries. A removal that fails is REFUSED: leave it and list it under leftovers. Never delete anything outside the ledger.
+- Mid-wave task change: re-read the task before the coder's next round; never interrupt a round (PRD 8.1 rule 1).
+- Plan-change debate: mark only the affected task BLOCKED; the rest of the wave continues (rule 2).
+- Every tracker write is re-read (R24); unverified writes go to the report.
+- Board or tracker moves are never skipped silently: a denied write is returned as the exact list (`issue -> Ready`, `issue -> Backlog`) for the assistant to apply.
 
 ## Execution Steps
 
-1. Reconcile once: open PRs, claims, `needs-user` issues (`gbai status`).
-2. Eligible = open, in the roadmap, all `blockedBy` closed, not `needs-user`, not claimed. Claim it (label + coordination comment, never the reviewer's verdict marker).
-3. Wave planning: move every unblocked card of the wave Backlog → Ready on the project board, then re-read the board to confirm.
-4. Run the wrk chain; launch coder sessions (at most `parallelism`), each with `gbai-coder`.
-5. On a verdict message: blocking ⇒ fix session; merged ⇒ advance, `gbai worktree close <absolute path>` for the coder worktree, then recompute eligibility (merges unblock issues).
-6. Wave close: hand the owner ONE block with every `REFUSED` worktree and its reason plus every test container the coders reported under `containers:` (and their `leftovers:`). Nothing from a finished wave may be left out.
-7. Nothing eligible ⇒ end the turn and wait for the next inbox message.
+1. Resume first (D17): read `gbai/trace/<wave>` and `gbai/ledger/<wave>`; re-read every wave task through `tasks`. DONE ⇒ skip; open PR or worktree ⇒ reattach. Tracker and trace disagree ⇒ report, do not guess.
+2. Read the unblocked tasks (all blocked-by closed), claim each (verified).
+3. Per task: `git worktree add <path> -b <branch> origin/dev`, record it in the ledger, launch `gbai-coder` with task, worktree, branch and mode.
+4. On each outcome (HANDED, DONE, BLOCKED): append resources to the ledger, update the task (status, PR link) and the trace, recompute what is unblocked, launch the next task within `parallelism`.
+5. Wave close: clean ledger entries whose PR merged; mark the rest live or leftover.
 
 ## Output Contract
 
-Per cycle: parent issue, sub-issues with PR and verdict, merged/blocked/needs-user, board moves applied, `CLOSED`/`REFUSED` lines, and the owner block (refused worktrees, containers, leftovers).
+Wave report: wave id; per task status, PR, last verdict, fix rounds; questions with answer and resolver; interaction count with reasons; unverified writes; REFUSED removals and leftovers (paths, containers); plan-change proposals.

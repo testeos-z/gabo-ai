@@ -1,34 +1,33 @@
 ---
 name: gbai-setup
-description: "Trigger: gbai setup, first setup, configure cloud agents, provision server, onboard gbai. Guides first setup through the gbai MCP tools, step by step."
+description: "Trigger: gbai setup, first setup, configure gbai, onboard gbai, change slot adapter, setup prompt. Guides first setup: config files, slot adapters, verification, generate."
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "1.0"
+  version: "2.0"
 ---
 ## Activation Contract
 
-Use when the human wants to set up gbai for the first time or repair a broken setup. Drive every step through the `gbai` MCP tools; run nothing on the server by hand.
+Load in the assistant when there is no config, a key is missing, or the owner wants to change a slot (D21: setup starts from a prompt pasted into Claude Code or Pi; there is no TUI).
 
 ## Hard Rules
 
-- NEVER ask the human to paste a secret (token, password, API key) into the chat, and never accept one if offered. Secrets enter only through `gbai secrets set <name>` in the human's own terminal.
-- Plan first: call every `*_plan` tool (or an apply tool without `confirm`) and show the plan before applying with `confirm: true`.
-- Ask before each apply; one question at a time.
-- Stop on a failing step; report the tool error verbatim and the fix it suggests.
+- NEVER ask for, accept or write a secret. Config holds env var names only (R21).
+- No silent defaults (R12): offer a recommendation, write a key only after the owner answers. One question at a time, in a burst the owner can answer quickly.
+- Personal keys (`alias`, `interaction_level`, `tone`, `language`) go only in `~/.config/gbai/config.yaml`; project keys only in `gbai.yaml`.
+- Edit the YAML directly; `gbai generate` validates it (D18). Read an existing file first and merge; never overwrite blindly.
+- gentle-ai (ODD methodology, RDD coder-side review, Engram memory) is the recommended stack, never required; install it only if the owner accepts.
 
 ## Execution Steps
 
-1. `doctor`: fix every `fail` locally first (railway login, gh auth as the repository owner).
-2. `provision_plan` → show → `provision_apply` with `confirm: true`. Re-run `doctor`.
-3. Cloud browser logins, done by the human in the server's Orca browser (local Orca paired to the server environment):
-   - Gmail for the agent mailbox.
-   - GitHub: the **owner** account, once, for the `orca` user. Single-user mode: the coder sessions and the reviewer share it; the reviewer never approves, it signs a verdict comment.
-   - Railway.
-4. `secret_instructions`: show each returned command and ask the human to run it in their own terminal. Wait for "done"; never ask for the value.
-5. `repo_setup_plan` → show → `repo_setup_apply` with `confirm: true`.
-6. `sessions_start` (mode `cloud` unless the human says local), then `status` to confirm the sessions are alive.
+1. Identity: `git config user.email`; ask the alias once; add it to `developers` and to the global file.
+2. Personal keys → global file.
+3. Project keys → `gbai.yaml`: `mode`, `repo.{name, integration_branch}`, `runtimes.*`, `generation.targets`, `reviewer.{placement, signing}`, `review.checks`, `plan_change.*`, `parallelism`.
+4. Slots (`tasks`, `repository_host`, `memory`, `methodology`, `reviewer_placement`): pick an existing adapter or co-write one; check it covers every operation of its contract (TRD 9.1).
+5. Verify each slot with one harmless round trip (for example read one issue, read one PR, save and read a memory note). A failed slot stays unverified: name the failing operation and ask how to fix the adapter.
+6. Ensure the user-level `gbai-reviewer` skill is installed (`~/.claude/skills/gbai-reviewer/`).
+7. Run `gbai generate` when the compiler is available; until then the agents and skills in `.claude/` are maintained by hand.
 
 ## Output Contract
 
-End with a checklist of the six steps marked done, skipped (with reason) or failed (with the tool error).
+A checklist per step: done, skipped (reason) or failed (failing operation and next step).

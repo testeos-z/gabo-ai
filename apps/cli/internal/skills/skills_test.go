@@ -69,7 +69,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 	}
 	want := map[string][]string{
 		"gbai-coder/SKILL.md":          {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
-		"gbai-cycle/SKILL.md":          {"gbai worktree close", "Backlog", "Ready", "parallelism", "REFUSED"},
+		"gbai-cycle/SKILL.md":          {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
 		"gbai-reviewer-notes/SKILL.md": {"never approves", "marker"},
 	}
 	for _, f := range files {

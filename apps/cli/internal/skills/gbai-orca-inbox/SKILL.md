@@ -1,31 +1,17 @@
 ---
 name: gbai-orca-inbox
-description: "Trigger: orca inbox, mailbox, agent messaging, verdict message, notify coder, send message between sessions. Messaging protocol between gbai sessions via Orca."
+description: "Trigger: orca inbox, mailbox, agent messaging between gbai agent sessions. Deprecated: gbai agents talk through native subagent returns; scheduled for removal."
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "1.0"
+  version: "2.0"
 ---
 ## Activation Contract
 
-Use whenever a gbai session sends or receives a message through Orca.
+Deprecated. Do not use for new work; this skill is kept only until it is removed from the embedded set.
 
-## Hard Rules
+## Replacement
 
-- Address durable mailboxes only: `run:<id>` or `dispatch:<id>`. Never address terminal handles; they change on restart.
-- A message is a notification only. It never decides anything: re-read the source of truth (GitHub PR, comment, status) before acting.
-- Never put secrets, tokens or diffs in a message.
-- Do not poll the inbox; wait for the next message event.
-
-## Who Sends What
-
-| From | To | Message |
-|---|---|---|
-| coder (via `gbai review request --notify`) | reviewer terminal | starts the review of a pinned head |
-| reviewer terminal (`gbai review notify`) | coder mailbox | the summary line |
-| coordinator | coder sessions | the issue to work on |
-| coder | coordinator | `HANDED`, `DONE` or `BLOCKED` with PR number |
-
-## Summary Line
-
-Exactly: `PR #<n> head <40-hex sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>`. Ignore a summary whose SHA is not your latest pushed head.
+- Coder ↔ cycle ↔ assistant: native subagent launches and their returned outcomes (TRD D1).
+- Review requests: the coder asks the `gbai-reviewer` subagent with `PR #<n> head <sha>` and receives the `VERDICT` line (see `gbai-reviewer-notes`).
+- Direct sessions with the owner belong to the `direct_sessions` slot adapter, not to this skill.

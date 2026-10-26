@@ -1,29 +1,29 @@
 ---
 name: gbai-reviewer-notes
-description: "Trigger: how the reviewer works, review verdict, reviewer marker comment, review run, why blocked, dirty reviewer clone. Explains the gbai reviewer side for other agents."
+description: "Trigger: how the reviewer works, review verdict, VERDICT line, reviewer marker comment, why blocked, merge gate. Explains the gbai reviewer side for other agents."
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "1.0"
+  version: "2.0"
 ---
 ## Activation Contract
 
-Use when an agent needs to understand or explain a review result. Agents never run or influence the reviewer themselves.
+Use when an agent needs to understand or explain a review result. Agents never run or influence the review themselves; they only ask the `gbai-reviewer` subagent for one.
 
 ## Facts
 
-- Single-user mode: the reviewer runs as the same OS user as the sessions and posts with the owner's `gh` login; no sudo, no extra users.
-- `gbai review request` opens a detached Orca terminal that runs `gbai review run head <pr> <sha>` directly, then pipes the summary line to the coder's mailbox.
-- The reviewer works from its own state dir (`~/.local/state/gbai/reviewer`: `clone/`, `worktrees/`, `ci/`) and refuses to run unless its clone is a clean checkout of the integration branch. Never edit or build inside that dir.
-- It re-reads the PR on GitHub and skips it when the head moved; it merges the pinned head with a fresh integration branch in a private worktree. A merge conflict is blocking.
-- Checks and the review model run in a workspace fed by `git archive`, with GitHub credentials stripped from their environment; the model runs read-only with a fresh empty HOME. This is trust-based, not an OS-user boundary.
-- The verdict is computed by the script from local evidence (checks, conflict, findings), never by a model's or agent's message.
-- It posts `reviewer/tests` and `reviewer/review` statuses and one comment whose first line is `No blocking issues found.` or `Blocking issues found.`, ending with the visible footer `🤖 gbai reviewer` and the hidden marker `<!-- gbai-reviewer-bot sha=<head> -->`. It never approves: GitHub forbids approving your own PR, and the ruleset requires no approval.
-- Merge gate: the newest marker comment by the owner's login must sign the current head and open with `No blocking issues found.`; both statuses must pass. Marker comments by other logins are ignored.
-- It merges only clean `mode:cloud` PRs into the integration branch, pinned to the reviewed SHA, and never PRs that touch human-only paths.
+- The `gbai-reviewer` subagent only validates `PR #<n> head <40-hex sha>`, runs the scripts of the user-level `gbai-reviewer` skill (`~/.claude/skills/gbai-reviewer/scripts/`) and relays their final `VERDICT` line (D20). It never reviews, edits, comments or merges itself.
+- The scripts live outside every repository, so PR code cannot modify the code that reviews it. They refuse to run when they are not under the user-level skills dir or are writable by others.
+- Single-user mode: the scripts run as the owner with the owner's `gh` login; no extra users.
+- The scripts work in their own state dir (`~/.local/state/gbai/reviewer`) with their own clone; never edit or build inside it.
+- They re-read the PR and skip a head that moved; they test-merge the pinned head into a fresh `dev`. A merge conflict is blocking.
+- Checks (`review.checks`) and the review model run in a credential-free copy of the merged tree; the model runs read-only. This is trust-based, not an OS-user boundary.
+- The verdict comes from local evidence (checks, conflict, findings), never from an agent's message. One verdict per pushed head (R26).
+- The verdict comment carries the marker `<!-- gbai-reviewer-bot sha=<head> -->` and the footer `🤖 gbai reviewer`. It never approves: GitHub forbids approving your own PR.
+- Merge gate: the newest marker comment by the owner's login must sign the current head and be clean; merges go only into `dev`, pinned to the reviewed SHA, never `main`, never PRs touching `review.human_only_paths`.
 
 ## Hard Rules
 
-- Do not argue with a verdict in messages; fix the findings and push a new head.
-- Read the reviewer's marker comment on GitHub for the findings; the message only says the verdict.
-- The coder posts with the same login, so it must never post a comment, PR body or review containing the marker, even quoted; a forged marker could sign a head the reviewer never checked.
+- Do not argue with a verdict; fix the findings and push a new head.
+- Read the marker comment on the PR for findings; the `VERDICT` line only states the outcome.
+- Never post a comment, PR body or review containing the marker, even quoted; a forged marker could sign a head the reviewer never checked.
