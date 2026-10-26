@@ -1,0 +1,442 @@
+{
+ "schema_version": 2,
+ "diagram_type": "workflow",
+ "meta": {
+  "title": "Marco gbai: flujo del equipo y puntos configurables",
+  "output": ".archify/workflow-gbai-fases-20261024-1900/gbai-fases.html",
+  "quality_profile": "showcase",
+  "locale": "es"
+ },
+ "lanes": [
+  {
+   "id": "owner",
+   "label": "Owner"
+  },
+  {
+   "id": "memoria",
+   "label": "Memoria"
+  },
+  {
+   "id": "vocero",
+   "label": "Asistente"
+  },
+  {
+   "id": "desarrollo",
+   "label": "Desarrollo"
+  },
+  {
+   "id": "repo",
+   "label": "Repositorio"
+  },
+  {
+   "id": "directiva",
+   "label": "Directiva"
+  },
+  {
+   "id": "tareas",
+   "label": "Tareas del equipo"
+  }
+ ],
+ "phases": [
+  {
+   "id": "planificacion",
+   "label": "Planificación global (una vez)",
+   "fromCol": 0,
+   "toCol": 1,
+   "variant": "emphasis"
+  },
+  {
+   "id": "olas",
+   "label": "Ola N, informe y ajuste (se repite)",
+   "fromCol": 2,
+   "toCol": 5,
+   "variant": "dashed"
+  }
+ ],
+ "mainPath": [
+  "owner_goal",
+  "asis_plan",
+  "asis_start",
+  "cycle",
+  "asis_report",
+  "owner_done"
+ ],
+ "nodes": [
+  {
+   "id": "owner_goal",
+   "lane": "owner",
+   "col": 0,
+   "type": "external",
+   "label": "Owner",
+   "sublabel": "objetivo"
+  },
+  {
+   "id": "owner_done",
+   "lane": "owner",
+   "col": 5,
+   "type": "external",
+   "label": "Owner",
+   "sublabel": "dudas, comodidad, respuesta"
+  },
+  {
+   "id": "asis_plan",
+   "lane": "vocero",
+   "col": 0,
+   "type": "frontend",
+   "label": "Asistente",
+   "sublabel": "ayuda a documentar",
+   "tag": "skill"
+  },
+  {
+   "id": "asis_start",
+   "lane": "vocero",
+   "col": 2,
+   "type": "frontend",
+   "label": "Asistente",
+   "sublabel": "inicia el ciclo",
+   "tag": "skill"
+  },
+  {
+   "id": "asis_report",
+   "lane": "vocero",
+   "col": 5,
+   "type": "frontend",
+   "label": "Asistente",
+   "sublabel": "recibe el informe",
+   "tag": "skill · modo manual/auto"
+  },
+  {
+   "id": "dir_plan",
+   "lane": "directiva",
+   "col": 1,
+   "type": "backend",
+   "label": "Plan global",
+   "sublabel": "pm, dev-lead, db, frontend",
+   "tag": "skills"
+  },
+  {
+   "id": "dir_adjust",
+   "lane": "directiva",
+   "col": 5,
+   "type": "backend",
+   "label": "Directiva",
+   "sublabel": "ajusta, mejora, investiga",
+   "tag": "skills + MCP de búsqueda"
+  },
+  {
+   "id": "cycle",
+   "lane": "desarrollo",
+   "col": 2,
+   "type": "backend",
+   "label": "gbai-cycle",
+   "sublabel": "elige tareas de la ola",
+   "tag": "skill"
+  },
+  {
+   "id": "coders",
+   "lane": "desarrollo",
+   "col": 3,
+   "type": "backend",
+   "label": "Coders",
+   "sublabel": "subagentes; GGA/RDD opcional",
+   "tag": "⚙ configurable: metodología"
+  },
+  {
+   "id": "reviewers",
+   "lane": "desarrollo",
+   "col": 4,
+   "type": "security",
+   "label": "Revisores",
+   "sublabel": "entorno aislado",
+   "tag": "⚙ configurable: dónde y motor"
+  },
+  {
+   "id": "t_create",
+   "lane": "tareas",
+   "col": 0,
+   "type": "database",
+   "label": "1. Creación",
+   "sublabel": "issues o tarjetas",
+   "tag": "⚙ configurable: tracker"
+  },
+  {
+   "id": "t_read",
+   "lane": "tareas",
+   "col": 1,
+   "type": "database",
+   "label": "2. Lectura",
+   "sublabel": "tareas desbloqueadas",
+   "tag": "⚙ configurable: tracker"
+  },
+  {
+   "id": "t_modify",
+   "lane": "tareas",
+   "col": 2,
+   "type": "database",
+   "label": "3. Modificación",
+   "sublabel": "estado y ajustes",
+   "tag": "⚙ configurable: tracker"
+  },
+  {
+   "id": "memory",
+   "lane": "memoria",
+   "col": 4,
+   "type": "database",
+   "label": "Decisiones",
+   "sublabel": "por qué se tomaron",
+   "tag": "⚙ configurable: memoria"
+  },
+  {
+   "id": "docs",
+   "lane": "directiva",
+   "col": 0,
+   "type": "database",
+   "label": "docs/product",
+   "sublabel": "PRD, TRD, plan, diseño",
+   "tag": "skills de directiva"
+  },
+  {
+   "id": "pr",
+   "lane": "repo",
+   "col": 4,
+   "type": "cloud",
+   "label": "Pull request",
+   "sublabel": "comentarios y statuses",
+   "tag": "⚙ configurable: gh u otro"
+  },
+  {
+   "id": "plan_change",
+   "lane": "tareas",
+   "col": 5,
+   "type": "security",
+   "label": "Cambio de plan",
+   "sublabel": "issue + PR aparte",
+   "tag": "espera aprobación del owner"
+  },
+  {
+   "id": "direct",
+   "lane": "desarrollo",
+   "col": 1,
+   "type": "external",
+   "label": "Sesión directa",
+   "sublabel": "en el worktree",
+   "tag": "⚙ configurable: Orca"
+  }
+ ],
+ "edges": [
+  {
+   "id": "owner-asis",
+   "from": "owner_goal",
+   "to": "asis_plan",
+   "label": "objetivo"
+  },
+  {
+   "id": "asis-dir",
+   "from": "asis_plan",
+   "to": "dir_plan",
+   "label": "documentar",
+   "variant": "emphasis",
+   "role": "branch"
+  },
+  {
+   "id": "asis-start",
+   "from": "asis_plan",
+   "to": "asis_start",
+   "label": "plan listo"
+  },
+  {
+   "id": "asis-cycle",
+   "from": "asis_start",
+   "to": "cycle",
+   "label": "iniciar ola",
+   "variant": "emphasis"
+  },
+  {
+   "id": "asis-dir-adjust",
+   "from": "asis_report",
+   "to": "dir_adjust",
+   "label": "¿cambios?",
+   "variant": "dashed",
+   "role": "branch"
+  },
+  {
+   "id": "asis-next",
+   "from": "asis_report",
+   "to": "asis_start",
+   "label": "siguiente ola",
+   "variant": "dashed",
+   "role": "return"
+  },
+  {
+   "id": "cycle-coders",
+   "from": "cycle",
+   "to": "coders",
+   "label": "lanza"
+  },
+  {
+   "id": "coders-rev",
+   "from": "coders",
+   "to": "reviewers",
+   "label": "PR"
+  },
+  {
+   "id": "dir-create",
+   "from": "dir_plan",
+   "to": "t_create",
+   "label": "crea"
+  },
+  {
+   "id": "create-read",
+   "from": "t_create",
+   "to": "t_read"
+  },
+  {
+   "id": "read-cycle",
+   "from": "t_read",
+   "to": "cycle",
+   "label": "lee desbloqueadas",
+   "variant": "dashed"
+  },
+  {
+   "id": "adjust-modify",
+   "from": "dir_adjust",
+   "to": "t_modify",
+   "label": "ajusta",
+   "variant": "dashed"
+  },
+  {
+   "id": "modify-read",
+   "from": "t_modify",
+   "to": "t_read",
+   "label": "se vuelve a leer",
+   "role": "return"
+  },
+  {
+   "id": "cycle-modify",
+   "from": "cycle",
+   "to": "t_modify",
+   "label": "actualiza estado",
+   "variant": "dashed",
+   "role": "branch"
+  },
+  {
+   "id": "asis-memory",
+   "from": "asis_report",
+   "to": "memory",
+   "label": "auto: registra",
+   "variant": "dashed",
+   "role": "branch"
+  },
+  {
+   "id": "asis-owner",
+   "from": "asis_report",
+   "to": "owner_done",
+   "label": "manual: pregunta"
+  },
+  {
+   "id": "dir-docs",
+   "from": "dir_plan",
+   "to": "docs",
+   "label": "documenta",
+   "role": "branch"
+  },
+  {
+   "id": "rev-coders",
+   "from": "reviewers",
+   "to": "coders",
+   "label": "veredicto",
+   "variant": "security",
+   "role": "return"
+  },
+  {
+   "id": "coders-cycle",
+   "from": "coders",
+   "to": "cycle",
+   "label": "DONE / BLOCKED",
+   "role": "return"
+  },
+  {
+   "id": "cycle-asis",
+   "from": "cycle",
+   "to": "asis_report",
+   "label": "informe, dudas, limpieza",
+   "variant": "dashed"
+  },
+  {
+   "id": "coders-pr",
+   "from": "coders",
+   "to": "pr",
+   "label": "abre PR",
+   "role": "branch"
+  },
+  {
+   "id": "rev-pr",
+   "from": "reviewers",
+   "to": "pr",
+   "label": "comenta veredicto",
+   "variant": "security",
+   "role": "branch"
+  },
+  {
+   "id": "adjust-planchange",
+   "from": "dir_adjust",
+   "to": "plan_change",
+   "label": "cambio drástico",
+   "variant": "security",
+   "role": "branch"
+  },
+  {
+   "id": "asis-direct",
+   "from": "asis_start",
+   "to": "direct",
+   "label": "si lo pides",
+   "variant": "dashed",
+   "role": "branch"
+  }
+ ],
+ "cards": [
+  {
+   "dot": "cyan",
+   "title": "Plan global y tareas",
+   "items": [
+    "Directiva planifica una vez: escribe docs/product y crea las tareas con sus dependencias",
+    "Tareas: 1. Creación → 2. Lectura ← 3. Modificación; cada ola lee las desbloqueadas"
+   ]
+  },
+  {
+   "dot": "emerald",
+   "title": "Cada ola",
+   "items": [
+    "El asistente inicia gbai-cycle; el ciclo lanza coders con la metodología de gbai.yaml",
+    "Validación del coder (GGA, RDD) opcional; el revisor corre aislado, comenta en el PR y devuelve el veredicto",
+    "El ciclo actualiza la tarea, limpia lo que creó e informa al asistente"
+   ]
+  },
+  {
+   "dot": "violet",
+   "title": "Dudas, modos e intervención",
+   "items": [
+    "Manual: las dudas suben al owner por el asistente; al cerrar la ola pregunta cómo se sintió con las interacciones",
+    "Automático: decide el asistente y registra el motivo en memoria",
+    "Si pides hablar directo con un agente, el asistente abre una sesión en Orca con el contexto previo"
+   ]
+  },
+  {
+   "dot": "rose",
+   "title": "Límites del modo automático",
+   "items": [
+    "Mergea solo a la rama asignada, nunca a main",
+    "Borra solo lo que él o sus subagentes crearon",
+    "Un cambio drástico de plan va en issue y PR aparte y espera tu aprobación"
+   ]
+  },
+  {
+   "dot": "amber",
+   "title": "Configurable por el usuario",
+   "items": [
+    "⚙ marca cada punto que el usuario configura",
+    "No hay valores por defecto silenciosos: el asistente pregunta antes de configurar"
+   ]
+  }
+ ]
+}
