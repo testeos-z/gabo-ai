@@ -286,3 +286,34 @@ func TestProjectRoot(t *testing.T) {
 		t.Fatalf("command = %+v", c)
 	}
 }
+
+func TestLoadLayersRejectsUnsupportedVersionInAnyLayer(t *testing.T) {
+	t.Parallel()
+	r := files{
+		"/etc/gbai/gbai.yaml":              minimal,
+		"/home/o/.config/gbai/config.yaml": "version: 99\n",
+		"/src/p/gbai.yaml":                 "version: 1\n",
+	}
+	_, err := LoadLayers(r, threeLayers())
+	if err == nil || !strings.Contains(err.Error(), "/home/o/.config/gbai/config.yaml") || !strings.Contains(err.Error(), "version") {
+		t.Fatalf("error = %v, want unsupported version naming the user file", err)
+	}
+}
+
+func TestLoadLayersKeepsVersionOutOfTheMergedConfig(t *testing.T) {
+	t.Parallel()
+	r := files{
+		"/etc/gbai/gbai.yaml": minimal + "version: 1\n",
+		"/src/p/gbai.yaml":    "parallelism: 4\n",
+	}
+	res, err := LoadLayers(r, threeLayers())
+	if err != nil {
+		t.Fatalf("LoadLayers() error = %v", err)
+	}
+	if res.Config.Version != 0 {
+		t.Fatalf("merged version = %d, want 0: version is per file", res.Config.Version)
+	}
+	if res.Layers[0].Version != 1 || res.Layers[2].Version != 0 {
+		t.Fatalf("layer versions = %d, %d", res.Layers[0].Version, res.Layers[2].Version)
+	}
+}

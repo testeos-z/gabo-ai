@@ -114,7 +114,8 @@ func LoadFile(r Reader, name string) (Resolution, error) {
 
 // LoadLayers reads every existing layer in order and merges them: a higher
 // layer overrides a lower one field by field (see Merge). Missing files are
-// skipped; unknown keys fail per file. Defaults and validation run once on
+// skipped; unknown keys and an unsupported version fail per file, and
+// version is kept out of the merged document. Defaults and validation run once on
 // the merged result. Layers are returned with Found set, even on error.
 func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 	res := Resolution{Layers: append([]Layer(nil), layers...)}
@@ -137,6 +138,11 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 			return res, fmt.Errorf("config %s: %w", l.Path, err)
 		}
 		res.Layers[i].Version = version
+		if version < 0 || version > MaxVersion {
+			return res, fmt.Errorf("config %s: version: must be between 0 and %d, got %d", l.Path, MaxVersion, version)
+		}
+		// version describes one file, not the merged document.
+		delete(doc, "version")
 		if l.Name == LayerProject {
 			res.Warnings = append(res.Warnings, dropPersonalKeys(doc, l.Path)...)
 		}

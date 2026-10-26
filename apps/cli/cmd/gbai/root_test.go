@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
 )
@@ -227,4 +228,48 @@ func TestConfigWarningsGoToStderr(t *testing.T) {
 		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 	printWarnings(nil, []string{"no writer must not panic"})
+}
+
+func TestProjectPersonalKeyWarnsOnceOnStderr(t *testing.T) {
+	example, err := os.ReadFile("../../gbai.example.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	if err := os.WriteFile(dir+"/gbai.yaml", append(example, []byte("\nalias: Leo\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Chdir(dir)
+	var out, errOut bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3", stderr: &errOut})
+	root.SetOut(&out)
+	root.SetArgs([]string{"provision", "--dry-run"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v", err)
+	}
+	if got := strings.Count(errOut.String(), `personal key "alias" is ignored`); got != 1 {
+		t.Fatalf("warning printed %d times, want 1:\n%s", got, errOut.String())
+	}
+}
+
+func TestConfigLoaderPrintsWarningsOncePerProcess(t *testing.T) {
+	t.Parallel()
+	var errOut bytes.Buffer
+	calls := 0
+	resolve := newWarnOnceResolver(&errOut, func(context.Context) (config.Resolution, error) {
+		calls++
+		return config.Resolution{Warnings: []string{"p: ignored"}}, nil
+	})
+	for range 3 {
+		if _, err := resolve(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if calls != 3 {
+		t.Fatalf("resolver ran %d times, want 3 (config is re-read on each load)", calls)
+	}
+	if got, want := errOut.String(), "gbai: warning: p: ignored\n"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
+	}
 }

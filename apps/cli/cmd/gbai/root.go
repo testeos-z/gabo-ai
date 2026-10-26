@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -54,14 +55,12 @@ func newRootCommand(d deps) *cobra.Command {
 			", the user config ($XDG_CONFIG_HOME/gbai/config.yaml) and the project "+config.ProjectFile+
 			" are merged (see `gbai config`)")
 
-	resolveConfig := func(ctx context.Context) (config.Resolution, error) {
+	resolveConfig := newWarnOnceResolver(d.stderr, func(ctx context.Context) (config.Resolution, error) {
 		if root.PersistentFlags().Changed("config") {
 			return config.LoadFile(osfs.FS{}, configPath)
 		}
-		res, err := config.LoadLayers(osfs.FS{}, configLayers(ctx, d.runner, os.Getenv, os.Getwd))
-		printWarnings(d.stderr, res.Warnings)
-		return res, err
-	}
+		return config.LoadLayers(osfs.FS{}, configLayers(ctx, d.runner, os.Getenv, os.Getwd))
+	})
 	loadConfig := func() (config.Config, error) {
 		res, err := resolveConfig(context.Background())
 		return res.Config, err
@@ -242,6 +241,28 @@ func serverVersion(v string) string {
 }
 
 // printWarnings writes each non-fatal config warning to w; nil w drops them.
+// newWarnOnceResolver wraps a config resolver so each distinct warning reaches
+// w once per process: config is re-read on every load (the MCP server loads it
+// per tool call), but the same warning is not repeated.
+func newWarnOnceResolver(w io.Writer, resolve func(context.Context) (config.Resolution, error)) func(context.Context) (config.Resolution, error) {
+	var mu sync.Mutex
+	seen := map[string]bool{}
+	return func(ctx context.Context) (config.Resolution, error) {
+		res, err := resolve(ctx)
+		mu.Lock()
+		defer mu.Unlock()
+		var fresh []string
+		for _, m := range res.Warnings {
+			if !seen[m] {
+				seen[m] = true
+				fresh = append(fresh, m)
+			}
+		}
+		printWarnings(w, fresh)
+		return res, err
+	}
+}
+
 func printWarnings(w io.Writer, warnings []string) {
 	if w == nil {
 		return

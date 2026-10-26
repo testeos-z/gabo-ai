@@ -47,16 +47,17 @@ Rules:
 - Missing files are skipped. If no file exists at all, loading fails and lists every path it looked in.
 - **Strict keys per layer.** Each file is decoded against the full `Config` type with unknown keys rejected, so a typo fails in the file that contains it.
 - **Deep merge.** Mappings present in both layers merge key by key; any other value (scalar, list, null) in the higher layer replaces the lower one; a key absent in the higher layer keeps the lower value. Lists are replaced, never concatenated.
+- **Version per file.** Each file's `version` is checked on its own (0 to the newest supported version; missing reads as 0) and an unsupported value fails naming that file. `version` is not merged.
 - Defaults and validation run once, on the merged result.
-- `--config <file>` loads exactly that one file, with no layering.
+- `--config <file>` loads exactly that one file, with no layering and no key-class filtering: personal keys in it are used as written, because the flag means "exactly this file".
 
-Today every layer accepts every key; there is no personal / project distinction.
+Personal keys set in the project file are dropped with a warning (see the split below); every other key is accepted in every layer.
 
 ### Approved split (loader implemented in T003)
 
 | key class | keys | valid in | precedence |
 |---|---|---|---|
-| Personal | `alias`, `interaction_level`, `tone`, `language` | Global user config | **Global always wins.** If a project file sets one, the global value is used and `gbai generate` warns (the read-only `gbai config` is removed, open question 11). |
+| Personal | `alias`, `interaction_level`, `tone`, `language` | Global user config | **Global always wins.** If a project file sets one, it is ignored and the global value is used. Every command that loads the layered config prints one warning per ignored key on stderr, once per process. |
 | Project | Everything in [Project `gbai.yaml`](#32-project-gbaiyaml) | Project file (global file may hold a personal fallback) | **Local wins**, using the existing deep merge. |
 
 This reverses the merge order for personal keys only: project keys keep user → project (the system layer moves into the `slots.agent_host` adapter, see below), personal keys resolve user first. The developer catalog stays in the project file because it is shared by the team (D10); a person's own `alias` in the global file wins over their catalog entry (D11).
@@ -90,7 +91,7 @@ Every key not implemented today is marked **proposed (not implemented)**. Implem
 
 | key | type | required | description | example |
 |---|---|---|---|---|
-| `version` | integer | yes | Schema version of this file. Loaded and validated (T003). | `1` |
+| `version` | integer | no (missing = 0) | Schema version of this file, validated per file. Loaded and validated (T003). | `1` |
 | `alias` | string | no | How the assistant addresses this person (R16, D11). Loaded and validated (T003). | `Leo` |
 | `interaction_level` | enum `low`, `balanced`, `high` | no | Preferred number of interactions (R17). The assistant adjusts it from what it learns about the user, for example the wave-close comfort question. Loaded and validated (T003). | `balanced` |
 | `tone` | string | no | Tone and speaking style, free text (R17). Loaded and validated (T003). | `direct, brief` |
