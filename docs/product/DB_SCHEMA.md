@@ -52,7 +52,7 @@ Rules:
 
 Today every layer accepts every key; there is no personal / project distinction.
 
-### Approved split (proposed (not implemented))
+### Approved split (loader implemented in T003)
 
 | key class | keys | valid in | precedence |
 |---|---|---|---|
@@ -90,11 +90,11 @@ Every key not implemented today is marked **proposed (not implemented)**. Implem
 
 | key | type | required | description | example |
 |---|---|---|---|---|
-| `version` | integer | yes | Schema version of this file. proposed (not implemented) | `1` |
-| `alias` | string | no | How the assistant addresses this person (R16, D11). proposed (not implemented) | `Leo` |
-| `interaction_level` | enum `low`, `balanced`, `high` | no | Preferred number of interactions (R17). The assistant adjusts it from what it learns about the user, for example the wave-close comfort question. proposed (not implemented) | `balanced` |
-| `tone` | string | no | Tone and speaking style, free text (R17). proposed (not implemented) | `direct, brief` |
-| `language` | string | no | Conversation language as a BCP 47 tag. Generated artifacts stay English. proposed (not implemented) | `es` |
+| `version` | integer | yes | Schema version of this file. Loaded and validated (T003). | `1` |
+| `alias` | string | no | How the assistant addresses this person (R16, D11). Loaded and validated (T003). | `Leo` |
+| `interaction_level` | enum `low`, `balanced`, `high` | no | Preferred number of interactions (R17). The assistant adjusts it from what it learns about the user, for example the wave-close comfort question. Loaded and validated (T003). | `balanced` |
+| `tone` | string | no | Tone and speaking style, free text (R17). Loaded and validated (T003). | `direct, brief` |
+| `language` | string | no | Conversation language as a BCP 47 tag. Generated artifacts stay English. Loaded and validated (T003). | `es` |
 
 Today the user layer accepts the same keys as the project file; under the split it holds only personal keys (plus any project fallback the owner keeps there deliberately).
 

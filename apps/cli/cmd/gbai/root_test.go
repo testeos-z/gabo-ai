@@ -218,3 +218,13 @@ func TestWorktreeCloseNeedsConfigAndRejectsForce(t *testing.T) {
 		t.Fatalf("Execute(--force) error = %v", err)
 	}
 }
+
+func TestConfigWarningsGoToStderr(t *testing.T) {
+	t.Parallel()
+	var errOut bytes.Buffer
+	printWarnings(&errOut, []string{"a: ignored", "b: ignored"})
+	if got, want := errOut.String(), "gbai: warning: a: ignored\ngbai: warning: b: ignored\n"; got != want {
+		t.Fatalf("stderr = %q, want %q", got, want)
+	}
+	printWarnings(nil, []string{"no writer must not panic"})
+}

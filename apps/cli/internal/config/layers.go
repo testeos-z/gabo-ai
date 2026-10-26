@@ -33,6 +33,8 @@ type Layer struct {
 	Name  string
 	Path  string
 	Found bool
+	// Version is the file's schema version; 0 when the file has none.
+	Version int
 }
 
 // Resolution is the merged, defaulted and validated config together with the
@@ -40,6 +42,9 @@ type Layer struct {
 type Resolution struct {
 	Layers []Layer
 	Config Config
+	// Warnings are non-fatal problems, such as a personal key set in the
+	// project file and ignored.
+	Warnings []string
 }
 
 // Reader reads a file; a missing file is reported with an error matching
@@ -102,6 +107,7 @@ func LoadFile(r Reader, name string) (Resolution, error) {
 	if err != nil {
 		return res, fmt.Errorf("config %s: %w", name, err)
 	}
+	res.Layers[0].Version = cfg.Version
 	res.Config = cfg
 	return res, nil
 }
@@ -126,9 +132,13 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 			return res, fmt.Errorf("read config %s: %w", l.Path, err)
 		}
 		res.Layers[i].Found = true
-		doc, err := decodeLayer(b)
+		doc, version, err := decodeLayer(b)
 		if err != nil {
 			return res, fmt.Errorf("config %s: %w", l.Path, err)
+		}
+		res.Layers[i].Version = version
+		if l.Name == LayerProject {
+			res.Warnings = append(res.Warnings, dropPersonalKeys(doc, l.Path)...)
 		}
 		merged = Merge(merged, doc)
 		used = append(used, l.Path)
@@ -155,22 +165,23 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 }
 
 // decodeLayer checks a layer's keys against Config (unknown keys fail) and
-// returns it as a generic mapping. An empty document is an empty layer.
-func decodeLayer(b []byte) (map[string]any, error) {
+// returns it as a generic mapping with its schema version. An empty document
+// is an empty layer of version 0.
+func decodeLayer(b []byte) (map[string]any, int, error) {
 	var probe Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)
 	if err := dec.Decode(&probe); err != nil {
 		if errors.Is(err, io.EOF) {
-			return nil, nil
+			return nil, 0, nil
 		}
-		return nil, fmt.Errorf("decode yaml: %w", err)
+		return nil, 0, fmt.Errorf("decode yaml: %w", err)
 	}
 	var doc map[string]any
 	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return nil, fmt.Errorf("decode yaml: %w", err)
+		return nil, 0, fmt.Errorf("decode yaml: %w", err)
 	}
-	return doc, nil
+	return doc, probe.Version, nil
 }
 
 // Merge returns lower overridden by higher: mappings present in both merge

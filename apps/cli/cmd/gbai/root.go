@@ -58,7 +58,9 @@ func newRootCommand(d deps) *cobra.Command {
 		if root.PersistentFlags().Changed("config") {
 			return config.LoadFile(osfs.FS{}, configPath)
 		}
-		return config.LoadLayers(osfs.FS{}, configLayers(ctx, d.runner, os.Getenv, os.Getwd))
+		res, err := config.LoadLayers(osfs.FS{}, configLayers(ctx, d.runner, os.Getenv, os.Getwd))
+		printWarnings(d.stderr, res.Warnings)
+		return res, err
 	}
 	loadConfig := func() (config.Config, error) {
 		res, err := resolveConfig(context.Background())
@@ -237,4 +239,14 @@ func serverVersion(v string) string {
 		return "dev"
 	}
 	return v
+}
+
+// printWarnings writes each non-fatal config warning to w; nil w drops them.
+func printWarnings(w io.Writer, warnings []string) {
+	if w == nil {
+		return
+	}
+	for _, m := range warnings {
+		fmt.Fprintln(w, "gbai: warning:", m)
+	}
 }
