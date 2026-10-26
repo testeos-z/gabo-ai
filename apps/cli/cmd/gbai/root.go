@@ -218,7 +218,12 @@ func provisionAccount(u config.User) provision.Account {
 	return provision.Account{Name: u.Name, Home: u.Home, UID: u.UID, Path: u.ExtraPath}
 }
 
-func newRemoteShell(runner kernel.Runner, cfg config.Config) *railwayssh.Shell {
+// newRemoteShell reaches the cloud server; without every server key it
+// returns a shell that fails with the missing keys and runs nothing.
+func newRemoteShell(runner kernel.Runner, cfg config.Config) kernel.RemoteShell {
+	if err := cfg.RequireCloud(); err != nil {
+		return unconfiguredShell{err: err}
+	}
 	users := map[string]railwayssh.User{}
 	for _, u := range cfg.Users.All() {
 		users[u.Name] = railwayssh.User{Home: u.Home, ExtraPath: u.ExtraPath}
@@ -229,6 +234,13 @@ func newRemoteShell(runner kernel.Runner, cfg config.Config) *railwayssh.Shell {
 		EnvironmentID: r.EnvironmentID,
 		ServiceID:     r.ServiceID,
 	}, users)
+}
+
+// unconfiguredShell is the remote shell of a config without cloud keys.
+type unconfiguredShell struct{ err error }
+
+func (u unconfiguredShell) Exec(context.Context, kernel.Script) (kernel.Result, error) {
+	return kernel.Result{}, u.err
 }
 
 // serverVersion is the version announced by the MCP server.

@@ -160,3 +160,23 @@ func TestExecRejectsUnsafeUserEnvironment(t *testing.T) {
 		t.Fatalf("runner called %d times, want 0", len(fake.Calls))
 	}
 }
+
+// An empty target id would let `railway ssh` fall back to whatever project is
+// linked in the working directory, so Exec refuses before running anything.
+func TestExecRejectsAnEmptyTargetID(t *testing.T) {
+	t.Parallel()
+	for name, target := range map[string]Target{
+		"project":     {EnvironmentID: "env", ServiceID: "svc"},
+		"environment": {ProjectID: "proj", ServiceID: "svc"},
+		"service":     {ProjectID: "proj", EnvironmentID: "env"},
+	} {
+		r := &kerneltest.Runner{}
+		_, err := New(r, target, nil).Exec(context.Background(), kernel.Script{User: kernel.RootUser, Body: "true"})
+		if err == nil || !strings.Contains(err.Error(), name) {
+			t.Errorf("%s: Exec() error = %v, want it to name the empty %s id", name, err, name)
+		}
+		if len(r.Calls) != 0 {
+			t.Errorf("%s: railway ran with an empty id: %+v", name, r.Calls)
+		}
+	}
+}

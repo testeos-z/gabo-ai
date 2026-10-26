@@ -184,7 +184,7 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			}
 			return doctor.NewUseCase(doctoradapters.Path{}, d.runner, newRemoteShell(d.runner, cfg), doctor.Settings{
 				LocalOrca:  cfg.Sessions.LocalOrca,
-				Remote:     cfg.Server.Railway.ServiceID != "",
+				Remote:     cfg.HasCloud(),
 				Users:      users,
 				OrcaUser:   cfg.Users.Orca.Name,
 				SecretsDir: path.Join(cfg.Users.Orca.Home, "secrets"),

@@ -55,6 +55,13 @@ func New(runner kernel.Runner, target Target, users map[string]User) *Shell {
 
 // Exec runs s on the server. s.Stdin is streamed to the script.
 func (sh *Shell) Exec(ctx context.Context, s kernel.Script) (kernel.Result, error) {
+	// An empty id lets `railway ssh` fall back to the project linked in the
+	// working directory, which may be an unintended service.
+	for _, id := range [][2]string{{"project", sh.target.ProjectID}, {"environment", sh.target.EnvironmentID}, {"service", sh.target.ServiceID}} {
+		if id[1] == "" {
+			return kernel.Result{}, fmt.Errorf("railway ssh: empty %s id", id[0])
+		}
+	}
 	wrapper, err := sh.wrapper(s)
 	if err != nil {
 		return kernel.Result{}, err

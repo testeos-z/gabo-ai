@@ -81,3 +81,60 @@ func TestCloudCommandsNameTheMissingServerKey(t *testing.T) {
 		t.Errorf("commands ran before the config check: %+v", r.Calls)
 	}
 }
+
+// railwayCalls returns every railway invocation the runner saw.
+func railwayCalls(r *kerneltest.Runner) []string {
+	var out []string
+	for _, c := range r.Calls {
+		if c.Command.Name == "railway" {
+			out = append(out, strings.Join(c.Command.Args, " "))
+		}
+	}
+	return out
+}
+
+// status is read-only, so a local-only config degrades its cloud probes to
+// unknown with the missing key instead of shelling out to railway.
+func TestStatusCloudWithoutServerKeysNamesTheMissingKey(t *testing.T) {
+	t.Parallel()
+	cfg, err := config.Parse([]byte("repo:\n  name: testeos-z/gbai-team\nbot:\n  login: owner\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &kerneltest.Runner{Handle: func(c kernel.Command) (kernel.Result, error) {
+		return kernel.Result{Stdout: []byte(`[]`)}, nil
+	}}
+	f := newFactories(deps{runner: r}, func() (config.Config, error) { return cfg, nil })
+	uc, err := f.status(context.Background(), "cloud")
+	if err != nil {
+		t.Fatalf("status factory error = %v, want a degraded snapshot", err)
+	}
+	snap := uc.Snapshot(context.Background())
+	for name, msg := range map[string]string{"server": snap.Server.Error, "sessions": snap.Sessions.Error} {
+		if !strings.Contains(msg, "✗ server.railway.project_id missing") || !strings.Contains(msg, "next: configure slots.agent_host") {
+			t.Errorf("%s probe = %q, want the missing key and next step", name, msg)
+		}
+	}
+	if calls := railwayCalls(r); len(calls) != 0 {
+		t.Errorf("railway ran without server keys: %q", calls)
+	}
+}
+
+// doctor runs its server checks only when every server key is set.
+func TestDoctorSkipsServerChecksWithPartialServerKeys(t *testing.T) {
+	t.Parallel()
+	cfg, err := config.Parse([]byte("repo:\n  name: testeos-z/gbai-team\nserver:\n  railway:\n    service_id: s1\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := &kerneltest.Runner{}
+	f := newFactories(deps{runner: r}, func() (config.Config, error) { return cfg, nil })
+	uc, err := f.doctor(context.Background())
+	if err != nil {
+		t.Fatalf("doctor factory error = %v", err)
+	}
+	uc.Run(context.Background())
+	if calls := railwayCalls(r); len(calls) != 0 {
+		t.Errorf("doctor ran server checks with a partial server block: %q", calls)
+	}
+}
