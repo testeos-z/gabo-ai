@@ -2,12 +2,17 @@
 package adapters
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"strconv"
 	"time"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/verdict"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
 )
 
@@ -80,4 +85,32 @@ func (g *GitHub) Statuses(ctx context.Context, sha string) ([]audit.CommitStatus
 		out = append(out, st)
 	}
 	return out, nil
+}
+
+// Comments lists the PR's issue comments with their authors, oldest first.
+// Each page prints one JSON array, so the output is decoded as a stream.
+func (g *GitHub) Comments(ctx context.Context, number int) ([]verdict.Comment, error) {
+	res, err := kernel.RunChecked(ctx, g.runner, kernel.Command{Name: "gh", Args: []string{
+		"api", "--paginate", "repos/" + g.repo + "/issues/" + strconv.Itoa(number) + "/comments",
+		"--jq", "[.[] | {author: .user.login, body: .body}]",
+	}})
+	if err != nil {
+		return nil, err
+	}
+	var comments []verdict.Comment
+	dec := json.NewDecoder(bytes.NewReader(res.Stdout))
+	for {
+		var page []struct {
+			Author string `json:"author"`
+			Body   string `json:"body"`
+		}
+		if err := dec.Decode(&page); errors.Is(err, io.EOF) {
+			return comments, nil
+		} else if err != nil {
+			return nil, fmt.Errorf("decode gh api comments: %w", err)
+		}
+		for _, c := range page {
+			comments = append(comments, verdict.Comment{Author: c.Author, Body: c.Body})
+		}
+	}
 }

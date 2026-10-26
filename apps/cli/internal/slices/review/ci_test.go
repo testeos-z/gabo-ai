@@ -49,18 +49,23 @@ func (r tracingRunner) Run(ctx context.Context, c kernel.Command) (kernel.Result
 	return r.Runner.Run(ctx, c)
 }
 
+// procTable is a single-user table: the reviewer, its checks and the owner's
+// own sessions share one uid, so only cwd inside the untrusted root marks a
+// leftover.
 func procTable() *fakeProcesses {
 	return &fakeProcesses{
 		t:    &trace{},
-		self: Process{PID: 100, PPID: 90, UID: 2001},
+		self: Process{PID: 100, PPID: 90, UID: 1000},
 		table: []Process{
 			{PID: 1, PPID: 0, UID: 0},
-			{PID: 90, PPID: 1, UID: 0},       // sudo, our parent
-			{PID: 100, PPID: 90, UID: 2001},  // ourselves
-			{PID: 101, PPID: 100, UID: 2001}, // our own child
-			{PID: 200, PPID: 1, UID: 2001},   // leftover from a previous check
-			{PID: 201, PPID: 200, UID: 2001}, // its child
-			{PID: 300, PPID: 1, UID: 2000},   // another user
+			{PID: 90, PPID: 1, UID: 1000, Cwd: "/data/home"},                // the review terminal, our parent
+			{PID: 100, PPID: 90, UID: 1000, Cwd: "/data/home"},              // ourselves
+			{PID: 101, PPID: 100, UID: 1000, Cwd: "/ci/work/" + wsName},     // our own child
+			{PID: 200, PPID: 1, UID: 1000, Cwd: "/ci/work/" + wsName},       // leftover from a previous check
+			{PID: 201, PPID: 200, UID: 1000, Cwd: "/ci/home"},               // its child
+			{PID: 210, PPID: 1, UID: 1000, Cwd: "/data/home/projects/repo"}, // the owner's coder session
+			{PID: 211, PPID: 1, UID: 1000, Cwd: "/cix"},                     // a sibling of the root, not inside it
+			{PID: 300, PPID: 1, UID: 2000, Cwd: "/ci/work/" + wsName},       // another user
 		},
 	}
 }
@@ -95,7 +100,7 @@ func (f *fakeWorkspace) Remove(name string) error {
 }
 
 func newCI(r *kerneltest.Runner) (*CIUseCase, *fakeWorkspace) {
-	uc, ws, _ := newCIWith(r, &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 2001}})
+	uc, ws, _ := newCIWith(r, &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 1000}})
 	return uc, ws
 }
 
@@ -104,6 +109,9 @@ func newCIWith(r *kerneltest.Runner, p *fakeProcesses) (*CIUseCase, *fakeWorkspa
 	cfg := CIConfig{
 		CredentialEnv: map[string]string{RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN", RuntimePi: "ANTHROPIC_API_KEY"},
 		Path:          "/usr/bin:/bin",
+		Home:          "/ci/home",
+		User:          "orca",
+		UntrustedRoot: "/ci",
 	}
 	return NewCIUseCase(ws, tracingRunner{Runner: r, t: p.t}, p, cfg), ws, p.t
 }
@@ -120,11 +128,59 @@ func TestCIRunExecsPlainArgvInWorkspace(t *testing.T) {
 		t.Fatalf("Run() = %+v, %v", res, err)
 	}
 	c := r.Calls[0].Command
-	if c.Name != "bun" || !slices.Equal(c.Args, []string{"run", "test; rm -rf /"}) || c.Dir != "/ci/work/"+wsName || len(c.Env) != 0 {
+	if c.Name != "bun" || !slices.Equal(c.Args, []string{"run", "test; rm -rf /"}) || c.Dir != "/ci/work/"+wsName {
 		t.Fatalf("command = %+v", c)
 	}
 	if ws.created[wsName] != "TAR" {
 		t.Fatalf("workspace = %v", ws.created)
+	}
+	want := []string{"PATH=/usr/bin:/bin", "HOME=/ci/home", "USER=orca", "LOGNAME=orca", "GH_CONFIG_DIR=/ci/work/" + wsName + ".home"}
+	if !c.CleanEnv || !slices.Equal(c.Env, want) {
+		t.Fatalf("check env clean=%v %q, want only %q", c.CleanEnv, c.Env, want)
+	}
+}
+
+// Without a second OS user, checks and the engine run as the owner; their
+// environment is built from scratch so no GitHub credential reaches them and
+// gh reads an empty config dir instead of the owner's login.
+func TestCIChecksAndEngineGetNoGitHubCredentials(t *testing.T) {
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("{}")}}
+	t.Setenv("GH_TOKEN", "gho_secret")
+	t.Setenv("GITHUB_TOKEN", "ghs_secret")
+	ci, _ := newCI(r)
+	if err := ci.Prepare(wsName, strings.NewReader("")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ci.Run(context.Background(), wsName, []string{"bun", "test"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ci.Engine(context.Background(), wsName, RuntimePi, strings.NewReader("tok\np")); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.Calls) != 2 {
+		t.Fatalf("calls = %d", len(r.Calls))
+	}
+	for _, call := range r.Calls {
+		c := call.Command
+		if !c.CleanEnv {
+			t.Errorf("%s inherits the environment", c.Name)
+		}
+		ghDir := false
+		for _, kv := range c.Env {
+			name, value, _ := strings.Cut(kv, "=")
+			switch name {
+			case "GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN", "GITHUB_ENTERPRISE_TOKEN":
+				t.Errorf("%s gets %s", c.Name, name)
+			case "GH_CONFIG_DIR":
+				ghDir = value == "/ci/work/"+wsName+".home"
+			}
+			if strings.Contains(value, "secret") {
+				t.Errorf("%s env leaks %q", c.Name, kv)
+			}
+		}
+		if !ghDir {
+			t.Errorf("%s: GH_CONFIG_DIR not pointed at the fresh empty dir: %q", c.Name, c.Env)
+		}
 	}
 }
 
@@ -172,7 +228,8 @@ func TestCIEngineUsesReadOnlyArgvAndCredentialFromStdin(t *testing.T) {
 		if got := append([]string{c.Command.Name}, c.Command.Args...); !slices.Equal(got, tt.argv) {
 			t.Errorf("%s: argv = %q", tt.runtime, got)
 		}
-		wantEnv := []string{"PATH=/usr/bin:/bin", "HOME=/ci/work/" + wsName + ".home", tt.env}
+		home := "/ci/work/" + wsName + ".home"
+		wantEnv := []string{"PATH=/usr/bin:/bin", "HOME=" + home, "GH_CONFIG_DIR=" + home, tt.env}
 		if !c.Command.CleanEnv || !slices.Equal(c.Command.Env, wantEnv) || c.Stdin != "the prompt\nline 2" || c.Command.Dir != "/ci/work/"+wsName {
 			t.Errorf("%s: env %q stdin %q dir %q", tt.runtime, c.Command.Env, c.Stdin, c.Command.Dir)
 		}
@@ -226,8 +283,8 @@ func TestCIKillsLeftoversOutsideOwnTreeBeforeEachCheckAndEngine(t *testing.T) {
 	if !slices.Equal(tr.calls, want) {
 		t.Fatalf("calls = %v, want %v", tr.calls, want)
 	}
-	if !slices.Equal(ws.homes, []string{wsName}) {
-		t.Fatalf("fresh homes = %v", ws.homes)
+	if !slices.Equal(ws.homes, []string{wsName, wsName}) {
+		t.Fatalf("fresh homes = %v, want one per check and one for the engine", ws.homes)
 	}
 }
 
@@ -248,11 +305,16 @@ func TestCIRefusesToRunWhenCleanupFails(t *testing.T) {
 		"root":      func(p *fakeProcesses) { p.self.UID = 0 },
 		"list":      func(p *fakeProcesses) { p.listErr = errors.New("no /proc") },
 		"terminate": func(p *fakeProcesses) { p.termErr = errors.New("EPERM") },
+		"no root":   nil,
 	} {
 		procs := procTable()
-		mutate(procs)
 		r := &kerneltest.Runner{}
 		ci, _, _ := newCIWith(r, procs)
+		if mutate != nil {
+			mutate(procs)
+		} else {
+			ci.cfg.UntrustedRoot = ""
+		}
 		_ = ci.Prepare(wsName, strings.NewReader(""))
 		if _, err := ci.Run(context.Background(), wsName, []string{"true"}); err == nil {
 			t.Errorf("%s: Run error = nil", name)
@@ -269,21 +331,60 @@ func TestCIRefusesToRunWhenCleanupFails(t *testing.T) {
 	}
 }
 
-func TestCIEngineDropsPathEntriesInsideTheUntrustedHome(t *testing.T) {
+func TestCIEngineDropsPathEntriesInsideTheUntrustedRoot(t *testing.T) {
 	t.Parallel()
 	r := &kerneltest.Runner{}
 	ws := &fakeWorkspace{}
-	procs := &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 2001}}
+	procs := &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 1000}}
 	ci := NewCIUseCase(ws, r, procs, CIConfig{
 		CredentialEnv: map[string]string{RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN"},
-		Path:          "/data/reviewer-ci/.local/bin:/usr/local/bin:bin:/data/reviewer-ci:/usr/bin",
-		UntrustedHome: "/data/reviewer-ci",
+		Path:          "/s/ci/home/.local/bin:/usr/local/bin:bin:/s/ci:/data/home/.local/bin:/usr/bin",
+		Home:          "/s/ci/home",
+		UntrustedRoot: "/s/ci",
 	})
 	_ = ci.Prepare(wsName, strings.NewReader(""))
 	if _, err := ci.Engine(context.Background(), wsName, RuntimeClaude, strings.NewReader("tok\np")); err != nil {
 		t.Fatal(err)
 	}
-	if got := r.Calls[0].Command.Env[0]; got != "PATH=/usr/local/bin:/usr/bin" {
+	if got := r.Calls[0].Command.Env[0]; got != "PATH=/usr/local/bin:/data/home/.local/bin:/usr/bin" {
 		t.Fatalf("engine %s", got)
+	}
+}
+
+// The checks' HOME is persistent and inside the untrusted root, so a PR can
+// plant binaries there; relative PATH entries resolve against the PR's own
+// workspace. Neither may reach the PATH of a later check, like the engine's.
+func TestCIChecksDropPathEntriesInsideTheUntrustedRoot(t *testing.T) {
+	t.Parallel()
+	r := &kerneltest.Runner{}
+	ws := &fakeWorkspace{}
+	procs := &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 1000}}
+	ci := NewCIUseCase(ws, r, procs, CIConfig{
+		Path:          "/s/ci/home/.local/bin:/usr/local/bin::bin:/s/ci:/data/home/.local/bin:/usr/bin",
+		Home:          "/s/ci/home",
+		UntrustedRoot: "/s/ci",
+	})
+	_ = ci.Prepare(wsName, strings.NewReader(""))
+	if _, err := ci.Run(context.Background(), wsName, []string{"bun", "test"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := r.Calls[0].Command.Env[0]; got != "PATH=/usr/local/bin:/data/home/.local/bin:/usr/bin" {
+		t.Fatalf("checks %s", got)
+	}
+}
+
+// A checks HOME outside the untrusted root would be the owner's real home
+// (or an empty HOME that tools resolve to it): refuse instead of running.
+func TestCIRunRefusesAHomeOutsideTheUntrustedRoot(t *testing.T) {
+	t.Parallel()
+	for name, home := range map[string]string{"empty": "", "owner home": "/data/home", "relative": "ci/home"} {
+		r := &kerneltest.Runner{}
+		ws := &fakeWorkspace{}
+		procs := &fakeProcesses{t: &trace{}, self: Process{PID: 100, PPID: 90, UID: 1000}}
+		ci := NewCIUseCase(ws, r, procs, CIConfig{Path: "/usr/bin", Home: home, UntrustedRoot: "/s/ci"})
+		_ = ci.Prepare(wsName, strings.NewReader(""))
+		if _, err := ci.Run(context.Background(), wsName, []string{"bun", "test"}); err == nil || len(r.Calls) != 0 {
+			t.Errorf("%s: error = %v, calls %d", name, err, len(r.Calls))
+		}
 	}
 }

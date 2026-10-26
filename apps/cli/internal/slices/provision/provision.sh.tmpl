@@ -2,7 +2,6 @@
 # step: packages
 set -eu
 missing=""
-command -v sudo >/dev/null 2>&1 || missing="$missing sudo"
 command -v git >/dev/null 2>&1 || missing="$missing git"
 if [ -n "$missing" ]; then
   export DEBIAN_FRONTEND=noninteractive
@@ -11,19 +10,11 @@ if [ -n "$missing" ]; then
 fi
 {{end}}
 
-{{define "users" -}}
-# step: users
+{{define "user" -}}
+# step: user
 set -eu
+# Single-user mode: the agent sessions and the review all run as this user.
 id -u {{q .Orca.Name}} >/dev/null 2>&1 || { echo {{q .Orca.Name}}' user is missing' >&2; exit 1; }
-{{range .Managed -}}
-getent group {{q .Name}} >/dev/null || groupadd --gid {{q .UIDText}} {{q .Name}}
-id -u {{q .Name}} >/dev/null 2>&1 || useradd --uid {{q .UIDText}} --gid {{q .Name}} --home-dir {{q .Home}} --no-create-home --shell /bin/bash {{q .Name}}
-[ "$(id -u {{q .Name}})" = {{q .UIDText}} ] || { echo {{q .Name}}' has an unexpected uid' >&2; exit 1; }
-mkdir -p {{q .Home}}
-chown {{q .Name}}:{{q .Name}} {{q .Home}}
-chmod 700 {{q .Home}}
-{{end -}}
-install -d -o {{q .Reviewer.Name}} -g {{q .Reviewer.Name}} -m 700 {{q .WorkDir}}
 {{end}}
 
 {{define "config" -}}
@@ -54,56 +45,13 @@ trap - EXIT
 {{q .BinaryPath}} version
 {{end}}
 
-{{define "wrappers" -}}
-# step: wrappers
+{{define "legacy" -}}
+# step: legacy
 set -eu
-install -d -o root -g root -m 755 /usr/local/libexec/gbai
-install_wrapper() {
-  tmp=$(mktemp "$1.XXXXXX")
-  cat > "$tmp"
-  sh -n "$tmp" || { rm -f "$tmp"; exit 1; }
-  chown root:root "$tmp"
-  chmod 755 "$tmp"
-  mv -f "$tmp" "$1"
-}
-install_wrapper {{q .ReviewRun}} <<'GBAI_WRAPPER_EOF'
-#!/bin/sh
-set -eu
-usage() { echo 'usage: review-run head <pr-number> <40-hex-sha>' >&2; exit 64; }
-[ "$#" -eq 3 ] && [ "$1" = head ] || usage
-case "$2" in ''|0*|*[!0-9]*) usage ;; esac
-case "$3" in *[!0-9a-f]*) usage ;; esac
-[ "${#3}" -eq 40 ] || usage
-umask 077
-cd {{q .Reviewer.Home}}
-exec env -i HOME={{q .Reviewer.Home}} USER={{q .Reviewer.Name}} LOGNAME={{q .Reviewer.Name}} PATH={{q .Reviewer.PathText}} {{.BinaryPath}} --config {{.ConfigPath}} review run head "$2" "$3"
-GBAI_WRAPPER_EOF
-install_wrapper {{q .ReviewCI}} <<'GBAI_WRAPPER_EOF'
-#!/bin/sh
-set -eu
-umask 077
-cd {{q .ReviewerCI.Home}}
-exec env -i HOME={{q .ReviewerCI.Home}} USER={{q .ReviewerCI.Name}} LOGNAME={{q .ReviewerCI.Name}} PATH={{q .ReviewerCI.PathText}} {{.BinaryPath}} --config {{.ConfigPath}} review ci "$@"
-GBAI_WRAPPER_EOF
-{{end}}
-
-{{define "sudoers" -}}
-# step: sudoers
-set -eu
-command -v visudo >/dev/null 2>&1 || { echo 'visudo is missing' >&2; exit 1; }
-grep -Eq '^[@#]includedir /etc/sudoers.d' /etc/sudoers || { echo 'sudoers does not include /etc/sudoers.d' >&2; exit 1; }
-tmp=$(mktemp /etc/sudoers.d/.gbai-reviewer.XXXXXX)
-trap 'rm -f "$tmp"' EXIT
-cat > "$tmp" <<'GBAI_SUDOERS_EOF'
-# Managed by gbai provision.
-{{.Orca.Name}} ALL=({{.Reviewer.Name}}) NOPASSWD: {{.ReviewRun}}
-{{.Reviewer.Name}} ALL=({{.ReviewerCI.Name}}) NOPASSWD: {{.ReviewCI}}
-GBAI_SUDOERS_EOF
-chown root:root "$tmp"
-chmod 440 "$tmp"
-visudo -cf "$tmp"
-mv -f "$tmp" {{q .SudoersPath}}
-trap - EXIT
+# Remove the sudo path of the retired three-user reviewer model. The old
+# reviewer OS users and their homes are left for the owner to remove.
+rm -f{{range .LegacyFiles}} {{q .}}{{end}}
+rmdir {{q .LegacyDir}} 2>/dev/null || true
 {{end}}
 
 {{define "skills" -}}

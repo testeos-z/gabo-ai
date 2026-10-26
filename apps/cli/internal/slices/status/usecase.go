@@ -68,7 +68,8 @@ type Snapshot struct {
 	NeedsUser    IssuesProbe   `json:"needs_user"`
 }
 
-// Settings name the integration branch and the bot identity.
+// Settings name the integration branch and the reviewer's login (the
+// owner's own login in single-user mode).
 type Settings struct {
 	Integration string
 	Bot         string
@@ -139,7 +140,7 @@ func (u *UseCase) pullRequests(ctx context.Context) PRProbe {
 		} else if state != "" {
 			st.Review = state
 		}
-		if body, err := u.gh.LastComment(ctx, pr.Number, u.s.Bot); err != nil {
+		if body, err := u.gh.LastVerdict(ctx, pr.Number, u.s.Bot); err != nil {
 			st.Verdict = "unknown: " + err.Error()
 		} else {
 			st.Verdict, _, _ = strings.Cut(strings.TrimSpace(body), "\n")

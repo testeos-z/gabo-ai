@@ -21,7 +21,10 @@ type GitHub interface {
 	OpenPullRequests(ctx context.Context, base string) ([]PullRequest, error)
 	// LatestStatus returns the newest state of the status context on sha, or "" when absent.
 	LatestStatus(ctx context.Context, sha, context string) (string, error)
-	// LastComment returns the body of author's newest comment on the PR, or "" when absent.
-	LastComment(ctx context.Context, number int, author string) (string, error)
+	// LastVerdict returns the body of author's newest comment on the PR that
+	// carries the reviewer's verdict marker, or "" when absent. In single-user
+	// mode the coder comments with the same login, so the marker is what
+	// identifies a verdict.
+	LastVerdict(ctx context.Context, number int, author string) (string, error)
 	NeedsUserIssues(ctx context.Context) ([]Issue, error)
 }

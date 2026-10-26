@@ -1,6 +1,7 @@
 // Package review runs the reviewer flow: requesting a review from the coder's
-// pane, running it inside the reviewer boundary, executing untrusted checks
-// as reviewer-ci and notifying the coder's mailbox with one summary line.
+// pane, running it from the reviewer's own state dir as the owner (single-user
+// mode), executing untrusted checks without GitHub credentials and notifying
+// the coder's mailbox with one summary line.
 package review
 
 import (
@@ -10,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/verdict"
 )
 
 // Verdict is the outcome of one review.
@@ -45,6 +48,59 @@ const (
 
 // CloudLabel marks PRs the reviewer may merge on its own.
 const CloudLabel = "mode:cloud"
+
+// Verdict comment lines; the format lives in kernel/verdict, shared with audit.
+const (
+	CommentClean    = verdict.Clean
+	CommentBlocking = verdict.Blocking
+	CommentFooter   = verdict.Footer
+)
+
+// Comment is one PR comment and the login that posted it.
+type Comment = verdict.Comment
+
+// Marker returns the hidden line that signs a verdict comment for sha.
+func Marker(sha string) string { return verdict.Marker(sha) }
+
+// MarkerSHA returns the head sha signed by the marker on the last line of body.
+func MarkerSHA(body string) (string, bool) { return verdict.MarkerSHA(body) }
+
+// CleanVerdictFor reports whether the newest marker comment reviewer posted
+// in comments (oldest first) signs head and opens with CommentClean.
+func CleanVerdictFor(comments []Comment, reviewer, head string) bool {
+	return verdict.CleanFor(comments, reviewer, head)
+}
+
+// ConflictNoticeFor reports whether the newest marker comment reviewer posted
+// in comments already reports that head conflicts with integration, so the
+// same conflict is not posted again on every run.
+func ConflictNoticeFor(comments []Comment, reviewer, head, integration string) bool {
+	c, signed, ok := verdict.NewestSigned(comments, reviewer)
+	if !ok || signed != head {
+		return false
+	}
+	lines := verdict.Lines(c.Body)
+	return len(lines) > 2 && lines[2] == conflictLine(head, integration)
+}
+
+// conflictLine is the fixed third line of a conflict verdict comment. It is
+// written only by CommentBody, never from engine or check output.
+func conflictLine(sha, integration string) string {
+	return fmt.Sprintf("Head `%s` does not merge cleanly onto `%s`; verdict `%s`.", sha, integration, VerdictBlocking)
+}
+
+// EchoPrefix starts every echoed line of diagnostic output, so no output a PR
+// can influence ever starts with a summary line.
+const EchoPrefix = "| "
+
+// Quote prefixes every line of s with EchoPrefix.
+func Quote(s string) string {
+	lines := strings.Split(strings.ReplaceAll(s, "\r", ""), "\n")
+	for i, l := range lines {
+		lines[i] = EchoPrefix + l
+	}
+	return strings.Join(lines, "\n")
+}
 
 // Finding is one review comment from the engine (or the merge step).
 type Finding struct {
@@ -114,8 +170,10 @@ func DefaultHumanOnlyPaths() []string {
 }
 
 // DecideMerge returns merged only for a clean cloud PR into the integration
-// branch with auto merge enabled and no human-only path changed.
-func DecideMerge(v Verdict, pr PullRequest, files []string, p MergePolicy) Merge {
+// branch with auto merge enabled, no human-only path changed and the newest
+// marker comment posted by reviewer (comments are oldest first) clean for the
+// PR head. An empty reviewer login never merges.
+func DecideMerge(v Verdict, pr PullRequest, files []string, comments []Comment, reviewer string, p MergePolicy) Merge {
 	switch v {
 	case VerdictSkipped:
 		return MergeSkipped
@@ -130,6 +188,9 @@ func DecideMerge(v Verdict, pr PullRequest, files []string, p MergePolicy) Merge
 		if IsHumanOnly(f, p.HumanOnlyPaths) {
 			return MergeNeedsHuman
 		}
+	}
+	if !CleanVerdictFor(comments, reviewer, pr.HeadSHA) {
+		return MergeNeedsHuman
 	}
 	return MergeMerged
 }

@@ -19,9 +19,9 @@ func NewCommand(factory Factory) *cobra.Command {
 		Use:   "doctor",
 		Short: "Check the known gotchas locally and on the server (read-only)",
 		Long: "Check, without changing anything: local tools (railway, gh, orca, go) and gh auth;\n" +
-			"on the server, sudo, the orca/reviewer/reviewer-ci users and uids, the sudoers drop-in,\n" +
-			"the root-owned review-run wrapper, token variable names visible to the orca user\n" +
-			"(names only, never values) and the reviewer home mode. Exits 1 when a check fails.",
+			"on the server, the orca user (it also runs the reviewer in single-user mode), that the\n" +
+			"retired reviewer sudoers drop-in and wrappers are gone, token variable names visible to\n" +
+			"the orca user (names only, never values) and the secrets dir mode. Exits 1 when a check fails.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			uc, err := factory(cmd.Context())

@@ -4,60 +4,65 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/review"
 )
 
-// CIClient implements review.Checks and review.Engine on the reviewer side by
-// calling the root-owned review-ci wrapper as reviewer-ci through sudo.
-type CIClient struct {
-	runner     kernel.Runner
-	user       string
+// ciCore is the checks side the reviewer drives; *review.CIUseCase
+// implements it.
+type ciCore interface {
+	Prepare(name string, tree io.Reader) error
+	Run(ctx context.Context, name string, argv []string) (kernel.Result, error)
+	Engine(ctx context.Context, name, runtime string, stdin io.Reader) (kernel.Result, error)
+	Cleanup(name string) error
+}
+
+var _ ciCore = (*review.CIUseCase)(nil)
+
+// LocalCI implements review.Checks and review.Engine in single-user mode:
+// the checks side runs in the reviewer's own process, as the same OS user,
+// with no sudo. Its isolation is the environment the checks use case builds
+// from scratch (no GitHub credentials, empty gh config dir).
+type LocalCI struct {
+	core       ciCore
 	runtime    string
 	credential func(runtime string) ([]byte, error)
 }
 
 var (
-	_ review.Checks = (*CIClient)(nil)
-	_ review.Engine = (*CIClient)(nil)
+	_ review.Checks = (*LocalCI)(nil)
+	_ review.Engine = (*LocalCI)(nil)
 )
 
-// NewCIClient returns the client. credential reads the model credential
-// owned by the reviewer; it is only ever sent over stdin.
-func NewCIClient(r kernel.Runner, user, runtime string, credential func(string) ([]byte, error)) *CIClient {
-	return &CIClient{runner: r, user: user, runtime: runtime, credential: credential}
+// NewLocalCI returns the adapter. credential reads the model credential; it
+// only ever reaches the engine over its stdin.
+func NewLocalCI(core ciCore, runtime string, credential func(string) ([]byte, error)) *LocalCI {
+	return &LocalCI{core: core, runtime: runtime, credential: credential}
 }
 
-func (c *CIClient) command(args ...string) kernel.Command {
-	return kernel.Command{Name: "sudo", Args: append([]string{"-n", "-u", c.user, kernel.ReviewCIPath}, args...)}
-}
-
-// Prepare streams the merged tree to a fresh reviewer-ci workspace.
-func (c *CIClient) Prepare(ctx context.Context, ws string, tree []byte) error {
-	cmd := c.command("prepare", "--dir", ws)
-	cmd.Stdin = bytes.NewReader(tree)
-	_, err := run(ctx, c.runner, cmd)
-	return err
+// Prepare replaces the workspace with the merged tree.
+func (c *LocalCI) Prepare(_ context.Context, ws string, tree []byte) error {
+	return c.core.Prepare(ws, bytes.NewReader(tree))
 }
 
 // Run executes one check; a non-zero exit is a failed check, not an error.
-func (c *CIClient) Run(ctx context.Context, ws string, argv []string) (review.CheckOutcome, error) {
-	res, err := c.runner.Run(ctx, c.command(append([]string{"run", "--dir", ws, "--"}, argv...)...))
+func (c *LocalCI) Run(ctx context.Context, ws string, argv []string) (review.CheckOutcome, error) {
+	res, err := c.core.Run(ctx, ws, argv)
 	if err != nil {
 		return review.CheckOutcome{}, err
 	}
 	return review.CheckOutcome{Passed: res.ExitCode == 0, Output: append(res.Stdout, res.Stderr...)}, nil
 }
 
-// Cleanup removes the reviewer-ci workspace.
-func (c *CIClient) Cleanup(ctx context.Context, ws string) error {
-	_, err := run(ctx, c.runner, c.command("cleanup", "--dir", ws))
-	return err
+// Cleanup removes the workspace.
+func (c *LocalCI) Cleanup(_ context.Context, ws string) error {
+	return c.core.Cleanup(ws)
 }
 
-// Review runs the engine as reviewer-ci and parses its findings.
-func (c *CIClient) Review(ctx context.Context, ws, prompt string) ([]review.Finding, error) {
+// Review runs the engine and parses its findings.
+func (c *LocalCI) Review(ctx context.Context, ws, prompt string) ([]review.Finding, error) {
 	cred, err := c.credential(c.runtime)
 	if err != nil {
 		return nil, fmt.Errorf("read %s credential: %w", c.runtime, err)
@@ -70,9 +75,7 @@ func (c *CIClient) Review(ctx context.Context, ws, prompt string) ([]review.Find
 	stdin := make([]byte, 0, len(cred)+1+len(prompt))
 	stdin = append(append(append(stdin, cred...), '\n'), prompt...)
 	defer clear(stdin)
-	cmd := c.command("engine", "--dir", ws, "--runtime", c.runtime)
-	cmd.Stdin = bytes.NewReader(stdin)
-	res, err := c.runner.Run(ctx, cmd)
+	res, err := c.core.Engine(ctx, ws, c.runtime, bytes.NewReader(stdin))
 	if err != nil {
 		return nil, err
 	}

@@ -60,6 +60,27 @@ func TestEverySkillHasValidFrontmatter(t *testing.T) {
 	}
 }
 
+// The process rules other tools and reports rely on stay in the skill text.
+func TestSkillsCarryTheProcessRules(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]string{
+		"gbai-coder/SKILL.md":          {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
+		"gbai-cycle/SKILL.md":          {"gbai worktree close", "Backlog", "Ready", "parallelism", "REFUSED"},
+		"gbai-reviewer-notes/SKILL.md": {"never approves", "marker"},
+	}
+	for _, f := range files {
+		for _, s := range want[f.Path] {
+			if !strings.Contains(string(f.Data), s) {
+				t.Errorf("%s: missing %q", f.Path, s)
+			}
+		}
+	}
+}
+
 func frontmatter(s string) (map[string]string, bool) {
 	rest, ok := strings.CutPrefix(s, "---\n")
 	if !ok {

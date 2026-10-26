@@ -1,9 +1,12 @@
 package adapters
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -68,10 +71,44 @@ func (g *GitHub) Comment(ctx context.Context, n int, body string) error {
 	return err
 }
 
-// Approve approves the PR.
-func (g *GitHub) Approve(ctx context.Context, n int, sha string) error {
-	_, err := g.gh(ctx, "", "pr", "review", strconv.Itoa(n), "--repo", g.repo, "--approve", "--body", "Approved by the gbai reviewer at "+sha+".")
-	return err
+// Comments lists the PR's issue comments with their authors, oldest first.
+// Each page prints one JSON array, so the output is decoded as a stream.
+func (g *GitHub) Comments(ctx context.Context, n int) ([]review.Comment, error) {
+	res, err := g.gh(ctx, "", "api", "--paginate", "repos/"+g.repo+"/issues/"+strconv.Itoa(n)+"/comments",
+		"--jq", "[.[] | {author: .user.login, body: .body}]")
+	if err != nil {
+		return nil, err
+	}
+	var comments []review.Comment
+	dec := json.NewDecoder(bytes.NewReader(res.Stdout))
+	for {
+		var page []struct {
+			Author string `json:"author"`
+			Body   string `json:"body"`
+		}
+		if err := dec.Decode(&page); errors.Is(err, io.EOF) {
+			return comments, nil
+		} else if err != nil {
+			return nil, fmt.Errorf("decode gh api comments: %w", err)
+		}
+		for _, c := range page {
+			comments = append(comments, review.Comment{Author: c.Author, Body: c.Body})
+		}
+	}
+}
+
+// Login returns the login gh is authenticated as, the identity every
+// review comment is posted with.
+func (g *GitHub) Login(ctx context.Context) (string, error) {
+	res, err := g.gh(ctx, "", "api", "user", "--jq", ".login")
+	if err != nil {
+		return "", err
+	}
+	login := strings.TrimSpace(string(res.Stdout))
+	if login == "" || strings.ContainsAny(login, " \t\r\n") {
+		return "", fmt.Errorf("gh api user returned login %q", login)
+	}
+	return login, nil
 }
 
 // Merge merges the PR with a merge commit, only if its head is still sha.

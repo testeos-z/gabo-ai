@@ -23,7 +23,7 @@ Use when the human wants to set up gbai for the first time or repair a broken se
 2. `provision_plan` → show → `provision_apply` with `confirm: true`. Re-run `doctor`.
 3. Cloud browser logins, done by the human in the server's Orca browser (local Orca paired to the server environment):
    - Gmail for the agent mailbox.
-   - GitHub: the coder session uses the **owner** account; the reviewer uses the **bot** account (never the reverse).
+   - GitHub: the **owner** account, once, for the `orca` user. Single-user mode: the coder sessions and the reviewer share it; the reviewer never approves, it signs a verdict comment.
    - Railway.
 4. `secret_instructions`: show each returned command and ask the human to run it in their own terminal. Wait for "done"; never ask for the value.
 5. `repo_setup_plan` → show → `repo_setup_apply` with `confirm: true`.

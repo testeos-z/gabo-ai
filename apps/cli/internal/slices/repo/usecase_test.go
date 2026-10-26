@@ -120,8 +120,10 @@ func TestRulesetBody(t *testing.T) {
 		}
 	}
 	pr := types["pull_request"]
-	if pr["required_approving_review_count"] != float64(1) || pr["dismiss_stale_reviews_on_push"] != true {
-		t.Fatalf("pull_request = %v", pr)
+	// The reviewer posts with the owner's account and can never approve, so
+	// the gate is the two required statuses, not an approving review.
+	if pr["required_approving_review_count"] != float64(0) || pr["require_last_push_approval"] != false || pr["require_code_owner_review"] != false {
+		t.Fatalf("pull_request = %v, want no required approval", pr)
 	}
 	checks, _ := json.Marshal(types["required_status_checks"]["required_status_checks"])
 	if string(checks) != `[{"context":"reviewer/tests"},{"context":"reviewer/review"}]` {

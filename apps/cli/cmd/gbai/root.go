@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -17,6 +17,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/railwayssh"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/audit"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/configcmd"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/doctor"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/mcp"
@@ -29,6 +30,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/sessions"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/status"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/version"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/worktree"
 )
 
 // deps holds everything the composition root wires into the slices.
@@ -47,11 +49,20 @@ func newRootCommand(d deps) *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
-	root.PersistentFlags().StringVar(&configPath, "config", defaultConfigPath,
-		"gbai config file; when not set and ./"+defaultConfigPath+" is missing, "+kernel.ServerConfigPath+" is used")
+	root.PersistentFlags().StringVar(&configPath, "config", "",
+		"load exactly this config file; when not set the layers "+kernel.ServerConfigPath+
+			", the user config ($XDG_CONFIG_HOME/gbai/config.yaml) and the project "+config.ProjectFile+
+			" are merged (see `gbai config`)")
 
+	resolveConfig := func(ctx context.Context) (config.Resolution, error) {
+		if root.PersistentFlags().Changed("config") {
+			return config.LoadFile(osfs.FS{}, configPath)
+		}
+		return config.LoadLayers(osfs.FS{}, configLayers(ctx, d.runner, os.Getenv, os.Getwd))
+	}
 	loadConfig := func() (config.Config, error) {
-		return config.Load(resolveConfigPath(configPath, root.PersistentFlags().Changed("config")))
+		res, err := resolveConfig(context.Background())
+		return res.Config, err
 	}
 
 	f := newFactories(d, loadConfig)
@@ -64,7 +75,9 @@ func newRootCommand(d deps) *cobra.Command {
 	root.AddCommand(status.NewCommand(f.status))
 	root.AddCommand(audit.NewCommand(f.audit, time.Now))
 	root.AddCommand(doctor.NewCommand(f.doctor))
+	root.AddCommand(worktree.NewCommand(f.worktree))
 	root.AddCommand(initcmd.NewCommand(f.init))
+	root.AddCommand(configcmd.NewCommand(resolveConfig))
 	root.AddCommand(plan.NewCommand(plan.NewUseCase(osfs.FS{})))
 	root.AddCommand(mcp.NewCommand(mcp.NewTools(mcpPorts(f), secrets.Names(), time.Now), serverVersion(d.version)))
 	return root
@@ -78,44 +91,46 @@ func newTerminals(runner kernel.Runner, cfg config.Config, mode string) kernel.T
 	return orcacli.NewRemote(newRemoteShell(runner, cfg), cfg.Users.Orca.Name)
 }
 
-const defaultConfigPath = "gbai.yaml"
-
-// resolveConfigPath uses the server config when no flag is given and there is
-// no gbai.yaml in the working directory.
-func resolveConfigPath(p string, explicit bool) string {
-	if explicit || p != defaultConfigPath {
-		return p
+// configLayers returns the system, user and project layers; the project root
+// is the git top-level of the working directory, or the directory itself.
+func configLayers(ctx context.Context, runner kernel.Runner, getenv func(string) string, getwd func() (string, error)) []config.Layer {
+	root := ""
+	if cwd, err := getwd(); err == nil {
+		root = config.ProjectRoot(ctx, runner, cwd)
 	}
-	if _, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
-		return kernel.ServerConfigPath
-	}
-	return p
+	return config.LayerPaths(getenv, root)
 }
 
 func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, error)) review.Factories {
 	return review.Factories{
 		Request: func(context.Context) (*review.RequestUseCase, error) {
-			cfg, err := loadConfig()
-			if err != nil {
+			if _, err := loadConfig(); err != nil {
 				return nil, err
 			}
-			return review.NewRequestUseCase(reviewadapters.NewOrca(runner), cfg.Users.Reviewer.Name), nil
+			return review.NewRequestUseCase(reviewadapters.NewOrca(runner)), nil
 		},
 		Notify: func(context.Context) (*review.NotifyUseCase, error) {
 			return review.NewNotifyUseCase(reviewadapters.NewOrca(runner)), nil
 		},
-		Run: func(context.Context) (*review.RunUseCase, error) {
+		Run: func(_ context.Context, keepWorktree bool) (*review.RunUseCase, error) {
 			cfg, err := loadConfig()
 			if err != nil {
 				return nil, err
 			}
-			rv := cfg.Users.Reviewer
-			ci := reviewadapters.NewCIClient(runner, cfg.Users.ReviewerCI.Name, string(cfg.Runtimes.Reviewer),
-				reviewadapters.CredentialReader(path.Join(rv.Home, "secrets")))
+			state, err := reviewerState(cfg)
+			if err != nil {
+				return nil, err
+			}
+			ci, err := newCIUseCase(runner, cfg, state)
+			if err != nil {
+				return nil, err
+			}
+			local := reviewadapters.NewLocalCI(ci, string(cfg.Runtimes.Reviewer),
+				reviewadapters.CredentialReader(path.Join(cfg.Users.Orca.Home, "secrets")))
 			return review.NewRunUseCase(
 				reviewadapters.NewGitHub(runner, cfg.Repo.Name),
-				reviewadapters.NewGit(runner, cfg.Repo.Name, path.Join(rv.Home, "work"), nil),
-				ci, ci,
+				reviewadapters.NewGit(runner, cfg.Repo.Name, state, nil),
+				local, local,
 				review.RunConfig{
 					Checks: cfg.Review.CheckArgv(),
 					Policy: review.MergePolicy{
@@ -123,30 +138,80 @@ func reviewFactories(runner kernel.Runner, loadConfig func() (config.Config, err
 						Integration:    cfg.Repo.IntegrationBranch,
 						HumanOnlyPaths: cfg.Review.HumanOnlyPaths,
 					},
+					KeepWorktree: keepWorktree,
+					Login:        cfg.Bot.Login,
 				},
-			).WithLock(reviewadapters.NewFileLock(path.Join(rv.Home, ".gbai-review.lock"))), nil
+			).WithLock(reviewadapters.NewFileLock(path.Join(state, "review.lock"))), nil
 		},
 		CI: func(context.Context) (*review.CIUseCase, error) {
 			cfg, err := loadConfig()
 			if err != nil {
 				return nil, err
 			}
-			ciHome := cfg.Users.ReviewerCI.Home
-			return review.NewCIUseCase(
-				reviewadapters.NewDirWorkspace(path.Join(ciHome, "work")),
-				runner,
-				reviewadapters.NewProcFS("/proc", 2*time.Second),
-				review.CIConfig{
-					CredentialEnv: map[string]string{
-						review.RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN",
-						review.RuntimePi:     cfg.Review.PiCredentialEnv,
-					},
-					Path:          os.Getenv("PATH"),
-					UntrustedHome: ciHome,
-				},
-			), nil
+			state, err := reviewerState(cfg)
+			if err != nil {
+				return nil, err
+			}
+			return newCIUseCase(runner, cfg, state)
 		},
 	}
+}
+
+// reviewerState resolves the reviewer's own state dir (clone/, worktrees/,
+// ci/) and creates it private to the current user.
+func reviewerState(cfg config.Config) (string, error) {
+	state, err := cfg.Review.StateDirFrom(os.Getenv)
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(state, 0o700); err != nil {
+		return "", fmt.Errorf("create reviewer state dir: %w", err)
+	}
+	return state, nil
+}
+
+// newCIUseCase builds the checks side under <state>/ci: workspaces in work/,
+// a persistent HOME for the checks' caches in home/. In single-user mode it
+// runs as the owner; its environment is built from scratch so no GitHub
+// credential reaches the checks or the engine.
+func newCIUseCase(runner kernel.Runner, cfg config.Config, state string) (*review.CIUseCase, error) {
+	root := path.Join(state, "ci")
+	home := path.Join(root, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		return nil, fmt.Errorf("create checks home: %w", err)
+	}
+	return review.NewCIUseCase(
+		reviewadapters.NewDirWorkspace(path.Join(root, "work")),
+		runner,
+		reviewadapters.NewProcFS("/proc", 2*time.Second),
+		review.CIConfig{
+			CredentialEnv: map[string]string{
+				review.RuntimeClaude: "CLAUDE_CODE_OAUTH_TOKEN",
+				review.RuntimePi:     cfg.Review.PiCredentialEnv,
+			},
+			Path:          os.Getenv("PATH"),
+			Home:          home,
+			User:          os.Getenv("USER"),
+			UntrustedRoot: root,
+		},
+	), nil
+}
+
+// ownerLogin returns the owner's GitHub login: the configured bot.login, or
+// the login gh is authenticated as.
+func ownerLogin(ctx context.Context, runner kernel.Runner, configured string) (string, error) {
+	if configured != "" {
+		return configured, nil
+	}
+	res, err := kernel.RunChecked(ctx, runner, kernel.Command{Name: "gh", Args: []string{"api", "user", "--jq", ".login"}})
+	if err != nil {
+		return "", fmt.Errorf("owner login from gh (or set bot.login): %w", err)
+	}
+	login := strings.TrimSpace(string(res.Stdout))
+	if login == "" || strings.ContainsAny(login, " \t\n") {
+		return "", fmt.Errorf("owner login from gh: unexpected output %q", login)
+	}
+	return login, nil
 }
 
 func provisionAccount(u config.User) provision.Account {

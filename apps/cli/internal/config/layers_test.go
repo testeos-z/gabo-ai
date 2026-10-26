@@ -1,0 +1,288 @@
+package config
+
+import (
+	"context"
+	"errors"
+	"io/fs"
+	"reflect"
+	"strings"
+	"testing"
+
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+)
+
+func TestMerge(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		lower, higher map[string]any
+		want          map[string]any
+	}{
+		{
+			name:   "higher scalar overrides",
+			lower:  map[string]any{"parallelism": 3},
+			higher: map[string]any{"parallelism": 5},
+			want:   map[string]any{"parallelism": 5},
+		},
+		{
+			name:   "higher list replaces the whole list",
+			lower:  map[string]any{"review": map[string]any{"checks": []any{"a", "b"}}},
+			higher: map[string]any{"review": map[string]any{"checks": []any{"c"}}},
+			want:   map[string]any{"review": map[string]any{"checks": []any{"c"}}},
+		},
+		{
+			name:   "key absent in higher keeps the lower value",
+			lower:  map[string]any{"repo": map[string]any{"name": "o/r"}, "parallelism": 2},
+			higher: map[string]any{"parallelism": 4},
+			want:   map[string]any{"repo": map[string]any{"name": "o/r"}, "parallelism": 4},
+		},
+		{
+			name: "nested mappings merge key by key",
+			lower: map[string]any{"server": map[string]any{"railway": map[string]any{
+				"project_id": "p1", "environment_id": "e1", "service_id": "s1"}}},
+			higher: map[string]any{"server": map[string]any{"railway": map[string]any{"service_id": "s2"}}},
+			want: map[string]any{"server": map[string]any{"railway": map[string]any{
+				"project_id": "p1", "environment_id": "e1", "service_id": "s2"}}},
+		},
+		{
+			name:   "a scalar in higher replaces a lower mapping",
+			lower:  map[string]any{"bot": map[string]any{"login": "x"}},
+			higher: map[string]any{"bot": nil},
+			want:   map[string]any{"bot": nil},
+		},
+		{
+			name:   "nil lower",
+			higher: map[string]any{"parallelism": 1},
+			want:   map[string]any{"parallelism": 1},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := Merge(tt.lower, tt.higher); !reflect.DeepEqual(got, tt.want) {
+				t.Fatalf("Merge() = %#v, want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMergeDoesNotMutateItsInputs(t *testing.T) {
+	t.Parallel()
+	lower := map[string]any{"review": map[string]any{"auto_merge": false}}
+	Merge(lower, map[string]any{"review": map[string]any{"auto_merge": true}})
+	if lower["review"].(map[string]any)["auto_merge"] != false {
+		t.Fatalf("lower mutated: %#v", lower)
+	}
+}
+
+// files is an in-memory Reader; a missing name reports fs.ErrNotExist.
+type files map[string]string
+
+func (f files) ReadFile(name string) ([]byte, error) {
+	b, ok := f[name]
+	if !ok {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	return []byte(b), nil
+}
+
+func threeLayers() []Layer {
+	return []Layer{
+		{Name: LayerSystem, Path: "/etc/gbai/gbai.yaml"},
+		{Name: LayerUser, Path: "/home/o/.config/gbai/config.yaml"},
+		{Name: LayerProject, Path: "/src/p/gbai.yaml"},
+	}
+}
+
+func TestLoadLayersHigherLayersWin(t *testing.T) {
+	t.Parallel()
+	r := files{
+		"/etc/gbai/gbai.yaml":              minimal + "parallelism: 2\nreview:\n  checks: [make test]\n  auto_merge: true\n",
+		"/home/o/.config/gbai/config.yaml": "parallelism: 4\nbot:\n  login: owner\n",
+		"/src/p/gbai.yaml":                 "parallelism: 6\nreview:\n  checks: [go test, go vet]\n",
+	}
+	res, err := LoadLayers(r, threeLayers())
+	if err != nil {
+		t.Fatalf("LoadLayers() error = %v", err)
+	}
+	c := res.Config
+	if c.Parallelism != 6 {
+		t.Errorf("parallelism = %d, want project 6", c.Parallelism)
+	}
+	if c.Bot.Login != "owner" {
+		t.Errorf("bot.login = %q, want user layer value", c.Bot.Login)
+	}
+	if !reflect.DeepEqual(c.Review.Checks, []string{"go test", "go vet"}) {
+		t.Errorf("checks = %q, want the project list only", c.Review.Checks)
+	}
+	if !c.Review.AutoMerge {
+		t.Errorf("auto_merge lost: a key absent in higher layers must keep the system value")
+	}
+	if c.Server.Railway.ProjectID != "p1" || c.Repo.IntegrationBranch != "dev" {
+		t.Errorf("system values or defaults lost: %+v %+v", c.Server.Railway, c.Repo)
+	}
+	for i, l := range res.Layers {
+		if !l.Found || l.Name != threeLayers()[i].Name {
+			t.Errorf("layer %d = %+v", i, l)
+		}
+	}
+}
+
+func TestLoadLayersSkipsMissingFiles(t *testing.T) {
+	t.Parallel()
+	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal}, threeLayers())
+	if err != nil {
+		t.Fatalf("LoadLayers() error = %v", err)
+	}
+	got := []bool{res.Layers[0].Found, res.Layers[1].Found, res.Layers[2].Found}
+	if !reflect.DeepEqual(got, []bool{false, false, true}) {
+		t.Fatalf("found = %v", got)
+	}
+	if res.Config.Parallelism != 3 {
+		t.Fatalf("defaults not applied: parallelism = %d", res.Config.Parallelism)
+	}
+}
+
+func TestLoadLayersEmptyPathAndEmptyFile(t *testing.T) {
+	t.Parallel()
+	layers := threeLayers()
+	layers[1].Path = ""
+	res, err := LoadLayers(files{"/etc/gbai/gbai.yaml": minimal, "/src/p/gbai.yaml": "# nothing yet\n"}, layers)
+	if err != nil {
+		t.Fatalf("LoadLayers() error = %v", err)
+	}
+	if res.Layers[1].Found || !res.Layers[2].Found {
+		t.Fatalf("layers = %+v", res.Layers)
+	}
+}
+
+func TestLoadLayersUnknownKeyNamesTheFile(t *testing.T) {
+	t.Parallel()
+	r := files{
+		"/etc/gbai/gbai.yaml": minimal,
+		"/src/p/gbai.yaml":    "parallelizm: 4\n",
+	}
+	res, err := LoadLayers(r, threeLayers())
+	if err == nil || !strings.Contains(err.Error(), "/src/p/gbai.yaml") || !strings.Contains(err.Error(), "parallelizm") {
+		t.Fatalf("error = %v, want unknown key naming the project file", err)
+	}
+	if len(res.Layers) != 3 {
+		t.Fatalf("layers not reported on error: %+v", res.Layers)
+	}
+}
+
+func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
+	t.Parallel()
+	// Neither file is valid alone; merged they are.
+	r := files{
+		"/etc/gbai/gbai.yaml": "server:\n  railway:\n    project_id: p1\n    environment_id: e1\n    service_id: s1\n",
+		"/src/p/gbai.yaml":    "repo:\n  name: o/r\n",
+	}
+	if _, err := LoadLayers(r, threeLayers()); err != nil {
+		t.Fatalf("LoadLayers() error = %v", err)
+	}
+	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "repo:\n  name: o/r\n"}, threeLayers()); err == nil ||
+		!strings.Contains(err.Error(), "server.railway.project_id") {
+		t.Fatalf("merged validation error = %v", err)
+	}
+}
+
+func TestLoadLayersNoFileFound(t *testing.T) {
+	t.Parallel()
+	_, err := LoadLayers(files{}, threeLayers())
+	if err == nil || !strings.Contains(err.Error(), "no config file found") || !strings.Contains(err.Error(), "--config") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadLayersReadErrorIsNotSkipped(t *testing.T) {
+	t.Parallel()
+	_, err := LoadLayers(failingReader{}, threeLayers())
+	if err == nil || !strings.Contains(err.Error(), "/etc/gbai/gbai.yaml") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+type failingReader struct{}
+
+func (failingReader) ReadFile(string) ([]byte, error) { return nil, errors.New("permission denied") }
+
+func TestLoadFileIsASingleLayer(t *testing.T) {
+	t.Parallel()
+	res, err := LoadFile(files{"/x/custom.yaml": minimal}, "/x/custom.yaml")
+	if err != nil {
+		t.Fatalf("LoadFile() error = %v", err)
+	}
+	if len(res.Layers) != 1 || res.Layers[0] != (Layer{Name: LayerFlag, Path: "/x/custom.yaml", Found: true}) {
+		t.Fatalf("layers = %+v", res.Layers)
+	}
+	if _, err := LoadFile(files{}, "/x/missing.yaml"); err == nil || !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("missing file error = %v", err)
+	}
+}
+
+func TestLayerPathsOrder(t *testing.T) {
+	t.Parallel()
+	env := map[string]string{"HOME": "/home/o"}
+	got := LayerPaths(func(k string) string { return env[k] }, "/src/p")
+	want := []Layer{
+		{Name: LayerSystem, Path: "/etc/gbai/gbai.yaml"},
+		{Name: LayerUser, Path: "/home/o/.config/gbai/config.yaml"},
+		{Name: LayerProject, Path: "/src/p/gbai.yaml"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("LayerPaths() = %+v, want %+v", got, want)
+	}
+}
+
+func TestUserPath(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{"xdg wins", map[string]string{"XDG_CONFIG_HOME": "/x", "HOME": "/home/o"}, "/x/gbai/config.yaml"},
+		{"relative xdg is ignored", map[string]string{"XDG_CONFIG_HOME": "rel", "HOME": "/home/o"}, "/home/o/.config/gbai/config.yaml"},
+		{"home fallback", map[string]string{"HOME": "/home/o"}, "/home/o/.config/gbai/config.yaml"},
+		{"nothing", map[string]string{}, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := UserPath(func(k string) string { return tt.env[k] }); got != tt.want {
+				t.Fatalf("UserPath() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProjectRoot(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		runner kernel.Runner
+		want   string
+	}{
+		{"git top-level", &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("/src/p\n")}}, "/src/p"},
+		{"not a repository", &kerneltest.Runner{Result: kernel.Result{ExitCode: 128, Stderr: []byte("fatal: not a git repository")}}, "/src/p/sub"},
+		{"git missing", &kerneltest.Runner{Err: errors.New("exec: git not found")}, "/src/p/sub"},
+		{"empty output", &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("\n")}}, "/src/p/sub"},
+		{"relative output", &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("src\n")}}, "/src/p/sub"},
+		{"no runner", nil, "/src/p/sub"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := ProjectRoot(context.Background(), tt.runner, "/src/p/sub"); got != tt.want {
+				t.Fatalf("ProjectRoot() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("/src/p\n")}}
+	ProjectRoot(context.Background(), r, "/src/p/sub")
+	if c := r.Calls[0].Command; c.Name != "git" || strings.Join(c.Args, " ") != "rev-parse --show-toplevel" || c.Dir != "/src/p/sub" {
+		t.Fatalf("command = %+v", c)
+	}
+}

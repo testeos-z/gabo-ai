@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/verdict"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/status"
 )
 
@@ -76,8 +77,9 @@ func (g *GitHub) LatestStatus(ctx context.Context, sha, context string) (string,
 	return "", nil
 }
 
-// LastComment returns the body of author's newest PR comment.
-func (g *GitHub) LastComment(ctx context.Context, number int, author string) (string, error) {
+// LastVerdict returns the body of author's newest PR comment that carries
+// the reviewer's verdict marker.
+func (g *GitHub) LastVerdict(ctx context.Context, number int, author string) (string, error) {
 	var doc struct {
 		Comments []struct {
 			Author struct {
@@ -90,8 +92,9 @@ func (g *GitHub) LastComment(ctx context.Context, number int, author string) (st
 		return "", err
 	}
 	for i := len(doc.Comments) - 1; i >= 0; i-- {
-		if sameLogin(doc.Comments[i].Author.Login, author) {
-			return doc.Comments[i].Body, nil
+		c := doc.Comments[i]
+		if _, signed := verdict.MarkerSHA(c.Body); signed && sameLogin(c.Author.Login, author) {
+			return c.Body, nil
 		}
 	}
 	return "", nil

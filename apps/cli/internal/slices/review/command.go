@@ -15,7 +15,7 @@ import (
 type Factories struct {
 	Request func(context.Context) (*RequestUseCase, error)
 	Notify  func(context.Context) (*NotifyUseCase, error)
-	Run     func(context.Context) (*RunUseCase, error)
+	Run     func(ctx context.Context, keepWorktree bool) (*RunUseCase, error)
 	CI      func(context.Context) (*CIUseCase, error)
 }
 
@@ -23,7 +23,7 @@ type Factories struct {
 func NewCommand(f Factories) *cobra.Command {
 	root := &cobra.Command{
 		Use:   "review",
-		Short: "Request, run and relay reviews inside the reviewer boundary",
+		Short: "Request, run and relay reviews (single-user mode: as the owner, no sudo)",
 	}
 	root.AddCommand(newRequestCommand(f), newNotifyCommand(f), newRunCommand(f), newCICommand(f))
 	return root
@@ -51,6 +51,7 @@ func newRequestCommand(f Factories) *cobra.Command {
 	cmd.Flags().IntVar(&in.PR, "pr", 0, "pull request number")
 	cmd.Flags().StringVar(&in.SHA, "sha", "", "pinned 40-hex head SHA")
 	cmd.Flags().StringVar(&in.Notify, "notify", "", "coder mailbox (run:<id> or dispatch:<id>)")
+	cmd.Flags().BoolVar(&in.KeepWorktree, "keep-worktree", false, "pass --keep-worktree to review run (keeps the worktree and checks workspace for debugging)")
 	for _, name := range []string{"pr", "sha", "notify"} {
 		_ = cmd.MarkFlagRequired(name)
 	}
@@ -83,9 +84,10 @@ func newNotifyCommand(f Factories) *cobra.Command {
 }
 
 func newRunCommand(f Factories) *cobra.Command {
-	return &cobra.Command{
+	var keep bool
+	cmd := &cobra.Command{
 		Use:   "run head <pr-number> <sha>",
-		Short: "Review a pinned PR head as the reviewer and print one summary line",
+		Short: "Review a pinned PR head from the reviewer state dir and print one summary line",
 		Args: cobra.MatchAll(cobra.ExactArgs(3), func(_ *cobra.Command, args []string) error {
 			if args[0] != "head" {
 				return fmt.Errorf("first argument must be %q", "head")
@@ -98,7 +100,7 @@ func newRunCommand(f Factories) *cobra.Command {
 		}),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			n, _ := strconv.Atoi(args[1])
-			uc, err := f.Run(cmd.Context())
+			uc, err := f.Run(cmd.Context(), keep)
 			if err != nil {
 				return err
 			}
@@ -106,19 +108,23 @@ func newRunCommand(f Factories) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			// Notes may carry check or engine output: quoting every line keeps
+			// the summary the only line that can parse as one.
 			for _, note := range report.Notes {
-				fmt.Fprintln(cmd.ErrOrStderr(), "gbai review:", note)
+				fmt.Fprintln(cmd.ErrOrStderr(), Quote("gbai review: "+note))
 			}
 			_, err = fmt.Fprintln(cmd.OutOrStdout(), report.Summary)
 			return err
 		},
 	}
+	cmd.Flags().BoolVar(&keep, "keep-worktree", false, "keep the worktree and checks workspace for debugging")
+	return cmd
 }
 
 func newCICommand(f Factories) *cobra.Command {
 	ci := &cobra.Command{
 		Use:   "ci",
-		Short: "Reviewer-ci side: run untrusted checks and the engine in a copied tree (no GitHub credentials)",
+		Short: "Checks side: run untrusted checks and the engine in a copied tree (no GitHub credentials)",
 	}
 	var dir, runtime string
 	withDir := func(c *cobra.Command) *cobra.Command {

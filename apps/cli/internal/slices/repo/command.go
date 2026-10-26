@@ -23,8 +23,9 @@ func NewCommand(factory Factory) *cobra.Command {
 		Short: "Create or update the mode/needs-user labels and the integration branch ruleset (idempotent)",
 		Long: "Create or update, with the owner's gh session:\n" +
 			"  labels mode:cloud (reviewer may auto-merge), mode:local (a human merges) and needs-user;\n" +
-			"  the repository ruleset " + RulesetName + " on the integration branch: pull request with one\n" +
-			"  approval, stale reviews dismissed, required statuses reviewer/tests and reviewer/review,\n" +
+			"  the repository ruleset " + RulesetName + " on the integration branch: pull request with no\n" +
+			"  required approval (the reviewer comments, it never approves), required statuses\n" +
+			"  reviewer/tests and reviewer/review,\n" +
 			"  no force pushes or deletions, and an empty bypass list.\n\n" +
 			"Admins of the repository or organization can still edit or bypass rulesets.",
 		Args: cobra.NoArgs,

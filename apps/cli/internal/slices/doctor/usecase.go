@@ -56,11 +56,11 @@ type User struct {
 
 // Settings describe what to check.
 type Settings struct {
-	LocalOrca    string // orca CLI used in local mode
-	Remote       bool   // run the server checks
-	Users        []User // orca, reviewer, reviewer-ci
-	OrcaUser     string
-	ReviewerHome string
+	LocalOrca  string // orca CLI used in local mode
+	Remote     bool   // run the server checks
+	Users      []User // the orca user (single-user mode: it also runs the reviewer)
+	OrcaUser   string
+	SecretsDir string // model credential files written by `gbai secrets set`
 }
 
 // UseCase runs the checks.
@@ -136,7 +136,7 @@ type remoteCheck struct {
 // None of them write anything.
 func (u *UseCase) remoteChecks() []remoteCheck {
 	provision := "run `gbai provision`"
-	checks := []remoteCheck{{"sudo", `command -v sudo >/dev/null || { echo "sudo is not installed"; exit 1; }`, provision}}
+	var checks []remoteCheck
 	for _, usr := range u.s.Users {
 		s := fmt.Sprintf(`uid=$(id -u %s 2>/dev/null) || { echo "user %s does not exist"; exit 1; }`, q(usr.Name), usr.Name)
 		if usr.UID > 0 {
@@ -144,17 +144,20 @@ func (u *UseCase) remoteChecks() []remoteCheck {
 		}
 		checks = append(checks, remoteCheck{"user " + usr.Name, s, provision})
 	}
+	var legacy strings.Builder
+	for _, f := range kernel.LegacyReviewerFiles() {
+		fmt.Fprintf(&legacy, `[ ! -e %s ] || { echo "%s is still present"; exit 1; }`+"\n", q(f), f)
+	}
 	checks = append(checks,
-		remoteCheck{"sudoers drop-in", fmt.Sprintf(`test -f %s || { echo "%s is missing"; exit 1; }
-visudo -c >/dev/null 2>&1 || { echo "visudo -c reports an invalid sudoers configuration"; exit 1; }`, q(kernel.SudoersPath), kernel.SudoersPath), provision},
-		remoteCheck{"review-run wrapper", fmt.Sprintf(`owner=$(stat -c %%U %s 2>/dev/null) || { echo "%s is missing"; exit 1; }
-[ "$owner" = root ] || { echo "owned by $owner, expected root"; exit 1; }`, q(kernel.ReviewRunPath), kernel.ReviewRunPath), provision},
+		remoteCheck{"legacy reviewer sudo removed", legacy.String(), provision},
 		remoteCheck{"service env tokens", fmt.Sprintf(`names=$( { tr '\0' '\n' </proc/1/environ 2>/dev/null
 for p in $(pgrep -u %s 2>/dev/null); do tr '\0' '\n' <"/proc/$p/environ" 2>/dev/null; done; } | cut -d= -f1 | grep -x -E 'GH_TOKEN|GITHUB_TOKEN|CLAUDE_CODE_OAUTH_TOKEN' | sort -u | tr '\n' ' ')
 [ -z "$names" ] || { echo "visible to %s: $names"; exit 1; }`, q(u.s.OrcaUser), u.s.OrcaUser),
-			"remove these variables from the Railway service and restart the sessions; reviewer credentials belong only in `gbai secrets set`"},
-		remoteCheck{"reviewer home mode", fmt.Sprintf(`mode=$(stat -c %%a %s 2>/dev/null) || { echo "%s is missing"; exit 1; }
-[ "$mode" = 700 ] || { echo "mode is $mode, expected 700"; exit 1; }`, q(u.s.ReviewerHome), u.s.ReviewerHome), provision},
+			"remove these variables from the Railway service and restart the sessions; the owner's gh login lives in gh's config and model credentials only in `gbai secrets set`"},
+		remoteCheck{"secrets dir mode", fmt.Sprintf(`[ -e %s ] || exit 0
+mode=$(stat -c %%a %s) || exit 1
+[ "$mode" = 700 ] || { echo "mode is $mode, expected 700"; exit 1; }`, q(u.s.SecretsDir), q(u.s.SecretsDir)),
+			"run `gbai secrets set` again or restrict " + u.s.SecretsDir + " to its owner (mode 700)"},
 	)
 	return checks
 }

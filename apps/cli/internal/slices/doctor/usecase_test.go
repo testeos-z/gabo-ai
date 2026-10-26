@@ -20,11 +20,11 @@ func (f fakeLocal) LookPath(name string) (string, error) {
 }
 
 var settings = Settings{
-	LocalOrca:    "orca-ide",
-	Remote:       true,
-	Users:        []User{{Name: "orca"}, {Name: "reviewer", UID: 2000}, {Name: "reviewer-ci", UID: 2001}},
-	OrcaUser:     "orca",
-	ReviewerHome: "/data/reviewer",
+	LocalOrca:  "orca-ide",
+	Remote:     true,
+	Users:      []User{{Name: "orca"}},
+	OrcaUser:   "orca",
+	SecretsDir: "/data/home/secrets",
 }
 
 var allTools = fakeLocal{"railway": true, "gh": true, "orca-ide": true, "go": true}
@@ -44,7 +44,7 @@ func TestDoctorAllPass(t *testing.T) {
 	if rep.Failed() {
 		t.Fatalf("report = %+v", rep)
 	}
-	if len(rep.Checks) != 5+8 {
+	if len(rep.Checks) != 5+4 {
 		t.Fatalf("checks = %d: %+v", len(rep.Checks), rep.Checks)
 	}
 	for _, s := range sh.Calls {
@@ -61,17 +61,17 @@ func TestDoctorAllPass(t *testing.T) {
 
 func TestDoctorReportsEachFailureIndependently(t *testing.T) {
 	t.Parallel()
-	results := make([]kernel.Result, 8)
-	results[2] = kernel.Result{ExitCode: 1, Stdout: []byte("uid is 1500, expected 2000\n")}
-	results[6] = kernel.Result{ExitCode: 1, Stdout: []byte("visible: GH_TOKEN CLAUDE_CODE_OAUTH_TOKEN\n")}
+	results := make([]kernel.Result, 4)
+	results[0] = kernel.Result{ExitCode: 1, Stdout: []byte("user orca does not exist\n")}
+	results[2] = kernel.Result{ExitCode: 1, Stdout: []byte("visible: GH_TOKEN CLAUDE_CODE_OAUTH_TOKEN\n")}
 	sh := &kerneltest.RemoteShell{Results: results}
 	runner := &kerneltest.Runner{Result: kernel.Result{ExitCode: 1}}
 	rep := NewUseCase(fakeLocal{"gh": true}, runner, sh, settings).Run(context.Background())
 	m := byName(rep)
 	expect := map[string]Status{
 		"local: railway": StatusFail, "local: gh": StatusPass, "local: orca-ide": StatusWarn, "local: go": StatusWarn,
-		"local: gh auth status": StatusFail, "remote: sudo": StatusPass, "remote: user reviewer": StatusFail,
-		"remote: user orca": StatusPass, "remote: service env tokens": StatusFail, "remote: reviewer home mode": StatusPass,
+		"local: gh auth status": StatusFail, "remote: user orca": StatusFail, "remote: legacy reviewer sudo removed": StatusPass,
+		"remote: service env tokens": StatusFail, "remote: secrets dir mode": StatusPass,
 	}
 	for name, want := range expect {
 		if got := m[name]; got.Status != want {
@@ -81,7 +81,7 @@ func TestDoctorReportsEachFailureIndependently(t *testing.T) {
 			t.Errorf("%s has no fix hint", name)
 		}
 	}
-	if d := m["remote: user reviewer"].Detail; d != "uid is 1500, expected 2000" {
+	if d := m["remote: user orca"].Detail; d != "user orca does not exist" {
 		t.Errorf("detail = %q", d)
 	}
 	if !rep.Failed() {
@@ -112,24 +112,25 @@ func TestDoctorScripts(t *testing.T) {
 	for i, c := range sh.Calls {
 		bodies[i] = c.Script.Body
 	}
-	if !strings.Contains(bodies[2], "id -u 'reviewer'") || !strings.Contains(bodies[2], `"2000"`) {
-		t.Errorf("user script = %s", bodies[2])
+	if !strings.Contains(bodies[0], "id -u 'orca'") || strings.Contains(bodies[0], "expected") {
+		t.Errorf("user script = %s", bodies[0])
 	}
-	if strings.Contains(bodies[1], `"0"`) {
-		t.Errorf("unmanaged uid must not be compared: %s", bodies[1])
+	for _, p := range []string{"/etc/sudoers.d/gbai-reviewer", "/usr/local/libexec/gbai/review-run", "/usr/local/libexec/gbai/review-ci"} {
+		if !strings.Contains(bodies[1], p) {
+			t.Errorf("legacy script lacks %s: %s", p, bodies[1])
+		}
 	}
-	if !strings.Contains(bodies[4], kernel.SudoersPath) || !strings.Contains(bodies[4], "visudo -c") {
-		t.Errorf("sudoers script = %s", bodies[4])
-	}
-	if !strings.Contains(bodies[5], kernel.ReviewRunPath) || !strings.Contains(bodies[5], "stat -c %U") {
-		t.Errorf("review-run script = %s", bodies[5])
-	}
-	tok := bodies[6]
+	tok := bodies[2]
 	if !strings.Contains(tok, "pgrep -u 'orca'") || strings.Index(tok, "cut -d= -f1") > strings.Index(tok, "grep -x") {
 		t.Errorf("token script must strip values before matching names: %s", tok)
 	}
-	if !strings.Contains(bodies[7], "stat -c %a '/data/reviewer'") {
-		t.Errorf("home script = %s", bodies[7])
+	if !strings.Contains(bodies[3], "stat -c %a '/data/home/secrets'") || !strings.Contains(bodies[3], "|| exit 0") {
+		t.Errorf("secrets dir script = %s", bodies[3])
+	}
+	for _, b := range bodies {
+		if strings.Contains(b, "reviewer-ci") || strings.Contains(b, "visudo") {
+			t.Errorf("single-user doctor still checks the three-user model: %s", b)
+		}
 	}
 }
 

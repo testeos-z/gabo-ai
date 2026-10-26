@@ -27,7 +27,7 @@ func (f *fakeGitHub) LatestStatus(_ context.Context, sha, _ string) (string, err
 	return f.statuses[sha], f.statusErr
 }
 
-func (f *fakeGitHub) LastComment(_ context.Context, n int, _ string) (string, error) {
+func (f *fakeGitHub) LastVerdict(_ context.Context, n int, _ string) (string, error) {
 	return f.comments[n], nil
 }
 

@@ -31,7 +31,7 @@ func TestCommandDryRunPrintsPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if !strings.Contains(out, "# step: sudoers") || len(shell.Calls) != 0 || len(bin.calls) != 0 {
+	if !strings.Contains(out, "# step: legacy") || len(shell.Calls) != 0 || len(bin.calls) != 0 {
 		t.Fatalf("output = %q, calls = %d, reads = %d", out, len(shell.Calls), len(bin.calls))
 	}
 }
@@ -47,7 +47,7 @@ func TestCommandDefaultsToRunningExecutable(t *testing.T) {
 	if len(bin.calls) != 1 || bin.calls[0] != "/proc/self/exe" {
 		t.Fatalf("ReadBinary calls = %v", bin.calls)
 	}
-	if !strings.HasSuffix(out, "ok sudoers\nok skills\n") {
+	if !strings.HasSuffix(out, "ok legacy\nok skills\n") {
 		t.Fatalf("output = %q", out)
 	}
 }

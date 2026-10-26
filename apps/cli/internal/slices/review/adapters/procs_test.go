@@ -35,6 +35,9 @@ func TestProcFSListParsesStatAndStatus(t *testing.T) {
 	root := t.TempDir()
 	writeProc(t, root, "1", "1 (init) S 0 1 1", "0")
 	writeProc(t, root, "42", "42 (evil) name) (x) S 7 42 42", "2001")
+	if err := os.Symlink("/state/ci/work/pr-1-0123456", filepath.Join(root, "42", "cwd")); err != nil {
+		t.Fatal(err)
+	}
 	if err := os.MkdirAll(filepath.Join(root, "self"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +48,7 @@ func TestProcFSListParsesStatAndStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []review.Process{{PID: 1, PPID: 0, UID: 0}, {PID: 42, PPID: 7, UID: 2001}}
+	want := []review.Process{{PID: 1, PPID: 0, UID: 0}, {PID: 42, PPID: 7, UID: 2001, Cwd: "/state/ci/work/pr-1-0123456"}}
 	if !slices.Equal(got, want) {
 		t.Fatalf("List() = %+v", got)
 	}

@@ -23,15 +23,18 @@ func (t *trace) has(prefix string) bool {
 }
 
 type fakeGitHub struct {
-	t          *trace
-	pr         PullRequest
-	prErr      error
-	statusErr  error
-	mergeErr   error
-	statuses   []Status
-	comments   []string
-	approvedAt string
-	mergedAt   string
+	t         *trace
+	pr        PullRequest
+	prErr     error
+	statusErr error
+	mergeErr  error
+	listErr   error
+	login     string
+	loginErr  error
+	statuses  []Status
+	comments  []Comment // posted by this run, signed with login
+	listed    []Comment // when set, Comments returns it instead of the posted comments
+	mergedAt  string
 }
 
 func (f *fakeGitHub) PullRequest(_ context.Context, n int) (PullRequest, error) {
@@ -47,14 +50,30 @@ func (f *fakeGitHub) SetStatus(_ context.Context, sha string, s Status) error {
 
 func (f *fakeGitHub) Comment(_ context.Context, n int, body string) error {
 	f.t.add("gh.comment %d", n)
-	f.comments = append(f.comments, body)
+	f.comments = append(f.comments, Comment{Author: f.login, Body: body})
 	return nil
 }
 
-func (f *fakeGitHub) Approve(_ context.Context, n int, sha string) error {
-	f.t.add("gh.approve %d %s", n, sha)
-	f.approvedAt = sha
-	return nil
+func (f *fakeGitHub) Comments(_ context.Context, n int) ([]Comment, error) {
+	f.t.add("gh.list-comments %d", n)
+	if f.listed != nil {
+		return f.listed, f.listErr
+	}
+	return f.comments, f.listErr
+}
+
+func (f *fakeGitHub) Login(context.Context) (string, error) {
+	f.t.add("gh.login")
+	return f.login, f.loginErr
+}
+
+// bodies returns the bodies of the comments posted by the run.
+func (f *fakeGitHub) bodies() []string {
+	out := make([]string, 0, len(f.comments))
+	for _, c := range f.comments {
+		out = append(out, c.Body)
+	}
+	return out
 }
 
 func (f *fakeGitHub) Merge(_ context.Context, n int, sha string) error {
@@ -65,13 +84,20 @@ func (f *fakeGitHub) Merge(_ context.Context, n int, sha string) error {
 
 type fakeGit struct {
 	t           *trace
+	guardErr    error
 	prepareErr  error
 	addErr      error
 	conflict    bool
 	mergeErr    error
 	snapshot    Snapshot
 	snapshotErr error
+	removeErr   error
 	removed     []string
+}
+
+func (f *fakeGit) Guard(_ context.Context, integration string) error {
+	f.t.add("git.guard %s", integration)
+	return f.guardErr
 }
 
 func (f *fakeGit) Prepare(_ context.Context, n int, integration string) error {
@@ -97,7 +123,7 @@ func (f *fakeGit) Snapshot(_ context.Context, name, integration, sha string) (Sn
 func (f *fakeGit) RemoveWorktree(_ context.Context, name string) error {
 	f.t.add("git.remove %s", name)
 	f.removed = append(f.removed, name)
-	return nil
+	return f.removeErr
 }
 
 type fakeChecks struct {
