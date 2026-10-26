@@ -1,0 +1,88 @@
+name: Change request
+description: Propose a scoped feature, bug fix, documentation, or maintenance change for gbai-team.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form to propose a change with clear scope and acceptance criteria.
+        Submitting an issue does not grant `status:approved` or authorize implementation;
+        approval remains a separate maintainer decision.
+
+  - type: dropdown
+    id: change-type
+    attributes:
+      label: Change type
+      description: Select the primary kind of work.
+      options:
+        - Feature or capability
+        - Bug fix
+        - Documentation or specification
+        - Maintenance or tooling
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: State the requested outcome in one sentence.
+      placeholder: What should change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context and problem
+      description: Explain the user need, current behavior, or problem. For bugs, include steps to reproduce and expected versus actual behavior.
+      placeholder: What motivates this change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-outcome
+    attributes:
+      label: Proposed outcome
+      description: Describe the result you want, without prescribing unnecessary implementation details.
+      placeholder: What should be true when this work is complete?
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: Identify included work, explicit exclusions, and relevant compatibility constraints.
+      placeholder: What is in scope, and what is not?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: List observable conditions that must be satisfied.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification plan
+      description: State how the outcome should be tested or otherwise verified; distinguish code, tests, local integration, and production evidence where relevant.
+      placeholder: Which checks or evidence will demonstrate completion?
+    validations:
+      required: true
+
+  - type: textarea
+    id: related-work
+    attributes:
+      label: Related issues, PRs, or references
+      description: Link relevant work or source material, if any.
+      placeholder: Add URLs or issue references.
+    validations:
+      required: false
