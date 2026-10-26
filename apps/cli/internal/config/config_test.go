@@ -74,8 +74,8 @@ func TestParseValidationErrors(t *testing.T) {
 		yaml string
 		want string
 	}{
-		{"missing project", strings.Replace(minimal, "project_id: p1", "project_id: \"\"", 1), "server.railway.project_id"},
-		{"missing service", strings.Replace(minimal, "service_id: s1", "service_id: \"\"", 1), "server.railway.service_id"},
+		{"unsafe project", strings.Replace(minimal, "project_id: p1", "project_id: \"p;1\"", 1), "server.railway.project_id"},
+		{"unsafe service", strings.Replace(minimal, "service_id: s1", "service_id: \"s 1\"", 1), "server.railway.service_id"},
 		{"bad repo", strings.Replace(minimal, "cappy-lab/vulcam", "vulcam", 1), "repo.name"},
 		{"bad bot", strings.Replace(minimal, "login: vulcambot", "login: \"bad login\"", 1), "bot.login"},
 		{"bad runtime", minimal + "runtimes:\n  coder: opencode\n", "runtimes.coder"},
@@ -280,5 +280,78 @@ func TestParseParallelism(t *testing.T) {
 	}
 	if _, err := Parse([]byte(minimal + "parallelism: -1\n")); err == nil || !strings.Contains(err.Error(), "parallelism") {
 		t.Fatalf("negative parallelism: error = %v", err)
+	}
+}
+
+// localOnly has no server.*, users.*, bot.* or sessions.* keys (TD1).
+const localOnly = `
+repo:
+  name: testeos-z/gbai-team
+`
+
+func TestParseLoadsLocalOnlyConfig(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(localOnly))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want a local-only config to load", err)
+	}
+	if cfg.Server.Railway != (Railway{}) {
+		t.Errorf("server.railway = %+v, want empty", cfg.Server.Railway)
+	}
+	if cfg.HasCloud() {
+		t.Error("HasCloud() = true, want false without server keys")
+	}
+}
+
+func TestRequireCloudNamesEachMissingKey(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(localOnly))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = cfg.RequireCloud()
+	if err == nil {
+		t.Fatal("RequireCloud() error = nil, want missing keys")
+	}
+	for _, want := range []string{
+		"✗ server.railway.project_id missing",
+		"✗ server.railway.environment_id missing",
+		"✗ server.railway.service_id missing",
+		"next: configure slots.agent_host",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("RequireCloud() error = %q, want it to contain %q", err, want)
+		}
+	}
+}
+
+func TestRequireCloudAcceptsCloudFixtures(t *testing.T) {
+	t.Parallel()
+	for name, load := range map[string]func() (Config, error){
+		"minimal": func() (Config, error) { return Parse([]byte(minimal)) },
+		"example": func() (Config, error) { return Load(filepath.Join("..", "..", "gbai.example.yaml")) },
+	} {
+		cfg, err := load()
+		if err != nil {
+			t.Fatalf("%s: load error = %v", name, err)
+		}
+		if !cfg.HasCloud() {
+			t.Errorf("%s: HasCloud() = false, want true", name)
+		}
+		if err := cfg.RequireCloud(); err != nil {
+			t.Errorf("%s: RequireCloud() error = %v", name, err)
+		}
+	}
+}
+
+func TestRequireCloudReportsOnlyTheMissingKey(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(strings.Replace(minimal, "service_id: s1", "service_id: \"\"", 1)))
+	if err != nil {
+		t.Fatalf("Parse() error = %v, want a partial server block to load", err)
+	}
+	got := cfg.RequireCloud()
+	if got == nil || got.Error() != "✗ server.railway.service_id missing\nnext: configure slots.agent_host" {
+		t.Fatalf("RequireCloud() error = %q", got)
 	}
 }

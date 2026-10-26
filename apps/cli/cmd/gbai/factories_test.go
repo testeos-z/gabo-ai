@@ -9,6 +9,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/sessions"
 )
 
 // status is read-only: when the owner login cannot be resolved, only the
@@ -48,5 +49,35 @@ func TestStatusDegradesWhenTheOwnerLoginLookupFails(t *testing.T) {
 		if c.Command.Name == "gh" && slices.Contains(c.Command.Args, "comments") {
 			t.Fatalf("verdict looked up without an owner login: %q", c.Command.Args)
 		}
+	}
+}
+
+// A local-only config (TD1) loads; every command that reaches the cloud
+// server fails up front naming the missing key and the next step.
+func TestCloudCommandsNameTheMissingServerKey(t *testing.T) {
+	t.Parallel()
+	cfg, err := config.Parse([]byte("repo:\n  name: testeos-z/gbai-team\n"))
+	if err != nil {
+		t.Fatalf("local-only config error = %v", err)
+	}
+	r := &kerneltest.Runner{}
+	f := newFactories(deps{runner: r}, func() (config.Config, error) { return cfg, nil })
+	ctx := context.Background()
+	for name, build := range map[string]func() error{
+		"secrets":        func() error { _, err := f.secrets(ctx); return err },
+		"provision":      func() error { _, err := f.provision(ctx); return err },
+		"sessions cloud": func() error { _, err := f.sessions(ctx, sessions.ModeCloud); return err },
+	} {
+		err := build()
+		if err == nil || !strings.Contains(err.Error(), "✗ server.railway.project_id missing") ||
+			!strings.Contains(err.Error(), "next: configure slots.agent_host") {
+			t.Errorf("%s factory error = %v, want the missing key and next step", name, err)
+		}
+	}
+	if _, err := f.sessions(ctx, sessions.ModeLocal); err != nil {
+		t.Errorf("sessions local factory error = %v, want no cloud keys needed", err)
+	}
+	if len(r.Calls) != 0 {
+		t.Errorf("commands ran before the config check: %+v", r.Calls)
 	}
 }

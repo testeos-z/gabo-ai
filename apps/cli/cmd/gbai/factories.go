@@ -47,7 +47,7 @@ type factories struct {
 func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 	return factories{
 		secrets: func(context.Context) (*secrets.UseCase, error) {
-			cfg, err := loadConfig()
+			cfg, err := loadCloudConfig(loadConfig)
 			if err != nil {
 				return nil, err
 			}
@@ -61,7 +61,7 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			), nil
 		},
 		provision: func(context.Context) (*provision.UseCase, error) {
-			cfg, err := loadConfig()
+			cfg, err := loadCloudConfig(loadConfig)
 			if err != nil {
 				return nil, err
 			}
@@ -91,7 +91,11 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			}), nil
 		},
 		sessions: func(_ context.Context, mode sessions.Mode) (*sessions.UseCase, error) {
-			cfg, err := loadConfig()
+			load := loadConfig
+			if mode == sessions.ModeCloud {
+				load = func() (config.Config, error) { return loadCloudConfig(loadConfig) }
+			}
+			cfg, err := load()
 			if err != nil {
 				return nil, err
 			}
@@ -187,6 +191,19 @@ func newFactories(d deps, loadConfig func() (config.Config, error)) factories {
 			}), nil
 		},
 	}
+}
+
+// loadCloudConfig loads the config for a command that reaches the cloud
+// server; a local-only config fails naming each missing server key.
+func loadCloudConfig(loadConfig func() (config.Config, error)) (config.Config, error) {
+	cfg, err := loadConfig()
+	if err != nil {
+		return config.Config{}, err
+	}
+	if err := cfg.RequireCloud(); err != nil {
+		return config.Config{}, err
+	}
+	return cfg, nil
 }
 
 // loginlessGitHub answers every verdict lookup with the owner login error, so

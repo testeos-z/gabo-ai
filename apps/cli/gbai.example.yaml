@@ -11,6 +11,10 @@
 # Missing files are skipped; an unknown key fails and names its file. Defaults
 # and validation run once on the merged result. `--config <file>` reads exactly
 # that one file. `gbai config` shows the files used and the resolved values.
+#
+# server.* is optional: a local-only config leaves it out, and commands that
+# reach the cloud server (provision, secrets, sessions --mode cloud) then fail
+# with `✗ <key> missing` and `next: configure slots.agent_host`.
 server:
   railway:
     project_id: 21669483-8aa3-4bc9-8b1c-63d1785a857b

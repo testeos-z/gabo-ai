@@ -80,6 +80,34 @@ type Railway struct {
 	ServiceID     string `yaml:"service_id"`
 }
 
+type railwayKey struct{ field, value string }
+
+func (r Railway) keys() []railwayKey {
+	return []railwayKey{
+		{"server.railway.project_id", r.ProjectID},
+		{"server.railway.environment_id", r.EnvironmentID},
+		{"server.railway.service_id", r.ServiceID},
+	}
+}
+
+// HasCloud reports whether every server key is set.
+func (c Config) HasCloud() bool { return c.RequireCloud() == nil }
+
+// RequireCloud fails with one `✗ <key> missing` line per unset server key
+// and the next step, for commands that reach the cloud server.
+func (c Config) RequireCloud() error {
+	var lines []string
+	for _, k := range c.Server.Railway.keys() {
+		if k.value == "" {
+			lines = append(lines, "✗ "+k.field+" missing")
+		}
+	}
+	if len(lines) == 0 {
+		return nil
+	}
+	return errors.New(strings.Join(append(lines, "next: configure slots.agent_host"), "\n"))
+}
+
 // Users lists the OS users on the server. Single-user mode: the reviewer
 // runs as the orca user, the same OS user as the agent sessions.
 type Users struct {
@@ -253,10 +281,11 @@ func (c Config) validate() error {
 			errs = append(errs, fmt.Errorf("%s: %s", field, msg))
 		}
 	}
-	r := c.Server.Railway
-	check(idPattern.MatchString(r.ProjectID), "server.railway.project_id", "required id")
-	check(idPattern.MatchString(r.EnvironmentID), "server.railway.environment_id", "required id")
-	check(idPattern.MatchString(r.ServiceID), "server.railway.service_id", "required id")
+	// Cloud keys are optional (TD1): a local-only config loads, and the
+	// commands that reach the server call RequireCloud.
+	for _, k := range c.Server.Railway.keys() {
+		check(k.value == "" || idPattern.MatchString(k.value), k.field, "must be an id of letters, digits and dashes")
+	}
 
 	u := c.Users.Orca
 	check(userPattern.MatchString(u.Name), "users.orca.name", "must be a lowercase POSIX user name")

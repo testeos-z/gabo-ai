@@ -174,16 +174,18 @@ func TestLoadLayersUnknownKeyNamesTheFile(t *testing.T) {
 
 func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
 	t.Parallel()
-	// Neither file is valid alone; merged they are.
+	// The server-only system file is invalid alone (no repo.name); merged
+	// with the project file it is valid.
+	system := "server:\n  railway:\n    project_id: p1\n    environment_id: e1\n    service_id: s1\n"
 	r := files{
-		"/etc/gbai/gbai.yaml": "server:\n  railway:\n    project_id: p1\n    environment_id: e1\n    service_id: s1\n",
+		"/etc/gbai/gbai.yaml": system,
 		"/src/p/gbai.yaml":    "repo:\n  name: o/r\n",
 	}
 	if _, err := LoadLayers(r, threeLayers()); err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "repo:\n  name: o/r\n"}, threeLayers()); err == nil ||
-		!strings.Contains(err.Error(), "server.railway.project_id") {
+	if _, err := LoadLayers(files{"/etc/gbai/gbai.yaml": system}, threeLayers()); err == nil ||
+		!strings.Contains(err.Error(), "repo.name") {
 		t.Fatalf("merged validation error = %v", err)
 	}
 }
