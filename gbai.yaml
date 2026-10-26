@@ -45,8 +45,9 @@ review:
     - go -C apps/cli build ./...
     - go -C apps/cli vet ./...
     - go -C apps/cli test ./...
-  # Merges only into repo.integration_branch (dev), never main (TRD D13).
-  auto_merge: true
+  # OWNER: set true (here and REVIEWER_AUTO_MERGE in the reviewer skill config.env)
+  # to let the reviewer merge clean heads into dev; it never merges into main (TRD D13).
+  auto_merge: false
   human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gbai.yaml, .claude/]
 
 # Git email -> alias (TRD D10). OWNER: change "Leo" if you prefer another alias.
