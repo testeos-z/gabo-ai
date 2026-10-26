@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the `reviewer_placement` slo
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the coverage check in `gbai generate` compares them.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
 - A review request is exactly `PR #<n> head <40-hex sha>`; anything else is refused before any command runs.
 - The review runs the installed scripts of the user-level `gbai-reviewer` skill, never a copy from the repository under review (D20).
 - One verdict per pushed head (R26): a head that moved or already has a verdict is skipped.

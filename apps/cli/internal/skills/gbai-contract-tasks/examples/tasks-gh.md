@@ -21,10 +21,10 @@ gh api -X POST repos/$R/issues/<n>/dependencies/blocked_by -F issue_id=<blocker 
 
 ### read unblocked
 
-Open issues without a `status:*` or `needs-user` label whose open blockers count is zero:
+Open issues without a `status:*` or `needs-user` label whose open blockers count is zero, sorted by the `T###` id in the title (plan order):
 
 ```bash
-gh issue list -R $R --state open --json number,labels
+gh issue list -R $R --state open --limit 500 --json number,title,labels --jq 'sort_by(.title)'
 gh api repos/$R/issues/<n>/dependencies/blocked_by --jq '[.[]|select(.state=="open")]|length'
 ```
 
@@ -49,7 +49,7 @@ gh issue comment <n> -R $R --body "<!-- gbai-progress --> <one line>"
 
 ### change status
 
-- DONE, only after the PR merged: `gh issue close <n> -R $R --reason completed --comment "DONE via PR #<pr>"`.
+- DONE, only after the PR merged: `gh issue edit <n> -R $R --remove-label status:in-progress`, then `gh issue close <n> -R $R --reason completed --comment "DONE via PR #<pr>"`.
 - BLOCKED: `gh issue edit <n> -R $R --add-label status:blocked --remove-label status:in-progress`, then a comment with the reason.
 
 ### link PR

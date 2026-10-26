@@ -32,15 +32,18 @@ Check `baseRefName` equals `$B` first and refuse otherwise, then:
 
 ```bash
 gh pr merge <pr> -R $R --squash --match-head-commit <sha>
+gh pr view <pr> -R $R --json state,mergeCommit --jq '[.state,.mergeCommit.oid]|@tsv'
 ```
+
+The read-back must show `MERGED`; its `mergeCommit.oid` is the merged SHA to return.
 
 ### delete branch
 
-After the merge only:
+After the merge only: confirm `gh pr view <pr> -R $R --json state --jq .state` is `MERGED`, remove the task worktree, then:
 
 ```bash
 git push origin --delete <branch>
 git branch -d <branch>
 ```
 
-Use lower-case `-d`, never `-D`.
+Use lower-case `-d`, never `-D`. After a squash merge `-d` refuses, because the branch commits are not ancestors of `$B`; report the local branch as left behind with that reason instead of forcing it.

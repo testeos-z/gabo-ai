@@ -116,6 +116,11 @@ func TestContractsListOperationsAndExamplesCoverThem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, n := range Names() {
+		if _, ok := contracts[n]; strings.HasPrefix(n, "gbai-contract-") && !ok {
+			t.Errorf("%s: contract skill not listed in contracts", n)
+		}
+	}
 	byPath := map[string]string{}
 	for _, f := range files {
 		byPath[f.Path] = string(f.Data)

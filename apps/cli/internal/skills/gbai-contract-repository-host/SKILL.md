@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the `repository_host` slot (
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the coverage check in `gbai generate` compares them.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
 - Pull requests target `repo.integration_branch`. Never open a PR to, merge into or push to `main` (D13).
 - Never force-push. Delete only merged branches the workflow created.
 - Re-read after every write: the PR must show the expected state.
