@@ -4,7 +4,7 @@
 |---|---|
 | status | Draft |
 | owner | gbai-frontend |
-| version | 0.5 |
+| version | 0.6 |
 | date | 2026-10-27 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [DB_SCHEMA](DB_SCHEMA.md), [APP_FLOW](APP_FLOW.md) |
 
@@ -99,9 +99,9 @@ Amended (owner 2026-10-27), U16, PRD R32, R34, R36. There is still no setup scre
 - **Entry (a), terminal.** Steps 1 and 2 below.
 - **Entry (b), pasted prompt.** The user pastes the published setup prompt into their agent; the agent installs the CLI, runs `gabo init` (step 1) and continues at step 3. The published prompt is the same literal text embedded in the CLI: one source, shipped in the binary and published in the documentation.
 
-1. The user installs the gabo CLI and runs `gabo init` in the project. It copies the skill catalog, writes the short neutral entry file, installs the user-level `gabo-reviewer` skill and ends with the next step: `next: open your agent in this project and ask it to configure gabo-ai`. If a config already exists it writes nothing (no catalog copy, no entry file, no `gabo-reviewer` reinstall), exits non-zero and says `next: run gabo check`. Refreshing the catalog after an upgrade is PRD open question 11.
+1. The user installs the gabo CLI and runs `gabo init` in the project. It copies the skill catalog, writes the version stamp, installs the user-level `gabo-reviewer` skill and prints the embedded setup prompt as the next step (updated owner 2026-10-27, issue #74; earlier it wrote an entry file). In an existing project it never touches the config: it refreshes the catalog and the reviewer skill when the stamp differs from the CLI version, and otherwise changes nothing and exits 0.
 2. The user opens their agent (Claude Code, Pi or another engine with a runtime skill) and asks it to configure gabo-ai.
-3. The agent follows the entry file. The setup skill runs the setup question burst one question at a time (identity, slots and adapters, runtimes, `mode`, `plan_change.*`, `language`), with suggestions and no preselected value (R12).
+3. The agent follows the setup prompt. The setup skill runs the setup question burst one question at a time (identity, slots and adapters, runtimes, `mode`, `plan_change.*`, `language`), with suggestions and no preselected value (R12).
 4. The config-writer skill writes the global user file and `gabo.yaml`.
 5. The runtime skill builds the agents of the neutral agent spec in the engine's format from fixed templates; for an engine without a runtime skill, the runtime builder writes one first (PRD R35).
 6. The agent runs `gabo check`, fixes what fails and reruns it until it passes; failures use the section 4 shape.
@@ -127,8 +127,8 @@ Amended (owner 2026-10-27, U7, PRD R31–R33). The CLI has three commands. It wr
 
 | command | purpose | source |
 |---|---|---|
-| `gabo init` | Copies the embedded skill catalog into a neutral project location, byte for byte and deterministically; writes the short engine-neutral entry file (which skills to load, which agents to create, which config files to write, how to verify); installs the user-level `gabo-reviewer` skill; prints the next step. If a config already exists it writes nothing, exits non-zero and points to `gabo check` | PRD R32 |
-| `gabo check` | Read-only, engine-neutral validation: the global user file and `gabo.yaml` against their JSON Schemas, every agent of the neutral agent spec present, nothing stale against the templates. Writes nothing; non-zero exit on any failure. Usable by the user, agents, the reviewer and CI | PRD R33 |
+| `gabo init` | Fresh project: copies the embedded skill catalog into a neutral project location, writes the version stamp, installs the user-level `gabo-reviewer` skill and prints the embedded setup prompt. Existing project: never touches the config; refreshes the catalog and reinstalls the reviewer skill when the stamp differs from the CLI version, otherwise changes nothing and exits 0. The same version always produces the same files (updated issue #74; the entry file is superseded) | PRD R32 |
+| `gabo check` | Read-only, engine-neutral validation of four things: the global user file and `gabo.yaml` against their JSON Schemas, every agent of the neutral agent spec present, slot coverage, and the catalog version stamp matching the CLI version (updated issue #74). Writes nothing; non-zero exit on any failure. Usable by the user, agents, the reviewer and CI | PRD R33 |
 | `gabo version` | Print the version | — |
 
 The CLI also carries the setup prompt as embedded text, identical to the one published in the documentation (PRD R36); this adds no command. Command flags and how the embedded text is exposed are TRD details.
@@ -186,8 +186,10 @@ Format: `✗ <what happened>` on one line, then `why:` and `next:` lines, then o
 | Coverage gap (setup agent; earlier `gbai generate`) | `✗ adapter tasks-gh.md does not cover: link PR, verify by re-read` · `next: add those operations or write them with the assistant` |
 | Traceability gap (reported by the directiva agent, D19) | `✗ planning step blocked` · `why: R7 has no task; US-012 has no requirement` · `next: close the gaps; the check reruns before the next step` |
 | Missing config (`gabo check`) | `✗ no gabo.yaml found` · `next: run gabo init, then ask your agent to configure gabo-ai` (updated owner 2026-10-27; earlier: paste the setup prompt) |
-| Existing config (`gabo init`, non-zero exit) | `✗ gabo.yaml already exists; nothing written` · `why: gabo init only sets up a project without a config` · `next: run gabo check` |
-| Missing or stale agent (`gabo check`) | `✗ agent gabo-reviewer is stale against its template` · `next: ask your agent to rebuild it with the runtime skill, then rerun gabo check` |
+| Catalog refreshed (`gabo init`, exit 0) | `catalog refreshed from <old> to <new>; reviewer skill reinstalled` · `next: ask your agent to rebuild the agents, then run gabo check` |
+| Already up to date (`gabo init`, exit 0) | `catalog already at <version>; nothing changed` |
+| Version stamp mismatch (`gabo check`) | `✗ catalog version <stamp> does not match gabo <version>` · `next: run gabo init, then ask your agent to rebuild` |
+| Missing agent (`gabo check`) | `✗ agent gabo-reviewer is missing` · `next: ask your agent to build it with the runtime skill, then rerun gabo check` |
 | Engine not supported (runtime builder) | `✗ cannot add a runtime for <engine>` · `why: it has no subagent and skill support, or an equivalent` · `next: use Claude Code, Pi or another engine with subagents and skills` |
 | Invalid config (agent edited the YAML during the work) | `✗ gbai.yaml: plan_change.scope: "teams" is not one of task, group, global` · `next: fix the key, then rerun gbai check` |
 
