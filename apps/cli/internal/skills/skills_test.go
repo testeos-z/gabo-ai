@@ -13,10 +13,10 @@ import (
 )
 
 var want = []string{
-	"gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup", "gbai-orca-inbox",
+	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
 }
 
 // contracts maps each contract skill to its TRD 9.1 operations, in order, and
@@ -128,10 +128,19 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"## Task Close", "PR #<n> merged", "repository_host", "never `--force`", "--git-common-dir", "resumable",
 			"`worktree.keep`", "before any removal", "unverified:",
 			"D23", "only writer of DONE", "lock error", "retry once",
+			// T016: the methodology comes from the slot; the TRD 9.2 outcome and the round limit stay.
+			"`gabo-methodology`", "`Closes #<n>`", "summary", "resources created", "test databases",
+			"fix rounds used", "Max 4 fix rounds",
 		},
 		"gabo-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
 			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
+			// T024: J3, J8, J10 and J11 through the skill alone (no gbai command, no state dir).
+			"blocked-by links", "before each coder round", "rule 1", "rule 2", "rule 3",
+			"4 fix rounds", "Unverified writes", "test databases", "no `gbai` command",
+			"no state dir", "D15", "D17", "skips DONE", "reattach", "disagreement",
+			"never guess", "TRD 9.2", "save the wave report", "`gbai/trace/<wave>`",
+			"`gbai/ledger/<wave>`", "merged tasks still open",
 		},
 		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
 		"gabo-assistant/SKILL.md": {
@@ -157,6 +166,12 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"filter by `mode`, `wave` and `task`", "user/preferences",
 		},
 		"gabo-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gabo-methodology"},
+		// T055: the doc guide maps every product doc, the setup prompt and the catalog.
+		"gabo-doc-guide/SKILL.md": {
+			"docs/product/PRD.md", "docs/product/stories/", "docs/product/TRD.md", "docs/product/IMPLEMENTATION_PLAN.md",
+			"docs/product/DB_SCHEMA.md", "docs/product/UX_UI.md", "docs/product/APP_FLOW.md", "DESIGN.md",
+			"setup prompt", ".gbai/skills/", "adds no rule",
+		},
 		// The former cloud keys of the core config (DB_SCHEMA 2.3).
 		"gabo-contract-agent-host/SKILL.md": {
 			"server.railway", "users.orca", "bot.login", "sessions.{coder, reviewer, assistant}.prompt_file",
@@ -171,6 +186,24 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			if !strings.Contains(string(f.Data), s) {
 				t.Errorf("%s: missing %q", f.Path, s)
 			}
+		}
+	}
+}
+
+// The coder skill hardcodes no methodology (T016): the former ODD and
+// gentle-ai text is gone and lives only in the `methodology` slot adapter.
+func TestCoderSkillHasNoHardcodedMethodology(t *testing.T) {
+	t.Parallel()
+	b, err := content.ReadFile("gabo-coder/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{
+		"ODD", "Test-first", "test-first", "gentle-ai", "receipt-driven", "RDD",
+		"Work-unit commits", "Conventional Commits", "no AI attribution",
+	} {
+		if strings.Contains(string(b), s) {
+			t.Errorf("gabo-coder/SKILL.md: must not contain %q", s)
 		}
 	}
 }
@@ -252,6 +285,92 @@ func TestContractsListOperationsAndExamplesCoverThem(t *testing.T) {
 			if got := operations(doc); !slices.Equal(got, c.ops) {
 				t.Errorf("%s: operations %q, want %q", p, got, c.ops)
 			}
+		}
+	}
+}
+
+// The shipped direct_sessions adapter (T060) covers every contract operation
+// with the Orca CLI, and the retired gbai-orca-inbox skill is named nowhere in
+// the catalog.
+func TestDirectSessionsOrcaAdapter(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var adapter string
+	for _, f := range files {
+		if f.Path == "gabo-direct-sessions-orca/SKILL.md" {
+			adapter = string(f.Data)
+		}
+		if strings.Contains(string(f.Data), "orca-inbox") {
+			t.Errorf("%s: references the removed orca-inbox skill", f.Path)
+		}
+	}
+	if got, want := operations(adapter), contracts["gabo-contract-direct-sessions"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-direct-sessions-orca/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{
+		"orca terminal create", "--worktree path:<worktree>", "--title", "orca terminal send",
+		"--retry-request", "orca terminal show", "orca terminal read", "orca terminal close",
+		"orca terminal list", "never merge", "never force-push", "ledger",
+	} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-direct-sessions-orca/SKILL.md: missing %q", s)
+		}
+	}
+}
+
+// The shipped reviewer_placement adapter (T057) covers every contract
+// operation for the local single-user placement with the installed user-level
+// reviewer scripts, and names isolated mode as another adapter.
+func TestReviewerPlacementLocalAdapter(t *testing.T) {
+	t.Parallel()
+	data, err := content.ReadFile("gabo-reviewer-placement-local/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter := string(data)
+	if got, want := operations(adapter), contracts["gabo-contract-reviewer-placement"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-reviewer-placement-local/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{
+		`bash "${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha>`,
+		"PR #<n> head <40-hex sha>", "placement=local mode=single-user", "PREFLIGHT-FAILED",
+		"VERDICT PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>",
+		"gbai/reviewer", "isolated", "another adapter", "merges itself", "never posts the reviewer marker",
+	} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-reviewer-placement-local/SKILL.md: missing %q", s)
+		}
+	}
+}
+
+// The shipped agent_host adapter (T059) covers every contract operation for
+// agents on a Railway server driven through Orca, holds the former cloud
+// fields, and names secrets only by env var.
+func TestAgentHostRailwayOrcaAdapter(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var adapter string
+	for _, f := range files {
+		if f.Path == "gabo-agent-host-railway-orca/SKILL.md" {
+			adapter = string(f.Data)
+		}
+	}
+	if got, want := operations(adapter), contracts["gabo-contract-agent-host"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-agent-host-railway-orca/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{
+		"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gbai/gbai.yaml",
+		"RAILWAY_TOKEN", "railway status", "Railway MCP", "orca terminal create", "--environment",
+		"orca terminal close", "orca terminal list", "single-user", "isolated",
+	} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-agent-host-railway-orca/SKILL.md: missing %q", s)
 		}
 	}
 }

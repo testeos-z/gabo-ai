@@ -8,18 +8,23 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// Factory builds the use case lazily, so help never touches the filesystem.
-type Factory func(ctx context.Context) (*UseCase, error)
+// Factory builds the init run lazily, so help never touches the filesystem.
+type Factory func(ctx context.Context) (*Init, error)
 
 // NewCommand builds the `init` driving adapter. It has no flags (TRD 9.4).
 func NewCommand(factory Factory) *cobra.Command {
 	return &cobra.Command{
 		Use:   "init",
-		Short: "Copy the gbai skill catalog into this project",
-		Long: "Copy the embedded gbai skill catalog (without gabo-reviewer) into " + CatalogDir + "/\n" +
+		Short: "Install the reviewer skill and copy the gbai skill catalog into this project",
+		Long: "Install the embedded gabo-reviewer skill and its scripts at user level, in\n" +
+			"${XDG_DATA_HOME:-~/.local/share}/gbai/skills/gabo-reviewer/, never in the repository;\n" +
+			"on every run it replaces a copy whose " + ReviewerStamp + " differs from the binary version.\n" +
+			"Copy the embedded gbai skill catalog (without gabo-reviewer) into " + CatalogDir + "/\n" +
 			"and write the catalog version to " + StampFile + "; commit both.\n" +
 			"An older or missing stamp refreshes the catalog; a matching stamp changes nothing;\n" +
 			"a newer stamp changes nothing and exits 1 with the upgrade command.\n" +
+			"On a fresh project (no stamp, no " + ConfigFile + ") it prints the setup prompt to paste\n" +
+			"into your agent; it writes the prompt nowhere.\n" +
 			"init never creates or edits " + ConfigFile + " or the user config.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

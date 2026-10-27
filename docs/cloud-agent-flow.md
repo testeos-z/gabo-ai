@@ -40,7 +40,7 @@ Long-lived agent sessions (Orca terminals, user `orca`, started by `gbai session
 - **gbai-reviewer** — reviewer-side session; the review itself runs in detached terminals opened by `gbai review request`.
 - **gbai-assistant** — planning orchestrator (`gbai-assistant` skill) that keeps the six product docs current.
 
-Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, see the `gbai-orca-inbox` skill), never through terminal handles. Messages are notifications only.
+Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`), never through terminal handles. Messages are notifications only.
 
 ## Flow of one issue
 
@@ -88,7 +88,7 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, 
 | Audit merges (owner login only, verdict status and signed marker comment on merged heads, no coder merges) | `gbai audit` / `audit` |
 | Known gotchas | `gbai doctor` / `doctor` |
 | Which config files are read (user `$XDG_CONFIG_HOME/gbai/config.yaml`, else `~/.config/gbai/config.yaml` → project `gbai.yaml` at the git top-level; each overrides only the keys it sets; `--config <file>` reads exactly one file; `/etc/gbai/gbai.yaml` is no longer read, T006) and the resolved values, credential-looking values redacted | `gbai config` |
-| Copy the skill catalog (without `gabo-reviewer`) into `.gbai/skills/` with the version stamp `.gbai/VERSION`; refresh it when the stamp is older or missing (TRD 9.4) | `gbai init` |
+| Install the `gabo-reviewer` skill with its `scripts/` at user level (`${XDG_DATA_HOME:-~/.local/share}/gbai/skills/gabo-reviewer/`, never in the repository) on every run, replacing a copy whose own `VERSION` differs from the binary; copy the skill catalog (without `gabo-reviewer`) into `.gbai/skills/` with the version stamp `.gbai/VERSION`; refresh it when the stamp is older or missing (TRD 9.4) | `gbai init` |
 | Product docs for the planning agents | `gbai plan new|status` |
 | MCP server for the local agent | `gbai mcp` |
 

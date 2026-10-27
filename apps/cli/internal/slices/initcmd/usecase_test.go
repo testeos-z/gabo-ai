@@ -273,3 +273,43 @@ func TestRefusesSymlinkedCatalogPaths(t *testing.T) {
 		t.Fatalf(".gbai as a file: err %v writes %v", err, s.Writes)
 	}
 }
+
+// TestSetupPromptPrintedOnlyOnFreshProject: a fresh project gets the setup
+// prompt verbatim right after the next step; any other run never prints it,
+// and init writes it nowhere (TRD 9.4, D25).
+func TestSetupPromptPrintedOnlyOnFreshProject(t *testing.T) {
+	t.Parallel()
+	const prompt = "Set up gabo-ai.\n\n1. Run gabo init.\n"
+	runWith := func(s *memStore) (Output, error) {
+		return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "1.2.3", SetupPrompt: prompt}).Run(context.Background())
+	}
+	s := newStore(map[string]string{})
+	out, err := runWith(s)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "catalog copied to .gbai/skills (1.2.3)\n" +
+		"next: open your agent in this project and paste this prompt\n" + prompt
+	if got := joined(out) + "\n"; got != want {
+		t.Fatalf("output:\n%q\nwant:\n%q", got, want)
+	}
+	for name, data := range s.Files {
+		if strings.Contains(data, "Set up gabo-ai") {
+			t.Fatalf("init wrote the prompt to %s", name)
+		}
+	}
+	for name, files := range map[string]map[string]string{
+		"config without stamp":   {config: cfgYAML},
+		"config, older stamp":    {config: cfgYAML, stamp: "1.2.2\n"},
+		"config, matching stamp": {config: cfgYAML, stamp: "1.2.3\n"},
+		"stamp without config":   {stamp: "1.2.3\n"},
+	} {
+		out, err := runWith(newStore(files))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if strings.Contains(joined(out), "Set up gabo-ai") {
+			t.Fatalf("%s: prompt printed:\n%s", name, joined(out))
+		}
+	}
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
 )
 
@@ -87,10 +88,12 @@ func TestReviewNotifyNeedsNoConfig(t *testing.T) {
 	}
 }
 
-// runInit runs `gbai init` in a temporary project with a temporary HOME.
+// runInit runs `gbai init` in a temporary project with a temporary HOME and
+// XDG_DATA_HOME, so the user-level reviewer install never reaches real data.
 func runInit(t *testing.T, project, version string) (string, error) {
 	t.Helper()
 	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
 	t.Chdir(project)
 	var out bytes.Buffer
 	root := newRootCommand(deps{version: version})
@@ -127,8 +130,12 @@ func TestInitCopiesEmbeddedCatalogWithoutReviewer(t *testing.T) {
 	if len(entries) != 1 || entries[0].Name() != ".gbai" {
 		t.Fatalf("project holds %v, want only .gbai", entries)
 	}
-	if !strings.HasSuffix(out, "next: open your agent in this project and paste this prompt\n") {
+	// The setup prompt follows the next step verbatim and is written nowhere (D25).
+	if !strings.HasSuffix(out, "next: open your agent in this project and paste this prompt\n"+setupprompt.Text) {
 		t.Fatalf("output:\n%s", out)
+	}
+	if out, err := runInit(t, project, "1.2.3"); err != nil || strings.Contains(out, setupprompt.Text) {
+		t.Fatalf("second init printed the prompt or failed: %v\n%s", err, out)
 	}
 }
 
@@ -250,5 +257,132 @@ func TestInitRefusesSymlinkedGbaiDir(t *testing.T) {
 	}
 	if after := snapshot(t, outside); !maps.Equal(before, after) {
 		t.Fatalf("outside changed:\n%v\n%v", before, after)
+	}
+}
+
+// assertUserReviewer checks the user copy holds the embedded gabo-reviewer
+// skill byte for byte plus its own VERSION file.
+func assertUserReviewer(t *testing.T, dir, version string) {
+	t.Helper()
+	files, err := skills.ReviewerFiles()
+	if err != nil || len(files) == 0 {
+		t.Fatalf("ReviewerFiles: %d files, %v", len(files), err)
+	}
+	for _, f := range files {
+		rel := strings.TrimPrefix(f.Path, "gabo-reviewer/")
+		got, err := os.ReadFile(filepath.Join(dir, filepath.FromSlash(rel)))
+		if err != nil || !bytes.Equal(got, f.Data) {
+			t.Fatalf("%s not installed byte for byte: %v", rel, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(dir, "scripts", "reviewer.sh")); err != nil {
+		t.Fatalf("scripts/ not installed: %v", err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(dir, "VERSION")); string(got) != version+"\n" {
+		t.Fatalf("user copy VERSION = %q", got)
+	}
+	// The reviewer preflight refuses a copy writable by group or others.
+	err = filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		info, err := d.Info()
+		if err == nil && info.Mode().Perm()&0o022 != 0 {
+			t.Errorf("%s is writable by group or others: %v", p, info.Mode())
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInitInstallsReviewerUnderXDGDataHome(t *testing.T) {
+	project, data := t.TempDir(), t.TempDir()
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", data)
+	t.Chdir(project)
+	var out bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetOut(&out)
+	root.SetArgs([]string{"init"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("init: %v\n%s", err, out.String())
+	}
+	dir := filepath.Join(data, "gbai", "skills", "gabo-reviewer")
+	assertUserReviewer(t, dir, "1.2.3")
+	if !strings.HasPrefix(out.String(), "reviewer skill installed to "+dir+" (1.2.3)\n") {
+		t.Fatalf("output:\n%s", out.String())
+	}
+}
+
+// Without XDG_DATA_HOME (or with a relative one) the copy goes to
+// ~/.local/share; a configured project with a matching stamp still gets it.
+func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
+	for _, xdg := range []string{"", "relative/data"} {
+		project, home := t.TempDir(), t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv("XDG_DATA_HOME", xdg)
+		t.Chdir(project)
+		cfg := []byte("repo:\n  name: o/r\n")
+		if err := os.WriteFile(filepath.Join(project, "gbai.yaml"), cfg, 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(project, ".gbai"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(project, ".gbai", "VERSION"), []byte("1.2.3\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		before := snapshot(t, project)
+		var out bytes.Buffer
+		root := newRootCommand(deps{version: "1.2.3"})
+		root.SetOut(&out)
+		root.SetArgs([]string{"init"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("XDG_DATA_HOME=%q: %v\n%s", xdg, err, out.String())
+		}
+		assertUserReviewer(t, filepath.Join(home, ".local", "share", "gbai", "skills", "gabo-reviewer"), "1.2.3")
+		if after := snapshot(t, project); !maps.Equal(before, after) {
+			t.Fatalf("XDG_DATA_HOME=%q: matching stamp changed the project", xdg)
+		}
+	}
+}
+
+// An older user copy is replaced, dropping files the embedded skill no longer
+// has; a second run leaves the current copy untouched.
+func TestInitReplacesOlderUserReviewerThenLeavesItAlone(t *testing.T) {
+	project, data := t.TempDir(), t.TempDir()
+	dir := filepath.Join(data, "gbai", "skills", "gabo-reviewer")
+	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, body := range map[string]string{"VERSION": "1.0.0\n", "scripts/gone.sh": "old"} {
+		if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(name)), []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_DATA_HOME", data)
+	t.Chdir(project)
+	for i, want := range []string{"reviewer skill replaced 1.0.0 → 1.2.3 in " + dir, "reviewer skill is current (1.2.3) in " + dir} {
+		var out bytes.Buffer
+		root := newRootCommand(deps{version: "1.2.3"})
+		root.SetOut(&out)
+		root.SetArgs([]string{"init"})
+		before := snapshot(t, dir)
+		if err := root.Execute(); err != nil {
+			t.Fatalf("run %d: %v\n%s", i, err, out.String())
+		}
+		if !strings.HasPrefix(out.String(), want+"\n") {
+			t.Fatalf("run %d output:\n%s", i, out.String())
+		}
+		assertUserReviewer(t, dir, "1.2.3")
+		if _, err := os.Stat(filepath.Join(dir, "scripts", "gone.sh")); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("run %d: stale script kept: %v", i, err)
+		}
+		if i == 1 && !maps.Equal(before, snapshot(t, dir)) {
+			t.Fatal("current user copy changed")
+		}
 	}
 }

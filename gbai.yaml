@@ -7,7 +7,7 @@ version: 1
 mode: auto
 
 repo:
-  name: testeos-z/gbai-team
+  name: testeos-z/gabo-ai
   integration_branch: dev
 
 runtimes:
