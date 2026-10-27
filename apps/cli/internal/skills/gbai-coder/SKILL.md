@@ -49,7 +49,7 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. T
    - it is not in `worktree.keep` (`gbai.yaml`);
    - `git -C <wt> status --porcelain --ignored=matching`, run before any removal, shows only committed work and rebuildable output (removal deletes ignored files);
    - `git worktree remove <wt>` succeeds, never `--force`.
-4. Delete the branch through `repository_host` (delete branch): local first, without force, while the remote branch still exists, then the remote one. A refused branch goes under `leftovers:`.
+4. Delete the branch through `repository_host` (delete branch). A refused branch goes under `leftovers:`.
 5. Containers stay: the cycle removes them from the ledger.
 
 ## Output Contract

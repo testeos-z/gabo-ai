@@ -39,11 +39,15 @@ The read-back must show `MERGED`; its `mergeCommit.oid` is the merged SHA to ret
 
 ### delete branch
 
-After the merge only: confirm `gh pr view <pr> -R $R --json state --jq .state` is `MERGED`, remove the task worktree, then:
+After the merge only, with the task worktree already removed:
 
 ```bash
-git push origin --delete <branch>
+gh pr view <pr> -R $R --json state,baseRefName,headRefName,headRefOid
 git branch -d <branch>
+git ls-remote --heads origin <branch>
+git push origin --delete <branch>
 ```
 
-Use lower-case `-d`, never `-D`. After a squash merge `-d` refuses, because the branch commits are not ancestors of `$B`; report the local branch as left behind with that reason instead of forcing it.
+1. The read must show `MERGED`, base `$B` and head `<branch>`; otherwise refuse.
+2. Local first, with lower-case `-d` while `origin/<branch>` still exists: git checks the branch against its upstream, so it succeeds after a squash merge and still refuses unpushed commits. A refusal is a leftover; never force it.
+3. Remote only if `ls-remote` shows exactly `headRefOid`; no line means nothing to delete; any other SHA is a refusal and a leftover.
