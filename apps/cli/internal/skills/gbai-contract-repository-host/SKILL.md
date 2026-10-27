@@ -38,7 +38,7 @@ Merge a pull request into `repo.integration_branch` only, pinned to the head SHA
 
 ### delete branch
 
-Delete a merged task branch on the host and locally, without force.
+Delete a merged task branch, without force, only when the PR merged into the integration branch from that branch. Delete the local copy first, while the host copy still exists to check it against, then the host copy only if it still points at the merged head. Any refusal is reported as a leftover, never forced.
 
 ## Output Contract
 

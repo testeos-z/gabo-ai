@@ -37,6 +37,13 @@ type Config struct {
 	// Version is the schema version of the file; a file without it is
 	// version 0, the current shape (see keyclass.go).
 	Version int `yaml:"version"`
+	// Project keys of DB_SCHEMA migration step 3 (see projectkeys.go).
+	Mode       Mode              `yaml:"mode,omitempty"`
+	Slots      map[string]Slot   `yaml:"slots,omitempty"`
+	Reviewer   Reviewer          `yaml:"reviewer,omitempty"`
+	Developers map[string]string `yaml:"developers,omitempty"`
+	PlanChange PlanChange        `yaml:"plan_change,omitempty"`
+	Generation Generation        `yaml:"generation,omitempty"`
 	// Personal keys (see PersonalKeys): read from the global layers only.
 	Alias            string `yaml:"alias,omitempty"`
 	InteractionLevel string `yaml:"interaction_level,omitempty"`
@@ -212,5 +219,6 @@ func (c Config) validate() error {
 		check(ok, "worktree.keep", fmt.Sprintf("entry %q must be a worktree name or an absolute path", k))
 	}
 	errs = append(errs, c.validateKeyClasses()...)
+	errs = append(errs, c.validateProjectKeys()...)
 	return errors.Join(errs...)
 }

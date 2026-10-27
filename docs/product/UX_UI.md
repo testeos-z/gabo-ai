@@ -4,11 +4,11 @@
 |---|---|
 | status | Draft |
 | owner | gbai-frontend |
-| version | 0.4 |
-| date | 2026-10-26 |
+| version | 0.5 |
+| date | 2026-10-27 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [DB_SCHEMA](DB_SCHEMA.md), [APP_FLOW](APP_FLOW.md) |
 
-gbai is a CLI plus an agent framework with no graphical UI, so `DESIGN.md`, CSS tokens and Storybook do not apply. This document adapts the template to what gbai actually presents: the assistant's conversation, the CLI command surface (an agent compiler used only for the initial configuration, TRD D18) and its messages. Approved (owner 2026-10-26): the proposed terminal UI (TUI) is withdrawn; setup starts from a prompt the user pastes into Claude Code or Pi (section 1.8, TRD D21). Every gap this document had to fill is marked **Proposed (auto)**.
+gbai is a CLI plus an agent framework with no graphical UI, so `DESIGN.md`, CSS tokens and Storybook do not apply. This document adapts the template to what gbai actually presents: the assistant's conversation, the CLI command surface (three commands: `gbai init`, `gbai check` and `gbai version`, owner 2026-10-27, PRD R31; earlier an agent compiler used only for the initial configuration, TRD D18) and its messages. Approved (owner 2026-10-26): the proposed terminal UI (TUI) is withdrawn. Superseded (owner 2026-10-27): setup starts from a prompt the user pastes into Claude Code or Pi (TRD D21); since 2026-10-27 setup has two entries (section 1.8): `gbai init` followed by the user's own agent, or the published setup prompt pasted into the agent, which installs the CLI and continues; the prompt is the same literal text embedded in the CLI (PRD R36). Every gap this document had to fill is marked **Proposed (auto)**.
 
 ## Auto-mode proposals
 
@@ -22,7 +22,7 @@ Written by gbai-frontend in auto mode (R6, R19). Every item is marked **Proposed
 | U4 | 1.5 | Wave reports reach the owner as a short summary (counts, blocked tasks, questions, decisions, leftovers) with the full report linked. | Protects the owner's energy (goal 1) while keeping R29's content one step away. |
 | U5 | 1.6 | The comfort question is one question with three answers (fewer / same / more interactions) plus an optional free-text style note. | R17 asks for a brief question; fixed answers map directly onto `interaction_level`. |
 | U6 | 1.7 | If `language` is unset, the assistant asks once during setup instead of guessing. | R12 forbids silent defaults; language is a personal key. |
-| U7 | 2 | Approved (owner 2026-10-26), replacing the earlier proposal: the CLI surface is `gbai init` (the first generate), `gbai generate [--check]`, `gbai config set` (owner convenience at configuration time only) and `gbai version` only; the read-only `gbai config` is removed (owner 2026-10-26, section 5 question 2). No wave, plan, review, status or other work-time command: agents do that work with their own tools guided by skills and adapters. | TRD D18, D19, D20; agents already have the tools. |
+| U7 | 2 | Amended (owner 2026-10-27, PRD R31–R33): the CLI surface is `gbai init` (copies the skill catalog, writes the neutral entry file, installs the user-level `gbai-reviewer` skill, prints the next step), `gbai check` (read-only, engine-neutral validation) and `gbai version` only. `gbai generate [--check]`, `gbai config set`, the Go generation targets and the per-runtime installer table are removed; the runtime's own agent builds the config and the agents from skills. Still no wave, plan, review, status or other work-time command. Superseded (owner 2026-10-27): Approved (owner 2026-10-26), replacing the earlier proposal: the CLI surface is `gbai init` (the first generate), `gbai generate [--check]`, `gbai config set` (owner convenience at configuration time only) and `gbai version` only; the read-only `gbai config` is removed (owner 2026-10-26, section 5 question 2). No wave, plan, review, status or other work-time command: agents do that work with their own tools guided by skills and adapters. | Owner decision 2026-10-27 (issue #51): technical simplicity, a more universal tool with less configuration; earlier TRD D18, D19, D20. |
 | U8 | — | Withdrawn (owner 2026-10-26): no wave command; the cycle reads tasks and their blocked-by links through the `tasks` adapter and takes the unblocked ones. | No glue CLI for work agents already do. |
 | U9 | 3 | Withdrawn (owner 2026-10-26): Build the TUI with Bubble Tea, Lip Gloss and Bubbles, following gentle-ai's screen router, keybindings and style roles. | The TUI is removed; setup is done by the user's agent from a pasted prompt (section 1.8, TRD D21). |
 | U10 | 3.2 | Withdrawn (owner 2026-10-26): `gbai` with no arguments on a TTY opens the TUI home; without a TTY it exits non-zero with a hint to use subcommands. | The TUI is removed; setup is done by the user's agent from a pasted prompt (section 1.8, TRD D21). |
@@ -31,7 +31,7 @@ Written by gbai-frontend in auto mode (R6, R19). Every item is marked **Proposed
 | U13 | 3.3 | Withdrawn (owner 2026-10-26): no status view; no Go status command exists (TRD D18) and the last wave report lives in the `memory` slot. The owner asks the assistant for the state. | The TUI is removed altogether (owner 2026-10-26). |
 | U14 | 3.5 | Withdrawn (owner 2026-10-26): gbai defines its own palette behind gentle-ai's style roles; honors `NO_COLOR` and adds `GBAI_NO_ANIMATION=1`. | The TUI is removed; setup is done by the user's agent from a pasted prompt (section 1.8, TRD D21). |
 | U15 | 4 | Every error or refusal uses three parts: what happened, why, what to do next; one line first, details after. | Gives the owner one next action per failure, matching existing CLI messages ("run setup"). |
-| U16 | 1.8 | Approved (owner 2026-10-26): setup starts from a prompt with a link, copied from the gbai documentation and pasted into Claude Code or Pi; that agent installs gbai, asks the setup questions, writes the config and runs `gbai generate`. | Replaces the TUI; the guided setup is agent work anyway (adapter co-writing, subagent verification). |
+| U16 | 1.8 | Amended (owner 2026-10-27, PRD R32, R34): setup starts with `gbai init`, then the user asks their own agent to configure gbai; the agent follows the entry file and the setup, config-writer and runtime skills, then runs `gbai check`. Second entry (owner 2026-10-27, PRD R36): the published setup prompt, pasted into the agent, which installs the CLI and continues; one text, embedded in the CLI and published in the documentation. Superseded (owner 2026-10-27): Approved (owner 2026-10-26): setup starts from a prompt with a link, copied from the gbai documentation and pasted into Claude Code or Pi; that agent installs gbai, asks the setup questions, writes the config and runs `gbai generate`. | Replaces the TUI; the guided setup is agent work anyway (adapter co-writing, subagent verification). |
 | U17 | 1.3 | Approved (owner 2026-10-26): preferences have a stable layer (global user file) and a learning layer (memory slot, topic `user/preferences`); an observation repeated about 3 times is proposed for the stable layer. | PRD 10.1 Personalization, TRD D22. |
 
 ## 1. Conversation UX of the assistant
@@ -86,7 +86,7 @@ Proposed (auto) U3 and U4. Shapes, not fixed wording:
 
 ### 1.6 Comfort question at wave close
 
-Proposed (auto) U5. One brief question after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". The answer updates `interaction_level` and `tone` for the next wave (R17); the assistant edits the global user file directly and the change is validated at the next `gbai generate` (owner 2026-10-26, TRD D22).
+Proposed (auto) U5. One brief question after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". The answer updates `interaction_level` and `tone` for the next wave (R17); the assistant edits the global user file directly and the change is validated at the next `gbai check` (owner 2026-10-26, TRD D22; updated owner 2026-10-27, earlier `gbai generate`).
 
 ### 1.7 Language
 
@@ -94,7 +94,22 @@ Conversation in the owner's `language` (BCP 47, global file); all generated arti
 
 ### 1.8 Setup entry
 
-Approved (owner 2026-10-26), U16. There is no setup screen. The gbai documentation publishes one setup prompt with a link. The user pastes it into Claude Code or Pi, and that agent:
+Amended (owner 2026-10-27), U16, PRD R32, R34, R36. There is still no setup screen. Setup has two entries that join at step 3:
+
+- **Entry (a), terminal.** Steps 1 and 2 below.
+- **Entry (b), pasted prompt.** The user pastes the published setup prompt into their agent; the agent installs the CLI, runs `gabo init` (step 1) and continues at step 3. The published prompt is the same literal text embedded in the CLI: one source, shipped in the binary and published in the documentation.
+
+1. The user installs the gabo CLI and runs `gabo init` in the project. It copies the skill catalog, writes the short neutral entry file, installs the user-level `gabo-reviewer` skill and ends with the next step: `next: open your agent in this project and ask it to configure gabo-ai`. If a config already exists it writes nothing (no catalog copy, no entry file, no `gabo-reviewer` reinstall), exits non-zero and says `next: run gabo check`. Refreshing the catalog after an upgrade is PRD open question 11.
+2. The user opens their agent (Claude Code, Pi or another engine with a runtime skill) and asks it to configure gabo-ai.
+3. The agent follows the entry file. The setup skill runs the setup question burst one question at a time (identity, slots and adapters, runtimes, `mode`, `plan_change.*`, `language`), with suggestions and no preselected value (R12).
+4. The config-writer skill writes the global user file and `gabo.yaml`.
+5. The runtime skill builds the agents of the neutral agent spec in the engine's format from fixed templates; for an engine without a runtime skill, the runtime builder writes one first (PRD R35).
+6. The agent runs `gabo check`, fixes what fails and reruns it until it passes; failures use the section 4 shape.
+7. The agent verifies each slot through a subagent (APP_FLOW J1).
+
+PRD open question 12 (pending owner decision, not applied): the CLI may be renamed "gabo"; its scope (binary only, or also skill prefixes and the config file name) is not confirmed yet.
+
+**Superseded (owner 2026-10-27), setup entry of 2026-10-26.** Approved (owner 2026-10-26), U16. There is no setup screen. The gbai documentation publishes one setup prompt with a link. The user pastes it into Claude Code or Pi, and that agent:
 
 1. installs gbai;
 2. runs the setup question burst one question at a time (identity, slots and adapters, runtimes and `generation.targets`, `mode`, `plan_change.*`, `language`), with suggestions and no preselected value (R12);
@@ -106,7 +121,19 @@ Approved (owner 2026-10-26), U16. There is no setup screen. The gbai documentati
 
 ### 2.1 Commands
 
-Approved (owner 2026-10-26, TRD D18). The CLI is an agent compiler for the initial configuration; nothing in Go runs during the work itself.
+Names (owner 2026-10-27, PRD O9): the product is gabo-ai and the CLI is invoked as `gabo`. Skill prefix `gabo-*`, project config file `gabo.yaml` and the global user file under a `gabo` directory are approved (confirmed by the owner 2026-10-27). The existing `gbai-*` skill names, `gbai.yaml`, the `gbai` command and the `gbai` global directory stay in every other section and in the repository until the rename task lands.
+
+Amended (owner 2026-10-27, U7, PRD R31–R33). The CLI has three commands. It writes no config and builds no agent; the user's agent does that from skills (PRD R34). Nothing in Go runs during the work itself.
+
+| command | purpose | source |
+|---|---|---|
+| `gabo init` | Copies the embedded skill catalog into a neutral project location, byte for byte and deterministically; writes the short engine-neutral entry file (which skills to load, which agents to create, which config files to write, how to verify); installs the user-level `gabo-reviewer` skill; prints the next step. If a config already exists it writes nothing, exits non-zero and points to `gabo check` | PRD R32 |
+| `gabo check` | Read-only, engine-neutral validation: the global user file and `gabo.yaml` against their JSON Schemas, every agent of the neutral agent spec present, nothing stale against the templates. Writes nothing; non-zero exit on any failure. Usable by the user, agents, the reviewer and CI | PRD R33 |
+| `gabo version` | Print the version | — |
+
+The CLI also carries the setup prompt as embedded text, identical to the one published in the documentation (PRD R36); this adds no command. Command flags and how the embedded text is exposed are TRD details.
+
+**Superseded (owner 2026-10-27), command table of 2026-10-26.** Approved (owner 2026-10-26, TRD D18). The CLI is an agent compiler for the initial configuration; nothing in Go runs during the work itself.
 
 | command | purpose | source |
 |---|---|---|
@@ -117,10 +144,13 @@ Approved (owner 2026-10-26, TRD D18). The CLI is an agent compiler for the initi
 
 ### 2.2 Removed commands
 
-Approved (owner 2026-10-26, TRD D18–D20). Each command below is removed from Go; its job moves to an agent using its own tools.
+Approved (owner 2026-10-26, TRD D18–D20; extended owner 2026-10-27). Each command below is removed from Go; its job moves to an agent using its own tools.
 
 | removed command | where its job goes |
 |---|---|
+| `gbai generate [--check]` (removed 2026-10-27) | Agent building: the runtime skill of the engine in use, from fixed templates (PRD R34). Validation and drift detection: `gbai check` (PRD R33) |
+| `gbai config set` (removed 2026-10-27) | The config-writer skill, or the owner editing the YAML; `gbai check` validates |
+| Go generation targets and per-runtime installer table (removed 2026-10-27) | Runtime skills for Claude Code and Pi; the runtime builder skill for other engines (PRD R34, R35) |
 | `gbai status` (removed) | The assistant reads the tracker, the PRs and the `memory` slot |
 | `gbai audit` (removed) | The assistant checks merges with gh and git per its skill |
 | `gbai sessions start\|stop` (removed) | The `direct_sessions` adapter (Orca CLI) |
@@ -128,10 +158,10 @@ Approved (owner 2026-10-26, TRD D18–D20). Each command below is removed from G
 | `gbai repo setup` (removed) | The `repository_host` adapter (gh) |
 | `gbai worktree close` (removed) | The cycle skill, with git worktree and branch commands |
 | `gbai mcp` (removed: no gbai MCP server) | Skills and adapters |
-| `gbai doctor` (removed) | Config validation folds into `gbai generate` |
-| `gbai config [--json]` (removed 2026-10-26) | The assistant reads the config files; `gbai generate` reports schema and coverage errors |
+| `gbai doctor` (removed) | Config validation folds into `gbai check` (updated 2026-10-27; earlier `gbai generate`) |
+| `gbai config [--json]` (removed 2026-10-26) | The assistant reads the config files; `gbai check` reports schema and agent errors (updated 2026-10-27; earlier `gbai generate`) |
 | `gbai plan new\|status\|story\|check` (removed) | Templates and the traceability check live in the directiva skills (D19) |
-| `gbai review request\|run\|ci\|notify` (removed) | Scripts of the user-level `gbai-reviewer` skill, installed by the compiler; the generated reviewer agent invokes them (D20) |
+| `gbai review request\|run\|ci\|notify` (removed) | Scripts of the user-level `gbai-reviewer` skill, installed by `gbai init` (updated 2026-10-27; earlier the compiler); the reviewer agent invokes them (D20) |
 
 Auto-mode decisions (R30) are queried through the assistant and the memory slot, not a compiled command, because memory access is tool-specific (D2). The same holds for wave work: the next wave, the resource ledger, cleanup and resume are done by the cycle through its skill (TRD D12, D15, D17).
 
@@ -143,26 +173,29 @@ Withdrawn (owner 2026-10-26). gbai has no terminal UI: no Bubble Tea dependency,
 
 Proposed (auto) U15. Tone: neutral, direct, no blame, no exclamation marks; English for CLI output, the owner's language in conversation.
 
-Approved (owner 2026-10-26): no work-time message comes from Go (TRD D18). Messages come from the CLI (config and generate errors), the scripts of the user-level `gbai-reviewer` skill (merge gate, TRD D20) and agents in the conversation and the wave report (cleanup, blocked tasks, setup verify, traceability), all in the same shape.
+Approved (owner 2026-10-26): no work-time message comes from Go (TRD D18). Messages come from the CLI (`gbai init` and `gbai check` output; updated owner 2026-10-27, earlier config and generate errors), the scripts of the user-level `gbai-reviewer` skill (merge gate, TRD D20) and agents in the conversation and the wave report (cleanup, blocked tasks, setup verify, traceability), all in the same shape.
 
 Format: `✗ <what happened>` on one line, then `why:` and `next:` lines, then optional details. Non-zero exit for every CLI or script failure.
 
 | case | example |
 |---|---|
-| Refusal (auto-mode limit, R23, 10.2; cycle agent at wave cleanup) | `✗ refused to delete worktree feat-x` · `why: it was not created by this workflow` · `next: remove it yourself or add it to worktree.keep` |
+| Refusal (auto-mode limit, R23, 10.2; coder at task close or cycle agent at the wave-close sweep) | `✗ refused to delete worktree feat-x` · `why: it was not created by this workflow` · `next: remove it yourself or add it to worktree.keep` |
 | Refusal (merge; reviewer script merge gate) | `✗ refused to merge into main` · `why: auto mode merges only into the integration branch (dev)` |
 | Blocked task (cycle agent, wave report) | `✗ task #42 BLOCKED` · `why: 4 review rounds without approval` · `next: owner decision needed` (also in the wave report) |
 | Verification failure (setup; assistant after the subagent smoke test) | `✗ tasks slot not verified` · `why: "read one task" failed: gh: not authenticated` · `next: run gh auth login, then retry verify` |
-| Coverage gap (`gbai generate`) | `✗ adapter tasks-gh.md does not cover: link PR, verify by re-read` · `next: add those operations or write them with the assistant` |
+| Coverage gap (setup agent; earlier `gbai generate`) | `✗ adapter tasks-gh.md does not cover: link PR, verify by re-read` · `next: add those operations or write them with the assistant` |
 | Traceability gap (reported by the directiva agent, D19) | `✗ planning step blocked` · `why: R7 has no task; US-012 has no requirement` · `next: close the gaps; the check reruns before the next step` |
-| Missing config | `✗ no gbai.yaml found` · `next: paste the setup prompt from the gbai documentation into Claude Code or Pi` |
-| Invalid config (agent edited the YAML during the work) | `✗ gbai.yaml: plan_change.scope: "teams" is not one of task, group, global` · `next: fix the key, then rerun gbai generate` |
+| Missing config (`gabo check`) | `✗ no gabo.yaml found` · `next: run gabo init, then ask your agent to configure gabo-ai` (updated owner 2026-10-27; earlier: paste the setup prompt) |
+| Existing config (`gabo init`, non-zero exit) | `✗ gabo.yaml already exists; nothing written` · `why: gabo init only sets up a project without a config` · `next: run gabo check` |
+| Missing or stale agent (`gabo check`) | `✗ agent gabo-reviewer is stale against its template` · `next: ask your agent to rebuild it with the runtime skill, then rerun gabo check` |
+| Engine not supported (runtime builder) | `✗ cannot add a runtime for <engine>` · `why: it has no subagent and skill support, or an equivalent` · `next: use Claude Code, Pi or another engine with subagents and skills` |
+| Invalid config (agent edited the YAML during the work) | `✗ gbai.yaml: plan_change.scope: "teams" is not one of task, group, global` · `next: fix the key, then rerun gbai check` |
 
 Messages never include secret values (R21); they name the env var or adapter instead.
 
 ## 5. Open questions
 
-All resolved (owner 2026-10-26).
+Questions 1–3 resolved (owner 2026-10-26). The 2026-10-27 decision leaves two product questions open in the PRD (section 13, questions 10 and 11): the role of the published setup prompt, and how a project with a config refreshes the copied skill catalog after an upgrade.
 
 1. **TUI scope.** Resolved: the TUI is removed (section 3); setup starts from a pasted prompt (section 1.8). Milestone M4 and tasks T035–T037 are removed.
 2. **Read-only `gbai config [--json]`.** Resolved: removed; the assistant reads the files and `gbai generate` reports schema and coverage errors.

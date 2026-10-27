@@ -79,7 +79,7 @@ The current config is cloud-shaped. Under the approved split, cloud fields leave
 | `coder.login` | Core | Coder-merge audit rule |
 | `review.{checks, auto_merge, human_only_paths, pi_credential_env, state_dir}` | Core | Read by the installed reviewer scripts (Approved (owner 2026-10-26), TRD D20) |
 | `parallelism` | Core | Coder sessions per wave |
-| `worktree.keep` | Core | Read by the cycle skill at wave cleanup; `gbai worktree close` is removed (Approved (owner 2026-10-26), TRD D15, D18) |
+| `worktree.keep` | Core | Read by the owning coder at task close and by the cycle skill at the wave-close sweep; `gbai worktree close` is removed (Approved (owner 2026-10-26), TRD D15, D18; amended (owner 2026-10-27), TRD D23) |
 
 The system layer `/etc/gbai/gbai.yaml` exists today only for the server, so it moves into the `slots.agent_host` adapter together with `sessions.local_orca`; the core loader keeps only the user and project layers.
 
@@ -125,17 +125,17 @@ Today the user layer accepts the same keys as the project file; under the split 
 
 | key | type | required | description | example |
 |---|---|---|---|---|
-| `version` | integer | yes | Schema version of this file. proposed (not implemented) | `1` |
-| `mode` | enum `manual`, `auto` | yes | Who resolves questions (R6). proposed (not implemented) | `manual` |
-| `slots.<name>.adapter` | relative path | per slot | Adapter Markdown file filling that slot's contract (D2). Slot names follow the TRD contracts: `tasks`, `memory`, `notifications`, `direct_sessions`, `methodology`, `repository_host`, `reviewer_placement`, plus the cloud slot `agent_host`. proposed (not implemented) | `.gbai/adapters/tasks-gh.md` |
-| `slots.methodology.adapter` | skill name or relative path | yes | Methodology slot, linked as `gbai-methodology` (R8). Coder-side review (for example GGA or RDD) is configured inside this adapter, not as its own key. Recommended, not required (owner 2026-10-26): a gentle-ai ODD adapter with RDD as coder-side validation, offered by setup and used only if the user accepts. proposed (not implemented) | `.gbai/adapters/methodology-tdd.md` |
-| `slots.agent_host.adapter` | relative path | no | Cloud slot: where agents run. Holds the server ids, OS user, bot identity, session prompt files, the Orca CLI name and the former system layer. Configured in a separate assistant session. proposed (not implemented) | `.gbai/adapters/agent-host-railway.md` |
-| `reviewer.placement` | enum `local`, `server`, `github-actions`, `gitlab-ci` | yes | Where the reviewer runs; first release `local` only (D6). proposed (not implemented) | `local` |
-| `reviewer.signing` | mapping | no | How the reviewer signs or marks its verdict comment (PRD 10.1 reviewer signing or marker); fields follow the reviewer comment format. proposed (not implemented) | `{marker: gbai-review}` |
-| `developers` | map: git email → alias | no | Developer catalog (D10, R16); the assistant adds a missing entry once. proposed (not implemented) | `{"ana@example.com": "Ana"}` |
-| `plan_change.scope` | enum `task`, `group`, `global` | yes | Widest plan scope that may change (R19, D7). proposed (not implemented) | `group` |
-| `plan_change.global_without_owner` | boolean | yes | Whether the global plan may change without the owner, still after the plan-change reviewer agrees (D7). proposed (not implemented) | `false` |
-| `generation.targets` | list of `claude`, `pi` | yes | Concrete runtimes to generate agent files for (D3), never a symbolic value, so a change shows in the diff. proposed (not implemented) | `[claude]` or `[claude, pi]` |
+| `version` | integer | yes | Schema version of this file. Loaded and validated (T003); failing when missing is T005 | `1` |
+| `mode` | enum `manual`, `auto` | yes | Who resolves questions (R6). Loaded and validated when set (T004); failing when missing is T005 | `manual` |
+| `slots.<name>.adapter` | relative path | per slot | Adapter Markdown file filling that slot's contract (D2). Slot names follow the TRD contracts: `tasks`, `memory`, `notifications`, `direct_sessions`, `methodology`, `repository_host`, `reviewer_placement`, plus the cloud slot `agent_host`. Loaded and validated when set (T004); failing when missing is T005 | `.gbai/adapters/tasks-gh.md` |
+| `slots.methodology.adapter` | skill name or relative path | yes | Methodology slot, linked as `gbai-methodology` (R8). Coder-side review (for example GGA or RDD) is configured inside this adapter, not as its own key. Recommended, not required (owner 2026-10-26): a gentle-ai ODD adapter with RDD as coder-side validation, offered by setup and used only if the user accepts. Loaded and validated when set (T004); failing when missing is T005 | `.gbai/adapters/methodology-tdd.md` |
+| `slots.agent_host.adapter` | relative path | no | Cloud slot: where agents run. Holds the server ids, OS user, bot identity, session prompt files, the Orca CLI name and the former system layer. Configured in a separate assistant session. Loaded and validated when set (T004); failing when missing is T005 | `.gbai/adapters/agent-host-railway.md` |
+| `reviewer.placement` | enum `local`, `server`, `github-actions`, `gitlab-ci` | yes | Where the reviewer runs; first release `local` only (D6). Loaded and validated when set (T004); failing when missing is T005 | `local` |
+| `reviewer.signing` | mapping | no | How the reviewer signs or marks its verdict comment (PRD 10.1 reviewer signing or marker); fields follow the reviewer comment format. Loaded and validated when set (T004); failing when missing is T005 | `{marker: gbai-review}` |
+| `developers` | map: git email → alias | no | Developer catalog (D10, R16); the assistant adds a missing entry once. Loaded and validated when set (T004); failing when missing is T005 | `{"ana@example.com": "Ana"}` |
+| `plan_change.scope` | enum `task`, `group`, `global` | yes | Widest plan scope that may change (R19, D7). Loaded and validated when set (T004); failing when missing is T005 | `group` |
+| `plan_change.global_without_owner` | boolean | yes | Whether the global plan may change without the owner, still after the plan-change reviewer agrees (D7). Loaded and validated when set (T004); failing when missing is T005 | `false` |
+| `generation.targets` | list of `claude`, `pi` | yes | Concrete runtimes to generate agent files for (D3), never a symbolic value, so a change shows in the diff. Loaded and validated when set (T004); failing when missing is T005 | `[claude]` or `[claude, pi]` |
 
 `plan_change.*`, `developers` and `repo.integration_branch` follow the names in TRD [Configuration shapes](TRD.md#93-configuration-shapes).
 
