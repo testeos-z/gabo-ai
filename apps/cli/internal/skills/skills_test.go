@@ -128,6 +128,9 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"## Task Close", "PR #<n> merged", "repository_host", "never `--force`", "--git-common-dir", "resumable",
 			"`worktree.keep`", "before any removal", "unverified:",
 			"D23", "only writer of DONE", "lock error", "retry once",
+			// T016: the methodology comes from the slot; the TRD 9.2 outcome and the round limit stay.
+			"`gabo-methodology`", "`Closes #<n>`", "summary", "resources created", "test databases",
+			"fix rounds used", "Max 4 fix rounds",
 		},
 		"gabo-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
@@ -171,6 +174,24 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			if !strings.Contains(string(f.Data), s) {
 				t.Errorf("%s: missing %q", f.Path, s)
 			}
+		}
+	}
+}
+
+// The coder skill hardcodes no methodology (T016): the former ODD and
+// gentle-ai text is gone and lives only in the `methodology` slot adapter.
+func TestCoderSkillHasNoHardcodedMethodology(t *testing.T) {
+	t.Parallel()
+	b, err := content.ReadFile("gabo-coder/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, s := range []string{
+		"ODD", "Test-first", "test-first", "gentle-ai", "receipt-driven", "RDD",
+		"Work-unit commits", "Conventional Commits", "no AI attribution",
+	} {
+		if strings.Contains(string(b), s) {
+			t.Errorf("gabo-coder/SKILL.md: must not contain %q", s)
 		}
 	}
 }
