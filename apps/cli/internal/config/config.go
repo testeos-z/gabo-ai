@@ -43,7 +43,6 @@ type Config struct {
 	Reviewer   Reviewer          `yaml:"reviewer,omitempty"`
 	Developers map[string]string `yaml:"developers,omitempty"`
 	PlanChange PlanChange        `yaml:"plan_change,omitempty"`
-	Generation Generation        `yaml:"generation,omitempty"`
 	// Personal keys (see PersonalKeys): read from the global layers only.
 	Alias            string `yaml:"alias,omitempty"`
 	InteractionLevel string `yaml:"interaction_level,omitempty"`
@@ -146,6 +145,9 @@ func Load(path string) (Config, error) {
 // missing required key fails with "✗ <key> missing" and NextSetup (R12);
 // the former defaults are only offered through Suggestions.
 func Parse(b []byte) (Config, error) {
+	if err := formerCloudKeyErrors(b); err != nil {
+		return Config{}, err
+	}
 	var cfg Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)

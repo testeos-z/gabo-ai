@@ -7,16 +7,13 @@ version: 1
 mode: auto
 
 repo:
-  name: testeos-z/gbai-team
+  name: testeos-z/gabo-ai
   integration_branch: dev
 
 runtimes:
   coder: claude
   reviewer: claude
   assistant: claude
-
-generation:
-  targets: [claude]
 
 # Adapters are the Claude Code skills that fill each slot contract (TRD 9.1).
 slots:
