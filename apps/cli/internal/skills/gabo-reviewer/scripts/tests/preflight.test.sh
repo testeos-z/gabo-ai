@@ -146,7 +146,8 @@ hop() { HOME="$fake_home" REVIEWER_HUMAN_ONLY_PATHS="${HOP:-.github/ AGENTS.md C
 for p in .github/workflows/x.yml .claude/agents/a.md AGENTS.md apps/cli/CLAUDE.md gbai.yaml .gbai/VERSION .gbai/skills/gabo-coder/SKILL.md; do
   check "human-only: $p" hop "is_human_only '$p'"
 done
-for p in .gbai/VERSION .gbai/skills/gabo-coder/SKILL.md; do
+for p in .gbai/VERSION .gbai/skills/gabo-coder/SKILL.md apps/cli/internal/skills/gabo-reviewer/scripts/common.sh \
+  skills/gabo-reviewer/SKILL.md; do
   check "always human-only, even with no configured paths: $p" \
     env HOME="$fake_home" REVIEWER_HUMAN_ONLY_PATHS=" " bash -c "source '$skill/common.sh'; is_human_only '$p'"
 done

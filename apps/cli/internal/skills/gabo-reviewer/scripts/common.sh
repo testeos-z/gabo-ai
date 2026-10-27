@@ -140,6 +140,9 @@ TRUSTED_DIRS=("${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/sc
 # catalog version stamp and the catalog copy (TRD 9.4, issue #79).
 BUILTIN_STAMP=".gbai/VERSION"
 BUILTIN_CATALOG=".gbai/skills/"
+# The reviewer's own source (any skills/gabo-reviewer/ dir, like the embedded
+# copy in gabo-ai) is human-only too: a PR may not weaken its own gate.
+BUILTIN_REVIEWER="skills/gabo-reviewer/"
 # The Claude Code token is kept in a shell variable, out of the environment:
 # only the review step gets it, inside its scrubbed `env -i`.
 CLAUDE_TOKEN="${CLAUDE_CODE_OAUTH_TOKEN:-}"
@@ -236,6 +239,7 @@ is_gabo_check() { [[ ("$1" == gabo || "$1" == gbai) && "$2" == check ]]; }
 is_human_only() {
   local p="$1" entry
   [[ "$p" == "$BUILTIN_STAMP" || "$p" == "$BUILTIN_CATALOG"* ]] && return 0
+  [[ "$p" == "$BUILTIN_REVIEWER"* || "$p" == */"$BUILTIN_REVIEWER"* ]] && return 0
   for entry in $HUMAN_ONLY_PATHS; do
     if [[ "$entry" == */ ]]; then
       [[ "$p" == "$entry"* ]] && return 0

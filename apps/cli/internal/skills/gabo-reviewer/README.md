@@ -1,6 +1,6 @@
 # gabo-reviewer
 
-Embedded skill with the deterministic reviewer scripts of gabo (TRD D20, plan task T040). Follows the vulcam `agents/pr-reviewer` pattern in single-user local mode: no sudo, no reviewer OS users, Claude Code as the only engine. `gbai init` installs it at user level (T041); it never belongs in a repository.
+Embedded skill with the deterministic reviewer scripts of gabo (TRD D20, plan task T040). Follows the vulcam `agents/pr-reviewer` pattern in single-user local mode: no sudo, no reviewer OS users, Claude Code as the only engine. It is embedded apart from the catalog (`skills.ReviewerFiles`), so the catalog install never writes it; `gbai init` installs it at user level (T041). It never belongs in a repository.
 
 ## Why user level
 
@@ -39,7 +39,7 @@ A conflict is `blocking`; a retryable failure or a refused preflight is `error`;
 
 ## Built-in rules
 
-- **Always human-only:** `.gbai/VERSION` and everything under `.gbai/skills/` (the catalog copy), independent of `review.human_only_paths` (TRD 9.4, issue #79).
+- **Always human-only:** `.gbai/VERSION`, everything under `.gbai/skills/` (the catalog copy) and the reviewer's own source (any `skills/gabo-reviewer/` dir), independent of `review.human_only_paths` (TRD 9.4, issue #79).
 - **Base minimum:** the integration branch's `.gbai/VERSION` (read from the reviewer's checkout, never from the PR head) is the minimum version of the gabo binary. An older binary, one without a release version, or none at all is refused with the upgrade command `go install <REVIEWER_GABO_INSTALL>@v<version>` (TRD 9.4). The scripts never update the binary. No stamp on the base means no minimum.
 - **Upgrade PR:** a PR that changes `.gbai/VERSION`. Its checks run with `GABO_UPGRADE_PR=1` (the CLI validates only the config); its comment reports `upgrade PR: only config validated, human merge required` and lists the changed paths outside `.gbai/skills/` and the agent directories that the runtime skills of `runtimes.*` declare (`metadata.agent_dir` in `.gbai/skills/<prefix>-runtime-<runtime>/SKILL.md`). The stamp is human-only, so the scripts never merge it.
 

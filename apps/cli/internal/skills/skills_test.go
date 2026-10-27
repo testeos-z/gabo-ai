@@ -16,7 +16,7 @@ var want = []string{
 	"gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-frontend", "gabo-pm", "gabo-reviewer", "gabo-reviewer-notes", "gabo-setup", "gbai-orca-inbox",
+	"gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup", "gbai-orca-inbox",
 }
 
 // contracts maps each contract skill to its TRD 9.1 operations, in order, and
@@ -340,15 +340,12 @@ var reviewerFiles = []string{
 
 func TestReviewerSkillShipsItsScripts(t *testing.T) {
 	t.Parallel()
-	files, err := Files()
+	files, err := ReviewerFiles()
 	if err != nil {
 		t.Fatal(err)
 	}
 	var got []string
 	for _, f := range files {
-		if !strings.HasPrefix(f.Path, "gabo-reviewer/") {
-			continue
-		}
 		got = append(got, f.Path)
 		// The repository comes from gbai.yaml; only the TRD 9.4 module path
 		// of the upgrade command may name the old repository.
@@ -356,9 +353,34 @@ func TestReviewerSkillShipsItsScripts(t *testing.T) {
 		if strings.Contains(rest, "testeos-z/gbai-team") {
 			t.Errorf("%s: hardcodes the repository testeos-z/gbai-team", f.Path)
 		}
+		if f.Path == "gabo-reviewer/SKILL.md" {
+			fm, ok := frontmatter(string(f.Data))
+			d := fm["description"]
+			if !ok || fm["name"] != "gabo-reviewer" || !strings.HasPrefix(d, `"Trigger: `) || len(d) > 252 {
+				t.Errorf("%s: bad frontmatter %v", f.Path, fm)
+			}
+		}
 	}
 	if !slices.Equal(got, reviewerFiles) {
 		t.Fatalf("gabo-reviewer files = %v\nwant %v", got, reviewerFiles)
+	}
+}
+
+// The catalog that init installs never carries the reviewer skill: it is
+// installed only at user level (T041), so PR code cannot change it.
+func TestCatalogLeavesOutTheReviewerSkill(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if strings.HasPrefix(f.Path, "gabo-reviewer/") {
+			t.Errorf("catalog holds %s", f.Path)
+		}
+	}
+	if slices.Contains(Names(), "gabo-reviewer") {
+		t.Error("Names() lists gabo-reviewer")
 	}
 }
 

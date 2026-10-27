@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use only to review one pushed PR head with the scripts of the user-level copy of this skill (TRD D20). The scripts decide the verdict; the agent never reviews, edits, comments, approves or merges itself. This skill is installed at user level (`${XDG_DATA_HOME:-~/.local/share}/gbai/skills/gabo-reviewer/`, T041), never into a repository: a PR cannot change the code that reviews it.
+Use only to review one pushed PR head with the scripts of the user-level copy of this skill (TRD D20). The scripts decide the verdict; the agent never reviews, edits, comments, approves or merges itself. This skill is installed at user level (`${XDG_DATA_HOME:-~/.local/share}/gbai/skills/gabo-reviewer/`, T041), never into a repository, so a PR cannot change the scripts it is reviewed with. This is trust-based single-user mode: the checks run PR code as the owner, which can still reach the owner's files; use an isolated placement when that matters.
 
 ## Hard Rules
 
@@ -22,7 +22,7 @@ Use only to review one pushed PR head with the scripts of the user-level copy of
 
 - Preflight: refuses `sudo`, a copy inside the repository under review, a copy outside the user-level skill dirs or writable by group or others, a `gh` login other than `REVIEWER_BOT_LOGIN`, and a reviewer checkout of the integration branch that is not clean. Single-user mode only; `REVIEWER_MODE=isolated` belongs to the `reviewer_placement` adapter; a `reviewer.placement` other than `local` fails as planned for a later release.
 - Configuration: `review.checks`, `review.auto_merge`, `review.human_only_paths` and `reviewer.signing.marker` come from `gbai.yaml` in the reviewer's own clean checkout of the integration branch, never from the PR head.
-- Built-in human-only paths: `.gbai/VERSION` and the catalog subtree `.gbai/skills/`, whatever `review.human_only_paths` says.
+- Built-in human-only paths: `.gbai/VERSION`, the catalog subtree `.gbai/skills/` and the reviewer's own source (any `skills/gabo-reviewer/` dir), whatever `review.human_only_paths` says.
 - Base minimum: the integration branch's `.gbai/VERSION` is the minimum version of the gabo binary (`REVIEWER_GABO_BIN`, `gbai` until T062); an older binary is refused with `go install <module>/cmd/<binary>@v<version>` (TRD 9.4); the scripts never update it; no stamp means no minimum.
 - `gabo check` (or `gbai check`) runs only when `review.checks` lists it, with the configured binary.
 - Upgrade PR (changes `.gbai/VERSION`): checks run with `GABO_UPGRADE_PR=1`; the comment reports `upgrade PR: only config validated, human merge required` with the changed paths outside `.gbai/skills/` and the declared agent directories; it is never merged by the scripts.
