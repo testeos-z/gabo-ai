@@ -14,7 +14,7 @@ As a tech lead, I want every PR validated by an isolated reviewer and linked to 
 
 ## Acceptance criteria
 
-- Given a coder opens a PR, When the reviewer validates it, Then the reviewer scripts installed in the repository run tests, build and lint as in CI plus an independent agent review, and this validation is a mandatory merge gate that never merges into main.
+- Given a coder opens a PR, When the reviewer validates it, Then the reviewer scripts of the user-level `gbai-reviewer` skill (installed by `gbai init`, outside the repository) run tests, build and lint as in CI plus an independent agent review, and this validation is a mandatory merge gate that never merges into main.
 - Given the reviewer runs, When it validates a PR, Then it uses its own clone, home and cache, never the coder's, comments the verdict on the PR, and the reviewer agent relays the verdict to the coder.
 - Given a coder reports DONE or BLOCKED, When the cycle processes the report, Then the task status in the tracker reflects it.
 - Given a PR exists, When I look at its task, Then the PR is linked to it (for example "Closes #n" for GitHub issues).
