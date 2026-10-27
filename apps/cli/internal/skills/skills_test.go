@@ -16,7 +16,7 @@ var want = []string{
 	"gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-direct-sessions-orca", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
+	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
 }
 
 // contracts maps each contract skill to its TRD 9.1 operations, in order, and
@@ -160,6 +160,12 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"filter by `mode`, `wave` and `task`", "user/preferences",
 		},
 		"gabo-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gabo-methodology"},
+		// T055: the doc guide maps every product doc, the setup prompt and the catalog.
+		"gabo-doc-guide/SKILL.md": {
+			"docs/product/PRD.md", "docs/product/stories/", "docs/product/TRD.md", "docs/product/IMPLEMENTATION_PLAN.md",
+			"docs/product/DB_SCHEMA.md", "docs/product/UX_UI.md", "docs/product/APP_FLOW.md", "DESIGN.md",
+			"setup prompt", ".gbai/skills/", "adds no rule",
+		},
 		// The former cloud keys of the core config (DB_SCHEMA 2.3).
 		"gabo-contract-agent-host/SKILL.md": {
 			"server.railway", "users.orca", "bot.login", "sessions.{coder, reviewer, assistant}.prompt_file",
