@@ -1,6 +1,6 @@
 // Package skills embeds the agent skills shipped with gbai. Each skill is a
 // directory holding a SKILL.md; contract skills also hold example adapters
-// under examples/.
+// under examples/, and directiva skills hold plan templates under templates/.
 package skills
 
 import (
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-//go:embed */SKILL.md */examples/*.md
+//go:embed */SKILL.md */examples/*.md */templates/*.md
 var content embed.FS
 
 // File is one embedded file; Path is relative, like gbai-setup/SKILL.md or
