@@ -10,8 +10,9 @@ import (
 )
 
 var want = []string{
-	"gbai-assistant", "gbai-coder", "gbai-contract-repository-host", "gbai-contract-reviewer-placement",
-	"gbai-contract-tasks", "gbai-cycle", "gbai-db-master", "gbai-dev-lead",
+	"gbai-assistant", "gbai-coder", "gbai-contract-agent-host", "gbai-contract-direct-sessions",
+	"gbai-contract-memory", "gbai-contract-methodology", "gbai-contract-notifications",
+	"gbai-contract-repository-host", "gbai-contract-reviewer-placement", "gbai-contract-tasks", "gbai-cycle", "gbai-db-master", "gbai-dev-lead",
 	"gbai-frontend", "gbai-orca-inbox", "gbai-pm", "gbai-reviewer-notes", "gbai-setup",
 }
 
@@ -38,6 +39,30 @@ var contracts = map[string]struct {
 	"gbai-contract-reviewer-placement": {
 		ops:      []string{"trigger review", "report placement", "return verdict"},
 		examples: []string{"reviewer-local.md"},
+	},
+	"gbai-contract-memory": {
+		ops: []string{
+			"save decision", "list decisions", "search", "read one",
+			"save ledger", "read ledger", "save wave trace", "read wave trace",
+			"save preference", "read preferences",
+		},
+		examples: []string{"memory-engram.md"},
+	},
+	"gbai-contract-notifications": {
+		ops:      []string{"notify owner", "notify developer by alias"},
+		examples: []string{"notify-task-comment.md"},
+	},
+	"gbai-contract-direct-sessions": {
+		ops:      []string{"open session", "send message", "read state", "close session"},
+		examples: []string{"sessions-orca.md"},
+	},
+	"gbai-contract-methodology": {
+		ops:      []string{"coder instructions", "coder-side review", "report per task"},
+		examples: []string{"methodology-tdd.md"},
+	},
+	"gbai-contract-agent-host": {
+		ops:      []string{"start agent session", "stop agent session", "report where agents run"},
+		examples: []string{"agent-host-railway.md"},
 	},
 }
 
@@ -98,6 +123,20 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		"gbai-coder/SKILL.md":          {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
 		"gbai-cycle/SKILL.md":          {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
 		"gbai-reviewer-notes/SKILL.md": {"never approves", "marker"},
+		// TRD 9.2 auto decision record fields and the list filters (R6, R30).
+		"gbai-contract-memory/SKILL.md": {
+			"`what`", "`question`", "`choice`", "`reason`", "`mode`", "`wave`", "`task`", "`resolver`",
+			"filter by `mode`, `wave` and `task`", "user/preferences",
+		},
+		"gbai-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gbai-methodology"},
+		// The former cloud keys of the core config (DB_SCHEMA 2.3).
+		"gbai-contract-agent-host/SKILL.md": {
+			"server.railway", "users.orca", "bot.login", "sessions.{coder, reviewer, assistant}.prompt_file",
+			"sessions.local_orca", "/etc/gbai/gbai.yaml",
+		},
+		"gbai-contract-agent-host/examples/agent-host-railway.md": {
+			"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gbai/gbai.yaml",
+		},
 	}
 	for _, f := range files {
 		for _, s := range want[f.Path] {
