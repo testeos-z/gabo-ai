@@ -135,6 +135,12 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		"gabo-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
 			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
+			// T024: J3, J8, J10 and J11 through the skill alone (no gbai command, no state dir).
+			"blocked-by links", "before each coder round", "rule 1", "rule 2", "rule 3",
+			"4 fix rounds", "Unverified writes", "test databases", "no `gbai` command",
+			"no state dir", "D15", "D17", "skips DONE", "reattach", "disagreement",
+			"never guess", "TRD 9.2", "save the wave report", "`gbai/trace/<wave>`",
+			"`gbai/ledger/<wave>`", "merged tasks still open",
 		},
 		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
 		"gabo-assistant/SKILL.md": {
