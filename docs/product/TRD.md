@@ -354,7 +354,7 @@ Each contract is a gbai skill; each operation must be covered by the adapter. Th
 | `methodology` | instructions the coder loads as `gbai-methodology`; declares whether coder-side review (for example GGA, RDD) runs and how. Recommended, not required (owner 2026-10-26): gentle-ai ODD with RDD as the coder-side validation layer | R8, R9 |
 | `repository_host` | open PR, comment on PR, read PR status and checks, merge into `repo.integration_branch`, delete branch | R9, R10, D13 |
 | `reviewer_placement` | trigger a review run for a PR head (invoke the script of the user-level `gbai-reviewer` skill, D20), report where it ran and in which mode (single-user or isolated), return the verdict location and `VERDICT` line | R9, R26 |
-| `agent_host` (cloud, optional) | start an agent session on the host, stop it, report where agents run; holds server ids, OS user, bot identity and session prompts. Configured in a separate assistant session | Deployment view |
+| `agent_host` (local or cloud, optional) | start an agent session on the host, stop it, report where agents run; for a cloud host it holds server ids, OS user, bot identity and session prompts. Configured in a separate assistant session | Deployment view |
 
 **Recommended adapters (Approved (owner 2026-10-26)).** A recommendation is an option setup offers first and installs only if the user accepts; it is never a silent default (R12).
 
@@ -374,7 +374,7 @@ Proposed (auto): `agent_host` contract row and the `memory` filters. Reason: DB_
 High level only; field-level details are in [DB_SCHEMA.md](DB_SCHEMA.md).
 
 - Global user file: `version`, `alias`, `interaction_level` (`low`, `balanced`, `high`), `tone`, `language` (the stable personalization layer, D22).
-- Project `gbai.yaml`: `version`, `mode`, `slots.<name>.adapter` (including `slots.methodology` and the cloud slot `slots.agent_host`), `reviewer.{placement, signing}`, `runtimes.{coder, reviewer, assistant}` (`runtimes.reviewer` is the only reviewer runtime key), `plan_change.{scope, global_without_owner}`, `developers` (git email → alias), `generation.targets` (dropped, owner 2026-10-27, D24: the runtimes to build for come from `runtimes.{coder, reviewer, assistant}`), `repo.{name, integration_branch}`, `review.*`, `parallelism`, `worktree.keep`.
+- Project `gbai.yaml`: `version`, `mode`, `slots.<name>.adapter` (including `slots.methodology` and the host slot `slots.agent_host`, local or cloud), `reviewer.{placement, signing}`, `runtimes.{coder, reviewer, assistant}` (`runtimes.reviewer` is the only reviewer runtime key), `plan_change.{scope, global_without_owner}`, `developers` (git email → alias), `generation.targets` (dropped, owner 2026-10-27, D24: the runtimes to build for come from `runtimes.{coder, reviewer, assistant}`), `repo.{name, integration_branch}`, `review.*`, `parallelism`, `worktree.keep`.
 - Cloud fields (Railway ids, OS user, bot, session prompts, `sessions.local_orca`, system layer) are not core keys; they live in the `agent_host` adapter.
 - Required keys have no code default; a missing required key fails with "run setup" (R12).
 
@@ -535,6 +535,8 @@ Proposed (auto). Reason: traceability pass; every requirement maps to a decision
 | R34 | D3, D24 | 8.1 | US-001, US-007 | test, demo → runtime skill probe agent plus `gbai check`, setup walkthrough |
 | R35 | D24 | 8.1 | US-007 | test, demo → runtime builder dry run on a third engine ending in `gbai check` |
 | R36 | D25 | 9.4 | US-001 | test, inspection → Go test: the published prompt block equals the embedded file; `gbai init` output test; docs review |
+| R37 | pending (Proposed (auto), issue #107) | pending | US-012 | inspection, demo → pending: setup skill review and walkthrough (plan stub S1) |
+| R38 | pending (Proposed (auto), issue #107) | pending | US-012 | test, inspection, demo → pending: setup skill test with scratch-topic probe cleanup (plan stub S1) |
 
 R5, R7 and R29 are covered by sections only, not by a dedicated decision; they need none beyond the approved ones.
 
