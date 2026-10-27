@@ -121,7 +121,7 @@ PRD open question 12 (pending owner decision, not applied): the CLI may be renam
 
 ### 2.1 Commands
 
-Names (owner 2026-10-27, PRD O9): the product is gabo-ai and the CLI is invoked as `gabo`. Skill prefix `gabo-*`, config file `gabo.yaml` and the global user file under a `gabo` directory are derived defaults, pending owner confirmation. The existing `gbai-*` skill names, `gbai.yaml`, the `gbai` command and the `gbai` global directory stay in every other section and in the repository until the rename task lands.
+Names (owner 2026-10-27, PRD O9): the product is gabo-ai and the CLI is invoked as `gabo`. Skill prefix `gabo-*`, project config file `gabo.yaml` and the global user file under a `gabo` directory are approved (confirmed by the owner 2026-10-27). The existing `gbai-*` skill names, `gbai.yaml`, the `gbai` command and the `gbai` global directory stay in every other section and in the repository until the rename task lands.
 
 Amended (owner 2026-10-27, U7, PRD R31–R33). The CLI has three commands. It writes no config and builds no agent; the user's agent does that from skills (PRD R34). Nothing in Go runs during the work itself.
 
