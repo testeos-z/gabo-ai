@@ -326,7 +326,15 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 	if got, want := operations(adapter), contracts["gabo-contract-agent-host"].ops; !slices.Equal(got, want) {
 		t.Errorf("gabo-agent-host-local/SKILL.md: operations %q, want %q", got, want)
 	}
-	for _, s := range []string{"gabo-contract-agent-host", "`not used`", "--session-id", "kill -0", "single-user", "ledger"} {
+	for _, s := range []string{
+		"gabo-contract-agent-host", "`not used`", "single-user", "ledger",
+		// claude and pi command lines, each with its session id and the prompt kept off argv.
+		`claude --print --agent <role agent> --session-id "$sid" <"$dir/prompt.md"`,
+		`pi --print --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md"`,
+		"</dev/null",
+		// a reused process id is never signalled: the session id is matched before kill.
+		`grep -F -- "--session-id <sid>"` + "\nkill -TERM <pid>",
+	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-agent-host-local/SKILL.md: missing %q", s)
 		}
