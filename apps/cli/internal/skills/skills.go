@@ -1,6 +1,8 @@
 // Package skills embeds the agent skills shipped with gbai. Each skill is a
 // directory holding a SKILL.md; contract skills also hold example adapters
-// under examples/, and directiva skills hold plan templates under templates/.
+// under examples/, directiva skills hold plan templates under templates/, and
+// gabo-reviewer holds the reviewer scripts and their shell tests under
+// scripts/ (TRD D20).
 package skills
 
 import (
@@ -10,10 +12,12 @@ import (
 	"io/fs"
 	"path"
 	"slices"
+	"strings"
 	"time"
 )
 
 //go:embed */SKILL.md */examples/*.md */templates/*.md
+//go:embed gabo-reviewer/README.md gabo-reviewer/scripts/*.sh gabo-reviewer/scripts/config.env gabo-reviewer/scripts/tests/*.sh
 var content embed.FS
 
 // File is one embedded file; Path is relative, like gabo-setup/SKILL.md or
@@ -23,12 +27,30 @@ type File struct {
 	Data []byte
 }
 
-// Files returns every embedded file in path order.
+// reviewerSkill is installed only at user level (TRD D20, T041), never with
+// the catalog, so PR code cannot change the scripts that review it.
+const reviewerSkill = "gabo-reviewer"
+
+// Files returns every embedded catalog file in path order, without the
+// reviewer skill.
 func Files() ([]File, error) {
+	return walk(func(dir string) bool { return dir != reviewerSkill })
+}
+
+// ReviewerFiles returns the files of the gabo-reviewer skill (SKILL.md,
+// README.md and scripts/) in path order.
+func ReviewerFiles() ([]File, error) {
+	return walk(func(dir string) bool { return dir == reviewerSkill })
+}
+
+func walk(keep func(dir string) bool) ([]File, error) {
 	var out []File
 	err := fs.WalkDir(content, ".", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
+		}
+		if dir, _, _ := strings.Cut(p, "/"); !keep(dir) {
+			return nil
 		}
 		b, err := content.ReadFile(p)
 		if err != nil {
@@ -40,12 +62,12 @@ func Files() ([]File, error) {
 	return out, err
 }
 
-// Names lists the skill names in sorted order.
+// Names lists the catalog skill names in sorted order.
 func Names() []string {
 	entries, _ := content.ReadDir(".")
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() {
+		if e.IsDir() && e.Name() != reviewerSkill {
 			names = append(names, e.Name())
 		}
 	}

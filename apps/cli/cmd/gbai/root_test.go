@@ -95,6 +95,11 @@ func TestInitDryRunChangesNothing(t *testing.T) {
 			t.Fatalf("missing %q:\n%s", want, out.String())
 		}
 	}
+	// The reviewer skill is installed only at user level by its own step
+	// (T041), never by the catalog install, so PR code cannot change it.
+	if strings.Contains(out.String(), "gabo-reviewer/") {
+		t.Fatalf("init installs the reviewer skill with the catalog:\n%s", out.String())
+	}
 	if strings.Contains(strings.ToLower(out.String()), "mcp") {
 		t.Fatalf("init still registers an MCP server:\n%s", out.String())
 	}

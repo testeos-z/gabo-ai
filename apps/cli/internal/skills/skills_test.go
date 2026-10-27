@@ -5,6 +5,8 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -316,5 +318,96 @@ func TestTarHoldsEverySkillFile(t *testing.T) {
 		if !slices.Contains(names, n+"/SKILL.md") {
 			t.Errorf("tar misses %s/SKILL.md (has %v)", n, names)
 		}
+	}
+}
+
+// reviewerFiles are the files of the embedded gabo-reviewer skill (T040): the
+// scripts live in its scripts/ folder, next to its SKILL.md, with their tests.
+var reviewerFiles = []string{
+	"gabo-reviewer/README.md",
+	"gabo-reviewer/SKILL.md",
+	"gabo-reviewer/scripts/common.sh",
+	"gabo-reviewer/scripts/config.env",
+	"gabo-reviewer/scripts/merge-head.sh",
+	"gabo-reviewer/scripts/review-head.sh",
+	"gabo-reviewer/scripts/reviewer.sh",
+	"gabo-reviewer/scripts/tests/lib.sh",
+	"gabo-reviewer/scripts/tests/merge-head.test.sh",
+	"gabo-reviewer/scripts/tests/preflight.test.sh",
+	"gabo-reviewer/scripts/tests/review.test.sh",
+	"gabo-reviewer/scripts/tests/stubs.sh",
+}
+
+func TestReviewerSkillShipsItsScripts(t *testing.T) {
+	t.Parallel()
+	files, err := ReviewerFiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, f := range files {
+		got = append(got, f.Path)
+		// The repository comes from gbai.yaml; only the TRD 9.4 module path
+		// of the upgrade command may name the old repository.
+		rest := strings.ReplaceAll(string(f.Data), "github.com/testeos-z/gbai-team/apps/cli/cmd/gbai", "")
+		if strings.Contains(rest, "testeos-z/gbai-team") {
+			t.Errorf("%s: hardcodes the repository testeos-z/gbai-team", f.Path)
+		}
+		if f.Path == "gabo-reviewer/SKILL.md" {
+			fm, ok := frontmatter(string(f.Data))
+			d := fm["description"]
+			if !ok || fm["name"] != "gabo-reviewer" || !strings.HasPrefix(d, `"Trigger: `) || len(d) > 252 {
+				t.Errorf("%s: bad frontmatter %v", f.Path, fm)
+			}
+		}
+	}
+	if !slices.Equal(got, reviewerFiles) {
+		t.Fatalf("gabo-reviewer files = %v\nwant %v", got, reviewerFiles)
+	}
+}
+
+// The catalog that init installs never carries the reviewer skill: it is
+// installed only at user level (T041), so PR code cannot change it.
+func TestCatalogLeavesOutTheReviewerSkill(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range files {
+		if strings.HasPrefix(f.Path, "gabo-reviewer/") {
+			t.Errorf("catalog holds %s", f.Path)
+		}
+	}
+	if slices.Contains(Names(), "gabo-reviewer") {
+		t.Error("Names() lists gabo-reviewer")
+	}
+}
+
+// The shell tests of the reviewer scripts run against fake gh, claude, go and
+// gbai and a local bare repository, so they run with the Go suite (and in
+// review.checks) wherever their tools exist.
+func TestReviewerScriptsShellTests(t *testing.T) {
+	t.Parallel()
+	if testing.Short() {
+		t.Skip("shell tests skipped in -short mode")
+	}
+	for _, tool := range []string{"bash", "git", "jq", "flock", "setsid"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("%s not found: %v", tool, err)
+		}
+	}
+	tests, err := filepath.Glob("gabo-reviewer/scripts/tests/*.test.sh")
+	if err != nil || len(tests) != 3 {
+		t.Fatalf("shell tests = %v (%v), want 3", tests, err)
+	}
+	for _, p := range tests {
+		t.Run(filepath.Base(p), func(t *testing.T) {
+			t.Parallel()
+			out, err := exec.Command("bash", p).CombinedOutput()
+			if err != nil {
+				t.Fatalf("bash %s: %v\n%s", p, err, out)
+			}
+		})
 	}
 }
