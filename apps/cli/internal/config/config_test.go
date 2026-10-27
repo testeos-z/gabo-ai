@@ -74,8 +74,8 @@ func TestParseValidationErrors(t *testing.T) {
 		yaml string
 		want string
 	}{
-		{"missing project", strings.Replace(minimal, "project_id: p1", "project_id: \"\"", 1), "server.railway.project_id"},
-		{"missing service", strings.Replace(minimal, "service_id: s1", "service_id: \"\"", 1), "server.railway.service_id"},
+		{"bad project id", strings.Replace(minimal, "project_id: p1", "project_id: \"p 1\"", 1), "server.railway.project_id"},
+		{"bad service id", strings.Replace(minimal, "service_id: s1", "service_id: \"s;1\"", 1), "server.railway.service_id"},
 		{"bad repo", strings.Replace(minimal, "cappy-lab/vulcam", "vulcam", 1), "repo.name"},
 		{"bad bot", strings.Replace(minimal, "login: vulcambot", "login: \"bad login\"", 1), "bot.login"},
 		{"bad runtime", minimal + "runtimes:\n  coder: opencode\n", "runtimes.coder"},
