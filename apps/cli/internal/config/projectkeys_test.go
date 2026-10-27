@@ -49,6 +49,7 @@ review:
     - go vet ./...
   auto_merge: false
   human_only_paths: [.github/, AGENTS.md, CLAUDE.md]
+  pi_credential_env: ANTHROPIC_API_KEY
 
 developers:
   "leo@example.com": Leo

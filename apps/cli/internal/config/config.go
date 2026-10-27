@@ -31,7 +31,7 @@ type Config struct {
 	Coder    Coder    `yaml:"coder"`
 	Worktree Worktree `yaml:"worktree"`
 	// Parallelism is the most coder sessions the cycle runs at once; it
-	// already leaves room for the reviewer's checks. 0 means the default, 3.
+	// already leaves room for the reviewer's checks. Required, no default.
 	Parallelism int `yaml:"parallelism"`
 
 	// Version is the schema version of the file; a file without it is
@@ -89,7 +89,8 @@ type Review struct {
 	Checks         []string `yaml:"checks"`
 	AutoMerge      bool     `yaml:"auto_merge"`
 	HumanOnlyPaths []string `yaml:"human_only_paths"`
-	// PiCredentialEnv names the env var that receives the pi model credential.
+	// PiCredentialEnv names the env var that receives the pi model
+	// credential; required when runtimes.reviewer is pi.
 	PiCredentialEnv string `yaml:"pi_credential_env"`
 	// StateDir holds the reviewer's own clone, worktrees and check
 	// workspaces. Empty means $XDG_STATE_HOME/gbai/reviewer, else
@@ -141,7 +142,9 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// Parse decodes, defaults and validates a config document.
+// Parse decodes and validates a config document. It fills no value: a
+// missing required key fails with "✗ <key> missing" and NextSetup (R12);
+// the former defaults are only offered through Suggestions.
 func Parse(b []byte) (Config, error) {
 	var cfg Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
@@ -149,14 +152,20 @@ func Parse(b []byte) (Config, error) {
 	if err := dec.Decode(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode yaml: %w", err)
 	}
-	cfg.applyDefaults()
-	if err := cfg.validate(); err != nil {
+	// An int cannot tell an absent parallelism from an explicit 0.
+	var set struct {
+		Parallelism *int `yaml:"parallelism"`
+	}
+	if err := yaml.Unmarshal(b, &set); err != nil {
+		return Config{}, fmt.Errorf("decode yaml: %w", err)
+	}
+	if err := cfg.validate(set.Parallelism != nil); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
 }
 
-// Marshal encodes the validated config, defaults included, as YAML.
+// Marshal encodes the validated config as YAML.
 func (c Config) Marshal() ([]byte, error) {
 	b, err := yaml.Marshal(c)
 	if err != nil {
@@ -165,38 +174,21 @@ func (c Config) Marshal() ([]byte, error) {
 	return b, nil
 }
 
-func (c *Config) applyDefaults() {
-	defaultString(&c.Runtimes.Coder, RuntimeClaude)
-	defaultString(&c.Runtimes.Reviewer, RuntimePi)
-	defaultString(&c.Runtimes.Assistant, RuntimeClaude)
-	defaultString(&c.Repo.IntegrationBranch, "dev")
-	if c.Review.Checks == nil {
-		c.Review.Checks = []string{"bun install --frozen-lockfile", "bun run build", "bun run check-types", "bun run lint", "bun run test"}
-	}
-	if c.Review.HumanOnlyPaths == nil {
-		c.Review.HumanOnlyPaths = []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}
-	}
-	defaultString(&c.Review.PiCredentialEnv, "ANTHROPIC_API_KEY")
-	if c.Parallelism == 0 {
-		c.Parallelism = 3
-	}
-}
-
-func defaultString[T ~string](v *T, d T) {
-	if *v == "" {
-		*v = d
-	}
-}
-
-func (c Config) validate() error {
-	var errs []error
+// validate reports every missing required key first, then every invalid
+// value of a key that is set, and ends with NextSetup when a key was missing.
+func (c Config) validate(parallelismSet bool) error {
+	missing := c.missingKeys(parallelismSet)
+	errs := missingErrors(missing)
 	check := func(ok bool, field, msg string) {
-		if !ok {
+		if !ok && !slices.Contains(missing, field) {
 			errs = append(errs, fmt.Errorf("%s: %s", field, msg))
 		}
 	}
-	for field, rt := range map[string]Runtime{"runtimes.coder": c.Runtimes.Coder, "runtimes.reviewer": c.Runtimes.Reviewer, "runtimes.assistant": c.Runtimes.Assistant} {
-		check(rt == RuntimeClaude || rt == RuntimePi, field, fmt.Sprintf("must be %q or %q, got %q", RuntimeClaude, RuntimePi, rt))
+	for _, rt := range []struct {
+		field string
+		value Runtime
+	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.reviewer", c.Runtimes.Reviewer}, {"runtimes.assistant", c.Runtimes.Assistant}} {
+		check(rt.value == RuntimeClaude || rt.value == RuntimePi, rt.field, fmt.Sprintf("must be %q or %q, got %q", RuntimeClaude, RuntimePi, rt.value))
 	}
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")
@@ -210,7 +202,7 @@ func (c Config) validate() error {
 		ok := p != "" && !strings.HasPrefix(p, "/") && !slices.Contains(strings.Split(strings.TrimSuffix(p, "/"), "/"), "..")
 		check(ok, "review.human_only_paths", fmt.Sprintf("entry %q must be a relative repository path", p))
 	}
-	check(envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
+	check(c.Review.PiCredentialEnv == "" || envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
 	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")
 	check(c.Review.StateDir == "" || pathPattern.MatchString(c.Review.StateDir), "review.state_dir", "must be an absolute path of safe characters")
 	check(c.Parallelism > 0, "parallelism", "must be a positive number of coder sessions")
@@ -220,5 +212,5 @@ func (c Config) validate() error {
 	}
 	errs = append(errs, c.validateKeyClasses()...)
 	errs = append(errs, c.validateProjectKeys()...)
-	return errors.Join(errs...)
+	return withNextSetup(errors.Join(errs...), missing)
 }

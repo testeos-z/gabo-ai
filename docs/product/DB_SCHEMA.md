@@ -17,7 +17,7 @@ This document therefore replaces "schema" with the file formats gbai owns, "migr
 
 **Format.** YAML, validated with JSON Schema (editor autocomplete and validation). TOON is not used for config files.
 
-**No silent defaults (R12).** The assistant asks before writing any key. Documented defaults are suggestions the assistant offers, not values gbai applies behind the user's back. See [Migration](#6-migration) for the defaults the current code still applies.
+**No silent defaults (R12).** The assistant asks before writing any key. Documented defaults are suggestions the assistant offers, not values gbai applies behind the user's back. The loader fills no key (migration step 5, T005): a missing required key fails with `✗ <key> missing` and `next: run setup`, and the former code defaults are exposed only as a read-only suggestions list (`config.Suggestions`).
 
 ### Persistence inventory
 
@@ -85,7 +85,7 @@ The system layer `/etc/gbai/gbai.yaml` exists today only for the server, so it m
 
 ## 3. Schema per file
 
-Every key not implemented today is marked **proposed (not implemented)**. Implemented keys show their current code default; under R12 these become suggestions (see Migration).
+Every key not implemented today is marked **proposed (not implemented)**. Implemented keys show their suggestion, the former code default, which gbai no longer applies (R12, T005).
 
 ### 3.1 Global user config
 
@@ -108,17 +108,17 @@ Today the user layer accepts the same keys as the project file; under the split 
 | key | type | required | description | example |
 |---|---|---|---|---|
 | `repo.name` | string `owner/name` | yes | Target GitHub repository | `testeos-z/gbai-team` |
-| `repo.integration_branch` | string | no (code default `dev`) | Only branch auto mode may merge into, never main (D13) | `dev` |
-| `runtimes.coder` | enum `claude`, `pi` | no (code default `claude`) | Coder runtime | `claude` |
-| `runtimes.reviewer` | enum `claude`, `pi` | no (code default `pi`) | Reviewer runtime, the only key for it (no separate engine key under `reviewer`); TRD requires the assistant to ask (no default) | `pi` |
-| `runtimes.assistant` | enum `claude`, `pi` | no (code default `claude`) | Assistant runtime | `claude` |
+| `repo.integration_branch` | string | yes (suggestion `dev`) | Only branch auto mode may merge into, never main (D13) | `dev` |
+| `runtimes.coder` | enum `claude`, `pi` | yes (suggestion `claude`) | Coder runtime | `claude` |
+| `runtimes.reviewer` | enum `claude`, `pi` | yes (suggestion `pi`) | Reviewer runtime, the only key for it (no separate engine key under `reviewer`); TRD requires the assistant to ask (no default) | `pi` |
+| `runtimes.assistant` | enum `claude`, `pi` | yes (suggestion `claude`) | Assistant runtime | `claude` |
 | `coder.login` | string | no | Coder GitHub login; audit flags merges by it; must differ from `bot.login` | `gbai-coder` |
-| `review.checks` | list of string | no (code default: bun install, build, check-types, lint, test) | Commands run in order in a credential-free copy of the merged tree; split on whitespace, no shell | `["go test ./..."]` |
+| `review.checks` | list of string | yes (suggestion: bun install, build, check-types, lint, test) | Commands run in order in a credential-free copy of the merged tree; split on whitespace, no shell | `["go test ./..."]` |
 | `review.auto_merge` | boolean | no (`false`) | Reviewer merges on approve | `false` |
-| `review.human_only_paths` | list of relative path | no (code default list) | Paths only a human may change | `[".github/", "AGENTS.md"]` |
-| `review.pi_credential_env` | env var name | no (code default `ANTHROPIC_API_KEY`) | Env var that receives the pi model credential; the value never enters config (R21) | `ANTHROPIC_API_KEY` |
+| `review.human_only_paths` | list of relative path | yes (suggestion: the former default list) | Paths only a human may change | `[".github/", "AGENTS.md"]` |
+| `review.pi_credential_env` | env var name | when `runtimes.reviewer` is `pi` (suggestion `ANTHROPIC_API_KEY`) | Env var that receives the pi model credential; the value never enters config (R21) | `ANTHROPIC_API_KEY` |
 | `review.state_dir` | absolute path | no | Reviewer clone and workspaces; see inventory | `/data/gbai/reviewer` |
-| `parallelism` | positive integer | no (code default `3`) | Most coder sessions at once | `3` |
+| `parallelism` | positive integer | yes (suggestion `3`) | Most coder sessions at once | `3` |
 | `worktree.keep` | list of string | no | Worktree names or absolute paths never closed | `["main"]` |
 
 **New keys:**
@@ -206,6 +206,7 @@ review:
     - go vet ./...
   auto_merge: false
   human_only_paths: [.github/, AGENTS.md, CLAUDE.md]
+  pi_credential_env: ANTHROPIC_API_KEY
 
 developers:
   "leo@example.com": Leo

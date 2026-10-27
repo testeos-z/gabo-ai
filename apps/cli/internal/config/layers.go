@@ -37,7 +37,7 @@ type Layer struct {
 	Version int
 }
 
-// Resolution is the merged, defaulted and validated config together with the
+// Resolution is the merged and validated config together with the
 // layers it was looked up in.
 type Resolution struct {
 	Layers []Layer
@@ -115,8 +115,8 @@ func LoadFile(r Reader, name string) (Resolution, error) {
 // LoadLayers reads every existing layer in order and merges them: a higher
 // layer overrides a lower one field by field (see Merge). Missing files are
 // skipped; unknown keys and an unsupported version fail per file, and
-// version is kept out of the merged document. Defaults and validation run once on
-// the merged result. Layers are returned with Found set, even on error.
+// version is kept out of the merged document. Validation runs once on the
+// merged result; no layer value is filled in. Layers are returned with Found set, even on error.
 func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 	res := Resolution{Layers: append([]Layer(nil), layers...)}
 	var merged map[string]any

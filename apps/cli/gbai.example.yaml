@@ -7,9 +7,10 @@
 #   3. project: gbai.yaml at the git top-level of the current directory
 #               (the current directory itself outside a git repository)
 # A higher layer overrides only the keys it sets: mappings merge key by key,
-# scalars and lists replace the lower value, `key: null` resets it to the default.
-# Missing files are skipped; an unknown key fails and names its file. Defaults
-# and validation run once on the merged result. `--config <file>` reads exactly
+# scalars and lists replace the lower value, `key: null` unsets it.
+# Missing files are skipped; an unknown key fails and names its file.
+# Validation runs once on the merged result. gbai fills no key: a missing
+# required key fails with `✗ <key> missing` and `next: run setup`. `--config <file>` reads exactly
 # that one file.
 
 runtimes:
@@ -44,7 +45,8 @@ review:
     - docs/policies/
     - tools/hook-tests/
     - agents/
-  # Env var that receives the pi model credential (claude uses CLAUDE_CODE_OAUTH_TOKEN).
+  # Env var that receives the pi model credential (claude uses CLAUDE_CODE_OAUTH_TOKEN);
+  # required when runtimes.reviewer is pi.
   pi_credential_env: ANTHROPIC_API_KEY
   # Reviewer state (its own clone/, worktrees/ and ci/ workspaces), 0700.
   # Default: $XDG_STATE_HOME/gbai/reviewer, else ~/.local/state/gbai/reviewer.
@@ -55,8 +57,8 @@ review:
 # coder:
 #   login: vulcam-coder
 
-# Most coder sessions the cycle runs at once. The default, 3, leaves room
-# for the reviewer's checks on the same machine; lower it on a smaller one.
+# Most coder sessions the cycle runs at once (required). 3 leaves room for
+# the reviewer's checks on the same machine; lower it on a smaller one.
 parallelism: 3
 
 # Read by the cycle at wave cleanup.
