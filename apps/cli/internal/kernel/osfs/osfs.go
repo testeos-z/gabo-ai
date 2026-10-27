@@ -2,6 +2,7 @@
 package osfs
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 
@@ -29,3 +30,12 @@ func (FS) WriteFile(name string, data []byte) error {
 
 // RemoveAll removes dir and everything below it; a missing dir is no error.
 func (FS) RemoveAll(dir string) error { return os.RemoveAll(dir) }
+
+// Lstat returns the mode of name without following a final symlink.
+func (FS) Lstat(name string) (fs.FileMode, error) {
+	info, err := os.Lstat(name)
+	if err != nil {
+		return 0, err
+	}
+	return info.Mode(), nil
+}

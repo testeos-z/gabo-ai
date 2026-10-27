@@ -226,3 +226,26 @@ func TestConfigLoaderPrintsWarningsOncePerProcess(t *testing.T) {
 		t.Fatalf("stderr = %q, want %q", got, want)
 	}
 }
+
+// A committed .gbai symlink must not let init delete or write outside the
+// project.
+func TestInitRefusesSymlinkedGbaiDir(t *testing.T) {
+	project, outside := t.TempDir(), t.TempDir()
+	keep := filepath.Join(outside, "skills", "mine", "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(keep), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(keep, []byte("mine"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(outside, filepath.Join(project, ".gbai")); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, outside)
+	if _, err := runInit(t, project, "1.2.3"); err == nil {
+		t.Fatal("init accepted a symlinked .gbai")
+	}
+	if after := snapshot(t, outside); !maps.Equal(before, after) {
+		t.Fatalf("outside changed:\n%v\n%v", before, after)
+	}
+}

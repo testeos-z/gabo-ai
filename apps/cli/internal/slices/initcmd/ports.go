@@ -1,5 +1,7 @@
 package initcmd
 
+import "io/fs"
+
 // Store reads and writes the project files init owns.
 type Store interface {
 	// ReadFile returns an error matching fs.ErrNotExist for a missing file.
@@ -8,4 +10,7 @@ type Store interface {
 	WriteFile(name string, data []byte) error
 	// RemoveAll removes dir and everything below it; a missing dir is no error.
 	RemoveAll(dir string) error
+	// Lstat returns the mode of name without following a final symlink, or an
+	// error matching fs.ErrNotExist.
+	Lstat(name string) (fs.FileMode, error)
 }

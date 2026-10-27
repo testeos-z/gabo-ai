@@ -17,7 +17,8 @@ func TestResolveVersion(t *testing.T) {
 	}{
 		{"ldflags wins", "1.2.3", info("v9.9.9", true), "1.2.3"},
 		{"go install module version", "", info("v1.4.0", true), "v1.4.0"},
-		{"source build", "", info("(devel)", true), ""},
+		{"source build without vcs", "", info("(devel)", true), ""},
+		{"source build with vcs", "", info("v1.4.1-0.20261027120000-abc123def456+dirty", true), "v1.4.1-0.20261027120000-abc123def456+dirty"},
 		{"no build info", "", info("", false), ""},
 	}
 	for _, tt := range tests {

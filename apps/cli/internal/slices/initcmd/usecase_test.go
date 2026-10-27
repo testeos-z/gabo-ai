@@ -2,6 +2,7 @@ package initcmd
 
 import (
 	"context"
+	"io/fs"
 	"maps"
 	"strings"
 	"testing"
@@ -22,10 +23,27 @@ const (
 
 var catalog = []File{{Path: "gabo-coder/SKILL.md", Data: []byte("coder")}, {Path: "gabo-setup/SKILL.md", Data: []byte("setup")}}
 
-// memStore adds RemoveAll to the shared in-memory fake.
+// memStore adds RemoveAll and Lstat to the shared in-memory fake; Modes
+// overrides the mode Lstat reports for a path (for example a symlink).
 type memStore struct {
 	kerneltest.FS
 	Removed []string
+	Modes   map[string]fs.FileMode
+}
+
+func (m *memStore) Lstat(name string) (fs.FileMode, error) {
+	if mode, ok := m.Modes[name]; ok {
+		return mode, nil
+	}
+	if _, ok := m.Files[name]; ok {
+		return 0, nil
+	}
+	for f := range m.Files {
+		if strings.HasPrefix(f, name+"/") {
+			return fs.ModeDir, nil
+		}
+	}
+	return 0, &fs.PathError{Op: "lstat", Path: name, Err: fs.ErrNotExist}
 }
 
 func (m *memStore) RemoveAll(dir string) error {
@@ -195,6 +213,7 @@ func TestUnusableVersionsChangeNothing(t *testing.T) {
 		want          string
 	}{
 		{"dev binary", "dev", map[string]string{}, `binary version "dev"`},
+		{"vcs pseudo-version", "v1.4.1-0.20261027120000-abc123def456+dirty", map[string]string{}, `binary version "v1.4.1-0.20261027120000-abc123def456+dirty"`},
 		{"garbage stamp", "1.2.3", map[string]string{stamp: "latest\n"}, `.gbai/VERSION holds "latest"`},
 	}
 	for _, tt := range tests {
@@ -228,5 +247,29 @@ func TestWritesNoRuntimeFoldersNorMCP(t *testing.T) {
 	}
 	if strings.Contains(strings.ToLower(joined(out)), "mcp") {
 		t.Fatalf("output mentions MCP:\n%s", joined(out))
+	}
+}
+
+// A symlinked .gbai, .gbai/skills or stamp would make init delete or write
+// outside the project, so init refuses before any change.
+func TestRefusesSymlinkedCatalogPaths(t *testing.T) {
+	t.Parallel()
+	for _, p := range []string{root + "/.gbai", root + "/.gbai/skills", stamp} {
+		for _, files := range []map[string]string{{}, {config: cfgYAML}} {
+			s := newStore(files)
+			s.Modes = map[string]fs.FileMode{p: fs.ModeSymlink}
+			_, err := run(t, s, "1.2.3")
+			if err == nil || !strings.Contains(err.Error(), "symlink") {
+				t.Fatalf("%s: err = %v", p, err)
+			}
+			if len(s.Writes) != 0 || len(s.Removed) != 0 {
+				t.Fatalf("%s: writes %v removed %v", p, s.Writes, s.Removed)
+			}
+		}
+	}
+	s := newStore(nil)
+	s.Modes = map[string]fs.FileMode{root + "/.gbai": 0}
+	if _, err := run(t, s, "1.2.3"); err == nil || len(s.Writes) != 0 {
+		t.Fatalf(".gbai as a file: err %v writes %v", err, s.Writes)
 	}
 }

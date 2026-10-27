@@ -98,6 +98,9 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 // copyCatalog replaces the catalog directory and writes the stamp last, so an
 // interrupted copy keeps the old stamp and the next run repeats it.
 func (u *UseCase) copyCatalog(v version) error {
+	if err := u.checkOwnPaths(); err != nil {
+		return err
+	}
 	dir := u.path(CatalogDir)
 	if err := u.store.RemoveAll(dir); err != nil {
 		return fmt.Errorf("remove %s: %w", dir, err)
@@ -111,6 +114,28 @@ func (u *UseCase) copyCatalog(v version) error {
 	stamp := u.path(StampFile)
 	if err := u.store.WriteFile(stamp, []byte(v.String()+"\n")); err != nil {
 		return fmt.Errorf("write %s: %w", stamp, err)
+	}
+	return nil
+}
+
+// checkOwnPaths refuses a .gbai, .gbai/skills or stamp that is a symlink or of
+// the wrong kind, so removing and writing never leave the project.
+func (u *UseCase) checkOwnPaths() error {
+	for _, p := range []struct {
+		rel, kind string
+		dir       bool
+	}{{".gbai", "directory", true}, {CatalogDir, "directory", true}, {StampFile, "regular file", false}} {
+		mode, err := u.store.Lstat(u.path(p.rel))
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			continue
+		case err != nil:
+			return fmt.Errorf("stat %s: %w", p.rel, err)
+		case mode&fs.ModeSymlink != 0:
+			return fmt.Errorf("%s is a symlink; init writes only inside the project, so replace it with a real directory or file and rerun gbai init", p.rel)
+		case mode.IsDir() != p.dir || (!p.dir && !mode.IsRegular()):
+			return fmt.Errorf("%s is not a %s; move it away and rerun gbai init", p.rel, p.kind)
+		}
 	}
 	return nil
 }
