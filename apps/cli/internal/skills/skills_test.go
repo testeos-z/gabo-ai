@@ -404,6 +404,11 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 		"Never start a `reviewer` session",
 		// pi must support every flag the start command relies on.
 		`pi --help | grep -qF -- --session-id && pi --help | grep -qF -- --append-system-prompt`,
+		// pi reads the role agent file as a file: its help states the flag takes text or file contents.
+		"Append text or file contents to the system prompt",
+		// each role has a defined directory, and a refused tools line names the format it needs.
+		"An `assistant` session starts in the repository's main checkout",
+		"one-line `tools: A, B, C`",
 		// the scratch dir comes from the ledger, not a shell variable of the start step.
 		"rm -r -- <scratch dir>",
 		// the report reads the elapsed time only after the session id matched.

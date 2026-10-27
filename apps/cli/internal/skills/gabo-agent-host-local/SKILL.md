@@ -17,7 +17,7 @@ Subagents launched inside the owner's runtime session (for example `gabo-cycle` 
 - Agents run as the owner's OS user on the owner's machine; nothing runs on a server and no remote host is reached.
 - Every former cloud field of the contract is `not used` (see Fields); the reviewer runs `single-user`.
 - Never start a `reviewer` session, on either runtime: its worktree holds the branch under review, and the agent CLI would load that branch's settings, hooks, agents and skills, so the code under review could widen the reviewer's tools. The reviewer gate runs through the `reviewer_placement` slot. Report the refusal instead of a handle.
-- Start a session only in an existing task worktree; never create, move or remove a worktree here, and never touch another task's worktree.
+- A `coder` session starts only in its existing task worktree. An `assistant` session starts in the repository's main checkout (the parent of `git rev-parse --path-format=absolute --git-common-dir`), the owner's own trusted copy, since the assistant works on no single task. Never create, move or remove a worktree here, and never touch another task's worktree. `<worktree>` below is that directory.
 - Never pass an API key on the command line and never read or copy credentials; the agent CLI uses the owner's existing login. A key the runtime needs is named only by its environment variable (R21).
 - Write the prompt and the session log in a `mktemp -d` dir, outside the worktree.
 - A session is a resource: record its handle (process id, session id, worktree, scratch dir) in the wave ledger when it starts, and stop it or report it as still running.
@@ -44,9 +44,9 @@ The role's prompt comes from its built agent and the brief of the caller; the OS
 A session runs headless (`--print`), so nobody can answer a permission prompt. The adapter never relies on one: it pins on the command line the tools the session may use, and anything else is denied at once instead of waiting.
 
 - `claude`: `--permission-mode dontAsk --permission-prompts none` denies every tool that is not pre-approved, and `--allowedTools "$tools"` pre-approves exactly the tools of the role's built agent (the one `tools:` line of its frontmatter, for example `Read, Grep, Glob, Edit, Write, Bash, Skill, Agent` for `gabo-coder`). The owner's settings `deny` rules still apply on top. The session also reads the worktree's project settings; that is safe only because the worktree holds the task's own branch, written by the same role, which is why a `reviewer` session is never started.
-- `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. It starts only the `coder` and `assistant` roles, which need edit and shell tools anyway: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same role.
+- `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. It starts only the `coder` and `assistant` roles, which need edit and shell tools anyway: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, `--append-system-prompt <role agent file>` reads the file (pi 1.4.0 `--help`: "Append text or file contents to the system prompt"), and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same role.
 
-Check before starting, and start nothing when a check fails; report which one failed instead of a handle:
+Check before starting, and start nothing when a check fails; report which one failed instead of a handle. When the `tools:` check fails, say that the built agent needs exactly one one-line `tools: A, B, C` entry in its frontmatter (a YAML list under `tools:` is refused, never guessed):
 
 ```bash
 # both runtimes: only the coder and assistant roles; a reviewer is refused before anything else
