@@ -2,7 +2,8 @@
 // directory holding a SKILL.md; contract skills also hold example adapters
 // under examples/, directiva skills hold plan templates under templates/, and
 // gabo-reviewer holds the reviewer scripts and their shell tests under
-// scripts/ (TRD D20).
+// scripts/ (TRD D20), and gabo-agent-templates holds the neutral agent spec
+// (agents.yaml) with one body template per agent under agents/ (TRD D24).
 package skills
 
 import (
@@ -17,6 +18,7 @@ import (
 )
 
 //go:embed */SKILL.md */examples/*.md */templates/*.md
+//go:embed gabo-agent-templates/agents.yaml gabo-agent-templates/agents/*.md
 //go:embed gabo-reviewer/README.md gabo-reviewer/scripts/*.sh gabo-reviewer/scripts/config.env gabo-reviewer/scripts/tests/*.sh
 var content embed.FS
 
@@ -30,6 +32,19 @@ type File struct {
 // reviewerSkill is installed only at user level (TRD D20, T041), never with
 // the catalog, so PR code cannot change the scripts that review it.
 const reviewerSkill = "gabo-reviewer"
+
+// Catalog returns the embedded catalog as a filesystem rooted like the
+// project's .gbai/skills/ copy, so without the reviewer skill.
+func Catalog() fs.FS { return catalogFS{} }
+
+type catalogFS struct{}
+
+func (catalogFS) Open(name string) (fs.File, error) {
+	if dir, _, _ := strings.Cut(name, "/"); dir == reviewerSkill {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	}
+	return content.Open(name)
+}
 
 // Files returns every embedded catalog file in path order, without the
 // reviewer skill.

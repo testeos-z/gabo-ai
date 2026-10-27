@@ -1,0 +1,63 @@
+# Neutral agent spec (TRD 8.1, D24): every gbai agent that runs from an agent
+# file. Engine-independent: runtime skills turn each entry and its template
+# into the engine's agent format, naming the agent file after its id.
+#
+# Fields:
+#   id           agent file base name, unique
+#   role         one line: what the agent does
+#   skills       catalog skills the agent loads (slot adapters are linked by
+#                the runtime skill under their fixed slot names, not here)
+#   tools        capabilities, engine-neutral: read, search, edit, shell, git,
+#                tracker, repository-host, memory, web, skills, subagents
+#   launched_by  the spec agent that launches it, or main-session (the
+#                assistant's main session, which has no agent file)
+#   template     body template, relative to this directory
+agents:
+  - id: gabo-pm
+    role: Directiva product manager; writes the PRD and user stories and opens plan-change proposals.
+    skills: [gabo-pm]
+    tools: [read, search, edit, shell, web, tracker, repository-host, memory, skills]
+    launched_by: main-session
+    template: agents/gabo-pm.md
+  - id: gabo-dev-lead
+    role: Directiva dev lead; writes the TRD, the implementation plan and the task issues with dependencies.
+    skills: [gabo-dev-lead]
+    tools: [read, search, edit, shell, web, tracker, repository-host, memory, skills]
+    launched_by: main-session
+    template: agents/gabo-dev-lead.md
+  - id: gabo-db-master
+    role: Directiva database master; designs the DB configuration, schema, migrations and the data doc.
+    skills: [gabo-db-master]
+    tools: [read, search, edit, shell, web, memory, skills]
+    launched_by: main-session
+    template: agents/gabo-db-master.md
+  - id: gabo-frontend
+    role: Directiva frontend; designs UX and UI, components, design tokens and the app flow.
+    skills: [gabo-frontend]
+    tools: [read, search, edit, shell, web, memory, skills]
+    launched_by: main-session
+    template: agents/gabo-frontend.md
+  - id: gabo-plan-reviewer
+    role: Fresh clean-context reviewer of one plan-change proposal; returns agree or a counter-proposal. Read-only.
+    skills: []
+    tools: [read, search, shell]
+    launched_by: main-session
+    template: agents/gabo-plan-reviewer.md
+  - id: gabo-cycle
+    role: Wave runner; claims unblocked tasks, creates worktrees, launches coders, keeps the resource ledger and reports the wave.
+    skills: [gabo-cycle]
+    tools: [read, search, shell, git, tracker, repository-host, memory, skills, subagents]
+    launched_by: main-session
+    template: agents/gabo-cycle.md
+  - id: gabo-coder
+    role: Coder for one task in its own worktree; implements test-first, opens the PR, requests review and closes the task after the merge.
+    skills: [gabo-coder, gabo-reviewer-notes]
+    tools: [read, search, edit, shell, git, tracker, repository-host, skills, subagents]
+    launched_by: gabo-cycle
+    template: agents/gabo-coder.md
+  - id: gabo-reviewer
+    role: Review relay; validates the request, runs the user-level gbai-reviewer script for one pinned PR head and relays its VERDICT line.
+    skills: []
+    tools: [shell]
+    launched_by: gabo-coder
+    template: agents/gabo-reviewer.md
