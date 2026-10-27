@@ -16,7 +16,7 @@ var want = []string{
 	"gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-direct-sessions-orca", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup",
+	"gabo-direct-sessions-orca", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
 }
 
 // contracts maps each contract skill to its TRD 9.1 operations, in order, and
@@ -305,6 +305,31 @@ func TestDirectSessionsOrcaAdapter(t *testing.T) {
 	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-direct-sessions-orca/SKILL.md: missing %q", s)
+		}
+	}
+}
+
+// The shipped reviewer_placement adapter (T057) covers every contract
+// operation for the local single-user placement with the installed user-level
+// reviewer scripts, and names isolated mode as another adapter.
+func TestReviewerPlacementLocalAdapter(t *testing.T) {
+	t.Parallel()
+	data, err := content.ReadFile("gabo-reviewer-placement-local/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	adapter := string(data)
+	if got, want := operations(adapter), contracts["gabo-contract-reviewer-placement"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-reviewer-placement-local/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{
+		`bash "${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha>`,
+		"PR #<n> head <40-hex sha>", "placement=local mode=single-user", "PREFLIGHT-FAILED",
+		"VERDICT PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>",
+		"gbai/reviewer", "isolated", "another adapter", "merges itself", "never posts the reviewer marker",
+	} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-reviewer-placement-local/SKILL.md: missing %q", s)
 		}
 	}
 }
