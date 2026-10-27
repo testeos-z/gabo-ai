@@ -42,17 +42,19 @@ The role's prompt comes from its built agent and the brief of the caller; the OS
 
 A session runs headless (`--print`), so nobody can answer a permission prompt. The adapter never relies on one: it pins on the command line the tools the session may use, and anything else is denied at once instead of waiting.
 
-- `claude`: `--permission-mode dontAsk --permission-prompts none` denies every tool that is not pre-approved, and `--allowedTools "$tools"` pre-approves exactly the tools of the role's built agent (its `tools:` line, for example `Read, Grep, Glob, Edit, Write, Bash, Skill, Agent` for `gabo-coder`). The owner's settings `deny` rules still apply on top.
-- `pi`: it has no tool approval prompt; every enabled tool runs. `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open.
+- `claude`: `--permission-mode dontAsk --permission-prompts none` denies every tool that is not pre-approved, and `--allowedTools "$tools"` pre-approves exactly the tools of the role's built agent (the one `tools:` line of its frontmatter, for example `Read, Grep, Glob, Edit, Write, Bash, Skill, Agent` for `gabo-coder`). The owner's settings `deny` rules still apply on top.
+- `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. So `pi` starts only the runtime roles that need edit and shell tools anyway, `coder` and `assistant`: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same session. A `reviewer` session is never started on `pi` through this adapter: a reviewer must stay read-only and must not load project-local files from the branch under review; the reviewer gate runs through the `reviewer_placement` slot instead. Report the refusal instead of a handle.
 
 Check before starting, and start nothing when a check fails; report which one failed instead of a handle:
 
 ```bash
-# claude: the role's built agent file (for example .claude/agents/gabo-coder.md) must name its tools
-tools=$(sed -n 's/^tools: *//p' <role agent file>)
-[ -n "$tools" ] && claude --help | grep -qF -- --permission-prompts && claude --help | grep -qF -- --allowedTools
-# pi: the installed version must support the pinned flags
-pi --help | grep -qF -- --approve && pi --help | grep -qF -- --tools
+# claude: the role's built agent file (for example .claude/agents/gabo-coder.md) must have exactly one
+# tools: line inside its frontmatter, never a body line
+tools=$(awk '/^---$/ { if (++n == 2) exit; next } n == 1 && sub(/^tools: */, "") { print; c++ } END { exit c != 1 }' <role agent file>) &&
+  [ -n "$tools" ] && claude --help | grep -qF -- --permission-prompts && claude --help | grep -qF -- --allowedTools
+# pi: only the coder and assistant runtime roles, and the installed version must support the pinned flags
+case "<runtime role>" in coder|assistant) ;; *) false ;; esac &&
+  pi --help | grep -qF -- --approve && pi --help | grep -qF -- --tools
 ```
 
 Then generate a session id, write the role's prompt to a file in a scratch dir, and start the agent CLI in the worktree as a background process with the prompt read from that file:
@@ -86,6 +88,12 @@ ps -o args= -p <pid> | grep -qF -- "--session-id <sid>" && echo running || echo 
 ```
 
 No match before `kill` means the session already exited and no signal is sent: report it as `finished` with the tail of its log. `stopped` after the wait means it stopped. `running` after the wait means it is still running; report that and never escalate to `kill -KILL` without the owner's request.
+
+Once a session is `stopped`, `finished` or `failed to start` and the tail of its log is in the report, remove its scratch dir (prompt, log and pid file) and drop the handle from the ledger; a `running` session keeps both:
+
+```bash
+rm -r -- "$dir"
+```
 
 ### report where agents run
 

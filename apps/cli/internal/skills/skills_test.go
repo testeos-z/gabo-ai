@@ -395,7 +395,13 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 		"</dev/null",
 		// a headless session cannot answer a permission prompt: the tools it may use are
 		// pinned on the command line and checked before the session starts.
-		`tools=$(sed -n 's/^tools: *//p' <role agent file>)`,
+		// the tools line is read from the frontmatter only, and exactly once.
+		`tools=$(awk '/^---$/ { if (++n == 2) exit; next } n == 1 && sub(/^tools: */, "") { print; c++ } END { exit c != 1 }' <role agent file>)`,
+		// pi has no per-role tool list: only coder and assistant start on pi; a reviewer is refused.
+		`case "<runtime role>" in coder|assistant) ;; *) false ;; esac`,
+		"A `reviewer` session is never started on `pi`",
+		// the scratch dir is removed once the session reached a final state.
+		`rm -r -- "$dir"`,
 		`claude --help | grep -qF -- --permission-prompts`,
 		`pi --help | grep -qF -- --approve`,
 		// the start check and the report never print the process arguments.
