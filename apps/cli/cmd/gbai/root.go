@@ -55,7 +55,7 @@ func newRootCommand(d deps) *cobra.Command {
 
 	root.AddCommand(version.NewCommand(version.NewUseCase(d.version)))
 	root.AddCommand(review.NewCommand(reviewFactories(d.runner, loadConfig)))
-	root.AddCommand(initcmd.NewCommand(newInitUseCase))
+	root.AddCommand(initcmd.NewCommand(initFactory(d.runner, d.version)))
 	root.AddCommand(plan.NewCommand(plan.NewUseCase(osfs.FS{})))
 	return root
 }

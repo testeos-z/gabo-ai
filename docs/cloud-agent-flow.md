@@ -88,7 +88,7 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, 
 | Audit merges (owner login only, verdict status and signed marker comment on merged heads, no coder merges) | `gbai audit` / `audit` |
 | Known gotchas | `gbai doctor` / `doctor` |
 | Which config files are read (system `/etc/gbai/gbai.yaml` → user `$XDG_CONFIG_HOME/gbai/config.yaml`, else `~/.config/gbai/config.yaml` → project `gbai.yaml` at the git top-level; each overrides only the keys it sets; `--config <file>` reads exactly one file) and the resolved values, credential-looking values redacted | `gbai config` |
-| Local agent setup: skills and MCP registration | `gbai init [--runtime] [--scope] [--dry-run]` |
+| Copy the skill catalog (without `gabo-reviewer`) into `.gbai/skills/` with the version stamp `.gbai/VERSION`; refresh it when the stamp is older or missing (TRD 9.4) | `gbai init` |
 | Product docs for the planning agents | `gbai plan new|status` |
 | MCP server for the local agent | `gbai mcp` |
 

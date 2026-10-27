@@ -26,3 +26,6 @@ func (FS) WriteFile(name string, data []byte) error {
 	}
 	return os.Chmod(name, 0o644)
 }
+
+// RemoveAll removes dir and everything below it; a missing dir is no error.
+func (FS) RemoveAll(dir string) error { return os.RemoveAll(dir) }

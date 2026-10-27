@@ -4,7 +4,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io/fs"
+	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -12,6 +15,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
 )
 
 // The work-time commands were retired (T042, D18): the CLI is an agent
@@ -80,32 +84,92 @@ func TestReviewNotifyNeedsNoConfig(t *testing.T) {
 	}
 }
 
-func TestInitDryRunChangesNothing(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
+// runInit runs `gbai init` in a temporary project with a temporary HOME.
+func runInit(t *testing.T, project, version string) (string, error) {
+	t.Helper()
+	t.Setenv("HOME", t.TempDir())
+	t.Chdir(project)
 	var out bytes.Buffer
-	root := newRootCommand(deps{version: "1.2.3"})
+	root := newRootCommand(deps{version: version})
 	root.SetOut(&out)
-	root.SetArgs([]string{"init", "--dry-run", "--runtime", "both"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
+	root.SetArgs([]string{"init"})
+	err := root.Execute()
+	return out.String(), err
+}
+
+func TestInitCopiesEmbeddedCatalogWithoutReviewer(t *testing.T) {
+	project := t.TempDir()
+	out, err := runInit(t, project, "1.2.3")
+	if err != nil {
+		t.Fatalf("init: %v\n%s", err, out)
 	}
-	for _, want := range []string{"would install " + home + "/.claude/skills/gabo-setup/SKILL.md", "would install " + home + "/.pi/agent/skills/gabo-coder/SKILL.md"} {
-		if !strings.Contains(out.String(), want) {
-			t.Fatalf("missing %q:\n%s", want, out.String())
+	embedded, err := skills.Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range embedded {
+		got, err := os.ReadFile(filepath.Join(project, ".gbai", "skills", filepath.FromSlash(f.Path)))
+		if err != nil || !bytes.Equal(got, f.Data) {
+			t.Fatalf("%s not copied byte for byte: %v", f.Path, err)
 		}
 	}
-	// The reviewer skill is installed only at user level by its own step
-	// (T041), never by the catalog install, so PR code cannot change it.
-	if strings.Contains(out.String(), "gabo-reviewer/") {
-		t.Fatalf("init installs the reviewer skill with the catalog:\n%s", out.String())
+	// The reviewer skill and its scripts never enter the repository (D20).
+	if _, err := os.Stat(filepath.Join(project, ".gbai", "skills", "gabo-reviewer")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("gabo-reviewer copied into the project: %v", err)
 	}
-	if strings.Contains(strings.ToLower(out.String()), "mcp") {
-		t.Fatalf("init still registers an MCP server:\n%s", out.String())
+	if stamp, _ := os.ReadFile(filepath.Join(project, ".gbai", "VERSION")); string(stamp) != "1.2.3\n" {
+		t.Fatalf("stamp = %q", stamp)
 	}
-	if entries, _ := os.ReadDir(home); len(entries) != 0 {
-		t.Fatalf("dry run wrote %v", entries)
+	entries, _ := os.ReadDir(project)
+	if len(entries) != 1 || entries[0].Name() != ".gbai" {
+		t.Fatalf("project holds %v, want only .gbai", entries)
 	}
+	if !strings.HasSuffix(out, "next: open your agent in this project and paste this prompt\n") {
+		t.Fatalf("output:\n%s", out)
+	}
+}
+
+func TestInitNewerStampExitsWithUpgradeCommand(t *testing.T) {
+	project := t.TempDir()
+	cfg := []byte("repo:\n  name: o/r\n")
+	if err := os.WriteFile(filepath.Join(project, "gbai.yaml"), cfg, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if out, err := runInit(t, project, "1.2.3"); err != nil {
+		t.Fatalf("restore on missing stamp: %v\n%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(project, ".gbai", "VERSION"), []byte("9.0.0\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	before := snapshot(t, project)
+	_, err := runInit(t, project, "1.2.3")
+	if err == nil || !strings.Contains(err.Error(), "go install github.com/testeos-z/gbai-team/apps/cli/cmd/gbai@v9.0.0") {
+		t.Fatalf("err = %v", err)
+	}
+	if after := snapshot(t, project); !maps.Equal(before, after) {
+		t.Fatal("newer stamp changed the project")
+	}
+	if got, _ := os.ReadFile(filepath.Join(project, "gbai.yaml")); !bytes.Equal(got, cfg) {
+		t.Fatalf("config changed: %q", got)
+	}
+}
+
+// snapshot maps every file under dir to its content.
+func snapshot(t *testing.T, dir string) map[string]string {
+	t.Helper()
+	m := map[string]string{}
+	err := filepath.WalkDir(dir, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		b, err := os.ReadFile(p)
+		m[p] = string(b)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return m
 }
 
 func TestConfigWarningsGoToStderr(t *testing.T) {

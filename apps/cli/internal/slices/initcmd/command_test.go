@@ -5,9 +5,9 @@ import (
 	"testing"
 )
 
-func TestCommandRejectsBadFlagsBeforeFactory(t *testing.T) {
+func TestCommandHasNoFlagsAndNoArgs(t *testing.T) {
 	t.Parallel()
-	for _, args := range [][]string{{"--runtime", "codex"}, {"--scope", "global"}} {
+	for _, args := range [][]string{{"--runtime", "pi"}, {"--force"}, {"extra"}} {
 		called := false
 		cmd := NewCommand(func(context.Context) (*UseCase, error) { called = true; return nil, nil })
 		cmd.SetArgs(args)
