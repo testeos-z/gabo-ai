@@ -95,6 +95,12 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]string{
+		// J9 and R16/R18: spokesperson, identity resolution and terminal rules.
+		"gbai-assistant/SKILL.md": {
+			"default point of contact", "Never block", "only the owner", "user.email",
+			"`developers`", "global `alias` wins", "Ask once", "No `gbai` command",
+			"`tone`", "`language`", "terminal",
+		},
 		"gbai-coder/SKILL.md":          {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
 		"gbai-cycle/SKILL.md":          {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
 		"gbai-reviewer-notes/SKILL.md": {"never approves", "marker"},
