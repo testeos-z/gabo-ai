@@ -27,10 +27,12 @@ type File struct {
 	Data []byte
 }
 
-// Settings locate the project and carry the binary version.
+// Settings locate the project and carry the binary version and the setup
+// prompt printed on a fresh project (D25).
 type Settings struct {
-	ProjectDir string
-	Version    string
+	ProjectDir  string
+	Version     string
+	SetupPrompt string
 }
 
 // Output is the human-readable report.
@@ -72,10 +74,15 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 		if err := u.copyCatalog(bin); err != nil {
 			return Output{}, err
 		}
-		return Output{Lines: []string{
+		lines := []string{
 			"catalog copied to " + CatalogDir + " (" + bin.String() + ")",
 			"next: open your agent in this project and paste this prompt",
-		}}, nil
+		}
+		if u.s.SetupPrompt != "" {
+			// Printed verbatim and written nowhere; the command adds the final newline.
+			lines = append(lines, strings.TrimSuffix(u.s.SetupPrompt, "\n"))
+		}
+		return Output{Lines: lines}, nil
 	case hasStamp && cur.compare(bin) == 0:
 		return Output{Lines: []string{"catalog is current (" + bin.String() + "); nothing changed"}}, nil
 	case hasStamp && cur.compare(bin) > 0:

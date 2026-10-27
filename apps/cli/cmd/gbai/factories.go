@@ -10,6 +10,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
 )
@@ -57,7 +58,7 @@ func initFactory(runner kernel.Runner, version string) initcmd.Factory {
 				Dir: dir, ProjectDir: project, Version: version,
 			}),
 			Catalog: initcmd.NewUseCase(osfs.FS{}, toFiles(embedded, ""), initcmd.Settings{
-				ProjectDir: project, Version: version,
+				ProjectDir: project, Version: version, SetupPrompt: setupprompt.Text,
 			}),
 		}, nil
 	}

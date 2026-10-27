@@ -15,6 +15,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
 )
 
@@ -126,8 +127,12 @@ func TestInitCopiesEmbeddedCatalogWithoutReviewer(t *testing.T) {
 	if len(entries) != 1 || entries[0].Name() != ".gbai" {
 		t.Fatalf("project holds %v, want only .gbai", entries)
 	}
-	if !strings.HasSuffix(out, "next: open your agent in this project and paste this prompt\n") {
+	// The setup prompt follows the next step verbatim and is written nowhere (D25).
+	if !strings.HasSuffix(out, "next: open your agent in this project and paste this prompt\n"+setupprompt.Text) {
 		t.Fatalf("output:\n%s", out)
+	}
+	if out, err := runInit(t, project, "1.2.3"); err != nil || strings.Contains(out, setupprompt.Text) {
+		t.Fatalf("second init printed the prompt or failed: %v\n%s", err, out)
 	}
 }
 
