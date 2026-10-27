@@ -31,6 +31,7 @@ Written by gbai-dev-lead in auto mode. Every sequencing or scoping choice below 
 | A15 | Second owner pass: T008 (read-only `gbai config`) and T035–T037 (TUI, milestone M4) are removed; T044 (per-runtime installer table) and T045 (setup prompt document) are added; T040 and T041 move the reviewer scripts into the user-level `gbai-reviewer` skill; T015, T019, T026 and T039 switch to direct YAML writes validated at `gbai generate`; T026 adds the personalization layers. | Owner decisions 2026-10-26 (TRD 13 questions 7–10; D18 amended, D20 amended, D21, D22). | Approved (owner 2026-10-26) |
 | A16 | Plan review (#39, D18): T002 is removed (closed by the owner, PR #37 closed unmerged); T042 moves to wave 3 and also removes the cloud config fields and the MCP registration in `gbai init`, so no later task edits code it deletes; T006 is trimmed to dropping the system layer and rejecting former cloud keys; T015 is trimmed to `gbai config set` (identity is resolved by the assistant, T020); T027 and T028 leave the Go `plan` slice untouched (T043 deletes it); T039 no longer touches MCP registration. | D18 limits Go to the agent compiler; work on code that a later task deletes is waste (wave 2 hit it with T002). | Proposed, awaiting owner |
 | A13 | The Go CLI is an agent compiler only: T018 (Go reviewer runner), T029 (`plan story` command), T030 (Go traceability command) and T038 (TUI status view) are removed; T039 (compiler entry points), T040 (reviewer scripts), T041 (reviewer script installation and reviewer agent), T042 (retire work-time slices) and T043 (retire review and plan slices) are added; T024, T027, T028, T031 and T033 drop their Go command parts. | Owner decisions 2026-10-26 (TRD D18, D19, D20). | Approved (owner 2026-10-26) |
+| A17 | T046 (rename the module and every reference to the old repository name to `testeos-z/gabo-ai`) is added to wave 3 under M1 with no dependencies, high priority and not `[P]`. | The owner renamed the repository on 2026-10-27; the old name resolves only through GitHub's redirect. One-task plan change (D7). | Proposed, awaiting plan-change reviewer or owner |
 
 ## Prerequisites
 
@@ -89,6 +90,7 @@ Written by gbai-dev-lead in auto mode. Every sequencing or scoping choice below 
 | T043 | Retire the Go review and plan slices | US-002, US-008 | R9, R20 | D18, D19, D20 | T028, T031, T041, T042 | — | The `review` (request, run, ci, notify) and `plan` (new, status, story, check) commands, slices, templates and tests are deleted once the reviewer scripts and the skill templates are in use; `gbai --help` lists only `init`, `generate`, `config set` and `version`; `go test ./...` passes; gbai's own reviews run through the installed scripts. | M |
 | T044 | [P] Per-runtime installer table in the generator | US-001, US-007 | R8, R12, R21 | D3, D20, D21 | T012 | T019, T041 | Test first: one Go table maps each runtime in `generation.targets` and each artifact kind to scope, location and method (TRD 9.6): Claude Code skills, agents, MCP servers (`.mcp.json`) and plugins (`claude plugin install`); Pi skills, agents, MCP servers (`.pi/mcp.json`) and packages or extensions (`pi install --local`); before a row is implemented its location is confirmed against the runtime docs, and the Pi git package clone row stays an open item until confirmed (TRD 13 question 11). Approved (owner 2026-10-26): the Pi agent rows are verified for gentle-pi (`.pi/agents/` project path, TRD 9.6); the installer detects the active Pi agent home (`GENTLE_PI_AGENT_HOME`, `PI_CODING_AGENT_DIR`, then plain Pi `~/.pi/agent`, or `gentle-shell` `~/.gentle-shell/agent`) for user-level paths such as the `gbai-reviewer` skill, with a golden test per home; for a Pi target `gbai generate` refuses to compile when no subagent package is present and prints what to install (gentle-pi recommended, another package acceptable), and never installs it or edits its configuration; `gbai generate` installs only what the table lists, into a temporary home and project in tests; golden tests per runtime; removing a runtime from `generation.targets` removes its project artifacts; MCP entries carry env var names only and the secret-pattern scan passes (R21). | M |
 | T045 | Setup prompt document | US-001 | R12, R28 | D21 | T019 | — | Documentation review against J1: the gbai documentation publishes one setup prompt with a link to the install instructions, written for both Claude Code and Pi; pasted into either, it tells the agent to install gbai, load the gbai-setup skill (T019), offer the gentle-ai stack (gentle-ai with ODD, RDD as coder-side validation in the methodology adapter, Engram as the memory adapter) as the recommended, not required, option and install it only if the user accepts (Approved (owner 2026-10-26)); when Pi is in `generation.targets`, check whether gentle-pi and `gentle-shell` are installed and, if no subagent package is present, explain why one is needed and, once the user accepts, install them (`npm i -g gentle-pi`, or `pi install npm:gentle-pi` inside plain Pi; Pi >= 1.2.0, Node >= 22.19.0), accepting another subagent package the user already has, without editing gentle-pi's own configuration; ask the setup questions one at a time with no silent default, edit the config files directly and run `gbai generate`; the prompt holds no secret and no machine-specific path; a dry run on a clean sample repository with each runtime reaches a verified slot without manual steps beyond the owner's answers, and the elapsed time is recorded (R28). | S |
+| T046 | Rename remaining old repository name references to `testeos-z/gabo-ai` | US-007, US-008 | R9, R11 | D2, D6 | — | — | The repository was renamed by the owner on 2026-10-27 and the old name works only through GitHub's redirect. `apps/cli/go.mod` declares `github.com/testeos-z/gabo-ai/apps/cli` and every import under `apps/cli` uses it; `gbai.yaml` `repo.name`, `AGENTS.md`, the `gbai-tasks-github` and `gbai-repository-host-github` adapter skills and the test fixtures use the new name; a `git grep` for the old `owner/name` (the repository before the rename) is empty on the branch (the `DB_SCHEMA.md` lines travel in a separate `docs/product`-only PR, D7; the dated evidence line in `odd/tasks/gbai-manual-bootstrap.md` is the owner's call); `go build ./...` and `go test ./...` pass in `apps/cli`; no behavior change. Not `[P]`: it touches imports across `apps/cli`, so it merges before the other Go PRs of its batch. Human-only merge (`.claude/`, `AGENTS.md`, `gbai.yaml`). Issue #49. | M |
 
 ## Waves
 
@@ -98,7 +100,7 @@ A wave is the set of tasks whose dependencies are done (D12). Waves larger than 
 |---|---|---|
 | 1 | T001 | Start from the merged single-user reviewer code. |
 | 2 | T003, T009, T010, T017, T027 | Personal and project key classes; first contract skills; template question format. |
-| 3 | T004, T016, T020, T028, T042 | New project keys; coder loads the methodology; assistant as spokesperson; remaining templates in the skills; retire the work-time Go slices before any task edits them. |
+| 3 | T004, T016, T020, T028, T042, T046 | New project keys; coder loads the methodology; assistant as spokesperson; remaining templates in the skills; retire the work-time Go slices before any task edits them; rename the module and repository references to `testeos-z/gabo-ai` (T046 first, high priority). |
 | 4 | T005, T006, T011, T024, T031, T040 | No silent defaults; system layer dropped; coverage check; cycle skill (next wave, memory ledger, cleanup, resume); directiva skills with the traceability check; reviewer scripts in the `gbai-reviewer` skill. |
 | 5 | T007, T026 | JSON Schemas; assistant runs waves, modes, comfort question and personalization layers. |
 | 6 | T012, T015, T032, T033 | Agent builder for Claude Code; `config set`; plan-change reviewer; direct sessions. |
@@ -120,8 +122,8 @@ Every story has at least one task and every live task links at least one story a
 | US-004 | T003, T010, T026 |
 | US-005 | T010, T033 |
 | US-006 | T004, T031, T032 |
-| US-007 | T004, T009, T010, T011, T012, T013, T014, T016, T019, T039, T042, T044 |
-| US-008 | T001, T009, T016, T017, T024, T034, T040, T041, T043 |
+| US-007 | T004, T009, T010, T011, T012, T013, T014, T016, T019, T039, T042, T044, T046 |
+| US-008 | T001, T009, T016, T017, T024, T034, T040, T041, T043, T046 |
 | US-009 | T020 |
 | US-010 | T001, T016, T024, T034 |
 | US-011 | T024, T034 |
@@ -136,9 +138,9 @@ Every story has at least one task and every live task links at least one story a
 | R6 | T004, T010, T026 |
 | R7 | T031, T032 |
 | R8 | T004, T010, T012, T013, T014, T016, T019, T039, T044 |
-| R9 | T001, T016, T017, T040, T041, T043 |
+| R9 | T001, T016, T017, T040, T041, T043, T046 |
 | R10 | T009, T016, T024 |
-| R11 | T009, T011, T012, T042 |
+| R11 | T009, T011, T012, T042, T046 |
 | R12 | T005, T006, T007, T011, T015, T019, T039, T041, T044, T045 |
 | R13 | T001, T016, T024, T034 |
 | R14 | T010, T033 |
@@ -163,7 +165,7 @@ Every story has at least one task and every live task links at least one story a
 
 | milestone | goal | tasks | waves | exit check |
 |---|---|---|---|---|
-| M1 Local core | Clean layered config, schemas, contracts, agent compiler with the per-runtime installer table, identity, guided setup from the setup prompt, user-level reviewer skill, retirement of work-time slices | T001, T003–T007, T009–T017, T019, T020, T039–T042, T044, T045 | 1–9 | A local-only `gbai.yaml` loads with no cloud keys and no silent default; `gbai generate --check` passes and reports schema errors for hand- or agent-edited YAML; the setup prompt pasted into Claude Code or Pi installs and configures gbai; setup verifies every slot through a subagent; the scripts of the user-level `gbai-reviewer` skill gate gbai's own PRs. |
+| M1 Local core | Clean layered config, schemas, contracts, agent compiler with the per-runtime installer table, identity, guided setup from the setup prompt, user-level reviewer skill, retirement of work-time slices | T001, T003–T007, T009–T017, T019, T020, T039–T042, T044–T046 | 1–9 | A local-only `gbai.yaml` loads with no cloud keys and no silent default; `gbai generate --check` passes and reports schema errors for hand- or agent-edited YAML; the setup prompt pasted into Claude Code or Pi installs and configures gbai; setup verifies every slot through a subagent; the scripts of the user-level `gbai-reviewer` skill gate gbai's own PRs. |
 | M2 Planning tool | Templates with fixed questions in the directiva skills, traceability check as a skill instruction, plan-change flow, retirement of the review and plan slices | T027, T028, T031, T032, T043 | 2–9 | The directiva skills scaffold every planning document from their templates; this plan passes their traceability check; a plan change travels in its own issue and PR; `gbai --help` lists only `init`, `generate`, `config set` and `version`. |
 | M3 Waves autonomy | Cycle skill (next wave through the `tasks` adapter, memory ledger, cleanup, resume), assistant wave flow with personalization layers, direct sessions | T024, T026, T033, T034 | 4–9 | The end-to-end mini wave runs, cleans up and resumes without reworking DONE tasks (T034). |
 | (removed 2026-10-26) M4 TUI | Withdrawn by the owner: no terminal UI; setup starts from a prompt pasted into Claude Code or Pi (T045) | — | — | — |
@@ -188,6 +190,7 @@ M1 and M2 run interleaved from wave 2 and M3 joins at wave 4; the first release 
 | Reviewer scripts are shell, outside the Go test suite. | Script regressions go unnoticed. | Shell tests against fake `gh` and `git` (T040) run in `review.checks`. |
 | The T001 merge is delayed or conflicts with the integration branch. | Wave 1 cannot start. | It is the only wave 1 task; the owner resolves it before any coder starts. |
 | Waves 2, 3, 4 and 6 have more than 3 tasks for a `parallelism` of 3. | Each takes two batches. | Run the critical-path tasks first (T003, then T004 and T042, then T005 and T006). |
+| The repository was renamed to `testeos-z/gabo-ai` (2026-10-27) and code, config and adapters still use the old `owner/name` (`gbai-team`) through GitHub's redirect. | If the old name is recreated, the redirect breaks: adapter `gh -R` calls and `repo.name` hit the wrong repository and the old module path no longer resolves. | T046 renames every reference with high priority and no dependencies; it merges before the other Go PRs of its batch. |
 
 ## Tracker export notes
 
