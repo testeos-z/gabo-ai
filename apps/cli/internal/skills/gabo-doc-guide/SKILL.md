@@ -48,6 +48,7 @@ Each project keeps its product docs in `docs/product/`, written from the templat
 | How are UX, UI, tokens and the app flow designed? | `gabo-frontend` |
 | Which agents exist and what is each one's body template? | `gabo-agent-templates` |
 | Which operations must an adapter for a slot cover? | `gabo-contract-<slot>` (`tasks`, `repository-host`, `memory`, `methodology`, `reviewer-placement`, `notifications`, `direct-sessions`, `agent-host`), each with an example adapter under `examples/` |
+| How does the reviewer run on the owner's machine (local placement)? | `gabo-reviewer-placement-local` |
 | How do agents run on a Railway server driven through Orca? | `gabo-agent-host-railway-orca` |
 | How does the owner open a direct session with a coder through Orca? | `gabo-direct-sessions-orca` |
 
