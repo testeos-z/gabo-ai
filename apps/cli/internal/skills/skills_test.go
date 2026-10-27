@@ -98,6 +98,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		"gbai-coder/SKILL.md": {
 			"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable",
 			"## Task Close", "PR #<n> merged", "repository_host", "never `--force`", "--git-common-dir", "resumable",
+			"`worktree.keep`", "before any removal", "unverified:",
 		},
 		"gbai-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",

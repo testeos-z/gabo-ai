@@ -45,7 +45,10 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. T
 
 1. Verify through `repository_host` (read status) that the PR is merged, and note its merged head SHA. Not merged ⇒ change nothing, report HANDED "not merged".
 2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
-3. `git worktree remove <wt>`, never `--force`. A refusal ⇒ keep the worktree and its local branch, list both under `leftovers:`, skip step 4.
+3. Remove the worktree only if all hold, else keep it and its local branch, list them under `leftovers:` and skip the local branch in step 4:
+   - it is not in `worktree.keep` (`gbai.yaml`);
+   - `git -C <wt> status --porcelain --ignored=matching`, run before any removal, shows only committed work and rebuildable output (removal deletes ignored files);
+   - `git worktree remove <wt>` succeeds, never `--force`.
 4. Delete the local and remote branch through `repository_host` (delete branch). It refuses a branch holding commits the merged head does not contain; list a refused branch under `leftovers:`.
 5. Containers stay: the cycle removes them from the ledger.
 
@@ -56,5 +59,6 @@ End with `HANDED`, `DONE` or `BLOCKED`, task id, PR number, last reviewed SHA, f
 ```
 leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output>
 containers: <none | name and image of every container you created>
+unverified: <none | each tracker or host write whose re-read did not show it>
 resources: <worktree path, branch, and any test database you created>
 ```
