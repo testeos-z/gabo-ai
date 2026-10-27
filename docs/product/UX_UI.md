@@ -8,7 +8,7 @@
 | date | 2026-10-27 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [DB_SCHEMA](DB_SCHEMA.md), [APP_FLOW](APP_FLOW.md) |
 
-gbai is a CLI plus an agent framework with no graphical UI, so `DESIGN.md`, CSS tokens and Storybook do not apply. This document adapts the template to what gbai actually presents: the assistant's conversation, the CLI command surface (three commands: `gbai init`, `gbai check` and `gbai version`, owner 2026-10-27, PRD R31; earlier an agent compiler used only for the initial configuration, TRD D18) and its messages. Approved (owner 2026-10-26): the proposed terminal UI (TUI) is withdrawn. Superseded (owner 2026-10-27): setup starts from a prompt the user pastes into Claude Code or Pi (TRD D21); setup now starts with `gbai init` and the user's own agent (section 1.8), and whether the pasted prompt stays as an alternative entry is PRD open question 10. Every gap this document had to fill is marked **Proposed (auto)**.
+gbai is a CLI plus an agent framework with no graphical UI, so `DESIGN.md`, CSS tokens and Storybook do not apply. This document adapts the template to what gbai actually presents: the assistant's conversation, the CLI command surface (three commands: `gbai init`, `gbai check` and `gbai version`, owner 2026-10-27, PRD R31; earlier an agent compiler used only for the initial configuration, TRD D18) and its messages. Approved (owner 2026-10-26): the proposed terminal UI (TUI) is withdrawn. Superseded (owner 2026-10-27): setup starts from a prompt the user pastes into Claude Code or Pi (TRD D21); since 2026-10-27 setup has two entries (section 1.8): `gbai init` followed by the user's own agent, or the published setup prompt pasted into the agent, which installs the CLI and continues; the prompt is the same literal text embedded in the CLI (PRD R36). Every gap this document had to fill is marked **Proposed (auto)**.
 
 ## Auto-mode proposals
 
@@ -31,7 +31,7 @@ Written by gbai-frontend in auto mode (R6, R19). Every item is marked **Proposed
 | U13 | 3.3 | Withdrawn (owner 2026-10-26): no status view; no Go status command exists (TRD D18) and the last wave report lives in the `memory` slot. The owner asks the assistant for the state. | The TUI is removed altogether (owner 2026-10-26). |
 | U14 | 3.5 | Withdrawn (owner 2026-10-26): gbai defines its own palette behind gentle-ai's style roles; honors `NO_COLOR` and adds `GBAI_NO_ANIMATION=1`. | The TUI is removed; setup is done by the user's agent from a pasted prompt (section 1.8, TRD D21). |
 | U15 | 4 | Every error or refusal uses three parts: what happened, why, what to do next; one line first, details after. | Gives the owner one next action per failure, matching existing CLI messages ("run setup"). |
-| U16 | 1.8 | Amended (owner 2026-10-27, PRD R32, R34): setup starts with `gbai init`, then the user asks their own agent to configure gbai; the agent follows the entry file and the setup, config-writer and runtime skills, then runs `gbai check`. The role of the published setup prompt is PRD open question 10. Superseded (owner 2026-10-27): Approved (owner 2026-10-26): setup starts from a prompt with a link, copied from the gbai documentation and pasted into Claude Code or Pi; that agent installs gbai, asks the setup questions, writes the config and runs `gbai generate`. | Replaces the TUI; the guided setup is agent work anyway (adapter co-writing, subagent verification). |
+| U16 | 1.8 | Amended (owner 2026-10-27, PRD R32, R34): setup starts with `gbai init`, then the user asks their own agent to configure gbai; the agent follows the entry file and the setup, config-writer and runtime skills, then runs `gbai check`. Second entry (owner 2026-10-27, PRD R36): the published setup prompt, pasted into the agent, which installs the CLI and continues; one text, embedded in the CLI and published in the documentation. Superseded (owner 2026-10-27): Approved (owner 2026-10-26): setup starts from a prompt with a link, copied from the gbai documentation and pasted into Claude Code or Pi; that agent installs gbai, asks the setup questions, writes the config and runs `gbai generate`. | Replaces the TUI; the guided setup is agent work anyway (adapter co-writing, subagent verification). |
 | U17 | 1.3 | Approved (owner 2026-10-26): preferences have a stable layer (global user file) and a learning layer (memory slot, topic `user/preferences`); an observation repeated about 3 times is proposed for the stable layer. | PRD 10.1 Personalization, TRD D22. |
 
 ## 1. Conversation UX of the assistant
@@ -94,7 +94,10 @@ Conversation in the owner's `language` (BCP 47, global file); all generated arti
 
 ### 1.8 Setup entry
 
-Amended (owner 2026-10-27), U16, PRD R32, R34. There is still no setup screen.
+Amended (owner 2026-10-27), U16, PRD R32, R34, R36. There is still no setup screen. Setup has two entries that join at step 3:
+
+- **Entry (a), terminal.** Steps 1 and 2 below.
+- **Entry (b), pasted prompt.** The user pastes the published setup prompt into their agent; the agent installs the CLI, runs `gbai init` (step 1) and continues at step 3. The published prompt is the same literal text embedded in the CLI: one source, shipped in the binary and published in the documentation.
 
 1. The user installs gbai and runs `gbai init` in the project. It copies the skill catalog, writes the short neutral entry file, installs the user-level `gbai-reviewer` skill and ends with the next step: `next: open your agent in this project and ask it to configure gbai`. If a config already exists it writes nothing (no catalog copy, no entry file, no `gbai-reviewer` reinstall), exits non-zero and says `next: run gbai check`. Refreshing the catalog after an upgrade is PRD open question 11.
 2. The user opens their agent (Claude Code, Pi or another engine with a runtime skill) and asks it to configure gbai.
@@ -104,7 +107,7 @@ Amended (owner 2026-10-27), U16, PRD R32, R34. There is still no setup screen.
 6. The agent runs `gbai check`, fixes what fails and reruns it until it passes; failures use the section 4 shape.
 7. The agent verifies each slot through a subagent (APP_FLOW J1).
 
-Whether the published setup prompt stays as an alternative entry is PRD open question 10.
+PRD open question 12 (pending owner decision, not applied): the CLI may be renamed "gabo"; its scope (binary only, or also skill prefixes and the config file name) is not confirmed yet.
 
 **Superseded (owner 2026-10-27), setup entry of 2026-10-26.** Approved (owner 2026-10-26), U16. There is no setup screen. The gbai documentation publishes one setup prompt with a link. The user pastes it into Claude Code or Pi, and that agent:
 
@@ -126,7 +129,7 @@ Amended (owner 2026-10-27, U7, PRD R31–R33). The CLI has three commands. It wr
 | `gbai check` | Read-only, engine-neutral validation: the global user file and `gbai.yaml` against their JSON Schemas, every agent of the neutral agent spec present, nothing stale against the templates. Writes nothing; non-zero exit on any failure. Usable by the user, agents, the reviewer and CI | PRD R33 |
 | `gbai version` | Print the version | — |
 
-Command flags are a TRD detail.
+The CLI also carries the setup prompt as embedded text, identical to the one published in the documentation (PRD R36); this adds no command. Command flags and how the embedded text is exposed are TRD details.
 
 **Superseded (owner 2026-10-27), command table of 2026-10-26.** Approved (owner 2026-10-26, TRD D18). The CLI is an agent compiler for the initial configuration; nothing in Go runs during the work itself.
 

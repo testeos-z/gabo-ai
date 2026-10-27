@@ -5,7 +5,7 @@
 | status | Approved (auto proposal, owner 2026-10-26) |
 | user | solo developer |
 | priority | must |
-| requirements | R12, R16, R8, R31, R32, R33, R34 |
+| requirements | R12, R16, R8, R31, R32, R33, R34, R36 |
 | depends on | — |
 
 ## Story
@@ -15,11 +15,12 @@ As a solo developer, I want the assistant to guide me through configuring my age
 ## Acceptance criteria
 
 - Given gbai is installed, When I run `gbai init` in a project without a config, Then it copies the skill catalog byte for byte into a neutral project location, writes a short engine-neutral entry file, installs the user-level `gbai-reviewer` skill, writes no config and builds no agent, and tells me to open my agent here and ask it to configure gbai (Approved (owner 2026-10-27), R32).
+- Given I paste the published setup prompt into my agent, When the agent runs it, Then it installs the gbai CLI, runs `gbai init` and continues with the same setup as when I run `gbai init` myself, and the prompt I pasted is the same literal text embedded in the CLI (Approved (owner 2026-10-27), R36).
 - Given the project already has a config, When I run `gbai init`, Then it writes nothing (no catalog copy, no entry file, no `gbai-reviewer` reinstall), exits non-zero and points me to `gbai check` (Approved (owner 2026-10-27), R32).
 - Given I ask my agent (Claude Code, Pi or another engine with a runtime skill) to configure gbai, When it follows the entry file, Then the setup skill asks me the questions one at a time, the config-writer skill writes `gbai.yaml` and the global user file, the runtime skill builds every agent of the neutral agent spec from fixed templates without inventing content, and the agent runs `gbai check` and fixes every failure before reporting setup as done (Approved (owner 2026-10-27), R34).
 - Given a configured project, When I, an agent, the reviewer or CI runs `gbai check`, Then it validates the config files against their JSON Schemas, confirms every agent of the neutral agent spec is present, reports any agent stale against its template, writes nothing and exits non-zero on any failure (Approved (owner 2026-10-27), R33).
 - Given I list the gbai CLI commands, When I read the help, Then only `gbai init`, `gbai check` and `gbai version` exist (Approved (owner 2026-10-27), R31).
-- Superseded (owner 2026-10-27): Given I paste the setup prompt from the gbai documentation into Claude Code or Pi, When the agent runs it, Then it installs gbai, asks the setup questions, writes the config files and runs `gbai generate`, which installs the agents and per-runtime artifacts for each runtime in `generation.targets` (Approved (owner 2026-10-26)). The role of the setup prompt is PRD open question 10.
+- Superseded (owner 2026-10-27): Given I paste the setup prompt from the gbai documentation into Claude Code or Pi, When the agent runs it, Then it installs gbai, asks the setup questions, writes the config files and runs `gbai generate`, which installs the agents and per-runtime artifacts for each runtime in `generation.targets` (Approved (owner 2026-10-26)). Since 2026-10-27 the pasted prompt is the second entry, with the text embedded in the CLI (R36).
 - Given I run setup for the first time, When the assistant configures a slot, Then it asks me before configuring it and only suggests options, applying no silent default.
 - Given I am configuring the team, When the assistant asks where each agent runs and which tracker is used, Then it explains whether and how the chosen agents can communicate.
 - Given Pi is one of the chosen runtimes and no Pi subagent package is installed, When setup runs, Then the assistant explains that Pi core has no subagents, offers to install the recommended gentle-pi and `gentle-shell`, installs them only if I accept, accepts another subagent package I already use, and never edits that package's own configuration (Approved (owner 2026-10-26), TRD D21).

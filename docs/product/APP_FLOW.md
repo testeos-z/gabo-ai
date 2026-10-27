@@ -57,9 +57,12 @@ While a proposal is debated or waits, only the affected task is BLOCKED (operati
 
 Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lead, db-master, frontend), **cycle** (gbai-cycle), **coders**, **reviewer**, **plan-change reviewer**.
 
-### J1 Configure the team — [US-001](stories/US-001-configure-the-team.md) (R12, R16, R8, R31–R34)
+### J1 Configure the team — [US-001](stories/US-001-configure-the-team.md) (R12, R16, R8, R31–R34, R36)
 
-- **Trigger.** First setup: the owner runs `gbai init` in the project, then opens their agent (Claude Code, Pi or another engine) and asks it to configure gbai (Approved (owner 2026-10-27), UX_UI 1.8, PRD R32, R34). Later: the owner wants to change a slot or a runtime.
+- **Trigger.** First setup, two entries (Approved (owner 2026-10-27), UX_UI 1.8, PRD R32, R34, R36):
+  - **(a) Terminal:** the owner runs `gbai init` in the project, then opens their agent (Claude Code, Pi or another engine) and asks it to configure gbai.
+  - **(b) Pasted prompt:** the owner pastes the published setup prompt into their agent; the agent installs the CLI, runs `gbai init` and continues. The prompt is the same literal text embedded in the CLI.
+  - Both entries join at step 1. Later: the owner wants to change a slot or a runtime.
   - Superseded (owner 2026-10-27): First setup: the owner copies the setup prompt (with a link) from the gbai documentation and pastes it into Claude Code or Pi (Approved (owner 2026-10-26), UX_UI 1.8, TRD D21). Later: the owner wants to change a slot.
 - **Actors.** Owner, the owner's agent (the assistant once gbai is installed), a subagent of the working kind (verify step).
 - **Steps** (configuration flow, [diagram](diagrams/configuration-flow.html)):

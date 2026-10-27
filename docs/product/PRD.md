@@ -42,6 +42,7 @@ Approved (owner 2026-10-27), plan change issue #51. Guiding principle: technical
 | O5 | A neutral agent spec defines, per agent, its role, the skills it loads, the tools it needs and who launches whom, independent of any engine. | R34 |
 | O6 | Runtime support lives in skills: shipped and tested runtime skills for Claude Code and Pi, plus a runtime builder skill that researches and writes a runtime skill for an engine without one. Adding a runtime needs no Go change and no release. | R35, 5, 6 |
 | O7 | Skill catalog direction (new skills, `gbai-orca-inbox` removed) is a technical detail recorded in the TRD. | — |
+| O8 | Setup has two entries: (a) a developer runs `gbai init` in the terminal and then asks their agent to configure gbai; (b) a user pastes the published setup prompt into their agent, which installs the CLI and continues. The published prompt is the same literal text embedded in the CLI: one source, shipped in the binary and published in the documentation (answers open question 10). | R36, 10.1 |
 
 ## 1. Product in one sentence
 
@@ -136,11 +137,11 @@ The PM proposes user stories (INVEST with Given-When-Then) in `docs/product/stor
 
 **Approved (auto proposal, owner 2026-10-25):** the index below. Story files were written on 2026-10-26 and US-009 to US-011 were added (owner approval 2026-10-26). Reason: each story groups the requirements one user needs for one outcome, so every functional requirement except R1 and R13 is traced to at least one story.
 
-Updated (owner 2026-10-27): US-001 traces R31–R34 and US-007 traces R34 and R35.
+Updated (owner 2026-10-27): US-001 traces R31–R34 and R36 and US-007 traces R34 and R35.
 
 | id | title | user | requirement ids | status | file |
 |---|---|---|---|---|---|
-| US-001 | Configure the team | Solo developer | R12, R16, R8, R31, R32, R33, R34 | approved | [US-001-configure-the-team.md](stories/US-001-configure-the-team.md) |
+| US-001 | Configure the team | Solo developer | R12, R16, R8, R31, R32, R33, R34, R36 | approved | [US-001-configure-the-team.md](stories/US-001-configure-the-team.md) |
 | US-002 | Plan the product once | Solo developer | R2, R3, R20 | approved | [US-002-plan-the-product-once.md](stories/US-002-plan-the-product-once.md) |
 | US-003 | Run a wave without watching | Solo developer | R4, R5, R15 | approved | [US-003-run-a-wave-without-watching.md](stories/US-003-run-a-wave-without-watching.md) |
 | US-004 | Resolve questions by mode | Solo developer | R5, R6, R17 | approved | [US-004-resolve-questions-by-mode.md](stories/US-004-resolve-questions-by-mode.md) |
@@ -193,6 +194,7 @@ Type: F functional, Q quality, C constraint. All requirements are `must` unless 
 | R33 | F | Approved (owner 2026-10-27): When the user, an agent, the reviewer or CI runs `gbai check`, the CLI shall validate the project read-only and independent of the engine. | `gbai check` validates the global user file and `gbai.yaml` against their JSON Schemas, checks that every agent of the neutral agent spec is present, and reports every agent that is stale against its template. It writes nothing, exits non-zero on any failure and reports each failure in the UX_UI section 4 shape. | must | US-001 | test |
 | R34 | F | Approved (owner 2026-10-27): When the user asks their agent to configure gbai, the agent shall build the configuration and the agents from gbai skills without inventing content. | The setup skill asks the setup questions one at a time (R12). The config-writer skill writes `gbai.yaml` and the global user file. The runtime skill for the engine in use builds every agent of the neutral agent spec in that engine's format from fixed templates; the agent fills only the templates' slots. The neutral agent spec defines, per agent, its role, the skills it loads, the tools it needs and who launches whom, independent of any engine. The agent then runs `gbai check` and fixes every failure before it reports setup as done. Claude Code and Pi have shipped, tested runtime skills. | must | US-001, US-007 | test, demo |
 | R35 | F | Approved (owner 2026-10-27): Where no runtime skill exists for the user's engine, the runtime builder skill shall produce one from verified sources without inventing. | The runtime builder researches the engine's official documentation first, checks it against the installed version and its CLI help, and cites the source and the version each fact applies to. When the documentation is unclear it asks the user one concrete question. Without web access or a documentation MCP it asks the user for documentation links. It refuses an engine without subagent and skill support, or an equivalent. It tests with a probe agent and then `gbai check`, and writes the new runtime skill for reuse. Adding a runtime needs no Go change and no gbai release. | must | US-007 | test, demo |
+| R36 | C | Approved (owner 2026-10-27): The setup prompt shall have a single source: the literal text embedded in the gbai CLI, published unchanged in the gbai documentation. | The prompt published in the documentation is identical to the text embedded in the CLI binary of the same version; there is one text to maintain. A user who pastes it into their agent gets the agent to install the CLI, run `gbai init` and continue with the same setup as entry (a) (R32, R34). How the CLI exposes the embedded text is a TRD detail. | must | US-001 | test, inspection |
 
 ### 8.1 Operating rules (proposed)
 
@@ -229,7 +231,9 @@ These rules answer open questions 1–3. Each is **Approved (auto proposal, owne
 
 Switching tool means changing the adapter and rebuilding the agents: edit the YAML (by hand or through the config-writer skill), ask the agent to rebuild the affected agents, then run `gbai check` (updated owner 2026-10-27; `gbai config set` and `gbai generate` are removed). Custom adapters live in the repository.
 
-**Setup entry.** Approved (owner 2026-10-27), R32, R34: the user installs gbai and runs `gbai init` in the project. It copies the skill catalog, writes the neutral entry file, installs the user-level `gbai-reviewer` skill and prints the next step. The user opens their agent (Claude Code, Pi or another engine) in the project and asks it to configure gbai; the agent follows the entry file and the setup, config-writer and runtime skills, then runs `gbai check`. There is still no setup terminal UI. Whether the published setup prompt stays as an alternative entry is open question 10.
+**Setup entry.** Approved (owner 2026-10-27), R32, R34: the user installs gbai and runs `gbai init` in the project. It copies the skill catalog, writes the neutral entry file, installs the user-level `gbai-reviewer` skill and prints the next step. The user opens their agent (Claude Code, Pi or another engine) in the project and asks it to configure gbai; the agent follows the entry file and the setup, config-writer and runtime skills, then runs `gbai check`. There is still no setup terminal UI.
+
+**Second setup entry.** Approved (owner 2026-10-27), R36, answers open question 10: a user can instead paste the published setup prompt into their agent; the agent installs the CLI, runs `gbai init` and continues with the same setup. The published prompt is the same literal text embedded in the CLI, so there is a single text to maintain.
 
 **Superseded (owner 2026-10-27), setup entry of 2026-10-26.** Approved (owner 2026-10-26): there is no setup terminal UI. The user copies a setup prompt (with a link) from the gbai documentation and pastes it into Claude Code or Pi; that agent installs gbai, runs the setup question burst above, writes the config files and runs `gbai generate`. `gbai generate` installs the per-runtime artifacts for each runtime in `generation.targets` (skills, agents, and the runtime's way of adding tools, such as MCP servers, plugins or packages) from one table of what goes where (TRD D21).
 
@@ -299,8 +303,9 @@ Out of the first release.
 | 7 | Does the read-only `gbai config [--json]` command stay in the agent compiler (TRD D18), or is the effective configuration read by the assistant from the files? | answered — Approved (owner 2026-10-26): removed; the assistant reads the files and `gbai generate` reports errors (10.1 Documentation) |
 | 8 | Where does the compiler install the reviewer scripts in the repository? Proposed: `.gbai/reviewer/` (TRD D20, DB_SCHEMA). | answered — Approved (owner 2026-10-26): not in the repository; the scripts live in the `scripts/` folder of the `gbai-reviewer` skill, installed at user level so PR code cannot modify them (R9, TRD D20) |
 | 9 | Does the terminal UI (TUI) for the initial configuration stay in scope, or is setup done only with the assistant plus `gbai config set` and `gbai generate` (UX_UI section 5, milestone M4)? | answered — Approved (owner 2026-10-26): the TUI is removed; setup starts from a prompt pasted into Claude Code or Pi (10.1 Setup entry, TRD D21) |
-| 10 | Does the published setup prompt stay as an alternative entry (the pasted prompt has the agent install gbai and run `gbai init`), or is the only entry `gbai init` followed by asking the agent to configure gbai (owner decision 2026-10-27)? | open |
+| 10 | Does the published setup prompt stay as an alternative entry (the pasted prompt has the agent install gbai and run `gbai init`), or is the only entry `gbai init` followed by asking the agent to configure gbai (owner decision 2026-10-27)? | answered — Approved (owner 2026-10-27): both entries stay; the published prompt is the same literal text embedded in the CLI (O8, R36, 10.1 Setup entry) |
 | 11 | When gbai is upgraded in a project that already has a config, how does the user refresh the copied skill catalog, given that `gbai init` never overwrites an existing config and points to `gbai check`? | open |
+| 12 | Pending owner decision (2026-10-27), not applied: the CLI will be renamed "gabo" ("GABO CLI"). Does the rename cover only the binary, or also the skill prefixes (`gbai-*`) and the config file name (`gbai.yaml`)? Nothing is renamed until the scope is confirmed. | open |
 
 ## 14. Glossary
 
@@ -321,7 +326,7 @@ Out of the first release.
 | Contract | What the agents must be able to do for a slot; shipped by gbai. |
 | Adapter | A Markdown skill or document in the repository explaining how to fulfil a contract with the team's tool. |
 | Agent builder | **Superseded (owner 2026-10-27)** by the runtime skill and `gbai init` / `gbai check`. Former meaning: the generic gbai code (the agent compiler, the only Go part) that validates the configuration, generates runtime-native agent files and installs the per-runtime artifacts (skills, including the reviewer skill and its scripts, adapters, and tool registrations) from one table of what goes where. |
-| Setup prompt | A prompt with a link, published in the gbai documentation, that the user pastes into Claude Code or Pi to have that agent install and configure gbai. Its role after the 2026-10-27 decision is open question 10. |
+| Setup prompt | A prompt with a link, published in the gbai documentation, that the user pastes into Claude Code or Pi to have that agent install and configure gbai. Since 2026-10-27 its text is the same literal text embedded in the CLI (one source); pasting it is the second setup entry (R36). |
 | Entry file | A short, engine-neutral file written by `gbai init` that tells any agent which skills to load, which agents to create, which config files to write and how to verify (R32). |
 | Neutral agent spec | The engine-independent list of gbai agents: for each, its role, the skills it loads, the tools it needs and who launches whom (R34). |
 | Runtime skill | A shipped skill that builds the agents of the neutral agent spec in one engine's format from fixed templates; Claude Code and Pi in the first release (R34). |
