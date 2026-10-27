@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -99,15 +100,17 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable",
 			"## Task Close", "PR #<n> merged", "repository_host", "never `--force`", "--git-common-dir", "resumable",
 			"`worktree.keep`", "before any removal", "unverified:",
+			"D23", "only writer of DONE", "lock error", "retry once",
 		},
 		"gbai-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
-			"handle", "resume the owning coder", "fallback sweep", "in-process",
+			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
 		},
-		"gbai-assistant/SKILL.md": {"resume the owning coder", "PR #<n> merged"},
+		"gbai-assistant/SKILL.md": {"resume the owning coder", "PR #<n> merged", "D23", "close report"},
 		"gbai-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
 		"gbai-contract-repository-host/examples/host-github.md": {
 			"baseRefName,headRefName,headRefOid", "git branch -d <branch>", "ls-remote", "leftover",
+			"local `origin/<branch>` tracking ref", "--prune",
 		},
 		"gbai-reviewer-notes/SKILL.md": {
 			"never approves", "marker", "## Review layers", "Coder-side review (optional)",
@@ -149,6 +152,20 @@ func TestTaskCloseNeverForceDeletesBranches(t *testing.T) {
 	}
 	if seen != len(guarded) {
 		t.Fatalf("checked %d files, want %d", seen, len(guarded))
+	}
+	// The Claude Code adapter and agent are not embedded; they live in the
+	// repository checkout, three levels above this package's module dir.
+	for _, p := range []string{
+		"../../../../.claude/skills/gbai-repository-host-github/SKILL.md",
+		"../../../../.claude/agents/gbai-coder.md",
+	} {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s: %v", p, err)
+		}
+		if strings.Contains(string(b), "branch -D") {
+			t.Errorf("%s: must not contain %q", p, "branch -D")
+		}
 	}
 }
 

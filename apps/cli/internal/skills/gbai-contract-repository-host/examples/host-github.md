@@ -49,5 +49,5 @@ git push origin --delete <branch>
 ```
 
 1. The read must show `MERGED`, base `$B` and head `<branch>`; otherwise refuse.
-2. Local first, with lower-case `-d` while `origin/<branch>` still exists: git checks the branch against its upstream, so it succeeds after a squash merge and still refuses unpushed commits. A refusal is a leftover; never force it.
+2. Local first, with lower-case `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it): git checks the branch against that upstream ref, so it succeeds after a squash merge and still refuses unpushed commits. A refusal is a leftover; never force it.
 3. Remote only if `ls-remote` shows exactly `headRefOid`; no line means nothing to delete; any other SHA is a refusal and a leftover.

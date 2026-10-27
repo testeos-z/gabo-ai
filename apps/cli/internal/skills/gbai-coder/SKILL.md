@@ -17,7 +17,7 @@ Load in a `gbai-coder` subagent launched by `gbai-cycle` for one task in one git
 - Open the PR to `repo.integration_branch` (`dev`), never `main`. Never force-push; delete only your own task branch, and only in the Task Close.
 - After every push, request one review from the `gbai-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`. Act on the `VERDICT` line it returns; the PR comment holds the findings.
 - Questions go back to the cycle in your outcome; never ask the owner directly.
-- You own your task to the end: after the merge you close it yourself (Task Close). Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
+- You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
 
 ## Clean Worktree and Resources
 
@@ -41,7 +41,7 @@ Max 4 fix rounds; then label the issue `needs-user`, report BLOCKED with the que
 
 ## Task Close
 
-Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`.
+Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome. Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover.
 
 1. Verify through `repository_host` (read status) that the PR is merged into `repo.integration_branch` from your branch, and note its merged head SHA. Not merged, or another base or head branch ⇒ change nothing, report HANDED "not merged".
 2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
