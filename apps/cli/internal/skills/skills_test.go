@@ -10,8 +10,35 @@ import (
 )
 
 var want = []string{
-	"gbai-assistant", "gbai-coder", "gbai-cycle", "gbai-db-master", "gbai-dev-lead",
+	"gbai-assistant", "gbai-coder", "gbai-contract-repository-host", "gbai-contract-reviewer-placement",
+	"gbai-contract-tasks", "gbai-cycle", "gbai-db-master", "gbai-dev-lead",
 	"gbai-frontend", "gbai-orca-inbox", "gbai-pm", "gbai-reviewer-notes", "gbai-setup",
+}
+
+// contracts maps each contract skill to its TRD 9.1 operations, in order, and
+// to the example adapters that must cover every one of them.
+var contracts = map[string]struct {
+	ops      []string
+	examples []string
+}{
+	"gbai-contract-tasks": {
+		ops: []string{
+			"create", "read unblocked", "read one", "claim", "log progress",
+			"change status", "link PR", "verify by re-read",
+		},
+		examples: []string{"tasks-gh.md"},
+	},
+	"gbai-contract-repository-host": {
+		ops: []string{
+			"open PR", "comment on PR", "read PR status and checks",
+			"merge into integration branch", "delete branch",
+		},
+		examples: []string{"host-github.md"},
+	},
+	"gbai-contract-reviewer-placement": {
+		ops:      []string{"trigger review", "report placement", "return verdict"},
+		examples: []string{"reviewer-local.md"},
+	},
 }
 
 func TestEmbeddedSkillsAreListed(t *testing.T) {
@@ -79,6 +106,61 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			}
 		}
 	}
+}
+
+// Every contract lists its operations as stable "### <op>" headings under
+// "## Operations", and every example adapter repeats exactly those headings.
+func TestContractsListOperationsAndExamplesCoverThem(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range Names() {
+		if _, ok := contracts[n]; strings.HasPrefix(n, "gbai-contract-") && !ok {
+			t.Errorf("%s: contract skill not listed in contracts", n)
+		}
+	}
+	byPath := map[string]string{}
+	for _, f := range files {
+		byPath[f.Path] = string(f.Data)
+	}
+	for name, c := range contracts {
+		skill, ok := byPath[name+"/SKILL.md"]
+		if !ok {
+			t.Errorf("%s: contract skill missing", name)
+			continue
+		}
+		if got := operations(skill); !slices.Equal(got, c.ops) {
+			t.Errorf("%s/SKILL.md: operations %q, want %q", name, got, c.ops)
+		}
+		for _, ex := range c.examples {
+			p := name + "/examples/" + ex
+			doc, ok := byPath[p]
+			if !ok {
+				t.Errorf("%s: example adapter missing", p)
+				continue
+			}
+			if got := operations(doc); !slices.Equal(got, c.ops) {
+				t.Errorf("%s: operations %q, want %q", p, got, c.ops)
+			}
+		}
+	}
+}
+
+// operations returns the "### " headings inside the "## Operations" section.
+func operations(doc string) []string {
+	var out []string
+	in := false
+	for _, line := range strings.Split(doc, "\n") {
+		switch {
+		case strings.HasPrefix(line, "## "):
+			in = strings.TrimSpace(line) == "## Operations"
+		case in && strings.HasPrefix(line, "### "):
+			out = append(out, strings.TrimSpace(strings.TrimPrefix(line, "### ")))
+		}
+	}
+	return out
 }
 
 func frontmatter(s string) (map[string]string, bool) {
