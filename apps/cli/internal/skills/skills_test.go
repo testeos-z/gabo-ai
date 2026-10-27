@@ -95,9 +95,14 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]string{
-		"gbai-coder/SKILL.md":          {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
-		"gbai-cycle/SKILL.md":          {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
-		"gbai-reviewer-notes/SKILL.md": {"never approves", "marker"},
+		"gbai-coder/SKILL.md": {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
+		"gbai-cycle/SKILL.md": {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
+		"gbai-reviewer-notes/SKILL.md": {
+			"never approves", "marker", "## Review layers", "Coder-side review (optional)",
+			"methodology", "Reviewer-side gate (mandatory)", "outside every repository",
+			"own clone", "own `HOME`", "cache", "clean environment", "Single-user mode", "Isolated mode",
+			"sha=<head>", "One verdict per pushed head", "`VERDICT`", "Later",
+		},
 	}
 	for _, f := range files {
 		for _, s := range want[f.Path] {
