@@ -37,6 +37,15 @@ type Config struct {
 	// Parallelism is the most coder sessions the cycle runs at once; it
 	// already leaves room for the reviewer's checks. 0 means the default, 3.
 	Parallelism int `yaml:"parallelism"`
+
+	// Version is the schema version of the file; a file without it is
+	// version 0, the current shape (see keyclass.go).
+	Version int `yaml:"version"`
+	// Personal keys (see PersonalKeys): read from the global layers only.
+	Alias            string `yaml:"alias,omitempty"`
+	InteractionLevel string `yaml:"interaction_level,omitempty"`
+	Tone             string `yaml:"tone,omitempty"`
+	Language         string `yaml:"language,omitempty"`
 }
 
 // Worktree configures `gbai worktree close`.
@@ -296,5 +305,6 @@ func (c Config) validate() error {
 		ok := k != "" && !strings.ContainsAny(k, "\n\r") && (path.IsAbs(k) || !strings.Contains(k, "/")) && k != ".." && k != "."
 		check(ok, "worktree.keep", fmt.Sprintf("entry %q must be a worktree name or an absolute path", k))
 	}
+	errs = append(errs, c.validateKeyClasses()...)
 	return errors.Join(errs...)
 }
