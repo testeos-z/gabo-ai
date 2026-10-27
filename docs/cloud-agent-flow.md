@@ -40,7 +40,7 @@ Long-lived agent sessions (Orca terminals, user `orca`, started by `gbai session
 - **gbai-reviewer** — reviewer-side session; the review itself runs in detached terminals opened by `gbai review request`.
 - **gbai-assistant** — planning orchestrator (`gbai-assistant` skill) that keeps the six product docs current.
 
-Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`, see the `gbai-orca-inbox` skill), never through terminal handles. Messages are notifications only.
+Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`), never through terminal handles. Messages are notifications only.
 
 ## Flow of one issue
 

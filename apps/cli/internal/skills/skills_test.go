@@ -16,7 +16,7 @@ var want = []string{
 	"gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup", "gbai-orca-inbox",
+	"gabo-direct-sessions-orca", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup",
 }
 
 // contracts maps each contract skill to its TRD 9.1 operations, in order, and
@@ -273,6 +273,38 @@ func TestContractsListOperationsAndExamplesCoverThem(t *testing.T) {
 			if got := operations(doc); !slices.Equal(got, c.ops) {
 				t.Errorf("%s: operations %q, want %q", p, got, c.ops)
 			}
+		}
+	}
+}
+
+// The shipped direct_sessions adapter (T060) covers every contract operation
+// with the Orca CLI, and the retired gbai-orca-inbox skill is named nowhere in
+// the catalog.
+func TestDirectSessionsOrcaAdapter(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var adapter string
+	for _, f := range files {
+		if f.Path == "gabo-direct-sessions-orca/SKILL.md" {
+			adapter = string(f.Data)
+		}
+		if strings.Contains(string(f.Data), "orca-inbox") {
+			t.Errorf("%s: references the removed orca-inbox skill", f.Path)
+		}
+	}
+	if got, want := operations(adapter), contracts["gabo-contract-direct-sessions"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-direct-sessions-orca/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{
+		"orca terminal create", "--worktree path:<worktree>", "--title", "orca terminal send",
+		"--retry-request", "orca terminal show", "orca terminal read", "orca terminal close",
+		"orca terminal list", "never merge", "never force-push", "ledger",
+	} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-direct-sessions-orca/SKILL.md: missing %q", s)
 		}
 	}
 }
