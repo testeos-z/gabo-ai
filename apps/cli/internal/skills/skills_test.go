@@ -13,7 +13,7 @@ import (
 )
 
 var want = []string{
-	"gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
 	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
@@ -371,6 +371,78 @@ func TestAgentHostRailwayOrcaAdapter(t *testing.T) {
 	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-agent-host-railway-orca/SKILL.md: missing %q", s)
+		}
+	}
+}
+
+// The shipped local agent_host adapter (T058) covers every contract operation
+// for agents on the owner's machine and states every server field as not used.
+func TestAgentHostLocalAdapter(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var adapter string
+	for _, f := range files {
+		if f.Path == "gabo-agent-host-local/SKILL.md" {
+			adapter = string(f.Data)
+		}
+	}
+	if got, want := operations(adapter), contracts["gabo-contract-agent-host"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-agent-host-local/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{
+		"gabo-contract-agent-host", "`not used`", "single-user", "ledger",
+		// claude and pi command lines, each with its session id and the prompt kept off argv.
+		// Only the agent command is backgrounded, so $! is the agent, not a subshell.
+		`{ nohup claude --print --agent <role agent> --session-id "$sid" --permission-mode dontAsk --permission-prompts none --allowedTools "$tools" <"$dir/prompt.md"`,
+		`{ nohup pi --print --approve --tools read,bash,edit,write,grep,find,ls --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md"`,
+		"</dev/null",
+		// a headless session cannot answer a permission prompt: the tools it may use are
+		// pinned on the command line and checked before the session starts.
+		// the tools line is read from the frontmatter only, and exactly once.
+		`tools=$(awk '/^---$/ { if (++n == 2) exit; next } n == 1 && sub(/^tools: */, "") { print; c++ } END { exit c != 1 }' <role agent file>)`,
+		// a reviewer would load settings, hooks and agents from the branch under review:
+		// only coder and assistant sessions start, on either runtime, and the role check runs first.
+		"case \"<runtime role>\" in coder|assistant) ;; *) false ;; esac &&\n  tools=$(awk",
+		"case \"<runtime role>\" in coder|assistant) ;; *) false ;; esac &&\n  pi --help",
+		"Never start a `reviewer` session",
+		// pi must support every flag the start command relies on.
+		`pi --help | grep -qF -- --session-id && pi --help | grep -qF -- --append-system-prompt`,
+		// pi reads the role agent file as a file: its help states the flag takes text or file contents.
+		"Append text or file contents to the system prompt",
+		// each role has a defined directory, and a refused tools line names the format it needs.
+		"An `assistant` session starts in the repository's main checkout",
+		"one-line `tools: A, B, C`",
+		// the scratch dir comes from the ledger, not a shell variable of the start step.
+		"rm -r -- <scratch dir>",
+		// the report reads the elapsed time only after the session id matched.
+		`ps -o args= -p <pid> | grep -qF -- "--session-id <sid>" && ps -o etime= -p <pid>`,
+		`claude --help | grep -qF -- --permission-prompts`,
+		`pi --help | grep -qF -- --approve`,
+		// the start check and the report never print the process arguments.
+		`ps -o args= -p "$(cat "$dir/pid")" | grep -qF -- "--session-id $sid"`,
+		// a reused process id is never signalled: the session id is matched before kill.
+		`grep -qF -- "--session-id <sid>" && kill -TERM <pid>`,
+		// every former cloud field of the contract is stated as not used.
+		"| `server.railway.{project_id, environment_id, service_id}` | `not used` |",
+		"| `users.orca.{name, home, uid, extra_path}` | `not used` |",
+		"| `bot.login` | `not used` |",
+		"| `sessions.{coder, reviewer, assistant}.prompt_file` | `not used` |",
+		"| `sessions.local_orca` | `not used` |",
+		"| `/etc/gbai/gbai.yaml` | `not used` |",
+	} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-agent-host-local/SKILL.md: missing %q", s)
+		}
+	}
+	if strings.Contains(adapter, "| grep -F --") {
+		t.Errorf("gabo-agent-host-local/SKILL.md: a ps check prints the process arguments; use grep -qF")
+	}
+	for _, s := range []string{"railway status", "railway mcp", "--environment", "ssh ", "orca "} {
+		if strings.Contains(strings.ToLower(adapter), s) {
+			t.Errorf("gabo-agent-host-local/SKILL.md: reaches a server or remote host %q", s)
 		}
 	}
 }
