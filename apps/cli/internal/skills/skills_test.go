@@ -131,7 +131,13 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
 			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
 		},
-		"gbai-assistant/SKILL.md": {"resume the owning coder", "PR #<n> merged", "D23", "close report"},
+		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
+		"gbai-assistant/SKILL.md": {
+			"default point of contact", "Never block", "only the owner", "user.email",
+			"`developers`", "global `alias` wins", "Ask once", "No `gbai` command",
+			"`tone`", "`language`", "terminal",
+			"resume the owning coder", "PR #<n> merged", "D23", "close report",
+		},
 		"gbai-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
 		"gbai-contract-repository-host/examples/host-github.md": {
 			"baseRefName,headRefName,headRefOid", "git branch -d <branch>", "ls-remote", "leftover",
