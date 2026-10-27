@@ -79,7 +79,7 @@ The current config is cloud-shaped. Under the approved split, cloud fields leave
 | `coder.login` | Core | Coder-merge audit rule |
 | `review.{checks, auto_merge, human_only_paths, pi_credential_env, state_dir}` | Core | Read by the installed reviewer scripts (Approved (owner 2026-10-26), TRD D20) |
 | `parallelism` | Core | Coder sessions per wave |
-| `worktree.keep` | Core | Read by the cycle skill at wave cleanup; `gbai worktree close` is removed (Approved (owner 2026-10-26), TRD D15, D18) |
+| `worktree.keep` | Core | Read by the owning coder at task close and by the cycle skill at the wave-close sweep; `gbai worktree close` is removed (Approved (owner 2026-10-26), TRD D15, D18; amended (owner 2026-10-27), TRD D23) |
 
 The system layer `/etc/gbai/gbai.yaml` exists today only for the server, so it moves into the `slots.agent_host` adapter together with `sessions.local_orca`; the core loader keeps only the user and project layers.
 

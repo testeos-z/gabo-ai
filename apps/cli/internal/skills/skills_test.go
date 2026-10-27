@@ -4,14 +4,16 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
 )
 
 var want = []string{
-	"gbai-assistant", "gbai-coder", "gbai-contract-repository-host", "gbai-contract-reviewer-placement",
-	"gbai-contract-tasks", "gbai-cycle", "gbai-db-master", "gbai-dev-lead",
+	"gbai-assistant", "gbai-coder", "gbai-contract-agent-host", "gbai-contract-direct-sessions",
+	"gbai-contract-memory", "gbai-contract-methodology", "gbai-contract-notifications",
+	"gbai-contract-repository-host", "gbai-contract-reviewer-placement", "gbai-contract-tasks", "gbai-cycle", "gbai-db-master", "gbai-dev-lead",
 	"gbai-frontend", "gbai-orca-inbox", "gbai-pm", "gbai-reviewer-notes", "gbai-setup",
 }
 
@@ -38,6 +40,30 @@ var contracts = map[string]struct {
 	"gbai-contract-reviewer-placement": {
 		ops:      []string{"trigger review", "report placement", "return verdict"},
 		examples: []string{"reviewer-local.md"},
+	},
+	"gbai-contract-memory": {
+		ops: []string{
+			"save decision", "list decisions", "search", "read one",
+			"save ledger", "read ledger", "save wave trace", "read wave trace",
+			"save preference", "read preferences",
+		},
+		examples: []string{"memory-engram.md"},
+	},
+	"gbai-contract-notifications": {
+		ops:      []string{"notify owner", "notify developer by alias"},
+		examples: []string{"notify-task-comment.md"},
+	},
+	"gbai-contract-direct-sessions": {
+		ops:      []string{"open session", "send message", "read state", "close session"},
+		examples: []string{"sessions-orca.md"},
+	},
+	"gbai-contract-methodology": {
+		ops:      []string{"coder instructions", "coder-side review", "report per task"},
+		examples: []string{"methodology-tdd.md"},
+	},
+	"gbai-contract-agent-host": {
+		ops:      []string{"start agent session", "stop agent session", "report where agents run"},
+		examples: []string{"agent-host-railway.md"},
 	},
 }
 
@@ -95,19 +121,47 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]string{
-		// J9 and R16/R18: spokesperson, identity resolution and terminal rules.
+		"gbai-coder/SKILL.md": {
+			"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable",
+			"## Task Close", "PR #<n> merged", "repository_host", "never `--force`", "--git-common-dir", "resumable",
+			"`worktree.keep`", "before any removal", "unverified:",
+			"D23", "only writer of DONE", "lock error", "retry once",
+		},
+		"gbai-cycle/SKILL.md": {
+			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
+			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
+		},
+		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
 		"gbai-assistant/SKILL.md": {
 			"default point of contact", "Never block", "only the owner", "user.email",
 			"`developers`", "global `alias` wins", "Ask once", "No `gbai` command",
 			"`tone`", "`language`", "terminal",
+			"resume the owning coder", "PR #<n> merged", "D23", "close report",
 		},
-		"gbai-coder/SKILL.md": {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
-		"gbai-cycle/SKILL.md": {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
+		"gbai-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
+		"gbai-contract-repository-host/examples/host-github.md": {
+			"baseRefName,headRefName,headRefOid", "git branch -d <branch>", "ls-remote", "leftover",
+			"local `origin/<branch>` tracking ref", "--prune",
+		},
 		"gbai-reviewer-notes/SKILL.md": {
 			"never approves", "marker", "## Review layers", "Coder-side review (optional)",
 			"methodology", "Reviewer-side gate (mandatory)", "outside every repository",
 			"own clone", "own `HOME`", "cache", "clean environment", "Single-user mode", "Isolated mode",
 			"sha=<head>", "One verdict per pushed head", "`VERDICT`", "Later",
+		},
+		// TRD 9.2 auto decision record fields and the list filters (R6, R30).
+		"gbai-contract-memory/SKILL.md": {
+			"`what`", "`question`", "`choice`", "`reason`", "`mode`", "`wave`", "`task`", "`resolver`",
+			"filter by `mode`, `wave` and `task`", "user/preferences",
+		},
+		"gbai-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gbai-methodology"},
+		// The former cloud keys of the core config (DB_SCHEMA 2.3).
+		"gbai-contract-agent-host/SKILL.md": {
+			"server.railway", "users.orca", "bot.login", "sessions.{coder, reviewer, assistant}.prompt_file",
+			"sessions.local_orca", "/etc/gbai/gbai.yaml",
+		},
+		"gbai-contract-agent-host/examples/agent-host-railway.md": {
+			"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gbai/gbai.yaml",
 		},
 	}
 	for _, f := range files {
@@ -115,6 +169,47 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			if !strings.Contains(string(f.Data), s) {
 				t.Errorf("%s: missing %q", f.Path, s)
 			}
+		}
+	}
+}
+
+// The task close never force-deletes a branch: the task branch goes with
+// `git branch -d` while its upstream still exists.
+func TestTaskCloseNeverForceDeletesBranches(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	guarded := []string{
+		"gbai-coder/SKILL.md", "gbai-cycle/SKILL.md",
+		"gbai-contract-repository-host/SKILL.md", "gbai-contract-repository-host/examples/host-github.md",
+	}
+	seen := 0
+	for _, f := range files {
+		if !slices.Contains(guarded, f.Path) {
+			continue
+		}
+		seen++
+		if strings.Contains(string(f.Data), "branch -D") {
+			t.Errorf("%s: must not contain %q", f.Path, "branch -D")
+		}
+	}
+	if seen != len(guarded) {
+		t.Fatalf("checked %d files, want %d", seen, len(guarded))
+	}
+	// The Claude Code adapter and agent are not embedded; they live in the
+	// repository checkout, three levels above this package's module dir.
+	for _, p := range []string{
+		"../../../../.claude/skills/gbai-repository-host-github/SKILL.md",
+		"../../../../.claude/agents/gbai-coder.md",
+	} {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s: %v", p, err)
+		}
+		if strings.Contains(string(b), "branch -D") {
+			t.Errorf("%s: must not contain %q", p, "branch -D")
 		}
 	}
 }

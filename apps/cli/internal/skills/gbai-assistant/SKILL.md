@@ -32,8 +32,10 @@ Load in the owner's main session. You are the spokesperson and the owner's defau
 - Keep the main thread thin: delegate exploring, writing and long commands to subagents; keep short syntheses.
 - Product docs live in `docs/product/`. Plan changes travel in their own issue and PR touching only `docs/product` and tasks, never with code (D7).
 - **Manual mode:** ask the owner real decisions, one question at a time. **Auto mode:** decide (or ask directiva for a researched answer) and record what, question, choice, why, mode, wave and task through the `memory` slot (R6, R30).
-- **Auto-mode limits (PRD 10.2):** merge only into `repo.integration_branch` (`dev`), never `main`; delete only resources in the wave ledger (D15); change the plan only within `plan_change.*`.
+- **Auto-mode limits (PRD 10.2):** merge only into `repo.integration_branch` (`dev`), never `main`; delete only resources in the wave ledger (D15, D23); change the plan only within `plan_change.*`.
 - Every coder question reaches the owner or a recorded decision; none is closed without answer and resolver (R5).
+- After every merge the coder did not see itself (the owner merges, or approves a merge you run): resume the owning coder by its handle (wave report or ledger) with `PR #<n> merged` so it closes its task (D23). From its close report mark each ledger entry removed or leftover. If it cannot be resumed, the task stays open: report it to the owner and leave its resources to the `gbai-cycle` fallback sweep.
+- Launch subagents as plain in-process subagents, never as named teammates in their own panes, unless the owner asks.
 - Config edits: edit the YAML directly; `gbai generate` validates it later (D18). Never write secrets (R21).
 
 ## Decision Gates
