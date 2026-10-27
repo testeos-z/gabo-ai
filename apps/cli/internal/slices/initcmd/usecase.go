@@ -1,5 +1,5 @@
 // Package initcmd installs the embedded gbai skills into the local agent
-// skill directories and registers the gbai MCP server with the agent.
+// skill directories.
 package initcmd
 
 import (
@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"strings"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 )
@@ -60,11 +59,10 @@ type File struct {
 	Data []byte
 }
 
-// Settings locate the user's home, the project and the gbai binary.
+// Settings locate the user's home and the project.
 type Settings struct {
 	Home       string
 	ProjectDir string
-	Binary     string // absolute path registered as the MCP server
 }
 
 // Input selects what to install.
@@ -80,24 +78,20 @@ type Output struct {
 	Lines []string
 }
 
-// UseCase installs skills and registers the MCP server.
+// UseCase installs skills.
 type UseCase struct {
-	fs     kernel.FileSystem
-	runner kernel.Runner
-	files  []File
-	s      Settings
+	fs    kernel.FileSystem
+	files []File
+	s     Settings
 }
 
 // NewUseCase wires the use case.
-func NewUseCase(fsys kernel.FileSystem, runner kernel.Runner, files []File, s Settings) *UseCase {
-	return &UseCase{fs: fsys, runner: runner, files: files, s: s}
+func NewUseCase(fsys kernel.FileSystem, files []File, s Settings) *UseCase {
+	return &UseCase{fs: fsys, files: files, s: s}
 }
 
-// Run installs the skills for each runtime, then registers the MCP server.
-func (u *UseCase) Run(ctx context.Context, in Input) (Output, error) {
-	if !filepath.IsAbs(u.s.Binary) {
-		return Output{}, fmt.Errorf("gbai binary path %q must be absolute", u.s.Binary)
-	}
+// Run installs the skills for each runtime.
+func (u *UseCase) Run(_ context.Context, in Input) (Output, error) {
 	var out Output
 	var errs []error
 	for _, rt := range in.Runtimes {
@@ -112,11 +106,6 @@ func (u *UseCase) Run(ctx context.Context, in Input) (Output, error) {
 				continue
 			}
 			out.Lines = append(out.Lines, line)
-		}
-		lines, err := u.register(ctx, rt, in.DryRun)
-		out.Lines = append(out.Lines, lines...)
-		if err != nil {
-			errs = append(errs, err)
 		}
 	}
 	return out, errors.Join(errs...)
@@ -162,28 +151,4 @@ func (u *UseCase) install(target string, data []byte, in Input) (string, error) 
 		return "", fmt.Errorf("write %s: %w", target, err)
 	}
 	return verb + " " + target, nil
-}
-
-func (u *UseCase) register(ctx context.Context, rt Runtime, dryRun bool) ([]string, error) {
-	if rt == RuntimePi {
-		return []string{
-			"pi: gbai does not edit pi config files; add this server to your pi MCP config:",
-			`  {"mcpServers": {"gbai": {"command": "` + u.s.Binary + `", "args": ["mcp"]}}}`,
-		}, nil
-	}
-	add := kernel.Command{Name: "claude", Args: []string{"mcp", "add", "--scope", "user", "gbai", "--", u.s.Binary, "mcp"}}
-	if dryRun {
-		return []string{"would run: claude " + strings.Join(add.Args, " ") + " (unless `claude mcp get gbai` succeeds)"}, nil
-	}
-	res, err := u.runner.Run(ctx, kernel.Command{Name: "claude", Args: []string{"mcp", "get", "gbai"}})
-	if err != nil {
-		return nil, fmt.Errorf("claude mcp get: %w", err)
-	}
-	if res.ExitCode == 0 {
-		return []string{"claude: MCP server gbai already registered"}, nil
-	}
-	if _, err := kernel.RunChecked(ctx, u.runner, add); err != nil {
-		return nil, fmt.Errorf("register MCP server: %w", err)
-	}
-	return []string{"claude: registered MCP server gbai (user scope)"}, nil
 }

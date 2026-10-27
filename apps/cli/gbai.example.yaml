@@ -1,8 +1,8 @@
-# gbai configuration for the vulcam cloud server (Railway "vulcam cloud").
-# Secrets never go here, in any layer: use `gbai secrets set`.
+# gbai configuration example. Secrets never go here, in any layer: only the
+# names of the environment variables that carry them.
 #
 # Without --config, gbai merges up to three layers, lowest to highest precedence:
-#   1. system:  /etc/gbai/gbai.yaml (written by `gbai provision` on the server)
+#   1. system:  /etc/gbai/gbai.yaml
 #   2. user:    $XDG_CONFIG_HOME/gbai/config.yaml, else ~/.config/gbai/config.yaml
 #   3. project: gbai.yaml at the git top-level of the current directory
 #               (the current directory itself outside a git repository)
@@ -10,20 +10,7 @@
 # scalars and lists replace the lower value, `key: null` resets it to the default.
 # Missing files are skipped; an unknown key fails and names its file. Defaults
 # and validation run once on the merged result. `--config <file>` reads exactly
-# that one file. `gbai config` shows the files used and the resolved values.
-server:
-  railway:
-    project_id: 21669483-8aa3-4bc9-8b1c-63d1785a857b
-    environment_id: 5bea8b6f-afec-471f-a757-fc57979b7a24
-    service_id: fb7c97ca-82e3-4554-8463-1d00e95fa57f
-
-# Single-user mode: the agent sessions and the reviewer all run as this OS
-# user, with the owner's own gh login. There are no reviewer users or sudo rules.
-users:
-  orca:
-    name: orca
-    home: /data/home
-    extra_path: [/data/home/.local/bin]
+# that one file.
 
 runtimes:
   coder: claude
@@ -34,13 +21,7 @@ repo:
   name: cappy-lab/vulcam
   integration_branch: dev
 
-# The owner's GitHub login: the reviewer posts, sets statuses and merges with
-# it, and `gbai audit` / `gbai status` count only its verdict comments.
-# Leave empty to use the login gh is authenticated as; when set it must match it.
-bot:
-  login: ""
-
-# `gbai review run` (as the orca user) and its checks side.
+# `gbai review run` and its checks side.
 review:
   # Run in order inside a copy of the merged tree, with GitHub credentials
   # stripped from the environment; split on whitespace, no shell.
@@ -50,7 +31,7 @@ review:
     - bun run check-types
     - bun run lint
     - bun run test
-  # Merge clean mode:cloud PRs into the integration branch, pinned to the reviewed head.
+  # Merge clean PRs into the integration branch, pinned to the reviewed head.
   auto_merge: true
   # Never merged automatically. Entries ending in "/" are root directories;
   # others are file names matched at any depth.
@@ -67,27 +48,18 @@ review:
   pi_credential_env: ANTHROPIC_API_KEY
   # Reviewer state (its own clone/, worktrees/ and ci/ workspaces), 0700.
   # Default: $XDG_STATE_HOME/gbai/reviewer, else ~/.local/state/gbai/reviewer.
-  # state_dir: /data/home/.local/state/gbai/reviewer
+  # state_dir: /home/owner/.local/state/gbai/reviewer
 
-# GitHub login the coder pushes with, only when it differs from the owner's;
-# `gbai audit` flags any merge by it. In single-user mode it is usually unset.
+# GitHub login the coder pushes with, only when it differs from the owner's.
+# In single-user mode it is usually unset.
 # coder:
 #   login: vulcam-coder
 
-# `gbai sessions start|stop` (Orca terminals gbai-coder, gbai-reviewer, gbai-assistant).
-sessions:
-  # Orca CLI for --mode local; use orca-ide on Linux desktops where orca is the screen reader.
-  local_orca: orca
-  # Optional startup prompt files, read on the host that runs the session.
-  # coder:
-  #   prompt_file: /data/home/prompts/coder.md
-
 # Most coder sessions the cycle runs at once. The default, 3, leaves room
-# for the reviewer's checks on the same server; lower it on a smaller one.
+# for the reviewer's checks on the same machine; lower it on a smaller one.
 parallelism: 3
 
-# `gbai worktree close <path>` closes approved coder worktrees under
-# <main checkout>-worktrees/ and deletes their merged local branch.
+# Read by the cycle at wave cleanup.
 worktree:
   # Worktree names (or absolute paths) that are never closed.
   keep: []

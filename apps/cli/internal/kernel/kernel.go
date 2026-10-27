@@ -32,35 +32,6 @@ type Runner interface {
 	Run(ctx context.Context, cmd Command) (Result, error)
 }
 
-// RootUser runs a Script without dropping privileges.
-const RootUser = "root"
-
-// Script is a shell script executed on the server as an OS user.
-type Script struct {
-	User  string
-	Body  string
-	Stdin io.Reader
-}
-
-// RemoteShell runs scripts on the server. Error semantics match Runner.
-type RemoteShell interface {
-	Exec(ctx context.Context, s Script) (Result, error)
-}
-
-// Terminal is a live Orca-managed terminal.
-type Terminal struct {
-	Handle string `json:"handle"`
-	Title  string `json:"title"`
-}
-
-// Terminals manages Orca terminals on the host that runs the sessions.
-type Terminals interface {
-	List(ctx context.Context) ([]Terminal, error)
-	// Create opens a terminal running command and returns orca's raw output.
-	Create(ctx context.Context, title, command string) (string, error)
-	Close(ctx context.Context, handle string) error
-}
-
 // FileSystem reads and writes local files. ReadFile reports a missing file
 // with an error matching fs.ErrNotExist.
 type FileSystem interface {

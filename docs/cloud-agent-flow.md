@@ -1,5 +1,7 @@
 # Cloud agent flow
 
+> **Retired (T042, TRD D18).** The Go commands this flow relied on (`status`, `audit`, `sessions`, `provision`, `secrets`, `repo`, `worktree`, `mcp`, `doctor`, `config`) and the cloud config keys (`server`, `users`, `bot`, `sessions`) were removed; gbai is now an agent compiler and the work runs through its skills. This document is kept for history only and no longer describes the CLI.
+
 gbai-team is the CLI and harness that provisions and operates autonomous coding agents in the cloud. The first target is the **vulcam** repository (cappy-lab/vulcam). This document describes the agreed flow; the CLI must automate it end to end.
 
 ## Goals

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -13,18 +14,27 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
 )
 
-func TestRootHelpListsVersion(t *testing.T) {
+// The work-time commands were retired (T042, D18): the CLI is an agent
+// compiler, and `review` and `plan` remain only until T043 retires them.
+func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	t.Parallel()
-	var out bytes.Buffer
 	root := newRootCommand(deps{version: "1.2.3"})
+	var got []string
+	for _, c := range root.Commands() {
+		got = append(got, c.Name())
+	}
+	if want := []string{"init", "plan", "review", "version"}; !slices.Equal(got, want) {
+		t.Fatalf("commands = %v, want %v", got, want)
+	}
+	var out bytes.Buffer
 	root.SetOut(&out)
 	root.SetArgs([]string{"--help"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, name := range []string{"version", "secrets", "provision", "review", "repo", "sessions", "status", "audit", "doctor", "mcp", "init", "plan", "worktree", "config"} {
-		if !strings.Contains(out.String(), name) {
-			t.Fatalf("help output does not list %s command:\n%s", name, out.String())
+	for _, removed := range []string{"secrets", "provision", "repo", "sessions", "status", "audit", "doctor", "mcp", "worktree", "config "} {
+		if strings.Contains(out.String(), "  "+removed) {
+			t.Fatalf("help still lists %s:\n%s", removed, out.String())
 		}
 	}
 }
@@ -40,58 +50,6 @@ func TestRootVersionSubcommand(t *testing.T) {
 	}
 	if got := out.String(); got != "gbai 1.2.3\n" {
 		t.Fatalf("output = %q", got)
-	}
-}
-
-func TestSecretsSetFailsWithoutConfigBeforeReadingValue(t *testing.T) {
-	t.Parallel()
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetArgs([]string{"--config", t.TempDir() + "/missing.yaml", "secrets", "set", "reviewer-pi"})
-	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "config") {
-		t.Fatalf("Execute() error = %v, want config error", err)
-	}
-}
-
-func TestProvisionDryRunPrintsPlanFromExampleConfig(t *testing.T) {
-	t.Parallel()
-	var out bytes.Buffer
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetOut(&out)
-	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "provision", "--dry-run"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-	for _, want := range []string{"# step: packages", "# step: legacy", "id -u 'orca'"} {
-		if !strings.Contains(out.String(), want) {
-			t.Fatalf("plan missing %q:\n%s", want, out.String())
-		}
-	}
-	for _, banned := range []string{"NOPASSWD", "useradd", "reviewer-ci"} {
-		if strings.Contains(out.String(), banned) {
-			t.Fatalf("single-user plan contains %q:\n%s", banned, out.String())
-		}
-	}
-}
-
-func TestConfigCommandWithFlagShowsOnlyThatFile(t *testing.T) {
-	t.Parallel()
-	var out bytes.Buffer
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetOut(&out)
-	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "config"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-	got := out.String()
-	for _, want := range []string{"flag", "../../gbai.example.yaml", "resolved config:", "name: cappy-lab/vulcam"} {
-		if !strings.Contains(got, want) {
-			t.Fatalf("output missing %q:\n%s", want, got)
-		}
-	}
-	for _, banned := range []string{"/etc/gbai/gbai.yaml", "config.yaml"} {
-		if strings.Contains(got, banned) {
-			t.Fatalf("--config must not layer, output has %q:\n%s", banned, got)
-		}
 	}
 }
 
@@ -122,45 +80,6 @@ func TestReviewNotifyNeedsNoConfig(t *testing.T) {
 	}
 }
 
-func TestRepoSetupDryRunFromExampleConfig(t *testing.T) {
-	t.Parallel()
-	var out bytes.Buffer
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetOut(&out)
-	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "repo", "setup", "--dry-run"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-	for _, want := range []string{"POST repos/cappy-lab/vulcam/rulesets", "refs/heads/dev", "admins"} {
-		if !strings.Contains(out.String(), want) {
-			t.Fatalf("plan missing %q:\n%s", want, out.String())
-		}
-	}
-}
-
-func TestAuditHelpSaysOnlyGitHubIsAudited(t *testing.T) {
-	t.Parallel()
-	var out bytes.Buffer
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetOut(&out)
-	root.SetArgs([]string{"audit", "--help"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
-	if !strings.Contains(out.String(), "Only GitHub is audited") {
-		t.Fatalf("help:\n%s", out.String())
-	}
-}
-
-func TestSessionsRejectsBadModeWithoutConfig(t *testing.T) {
-	t.Parallel()
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetArgs([]string{"--config", t.TempDir() + "/missing.yaml", "sessions", "start", "--mode", "hybrid"})
-	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "mode") {
-		t.Fatalf("Execute() error = %v", err)
-	}
-}
-
 func TestInitDryRunChangesNothing(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -171,52 +90,16 @@ func TestInitDryRunChangesNothing(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, want := range []string{"would install " + home + "/.claude/skills/gbai-setup/SKILL.md", "would install " + home + "/.pi/agent/skills/gbai-coder/SKILL.md", "would run: claude mcp add --scope user gbai -- "} {
+	for _, want := range []string{"would install " + home + "/.claude/skills/gbai-setup/SKILL.md", "would install " + home + "/.pi/agent/skills/gbai-coder/SKILL.md"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q:\n%s", want, out.String())
 		}
 	}
+	if strings.Contains(strings.ToLower(out.String()), "mcp") {
+		t.Fatalf("init still registers an MCP server:\n%s", out.String())
+	}
 	if entries, _ := os.ReadDir(home); len(entries) != 0 {
 		t.Fatalf("dry run wrote %v", entries)
-	}
-}
-
-func TestOwnerLoginDefaultsToTheGhLogin(t *testing.T) {
-	t.Parallel()
-	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("Owner\n")}}
-	got, err := ownerLogin(context.Background(), r, "")
-	if err != nil || got != "Owner" {
-		t.Fatalf("ownerLogin() = %q, %v", got, err)
-	}
-	if c := r.Calls[0].Command; c.Name != "gh" || strings.Join(c.Args, " ") != "api user --jq .login" {
-		t.Fatalf("command = %s %q", c.Name, c.Args)
-	}
-	r = &kerneltest.Runner{}
-	if got, err := ownerLogin(context.Background(), r, "configured"); err != nil || got != "configured" || len(r.Calls) != 0 {
-		t.Fatalf("configured login = %q, %v, calls %d", got, err, len(r.Calls))
-	}
-	for name, res := range map[string]kernel.Result{
-		"gh fails": {ExitCode: 1, Stderr: []byte("not logged in")},
-		"empty":    {Stdout: []byte("\n")},
-		"garbage":  {Stdout: []byte("a b")},
-	} {
-		if _, err := ownerLogin(context.Background(), &kerneltest.Runner{Result: res}, ""); err == nil {
-			t.Errorf("%s: error = nil", name)
-		}
-	}
-}
-
-func TestWorktreeCloseNeedsConfigAndRejectsForce(t *testing.T) {
-	t.Parallel()
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetArgs([]string{"--config", t.TempDir() + "/missing.yaml", "worktree", "close", "/src/repo-worktrees/x"})
-	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "config") {
-		t.Fatalf("Execute() error = %v, want config error", err)
-	}
-	root = newRootCommand(deps{version: "1.2.3"})
-	root.SetArgs([]string{"--config", "../../gbai.example.yaml", "worktree", "close", "--force", "/src/repo-worktrees/x"})
-	if err := root.Execute(); err == nil || !strings.Contains(err.Error(), "force") {
-		t.Fatalf("Execute(--force) error = %v", err)
 	}
 }
 
@@ -244,10 +127,11 @@ func TestProjectPersonalKeyWarnsOnceOnStderr(t *testing.T) {
 	var out, errOut bytes.Buffer
 	root := newRootCommand(deps{version: "1.2.3", stderr: &errOut})
 	root.SetOut(&out)
-	root.SetArgs([]string{"provision", "--dry-run"})
-	if err := root.Execute(); err != nil {
-		t.Fatalf("Execute() error = %v", err)
-	}
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	// review ci cleanup loads the config before it validates the workspace
+	// name; the command's own outcome does not matter here.
+	root.SetArgs([]string{"review", "ci", "cleanup", "--dir", "../outside"})
+	_ = root.Execute()
 	if got := strings.Count(errOut.String(), `personal key "alias" is ignored`); got != 1 {
 		t.Fatalf("warning printed %d times, want 1:\n%s", got, errOut.String())
 	}

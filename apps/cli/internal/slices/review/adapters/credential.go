@@ -11,7 +11,7 @@ import (
 
 const maxCredentialBytes = 64 << 10
 
-// credentialFiles maps a runtime to the file `gbai secrets set` writes for it.
+// credentialFiles maps a runtime to its credential file name in the secrets dir.
 var credentialFiles = map[string]string{
 	review.RuntimeClaude: "claude-oauth-token",
 	review.RuntimePi:     "pi-api-key",
