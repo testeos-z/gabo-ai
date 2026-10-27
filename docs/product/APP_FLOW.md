@@ -97,8 +97,8 @@ Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lea
   1. The assistant starts the wave; the cycle reads the tasks and their blocked-by links through the `tasks` adapter and takes the unblocked ones (its skill, no gbai command).
   2. The cycle launches one coder per task (up to `parallelism`), each in its own worktree.
   3. Each coder implements, opens a PR linked to its task and goes through review (J8).
-  4. Each coder reports DONE or BLOCKED with PR, questions and resources created.
-  5. The cycle updates the tracker (verified by re-read), cleans up (J10) and sends the wave report to the assistant.
+  4. Each coder reports HANDED (clean review) or BLOCKED with PR, questions and resources created; the cycle records its resume handle in the wave ledger.
+  5. The cycle updates the tracker (in progress, BLOCKED, PR link; verified by re-read). After each merge the assistant resumes the owning coder, which closes its task (J10). At wave close the cycle sweeps what no coder closed (J10) and sends the wave report to the assistant.
   6. The assistant answers the owner with the report summary and the comfort question (J4).
 - **Decision points.** Auto mode: no prompts during the run; only the final answer (R15).
 - **Outcome.** The owner performed no launch, relay or copy step.
@@ -165,7 +165,7 @@ Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lea
   2. The coder messages the reviewer agent `PR #<n> head <sha> ready for review`; the reviewer agent validates the request and invokes the installed reviewer script (TRD D20).
   3. The script, in its own clone, home and cache with a clean environment, skips a head that moved, test-merges the PR, runs tests, build and lint as in CI plus an independent agent review, once per pushed head (R26), comments the verdict with the gbai marker and head SHA, and runs the merge gate (integration branch only, never main).
   4. The reviewer agent relays the script's `VERDICT` line to the coder.
-  5. The coder fixes and pushes, or reports DONE; the cycle updates the task and links the PR.
+  5. The coder fixes and pushes, or reports HANDED once the review is clean; the cycle links the PR. After the merge (owner merge or reviewer `auto_merge`) the assistant resumes the coder, which closes its task (J10, TRD D23).
 - **Decision points.** Verdict approve / changes requested / blocked.
 - **Outcome.** Only validated PRs merge; the task shows status and PR.
 - **Failure and escalation.** After 4 fix rounds the task is BLOCKED and escalated to the assistant (operating rule 3).
@@ -183,14 +183,15 @@ Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lea
 
 ### J10 My machine stays clean — [US-010](stories/US-010-my-machine-stays-clean.md) (R13)
 
-- **Trigger.** A wave closes.
-- **Actors.** Cycle, assistant.
+- **Trigger.** A task's PR merges; later, the wave closes.
+- **Actors.** Coder, assistant, cycle.
 - **Steps.**
-  1. During the wave, each subagent reports what it created (worktrees, branches, containers, test databases) and the cycle appends it to the wave ledger in the `memory` slot (TRD D15).
-  2. At wave close the cycle, through its skill, cleans only ledger entries: worktrees with git worktree commands, merged branches and containers with ordinary git and container commands, except `worktree.keep` entries.
-  3. Anything that could not be cleaned is listed in the wave report.
+  1. During the wave, each subagent reports what it created (worktrees, branches, containers, test databases) and the cycle appends it to the wave ledger in the `memory` slot, together with each coder's resume handle (TRD D15, D23).
+  2. After every merge (owner merge or reviewer `auto_merge`), the assistant resumes the owning coder by its handle. The coder verifies the merge on the host, closes its task issue (it is the only writer of DONE), removes its worktree without force, then deletes its local branch and then its remote branch through the `repository_host` adapter, skipping `worktree.keep` entries. A step that fails becomes a leftover in its close report, never forced (TRD D23).
+  3. At wave close the cycle, through its skill, sweeps only ledger entries no coder closed, including those of coders that cannot be resumed: worktrees with git worktree commands, merged branches and containers with ordinary git and container commands, except `worktree.keep` entries. The cycle does not write DONE.
+  4. Anything that could not be cleaned, and any merged task left open, is listed in the wave report.
 - **Decision points.** Auto mode deletes only resources recorded as created by the workflow (R23).
-- **Outcome.** No manual cleanup after waves.
+- **Outcome.** No manual cleanup after merges or waves.
 - **Failure and escalation.** A deletion outside the workflow's resources is refused and reported.
 
 ### J11 Resume without losing work — [US-011](stories/US-011-resume-without-losing-work.md) (R25)
@@ -223,7 +224,8 @@ flowchart TD
   cycle --> coders[Coders: implement, open PR]
   coders --> review[Reviewer agent runs installed script: checks + agent review, VERDICT]
   review -- changes --> coders
-  review -- approve --> report[Cycle: update tracker, cleanup, wave report]
+  review -- approve --> taskclose[Merge; assistant resumes coder: close issue DONE, remove worktree and branches]
+  taskclose --> report[Cycle: wave-close sweep, wave report]
   coders -- question --> q{Critical?}
   q -- no --> mode{Mode}
   mode -- manual --> owner[Owner answers]

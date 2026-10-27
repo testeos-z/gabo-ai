@@ -149,7 +149,7 @@ Format: `✗ <what happened>` on one line, then `why:` and `next:` lines, then o
 
 | case | example |
 |---|---|
-| Refusal (auto-mode limit, R23, 10.2; cycle agent at wave cleanup) | `✗ refused to delete worktree feat-x` · `why: it was not created by this workflow` · `next: remove it yourself or add it to worktree.keep` |
+| Refusal (auto-mode limit, R23, 10.2; coder at task close or cycle agent at the wave-close sweep) | `✗ refused to delete worktree feat-x` · `why: it was not created by this workflow` · `next: remove it yourself or add it to worktree.keep` |
 | Refusal (merge; reviewer script merge gate) | `✗ refused to merge into main` · `why: auto mode merges only into the integration branch (dev)` |
 | Blocked task (cycle agent, wave report) | `✗ task #42 BLOCKED` · `why: 4 review rounds without approval` · `next: owner decision needed` (also in the wave report) |
 | Verification failure (setup; assistant after the subagent smoke test) | `✗ tasks slot not verified` · `why: "read one task" failed: gh: not authenticated` · `next: run gh auth login, then retry verify` |
