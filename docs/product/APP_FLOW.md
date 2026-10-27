@@ -59,7 +59,7 @@ Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lea
 
 ### J1 Configure the team — [US-001](stories/US-001-configure-the-team.md) (R12, R16, R8, R31–R34, R36)
 
-- **Names.** Approved (owner 2026-10-27, PRD O9): the CLI is invoked as `gabo`. `gabo.yaml`, `gabo-reviewer` and `gabo-methodology` below are derived defaults, pending owner confirmation. The existing `gbai-*` skill names, `gbai.yaml`, the `gbai` command and the `gbai` global directory stay in every other section and in the repository until the rename task lands.
+- **Names.** Approved (owner 2026-10-27, PRD O9): the CLI is invoked as `gabo`. `gabo.yaml`, `gabo-reviewer` and `gabo-methodology` below follow the approved names (skills `gabo-*`, project config `gabo.yaml`, global user file under a `gabo` directory; confirmed by the owner 2026-10-27). The existing `gbai-*` skill names, `gbai.yaml`, the `gbai` command and the `gbai` global directory stay in every other section and in the repository until the rename task lands.
 - **Trigger.** First setup, two entries (Approved (owner 2026-10-27), UX_UI 1.8, PRD R32, R34, R36):
   - **(a) Terminal:** the owner runs `gabo init` in the project, then opens their agent (Claude Code, Pi or another engine) and asks it to configure gabo-ai.
   - **(b) Pasted prompt:** the owner pastes the published setup prompt into their agent; the agent installs the CLI, runs `gabo init` and continues. The prompt is the same literal text embedded in the CLI.
