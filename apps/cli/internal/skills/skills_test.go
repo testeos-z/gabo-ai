@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -120,8 +121,22 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]string{
-		"gbai-coder/SKILL.md": {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
-		"gbai-cycle/SKILL.md": {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
+		"gbai-coder/SKILL.md": {
+			"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable",
+			"## Task Close", "PR #<n> merged", "repository_host", "never `--force`", "--git-common-dir", "resumable",
+			"`worktree.keep`", "before any removal", "unverified:",
+			"D23", "only writer of DONE", "lock error", "retry once",
+		},
+		"gbai-cycle/SKILL.md": {
+			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
+			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
+		},
+		"gbai-assistant/SKILL.md": {"resume the owning coder", "PR #<n> merged", "D23", "close report"},
+		"gbai-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
+		"gbai-contract-repository-host/examples/host-github.md": {
+			"baseRefName,headRefName,headRefOid", "git branch -d <branch>", "ls-remote", "leftover",
+			"local `origin/<branch>` tracking ref", "--prune",
+		},
 		"gbai-reviewer-notes/SKILL.md": {
 			"never approves", "marker", "## Review layers", "Coder-side review (optional)",
 			"methodology", "Reviewer-side gate (mandatory)", "outside every repository",
@@ -148,6 +163,47 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			if !strings.Contains(string(f.Data), s) {
 				t.Errorf("%s: missing %q", f.Path, s)
 			}
+		}
+	}
+}
+
+// The task close never force-deletes a branch: the task branch goes with
+// `git branch -d` while its upstream still exists.
+func TestTaskCloseNeverForceDeletesBranches(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	guarded := []string{
+		"gbai-coder/SKILL.md", "gbai-cycle/SKILL.md",
+		"gbai-contract-repository-host/SKILL.md", "gbai-contract-repository-host/examples/host-github.md",
+	}
+	seen := 0
+	for _, f := range files {
+		if !slices.Contains(guarded, f.Path) {
+			continue
+		}
+		seen++
+		if strings.Contains(string(f.Data), "branch -D") {
+			t.Errorf("%s: must not contain %q", f.Path, "branch -D")
+		}
+	}
+	if seen != len(guarded) {
+		t.Fatalf("checked %d files, want %d", seen, len(guarded))
+	}
+	// The Claude Code adapter and agent are not embedded; they live in the
+	// repository checkout, three levels above this package's module dir.
+	for _, p := range []string{
+		"../../../../.claude/skills/gbai-repository-host-github/SKILL.md",
+		"../../../../.claude/agents/gbai-coder.md",
+	} {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("read %s: %v", p, err)
+		}
+		if strings.Contains(string(b), "branch -D") {
+			t.Errorf("%s: must not contain %q", p, "branch -D")
 		}
 	}
 }
