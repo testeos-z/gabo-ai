@@ -98,7 +98,7 @@ func threeLayers() []Layer {
 func TestLoadLayersHigherLayersWin(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/etc/gbai/gbai.yaml":              minimal + "parallelism: 2\nreview:\n  checks: [make test]\n  auto_merge: true\n",
+		"/etc/gbai/gbai.yaml":              with("parallelism: 2\nreview:\n  checks: [make test]\n  auto_merge: true\n"),
 		"/home/o/.config/gbai/config.yaml": "parallelism: 4\ncoder:\n  login: helper\n",
 		"/src/p/gbai.yaml":                 "parallelism: 6\nreview:\n  checks: [go test, go vet]\n",
 	}
@@ -120,7 +120,7 @@ func TestLoadLayersHigherLayersWin(t *testing.T) {
 		t.Errorf("auto_merge lost: a key absent in higher layers must keep the system value")
 	}
 	if c.Repo.Name != "cappy-lab/vulcam" || c.Repo.IntegrationBranch != "dev" {
-		t.Errorf("system values or defaults lost: %+v", c.Repo)
+		t.Errorf("system values lost: %+v", c.Repo)
 	}
 	for i, l := range res.Layers {
 		if !l.Found || l.Name != threeLayers()[i].Name {
@@ -140,7 +140,7 @@ func TestLoadLayersSkipsMissingFiles(t *testing.T) {
 		t.Fatalf("found = %v", got)
 	}
 	if res.Config.Parallelism != 3 {
-		t.Fatalf("defaults not applied: parallelism = %d", res.Config.Parallelism)
+		t.Fatalf("parallelism = %d, want the project file's 3", res.Config.Parallelism)
 	}
 }
 
@@ -176,7 +176,7 @@ func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
 	t.Parallel()
 	// Neither file is valid alone; merged they are.
 	r := files{
-		"/etc/gbai/gbai.yaml": "repo:\n  name: o/r\nreview:\n  checks: []\n",
+		"/etc/gbai/gbai.yaml": with("review:\n  checks: []\n"),
 		"/src/p/gbai.yaml":    "review:\n  checks: [go test ./...]\n",
 	}
 	if _, err := LoadLayers(r, threeLayers()); err != nil {

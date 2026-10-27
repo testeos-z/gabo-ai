@@ -6,24 +6,47 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
+// minimal sets every required key and nothing else; review stays last so a
+// test can append a review entry.
 const minimal = `
 repo:
   name: cappy-lab/vulcam
+  integration_branch: dev
+runtimes:
+  coder: claude
+  reviewer: claude
+  assistant: claude
+parallelism: 3
+review:
+  checks: [go test ./...]
+  human_only_paths: [.github/]
 `
 
-func TestParseAppliesDefaults(t *testing.T) {
+// with returns minimal overridden by extra, merged like a higher layer.
+func with(extra string) string {
+	var lower, higher map[string]any
+	if err := yaml.Unmarshal([]byte(minimal), &lower); err != nil {
+		panic(err)
+	}
+	if err := yaml.Unmarshal([]byte(extra), &higher); err != nil {
+		panic(err)
+	}
+	b, err := yaml.Marshal(Merge(lower, higher))
+	if err != nil {
+		panic(err)
+	}
+	return string(b)
+}
+
+func TestParseRepoSplit(t *testing.T) {
 	t.Parallel()
 	cfg, err := Parse([]byte(minimal))
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
-	}
-	if r := cfg.Runtimes; r.Coder != RuntimeClaude || r.Reviewer != RuntimePi || r.Assistant != RuntimeClaude {
-		t.Errorf("runtimes = %+v", r)
-	}
-	if cfg.Repo.IntegrationBranch != "dev" {
-		t.Errorf("integration branch = %q, want dev", cfg.Repo.IntegrationBranch)
 	}
 	if cfg.Repo.Owner() != "cappy-lab" || cfg.Repo.Repo() != "vulcam" {
 		t.Errorf("repo split = %q/%q", cfg.Repo.Owner(), cfg.Repo.Repo())
@@ -32,11 +55,11 @@ func TestParseAppliesDefaults(t *testing.T) {
 
 func TestParseKeepsExplicitValues(t *testing.T) {
 	t.Parallel()
-	cfg, err := Parse([]byte(minimal + `
+	cfg, err := Parse([]byte(with(`
 runtimes:
   coder: pi
   reviewer: claude
-`))
+`)))
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
@@ -53,8 +76,8 @@ func TestParseValidationErrors(t *testing.T) {
 		want string
 	}{
 		{"bad repo", strings.Replace(minimal, "cappy-lab/vulcam", "vulcam", 1), "repo.name"},
-		{"bad runtime", minimal + "runtimes:\n  coder: opencode\n", "runtimes.coder"},
-		{"relative state dir", minimal + "review:\n  state_dir: state\n", "review.state_dir"},
+		{"bad runtime", with("runtimes:\n  coder: opencode\n"), "runtimes.coder"},
+		{"relative state dir", with("review:\n  state_dir: state\n"), "review.state_dir"},
 		{"unknown field", minimal + "extra: 1\n", "extra"},
 	}
 	for _, tt := range tests {
@@ -109,30 +132,20 @@ func TestMarshalRoundTrips(t *testing.T) {
 	}
 }
 
-func TestParseReviewDefaults(t *testing.T) {
+func TestParseReviewAutoMergeIsOptional(t *testing.T) {
 	t.Parallel()
 	cfg, err := Parse([]byte(minimal))
 	if err != nil {
 		t.Fatal(err)
 	}
-	r := cfg.Review
-	if len(r.Checks) != 5 || r.Checks[0] != "bun install --frozen-lockfile" || r.Checks[4] != "bun run test" {
-		t.Errorf("checks = %q", r.Checks)
-	}
-	if r.AutoMerge {
-		t.Error("auto_merge must default to false")
-	}
-	if strings.Join(r.HumanOnlyPaths, ",") != ".claude/,.github/,.opencode/,AGENTS.md,CLAUDE.md,docs/policies/,tools/hook-tests/,agents/" {
-		t.Errorf("human_only_paths = %q", r.HumanOnlyPaths)
-	}
-	if r.PiCredentialEnv != "ANTHROPIC_API_KEY" {
-		t.Errorf("pi_credential_env = %q", r.PiCredentialEnv)
+	if cfg.Review.AutoMerge {
+		t.Error("auto_merge must be false when unset")
 	}
 }
 
 func TestParseReviewExplicit(t *testing.T) {
 	t.Parallel()
-	cfg, err := Parse([]byte(minimal + "review:\n  checks: [\"go test ./...\"]\n  auto_merge: true\n  human_only_paths: [secret/]\n  pi_credential_env: OPENAI_API_KEY\n"))
+	cfg, err := Parse([]byte(with("review:\n  checks: [\"go test ./...\"]\n  auto_merge: true\n  human_only_paths: [secret/]\n  pi_credential_env: OPENAI_API_KEY\n")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +168,7 @@ func TestParseReviewValidation(t *testing.T) {
 		"empty path list": {"review:\n  human_only_paths: []\n", "review.human_only_paths"},
 		"bad env":         {"review:\n  pi_credential_env: \"A=B\"\n", "review.pi_credential_env"},
 	} {
-		if _, err := Parse([]byte(minimal + tt.yaml)); err == nil || !strings.Contains(err.Error(), tt.want) {
+		if _, err := Parse([]byte(with(tt.yaml))); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%s: error = %v, want %q", name, err, tt.want)
 		}
 	}
@@ -235,15 +248,11 @@ func TestParseWorktreeKeep(t *testing.T) {
 
 func TestParseParallelism(t *testing.T) {
 	t.Parallel()
-	cfg, err := Parse([]byte(minimal))
-	if err != nil || cfg.Parallelism != 3 {
-		t.Fatalf("default parallelism = %d, %v; want 3", cfg.Parallelism, err)
-	}
-	cfg, err = Parse([]byte(minimal + "parallelism: 5\n"))
+	cfg, err := Parse([]byte(with("parallelism: 5\n")))
 	if err != nil || cfg.Parallelism != 5 {
 		t.Fatalf("parallelism = %d, %v; want 5", cfg.Parallelism, err)
 	}
-	if _, err := Parse([]byte(minimal + "parallelism: -1\n")); err == nil || !strings.Contains(err.Error(), "parallelism") {
+	if _, err := Parse([]byte(with("parallelism: -1\n"))); err == nil || !strings.Contains(err.Error(), "parallelism") {
 		t.Fatalf("negative parallelism: error = %v", err)
 	}
 }
