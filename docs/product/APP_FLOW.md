@@ -4,8 +4,8 @@
 |---|---|
 | status | Draft |
 | owner | gbai-frontend |
-| version | 0.4 |
-| date | 2026-10-26 |
+| version | 0.5 |
+| date | 2026-10-27 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [DB_SCHEMA](DB_SCHEMA.md), [UX_UI](UX_UI.md), [stories](stories/README.md) |
 | diagrams | [team-flow.html](diagrams/team-flow.html), [configuration-flow.html](diagrams/configuration-flow.html) |
 
@@ -26,6 +26,7 @@ Written by gbai-frontend in auto mode (R6, R19). Every item is marked **Proposed
 | A7 | US-011 | A resumed wave first re-reads every wave task from the tracker and reconciles it with the memory ledger and traces before launching any coder; the cycle does this through its skill, with no gbai command (TRD D17, owner 2026-10-26). | R3 and R25 require resuming from tracker state and traces; reading first prevents relaunching DONE tasks. |
 | A9 | CLI, J2, J7, J8, J10, Flow | Approved (owner 2026-10-26): the CLI is used only for the initial configuration (`gbai init`, `gbai config set`, `gbai generate`); planning templates and the traceability check live in the directiva skills; the reviewer agent invokes the installed reviewer scripts; worktrees are removed with git. | TRD D18, D19, D20. |
 | A10 | Surfaces, J1, J4, J7, Flow | Approved (owner 2026-10-26): setup starts from a prompt pasted into Claude Code or Pi (no TUI); agents write config by editing the YAML directly and `gbai generate` validates it; there is no read-only `gbai config`; the reviewer scripts live in the user-level `gbai-reviewer` skill; preferences have a stable layer (global file) and a learning layer (memory, `user/preferences`). | TRD D18, D20, D21, D22; UX_UI 1.8. |
+| A11 | Surfaces, J1, J4, J7, Flow | Approved (owner 2026-10-27, issue #51): the CLI has three commands (`gbai init`, `gbai check`, `gbai version`); setup starts with `gbai init`, then the user asks their own agent to configure gbai; the agent builds the config and the agents from skills (setup, config-writer, runtime skill or runtime builder) and runs `gbai check`. Supersedes the `gbai generate` and `gbai config set` parts of A9 and A10. | PRD R31–R35; UX_UI 1.8, 2. |
 | A8 | Flow | One Mermaid flowchart covers the planning → wave → adjust loop; the two Archify diagrams stay the detailed references. | Avoids duplicating the existing diagrams while giving a text-diffable overview. |
 
 ## Surfaces
@@ -34,9 +35,9 @@ Proposed (auto) A1.
 
 | surface | entry points | primary action | empty and error states |
 |---|---|---|---|
-| Assistant conversation (the single Orca terminal opened by default, R18) | New session (R1); first time: the setup prompt from the gbai documentation pasted into Claude Code or Pi (UX_UI 1.8) | Talk to the owner, start waves, route questions | No config: the assistant starts setup (US-001). Missing alias: asks once (R16). |
+| Assistant conversation (the single Orca terminal opened by default, R18) | New session (R1); first time: after `gbai init`, the owner asks their agent to configure gbai (UX_UI 1.8, owner 2026-10-27; earlier the pasted setup prompt) | Talk to the owner, start waves, route questions | No config: the assistant starts setup (US-001). Missing alias: asks once (R16). |
 | Direct session (Orca terminal in a task worktree) | Owner accepts the assistant's offer (R14) | Owner talks to the working agent directly | Orca unavailable: the assistant keeps mediating and says why (Orca only in the first release). |
-| CLI (`gbai …`, initial configuration only, TRD D18) | Terminal, assistant | Compile agents, validate the config and install the per-runtime artifacts (`gbai generate`, TRD D21); `gbai config set` is an optional owner convenience | Errors print what failed and the next step (see [UX_UI](UX_UI.md#4-messages-and-errors)). |
+| CLI (`gbai init`, `gbai check`, `gbai version`; owner 2026-10-27, PRD R31) | Terminal, assistant, reviewer, CI | `gbai init` copies the skill catalog, writes the neutral entry file and installs the user-level `gbai-reviewer` skill; `gbai check` validates read-only | Errors print what failed and the next step (see [UX_UI](UX_UI.md#4-messages-and-errors)). Superseded (owner 2026-10-27): compile agents and install per-runtime artifacts with `gbai generate`; `gbai config set`. |
 | Tracker and PR (team's tools via adapters) | Links in wave reports | Read task status, PR verdicts, plan-change PRs | Unverified writes are listed in the wave report (R24). |
 
 ## Plan-change approval scale
@@ -56,25 +57,33 @@ While a proposal is debated or waits, only the affected task is BLOCKED (operati
 
 Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lead, db-master, frontend), **cycle** (gbai-cycle), **coders**, **reviewer**, **plan-change reviewer**.
 
-### J1 Configure the team — [US-001](stories/US-001-configure-the-team.md) (R12, R16, R8)
+### J1 Configure the team — [US-001](stories/US-001-configure-the-team.md) (R12, R16, R8, R31–R34, R36)
 
-- **Trigger.** First setup: the owner copies the setup prompt (with a link) from the gbai documentation and pastes it into Claude Code or Pi (Approved (owner 2026-10-26), UX_UI 1.8, TRD D21). Later: the owner wants to change a slot.
+- **Names.** Approved (owner 2026-10-27, PRD O9): the CLI is invoked as `gabo`. `gabo.yaml`, `gabo-reviewer` and `gabo-methodology` below are derived defaults, pending owner confirmation. The existing `gbai-*` skill names, `gbai.yaml`, the `gbai` command and the `gbai` global directory stay in every other section and in the repository until the rename task lands.
+- **Trigger.** First setup, two entries (Approved (owner 2026-10-27), UX_UI 1.8, PRD R32, R34, R36):
+  - **(a) Terminal:** the owner runs `gabo init` in the project, then opens their agent (Claude Code, Pi or another engine) and asks it to configure gabo-ai.
+  - **(b) Pasted prompt:** the owner pastes the published setup prompt into their agent; the agent installs the CLI, runs `gabo init` and continues. The prompt is the same literal text embedded in the CLI.
+  - Both entries join at step 1. Later: the owner wants to change a slot or a runtime.
+  - Superseded (owner 2026-10-27): First setup: the owner copies the setup prompt (with a link) from the gbai documentation and pastes it into Claude Code or Pi (Approved (owner 2026-10-26), UX_UI 1.8, TRD D21). Later: the owner wants to change a slot.
 - **Actors.** Owner, the owner's agent (the assistant once gbai is installed), a subagent of the working kind (verify step).
 - **Steps** (configuration flow, [diagram](diagrams/configuration-flow.html)):
-  1. On first setup the agent installs gbai following the linked documentation.
+  1. On first setup `gabo init` has copied the skill catalog, written the neutral entry file and installed the user-level `gabo-reviewer` skill; the agent reads the entry file and loads the setup skill (Approved (owner 2026-10-27), PRD R32). Superseded (owner 2026-10-27): the agent installs gbai following the linked documentation.
      - **Recommended stack.** Approved (owner 2026-10-26): the agent offers the gentle-ai stack (gentle-ai with ODD for the methodology slot, RDD as coder-side validation inside that adapter, Engram for the memory slot) as the recommended, not required, option, explains why, and installs it only if the owner accepts (TRD D21).
-     - **Pi prerequisite.** Approved (owner 2026-10-26): when Pi is in `generation.targets`, the agent checks whether gentle-pi and `gentle-shell` are installed; if no subagent package is present, it explains that Pi core has no subagents and offers to install them, and installs them once the owner accepts. Another subagent package the owner already uses is acceptable. gbai never edits gentle-pi's own configuration (TRD D21, 9.6).
+     - **Pi prerequisite.** Approved (owner 2026-10-26): when Pi is one of the chosen runtimes (earlier: in `generation.targets`), the agent checks whether gentle-pi and `gentle-shell` are installed; if no subagent package is present, it explains that Pi core has no subagents and offers to install them, and installs them once the owner accepts. Another subagent package the owner already uses is acceptable. gbai never edits gentle-pi's own configuration (TRD D21, 9.6).
   2. The agent detects the git user; if the developer catalog has no alias, it asks once how to call the owner and stores it (R16).
   3. For each slot it **asks** how the slot is handled and with what, suggesting options from what is installed; it never applies a default (R12).
   4. It asks where each agent runs and which tracker is used, and explains whether and how the chosen agents can communicate.
   5. **Receive the adapter**: the owner points to a skill or document, or co-writes one with the agent.
   6. **Check coverage**: the agent checks every contract operation is explained and asks about gaps.
-  7. **Write the config**: the agent edits the files directly (personal keys → global file, team keys → `gbai.yaml`); `gbai config set` remains an owner convenience (Approved (owner 2026-10-26), TRD D18).
-  8. **Build the agents**: `gbai generate` validates both files against their JSON Schemas and adapter coverage, generates the runtime-native agent files and installs the per-runtime artifacts for each `generation.targets` runtime from its installer table (TRD D21), including the user-level `gbai-reviewer` skill (TRD D20); the methodology is linked as `gbai-methodology` (R8).
-  9. **Verify**: a subagent of the working kind runs a harmless operation (for example, read one task).
-- **Decision points.** Personal key or project key (global always wins for personal keys); runtime targets (`generation.targets`); mode; `plan_change.scope` and `global_without_owner` (the agent asks the owner to set both).
-- **Outcome.** Config written, agents generated and committed, per-runtime artifacts installed, each slot verified.
-- **Failure and escalation.** Coverage gap: the agent asks the owner, one gap at a time. Schema error from `gbai generate`: the agent fixes the key with the owner and reruns it. Pi target without a subagent package: `gbai generate` refuses to compile the Pi target and prints what to install; the agent offers the install (step 1) and reruns it (Approved (owner 2026-10-26)). Verify fails: Proposed (auto) A3, the slot stays unverified, the agent names the failed operation and asks how to fix the adapter.
+  7. **Write the config**: the config-writer skill edits the files directly (personal keys → global file, team keys → `gabo.yaml`) (Approved (owner 2026-10-27), PRD R34). Superseded (owner 2026-10-27): `gbai config set` as an owner convenience.
+  8. **Build the agents**: the runtime skill of the engine in use builds every agent of the neutral agent spec in that engine's format from fixed templates, filling only the templates' slots; the methodology is linked as `gabo-methodology` (R8). For an engine without a runtime skill, the runtime builder first researches its official documentation, asks the owner when it is unclear, tests a probe agent and writes the runtime skill; it refuses an engine without subagent and skill support (Approved (owner 2026-10-27), PRD R34, R35).
+  9. **Check**: the agent runs `gabo check` (config files against the JSON Schemas, every agent of the neutral agent spec present, nothing stale against the templates), fixes what fails and reruns it until it passes (Approved (owner 2026-10-27), PRD R33).
+     - Superseded (owner 2026-10-27), former step 8: **Build the agents**: `gbai generate` validates both files against their JSON Schemas and adapter coverage, generates the runtime-native agent files and installs the per-runtime artifacts for each `generation.targets` runtime from its installer table (TRD D21), including the user-level `gbai-reviewer` skill (TRD D20); the methodology is linked as `gbai-methodology` (R8).
+  10. **Verify**: a subagent of the working kind runs a harmless operation (for example, read one task).
+- **Decision points.** Personal key or project key (global always wins for personal keys); the runtimes in use (earlier `generation.targets`); mode; `plan_change.scope` and `global_without_owner` (the agent asks the owner to set both).
+- **Outcome.** Config written, agents built from the templates and committed, `gabo check` passing, each slot verified (updated owner 2026-10-27; earlier: agents generated, per-runtime artifacts installed).
+- **Failure and escalation.** Coverage gap: the agent asks the owner, one gap at a time. `gabo check` failure: the agent fixes the config key with the owner or rebuilds the stale or missing agent, then reruns it. Existing config on `gabo init`: it writes nothing, exits non-zero and points the owner to `gabo check` (catalog refresh after an upgrade is PRD open question 11). Pi without a subagent package: the Pi runtime skill refuses to build Pi agents and says what to install; the agent offers the install (step 1) and retries. Unsupported engine: the runtime builder refuses and says why. Verify fails: Proposed (auto) A3, the slot stays unverified, the agent names the failed operation and asks how to fix the adapter (updated owner 2026-10-27).
+  - Superseded (owner 2026-10-27): Coverage gap: the agent asks the owner, one gap at a time. Schema error from `gbai generate`: the agent fixes the key with the owner and reruns it. Pi target without a subagent package: `gbai generate` refuses to compile the Pi target and prints what to install; the agent offers the install (step 1) and reruns it (Approved (owner 2026-10-26)). Verify fails: Proposed (auto) A3, the slot stays unverified, the agent names the failed operation and asks how to fix the adapter.
 
 ### J2 Plan the product once — [US-002](stories/US-002-plan-the-product-once.md) (R2, R3, R20)
 
@@ -113,7 +122,7 @@ Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lea
   2. If it is critical, it becomes a plan-change proposal (J6).
   3. Otherwise: **manual** → the assistant asks the owner (one question, at the owner's interaction level); **auto** → the assistant decides, or asks directiva for a researched answer, and records the decision with its reason in memory (R6).
   4. The answer and who gave it are recorded and appear in the wave report.
-  5. At wave close the assistant asks how comfortable the owner felt with the interactions and stores the answer for the next wave (R17): it edits `interaction_level` and `tone` in the global user file directly (validated at the next `gbai generate`). Observations it learns along the way go to the memory slot under `user/preferences`; one repeated about 3 times is proposed for the global file (asked in manual mode, applied and recorded in auto mode; TRD D22).
+  5. At wave close the assistant asks how comfortable the owner felt with the interactions and stores the answer for the next wave (R17): it edits `interaction_level` and `tone` in the global user file directly (validated at the next `gbai check`; earlier `gbai generate`). Observations it learns along the way go to the memory slot under `user/preferences`; one repeated about 3 times is proposed for the global file (asked in manual mode, applied and recorded in auto mode; TRD D22).
 - **Decision points.** Manual vs auto; critical vs non-critical.
 - **Outcome.** Every question closed with answer and resolver; preferences updated.
 - **Failure and escalation.** Proposed (auto) A4: in manual mode, a question waiting for the owner blocks only its task.
@@ -144,13 +153,14 @@ Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lea
 - **Outcome.** The plan changes within the configured scope, with git history explaining what and why.
 - **Failure and escalation.** Reviewer rejects or scope exceeded: never applied automatically; waits for the owner.
 
-### J7 Use the team's own tools — [US-007](stories/US-007-use-the-teams-own-tools.md) (R8, R11)
+### J7 Use the team's own tools — [US-007](stories/US-007-use-the-teams-own-tools.md) (R8, R11, R34, R35)
 
 - **Trigger.** A tech lead configures or switches methodology or tracker.
 - **Actors.** Owner (tech lead), assistant, coders, cycle.
 - **Steps.**
   1. The owner edits one line (`slots.methodology.adapter` or `slots.tasks.adapter`) or answers the assistant in setup.
-  2. The assistant reruns setup for that slot: coverage check, config edit and `gbai generate`, verify (J1 steps 6–9; Approved (owner 2026-10-26), TRD D18).
+  2. The assistant reruns setup for that slot: coverage check, config edit through the config-writer skill, rebuild of the affected agents through the runtime skill, `gbai check`, verify (J1 steps 6–10; Approved (owner 2026-10-27), PRD R34; earlier `gbai generate`, TRD D18).
+     - **Another engine.** To use another engine, the assistant uses its runtime skill, or the runtime builder writes one first (Approved (owner 2026-10-27), PRD R35).
   3. Coders load the methodology as `gbai-methodology`; the cycle reads and updates tasks through the tracker adapter.
 - **Decision points.** Existing adapter or co-written one.
 - **Outcome.** Agents use the team's tools without skill changes.
@@ -213,7 +223,7 @@ Proposed (auto) A8. Detailed references: [team-flow.html](diagrams/team-flow.htm
 flowchart TD
   start([Owner opens session]) --> asis[Assistant: point of contact]
   asis --> cfg{Configured?}
-  cfg -- no --> setup[Setup from the pasted prompt: install, ask, adapter, coverage, write config, gbai generate, verify]
+  cfg -- no --> setup[Setup: gbai init, then the agent asks, takes adapters, checks coverage, writes config and builds agents from skills, runs gbai check, verifies]
   setup --> asis
   cfg -- yes --> goal[Owner states goal]
   goal --> plan[Directiva: docs/product + tasks with dependencies]
