@@ -397,11 +397,17 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 		// pinned on the command line and checked before the session starts.
 		// the tools line is read from the frontmatter only, and exactly once.
 		`tools=$(awk '/^---$/ { if (++n == 2) exit; next } n == 1 && sub(/^tools: */, "") { print; c++ } END { exit c != 1 }' <role agent file>)`,
-		// pi has no per-role tool list: only coder and assistant start on pi; a reviewer is refused.
-		`case "<runtime role>" in coder|assistant) ;; *) false ;; esac`,
-		"A `reviewer` session is never started on `pi`",
-		// the scratch dir is removed once the session reached a final state.
-		`rm -r -- "$dir"`,
+		// a reviewer would load settings, hooks and agents from the branch under review:
+		// only coder and assistant sessions start, on either runtime, and the role check runs first.
+		"case \"<runtime role>\" in coder|assistant) ;; *) false ;; esac &&\n  tools=$(awk",
+		"case \"<runtime role>\" in coder|assistant) ;; *) false ;; esac &&\n  pi --help",
+		"Never start a `reviewer` session",
+		// pi must support every flag the start command relies on.
+		`pi --help | grep -qF -- --session-id && pi --help | grep -qF -- --append-system-prompt`,
+		// the scratch dir comes from the ledger, not a shell variable of the start step.
+		"rm -r -- <scratch dir>",
+		// the report reads the elapsed time only after the session id matched.
+		`ps -o args= -p <pid> | grep -qF -- "--session-id <sid>" && ps -o etime= -p <pid>`,
 		`claude --help | grep -qF -- --permission-prompts`,
 		`pi --help | grep -qF -- --approve`,
 		// the start check and the report never print the process arguments.
