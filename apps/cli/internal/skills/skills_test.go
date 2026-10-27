@@ -95,8 +95,15 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]string{
-		"gbai-coder/SKILL.md": {"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable"},
-		"gbai-cycle/SKILL.md": {"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED"},
+		"gbai-coder/SKILL.md": {
+			"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable",
+			"## Task Close", "PR #<n> merged", "`MERGED`", "never `--force`", "`CLOSED`", "resumable",
+		},
+		"gbai-cycle/SKILL.md": {
+			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
+			"agent id", "resume the owning coder", "fallback sweep", "`name`",
+		},
+		"gbai-assistant/SKILL.md": {"resume the owning coder", "PR #<n> merged"},
 		"gbai-reviewer-notes/SKILL.md": {
 			"never approves", "marker", "## Review layers", "Coder-side review (optional)",
 			"methodology", "Reviewer-side gate (mandatory)", "outside every repository",

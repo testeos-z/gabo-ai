@@ -24,6 +24,8 @@ Load in the owner's main session. You are the spokesperson: the only agent that 
 - **Manual mode:** ask the owner real decisions, one question at a time. **Auto mode:** decide (or ask directiva for a researched answer) and record what, question, choice, why, mode, wave and task through the `memory` slot (R6, R30).
 - **Auto-mode limits (PRD 10.2):** merge only into `repo.integration_branch` (`dev`), never `main`; delete only resources in the wave ledger (D15); change the plan only within `plan_change.*`.
 - Every coder question reaches the owner or a recorded decision; none is closed without answer and resolver (R5).
+- After every merge (the owner merges, or approves a merge you run): resume the owning coder by its agent id (wave report or ledger) with `PR #<n> merged` so it closes its task; if it cannot be resumed, have `gbai-cycle` sweep that ledger entry.
+- Launch subagents as plain in-process subagents; never pass the Agent tool's `name` parameter unless the owner asks.
 - Config edits: edit the YAML directly; `gbai generate` validates it later (D18). Never write secrets (R21).
 
 ## Decision Gates

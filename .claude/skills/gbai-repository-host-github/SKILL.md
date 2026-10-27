@@ -14,7 +14,7 @@ Use whenever a gbai agent works with branches or pull requests. Fills the `repos
 
 - Every PR targets the integration branch `dev`. Never open a PR to `main`, never merge into `main`, never push to `main` or `dev` directly (TRD D13).
 - Merge only into `dev`, only pinned to the head SHA that received a clean verdict, and only when the merge is yours to do (reviewer gate or explicit owner request). Coders never merge.
-- Never force-push. Delete only branches the workflow created and that are merged (ledger, D15).
+- Never force-push. Delete only branches the workflow created and that are merged (ledger, D15). Force-delete a local branch (`git branch -D`) only after `gh pr view` shows the PR `state` `MERGED`; squash merges leave it unmerged for git.
 - Re-read after every write: `gh pr view` must show the expected state.
 - Never post the reviewer marker (`gbai-reviewer-bot`) in a PR body, comment or review.
 
@@ -27,7 +27,7 @@ Use whenever a gbai agent works with branches or pull requests. Fills the `repos
 | comment | `gh pr comment <pr> -R $R --body-file <tmp>` |
 | read status and checks | `gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup,comments` |
 | merge into dev | Check `baseRefName == "dev"` first, then `gh pr merge <pr> -R $R --squash --match-head-commit <sha>`; refuse on any other base |
-| delete branch | after merge only: `git push origin --delete <branch>` and `git branch -d <branch>` (lower-case `-d`, never `-D`) |
+| delete branch | after merge only: `gh pr view <pr> -R $R --json state` must be `MERGED`; then `git branch -D <branch>` (otherwise only `git branch -d <branch>`), and `git push origin --delete <branch>` if `git ls-remote --exit-code --heads origin <branch>` still finds it |
 
 ## Output Contract
 
