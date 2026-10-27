@@ -13,5 +13,5 @@ Deprecated. Do not use for new work; this skill is kept only until it is removed
 ## Replacement
 
 - Coder ↔ cycle ↔ assistant: native subagent launches and their returned outcomes (TRD D1).
-- Review requests: the coder asks the `gbai-reviewer` subagent with `PR #<n> head <sha>` and receives the `VERDICT` line (see `gbai-reviewer-notes`).
+- Review requests: the coder asks the `gabo-reviewer` subagent with `PR #<n> head <sha>` and receives the `VERDICT` line (see `gabo-reviewer-notes`).
 - Direct sessions with the owner belong to the `direct_sessions` slot adapter, not to this skill.

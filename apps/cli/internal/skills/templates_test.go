@@ -19,7 +19,7 @@ var templates = map[string]struct {
 	columns  []string
 	headings []string
 }{
-	"gbai-pm/templates/PRD.md": {
+	"gabo-pm/templates/PRD.md": {
 		columns: []string{
 			"| field | value |",
 			"| id | title | user | requirement ids | status | file |",
@@ -40,7 +40,7 @@ var templates = map[string]struct {
 			"## 14. Glossary",
 		},
 	},
-	"gbai-pm/templates/STORY.md": {
+	"gabo-pm/templates/STORY.md": {
 		columns: []string{"| field | value |"},
 		headings: []string{
 			"# US-0NN <Title>",
@@ -110,13 +110,13 @@ func TestTemplatesKeepStableColumnsAndSections(t *testing.T) {
 
 func TestPMSkillPointsToTemplatesAndStoryNaming(t *testing.T) {
 	t.Parallel()
-	skill := embeddedByPath(t)["gbai-pm/SKILL.md"]
+	skill := embeddedByPath(t)["gabo-pm/SKILL.md"]
 	for _, s := range []string{
 		"templates/PRD.md", "templates/STORY.md", "US-0NN-<kebab>.md",
 		"| id | type | requirement | acceptance criteria | priority | stories | verification |",
 	} {
 		if !strings.Contains(skill, s) {
-			t.Errorf("gbai-pm/SKILL.md: missing %q", s)
+			t.Errorf("gabo-pm/SKILL.md: missing %q", s)
 		}
 	}
 }

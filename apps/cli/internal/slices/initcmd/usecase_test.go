@@ -9,7 +9,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
 )
 
-var files = []File{{Path: "gbai-setup/SKILL.md", Data: []byte("setup")}, {Path: "gbai-coder/SKILL.md", Data: []byte("coder")}}
+var files = []File{{Path: "gabo-setup/SKILL.md", Data: []byte("setup")}, {Path: "gabo-coder/SKILL.md", Data: []byte("coder")}}
 
 func newUC(fsys *kerneltest.FS) *UseCase {
 	return NewUseCase(fsys, files, Settings{Home: "/home/u", ProjectDir: "/work/p"})
@@ -25,11 +25,11 @@ func TestInstallsSkillsPerRuntimeAndScope(t *testing.T) {
 		scope    Scope
 		want     []string
 	}{
-		{"claude user", []Runtime{RuntimeClaude}, ScopeUser, []string{"/home/u/.claude/skills/gbai-setup/SKILL.md", "/home/u/.claude/skills/gbai-coder/SKILL.md"}},
-		{"pi user", []Runtime{RuntimePi}, ScopeUser, []string{"/home/u/.pi/agent/skills/gbai-setup/SKILL.md", "/home/u/.pi/agent/skills/gbai-coder/SKILL.md"}},
+		{"claude user", []Runtime{RuntimeClaude}, ScopeUser, []string{"/home/u/.claude/skills/gabo-setup/SKILL.md", "/home/u/.claude/skills/gabo-coder/SKILL.md"}},
+		{"pi user", []Runtime{RuntimePi}, ScopeUser, []string{"/home/u/.pi/agent/skills/gabo-setup/SKILL.md", "/home/u/.pi/agent/skills/gabo-coder/SKILL.md"}},
 		{"both project", []Runtime{RuntimeClaude, RuntimePi}, ScopeProject, []string{
-			"/work/p/.claude/skills/gbai-setup/SKILL.md", "/work/p/.claude/skills/gbai-coder/SKILL.md",
-			"/work/p/.pi/skills/gbai-setup/SKILL.md", "/work/p/.pi/skills/gbai-coder/SKILL.md",
+			"/work/p/.claude/skills/gabo-setup/SKILL.md", "/work/p/.claude/skills/gabo-coder/SKILL.md",
+			"/work/p/.pi/skills/gabo-setup/SKILL.md", "/work/p/.pi/skills/gabo-coder/SKILL.md",
 		}},
 	}
 	for _, tt := range tests {
@@ -51,8 +51,8 @@ func TestInstallsSkillsPerRuntimeAndScope(t *testing.T) {
 
 func TestNeverOverwritesDifferentContentWithoutForce(t *testing.T) {
 	t.Parallel()
-	target := "/home/u/.claude/skills/gbai-setup/SKILL.md"
-	same := "/home/u/.claude/skills/gbai-coder/SKILL.md"
+	target := "/home/u/.claude/skills/gabo-setup/SKILL.md"
+	same := "/home/u/.claude/skills/gabo-coder/SKILL.md"
 	fsys := &kerneltest.FS{Files: map[string]string{target: "edited by human", same: "coder"}}
 	out, err := newUC(fsys).Run(context.Background(), Input{Runtimes: []Runtime{RuntimeClaude}, Scope: ScopeUser})
 	if err != nil {
@@ -97,7 +97,7 @@ func TestDryRunWritesNothing(t *testing.T) {
 	if err != nil || len(fsys.Writes) != 0 {
 		t.Fatalf("err %v writes %v", err, fsys.Writes)
 	}
-	if want := "would install /home/u/.claude/skills/gbai-setup/SKILL.md"; !strings.Contains(joined(out), want) {
+	if want := "would install /home/u/.claude/skills/gabo-setup/SKILL.md"; !strings.Contains(joined(out), want) {
 		t.Fatalf("missing %q:\n%s", want, joined(out))
 	}
 }
