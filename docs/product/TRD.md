@@ -4,8 +4,8 @@
 |---|---|
 | status | Draft |
 | owner | gbai-dev-lead |
-| version | 0.7 |
-| date | 2026-10-26 |
+| version | 0.8 |
+| date | 2026-10-27 |
 | linked docs | [PRD](PRD.md) (R1–R30), stories `docs/product/stories/` (US-001–US-011), [DB_SCHEMA](DB_SCHEMA.md), diagrams `docs/product/diagrams/` |
 
 Every decision traces to PRD requirement ids.
@@ -19,7 +19,7 @@ This version was completed by the dev-lead in auto mode. Each item is marked **P
 | A1 | 9 Interfaces | Finalized: key names aligned to DB_SCHEMA, `agent_host` contract added, operating rules (9.5) added. |
 | A2 | 9.2 Inter-agent payloads | Reviewer verdict marker carries the reviewed head SHA (R26). |
 | A3 | 9.1 / 9.2 | Auto decisions are recorded with wave, task, question, choice and reason (R30). |
-| A4 | 10 D15 | Per-wave resource ledger drives cleanup and auto-mode deletions (R13, R23). Accepted (owner 2026-10-26): the cycle keeps it in the memory slot through its skill; no CLI, no state dir. |
+| A4 | 10 D15 | Per-wave resource ledger drives cleanup and auto-mode deletions (R13, R23). Accepted (owner 2026-10-26): the cycle keeps it in the memory slot through its skill; no CLI, no state dir. Amended by D23 (owner 2026-10-27): the coder that owns a task closes it after its PR merges (task issue DONE, worktree, local then remote branch), the coder's resume handle is recorded in the ledger, and the cycle's wave close is a fallback sweep over ledger entries no coder could close. |
 | A5 | 10 D16 | Traceability check is generic Go in the `plan` slice (R20). Accepted (owner 2026-10-26), then superseded by D19 (owner 2026-10-26): the check is a skill instruction. |
 | A6 | 10 D17 | Wave resume recomputes from tracker state and memory traces (R25). Accepted (owner 2026-10-26): done by the cycle skill; no CLI, no state dir. |
 | A7 | 8.4 Observability | Time to first wave measured from setup start to first wave start (R28). |
@@ -149,7 +149,7 @@ Approved (owner 2026-10-26): layered config, `configcmd` and the generator are t
 | Assistant | Main session: the single Orca terminal opened by default (R1, R18) | Native subagent returns; Orca messaging for reviewer and direct sessions |
 | Directiva (pm, dev-lead, db-master, frontend) | Native subagents of the assistant (R2, R7) | Return to the assistant |
 | gbai-cycle | Native subagent of the assistant; runs one wave (R3, R4) | Return to the assistant (wave report) |
-| Coders | Native subagents of the cycle, one per wave task (R3, R10) | Return to the cycle (task outcome) |
+| Coders | Native in-process subagents of the cycle, one per wave task; the cycle records each coder's resume handle in the wave ledger (R3, R10, D23) | Return to the cycle (task outcome); after the task's PR merges, the assistant resumes the owning coder for the task close and receives its close report (D23) |
 | Reviewer | Generated reviewer agent that validates the request and invokes the script of the user-level `gbai-reviewer` skill; the script runs isolated with its own clone, home and cache (R9, D20) | PR comment + `VERDICT` line relayed to the coder through Orca |
 | Plan-change reviewer | Fresh clean-context session that indexes the repository (R19) | Returns agree / counter-proposal |
 | Direct session | Extra Orca terminal in the task worktree, opened only on the user's request (R14, R18) | Orca messaging |
@@ -164,6 +164,8 @@ Owner ─ Assistant (main session, Orca terminal)
         Reviewer agent ── reviewer script ── PR comment + VERDICT ──> coder
 ```
 
+Subagents are launched in-process, not as split-pane teammates, unless the owner asks (D23).
+
 ## 5. Runtime view
 
 User flows live in `docs/product/diagrams/`. Key internal sequences:
@@ -177,13 +179,22 @@ sequenceDiagram
   participant T as Tracker
   participant K as Coder
   participant M as Memory
+  participant H as Repository host
   A->>C: start wave
   C->>T: read tasks and blocked-by links, take the unblocked ones
-  C->>K: launch one coder per task
-  K-->>C: outcome (DONE / BLOCKED, PR, questions, resources created)
+  C->>K: launch one in-process coder per task
+  C->>M: record the coder's resume handle in the wave ledger
+  K-->>C: outcome (HANDED / BLOCKED, PR, questions, resources created)
   C->>M: append resources to the wave ledger
-  C->>T: update status, link PR, verify by re-read
-  C->>C: clean only ledger entries (git worktree, git branch, containers)
+  C->>T: update status (in progress, BLOCKED), link PR, verify by re-read
+  Note over A,H: after each merge (owner merge or reviewer auto_merge)
+  A->>K: resume the owning coder (handle from the ledger)
+  K->>H: verify the PR is merged
+  K->>T: close the task issue (DONE), verify by re-read
+  K->>H: remove worktree (no force), delete local then remote branch
+  K-->>A: close report (removed, leftovers)
+  A->>M: mark ledger entries removed or leftover
+  C->>C: wave close: fallback sweep over ledger entries no coder closed
   C-->>A: wave report (statuses, questions, leftovers)
 ```
 
@@ -330,8 +341,9 @@ Proposed (auto): `agent_host` contract row and the `memory` filters. Reason: DB_
 
 ### 9.2 Inter-agent payloads
 
-- **Coder → cycle (outcome).** `status` (HANDED, DONE, BLOCKED), task id, PR link, summary, open questions, resources created (worktrees, branches, containers, test databases), reviewer fix rounds used. The cycle appends them to the wave ledger in the `memory` slot (D15).
-- **Cycle → assistant (wave report).** Wave id; per task: status, PR, verdict; questions raised with answer and resolver (R5); interaction count and reasons (R29); unverified task writes (R24); cleanup leftovers (R13); plan-change proposals; the owner's comfort answer to apply next wave (R17).
+- **Coder → cycle (outcome).** `status` (HANDED, BLOCKED), task id, PR link, summary, open questions, resources created (worktrees, branches, containers, test databases), reviewer fix rounds used. HANDED means the review is clean and the coder stays resumable. The cycle appends the resources and the coder's resume handle to the wave ledger in the `memory` slot (D15, D23).
+- **Coder → assistant (close report).** Returned when the assistant resumes the owning coder after its PR merged (D23): task id, PR, merged SHA, `status` DONE only once the merge is verified on the host and the task issue is closed (the coder is the only writer of DONE), and each ledger resource as removed or leftover with the reason. The assistant marks the ledger entries removed or leftover.
+- **Cycle → assistant (wave report).** Wave id; per task: status, PR, verdict; questions raised with answer and resolver (R5); interaction count and reasons (R29); unverified task writes (R24); cleanup leftovers from coder task closes and the wave-close sweep, including merged tasks still open because no coder could close them (R13); plan-change proposals; the owner's comfort answer to apply next wave (R17).
 - **Reviewer → PR.** One comment carrying the marker from `reviewer.signing`, the reviewed head SHA, the verdict (approve / changes requested / blocked) and per-check statuses (tests, build, lint, agent review). **Reviewer → coder.** Orca message relaying the script's final `VERDICT` line (PR, head SHA, verdict, merge result) and pointing to that comment (D20). Proposed (auto): the marker carries the head SHA and the reviewer skips a head that already has a verdict. Reason: makes R26 (one verdict per pushed head) checkable.
 - **Plan-change proposal.** Trigger question, scope (task, group, global), affected task ids, proposed change, rationale, debater (owner or plan-change reviewer) and outcome (agreed, counter-proposal, waiting for owner); delivered as its own issue and PR touching only `docs/product` and tasks (D7).
 - **Auto decision record.** What was decided, question, choice, reason, mode, wave, task, resolver; written through the `memory` slot (R6, R30).
@@ -363,6 +375,7 @@ From PRD 8.1; enforced in the role skills.
 | A mid-wave task change applies when the coder finishes its current round; the coder is not interrupted | Cycle skill: re-reads the task before the coder's next round | R3, R7 |
 | During a plan-change debate only the affected task is BLOCKED; the rest of the wave continues | Cycle skill marks the task BLOCKED through the `tasks` slot; assistant tracks the proposal | R19 |
 | At most 4 reviewer fix rounds per PR, then the task is BLOCKED and the question escalates to the assistant | Coder skill counts rounds; outcome carries the count | R9, R10 |
+| After a PR merges, the owning coder closes its task: verifies the merge on the host, closes the task issue (the only writer of DONE), removes its worktree without force, then deletes its local branch and its remote branch through `repository_host`; a failed step becomes a leftover, never forced (D23) | Coder skill (task close); assistant skill resumes the owning coder after every merge; cycle skill sweeps at wave close only the ledger entries no coder closed and never writes DONE | R10, R13, R23 |
 
 ### 9.6 Installer table (D21)
 
@@ -386,7 +399,7 @@ Proposed (auto): files (skills, agents, MCP config) are written by the generator
 
 ## 10. Architecture decisions
 
-All decisions are MADR-style. D1–D14: accepted. D15–D17: accepted (owner 2026-10-26); D16 superseded by D19. D18–D22: approved (owner 2026-10-26).
+All decisions are MADR-style. D1–D14: accepted. D15–D17: accepted (owner 2026-10-26); D16 superseded by D19. D18–D22: approved (owner 2026-10-26). D23: accepted (owner 2026-10-27); it amends D15.
 
 | id | decision | options considered | choice | consequences | status | requirement ids |
 |---|---|---|---|---|---|---|
@@ -404,7 +417,7 @@ All decisions are MADR-style. D1–D14: accepted. D15–D17: accepted (owner 202
 | D12 | Waves | Manual wave lists; computed | Computed from tracker dependencies (blocked by / unblocks); a wave is the set of tasks whose dependencies are done | Wave computation must handle cycles and dangling ids | accepted | R2, R3 |
 | D13 | Auto-mode limits | Unrestricted; bounded | Merge only into the assigned integration branch, never main; delete only resources created by the assistant or its subagents in this workflow | — | accepted | R15, R19, PRD Auto-mode limits |
 | D14 | Planning document conventions | Adopt an existing tool (BMAD, Task Master); invent our own format; own templates built on open conventions | Own templates and fixed questions built on open conventions: PRD on ISO/IEC/IEEE 29148 (header, evidence, appetite, assumptions and dependencies, quality requirements, constraints, glossary; requirements as `id \| type \| EARS requirement \| acceptance \| priority \| stories \| verification`); user stories on INVEST with Given-When-Then; TRD on arc42 with C4 diagrams and MADR-style decisions (consequences, status); plan tasks in `T###` notation with `[P]` and story links. Traceability chain: story → requirement → decision → task → test | Traceability chain story → requirement → decision → task → test | accepted | R2, R20 |
-| D15 | Resource ownership for cleanup and deletion | Clean by naming convention; per-wave ledger | Per-wave resource ledger kept by the cycle skill in the `memory` slot (for example Engram): every worktree, branch, container or test database a subagent creates is reported in its outcome and appended by the cycle; at wave close the cycle cleans only ledger entries with ordinary git worktree, git and container commands per its skill (amended by D18: `gbai worktree close` is removed); auto mode deletes only ledger entries; anything not removed is a leftover in the report. No CLI command and no state dir. Reason: R13 and R23 need a record of what the workflow created, and agents already have the tools | Resources created outside the ledger are never deleted, only reported | accepted (owner 2026-10-26) | R13, R23 |
+| D15 | Resource ownership for cleanup and deletion | Clean by naming convention; per-wave ledger | Per-wave resource ledger kept by the cycle skill in the `memory` slot (for example Engram): every worktree, branch, container or test database a subagent creates is reported in its outcome and appended by the cycle; at wave close the cycle cleans only ledger entries with ordinary git worktree, git and container commands per its skill (amended by D18: `gbai worktree close` is removed); auto mode deletes only ledger entries; anything not removed is a leftover in the report. No CLI command and no state dir. Reason: R13 and R23 need a record of what the workflow created, and agents already have the tools | Resources created outside the ledger are never deleted, only reported | accepted (owner 2026-10-26); amended by D23 (owner 2026-10-27): the owning coder removes its own worktree and branches after its PR merges, and the wave close is a fallback sweep over ledger entries no coder could close | R13, R23 |
 | D16 | Traceability check | Agent-only review; generic Go check | Generic Go check in the `plan` slice over the `docs/product` tables (stories, requirements, decisions, plan tasks with `depends_on`); fails on a story without requirement, a requirement without decision, task or verification, a task without story, or a dependency cycle; the assistant runs it before each next planning step. Reason: R20 needs a deterministic block, and the inputs are gbai's own templates; it also prevents dependency loops | Templates must keep stable table columns | superseded by D19 (owner 2026-10-26) | R2, R20 |
 | D17 | Wave resume | Restart the wave; resume from traces | The cycle skill recomputes the wave from tracker state (through the `tasks` adapter) plus the memory ledger and traces, skips DONE tasks, re-attaches open PRs and worktrees and continues. No CLI command and no state dir. Reason: R25 had no technical mechanism | Depends on verified task writes (D4) and the ledger (D15) | accepted (owner 2026-10-26) | R14, R25 |
 | D18 | Scope of the Go CLI | Go CLI for setup and work-time operations (status, audit, sessions, provision, secrets, repo setup, worktree close, MCP server, doctor, plan, review); Go CLI as an agent compiler only | Agent compiler only: validate config (global user file + `gbai.yaml`, JSON Schema), compile runtime-native agents into `.claude/agents/` and `.pi/agents/`, install the per-runtime artifacts (D21: embedded skills, the user's Markdown adapters, the user-level `gbai-reviewer` skill with its scripts, tool registrations); change a key and recompile with `gbai generate`; `gbai init` is the first generate; plus `gbai version` and `gbai config set`. Amended (owner 2026-10-26): the read-only `gbai config [--json]` is removed (question 7); agents write preferences and config by editing the YAML directly, during setup and during the work, and JSON Schema validation runs at the next `gbai generate`; `gbai config set` is an owner convenience at configuration time only, not a required writer (question 10). Every removed command's job is done by agents with their own tools (gh, git, Orca, Railway MCP) guided by skills and adapters; `doctor` validation folds into generate. Reason: agents already have the tools; Go keeps only what must be deterministic before the work starts | Existing slices are retired; skills carry the operating instructions | approved (owner 2026-10-26) | R8, R11, R12, R21 |
@@ -412,6 +425,7 @@ All decisions are MADR-style. D1–D14: accepted. D15–D17: accepted (owner 202
 | D20 | Reviewer execution | Go reviewer runner (the now removed `gbai review run`); deterministic scripts installed into the repository (proposed `.gbai/reviewer/`); deterministic scripts bundled in a user-level skill | Amended (owner 2026-10-26, question 8): the scripts live in the `scripts/` folder of the `gbai-reviewer` skill, which the compiler installs at user level for the reviewer's runtime (D21), not in the repository, so PR code cannot modify the scripts that review it. The scripts follow the vulcam pr-reviewer pattern: head-moved check, test merge of the PR into the integration branch, checks, agent review, verdict comment with marker and head SHA, merge gate (integration branch only, never main), all in a clean environment, ending with one `VERDICT` line. The generated reviewer agent only validates the request (PR number, 40-hex SHA) and invokes the script, then relays the `VERDICT` line. Local default is single-user mode: the owner's own account, preflight refuses unless the scripts run from a clean checkout of the integration branch; isolated two-user mode stays available through the `reviewer_placement` or `agent_host` adapter. The Go review slice is retired | The marker is trust-based in single-user mode; the scripts need their own tests; the user-level copy is not versioned with the repository, so `gbai generate` reinstalls it from the embedded skill and reports a differing copy | approved (owner 2026-10-26) | R9, R22, R26 |
 | D21 | Setup entry and per-runtime installation | Setup TUI in Go (former M4); setup by the user's agent from a pasted prompt, with a Go installer table | Approved (owner 2026-10-26): no TUI. The gbai documentation publishes a setup prompt with a link; the user pastes it into Claude Code or Pi, and that agent installs gbai, runs the setup question burst, writes the config and runs `gbai generate`. `gbai generate` installs the per-runtime artifacts for each runtime in `generation.targets` from one Go table of what goes where (Claude Code: skills, agents, MCP servers, plugins; Pi: skills, agents, MCP servers, packages and extensions), section 9.6. Amended (Approved (owner 2026-10-26)): setup recommends, but does not require, the gentle-ai stack (ODD in the methodology slot, RDD as coder-side validation inside the methodology adapter, Engram in the memory slot) and installs it only if the user accepts. Pi targets require a subagent package as a prerequisite: when Pi is in `generation.targets`, setup checks whether gentle-pi and `gentle-shell` are installed and, if no subagent package is present, explains why and offers to install them; another subagent package is acceptable. `gbai generate` refuses to compile Pi targets when no subagent package is present and prints what to install. gbai never edits gentle-pi's own configuration; it only places its agents and skills | Adding a runtime or artifact kind means adding table rows; rows must be checked against the runtime docs, and unverified rows stay open items | approved (owner 2026-10-26) | R8, R12, R28 |
 | D22 | Personalization layers | Preferences only in the global file; only in memory; two layers | Approved (owner 2026-10-26): a stable layer in the global user file (alias or name, `language`, `tone`, `interaction_level`), read by every compiled agent; a learning layer of observations in the `memory` slot (Engram or claude-mem, per adapter) under the fixed topic `user/preferences`, read by the assistant at session start. An observation repeated about 3 times is proposed for the stable layer: the assistant asks in manual mode, and in auto mode applies it and records the decision in memory. The wave-close comfort answer adjusts `interaction_level` and `tone`. Personal observations use the global memory scope, project ones the project scope. Secrets and sensitive data are never stored | The memory contract gains a preferences topic; the stable layer is edited directly and validated at the next `gbai generate` (D18 amended) | approved (owner 2026-10-26) | R16, R17, R21 |
+| D23 | Task close after merge | Cycle cleans every ledger entry at wave close (D15 as first accepted); the owning coder closes its task after its PR merges, with a wave-close fallback sweep | Accepted (owner 2026-10-27), amends D15: the coder that owns a task closes it after its PR merges. The assistant resumes the owning coder after every merge (owner merge or reviewer `auto_merge`), using the coder's resume handle that the cycle records in the wave ledger. The coder verifies the merge on the host, closes the task issue through the `tasks` adapter (the coder is the only writer of DONE), removes its worktree without force, then deletes its local branch and then its remote branch through the `repository_host` contract; it touches only the resources it created for that task and reported in its outcome, and skips `worktree.keep` entries. A step that fails becomes a leftover in its close report, never forced. The cycle's wave close becomes a fallback sweep over ledger entries a coder could not close, including those of coders that cannot be resumed; the cycle no longer writes DONE. Subagents are launched in-process, not as split-pane teammates, unless the owner asks. Reason: between a merge and the next wave close, worktrees and branches stayed orphaned with no owner (after PRs #41, #42 and #45); the actor that created the resources holds the context to remove them (issue #46) | Two cleanup actors (the coder per task, the cycle sweep), both limited to ledger resources; a coder must stay resumable after HANDED; a merged task whose coder cannot be resumed stays open and is reported in the wave report for the owner, because the sweep does not write DONE; PRD R10 still names the cycle as the status writer and needs a PM wording follow-up for the DONE write | accepted (owner 2026-10-27) | R10, R13, R23 |
 
 ### Requirement coverage
 
@@ -428,10 +442,10 @@ Proposed (auto). Reason: traceability pass; every requirement maps to a decision
 | R7 | — | 4.3, 9.5 | US-006 | test → integration (task identity preserved) |
 | R8 | D2, D3, D18, D21 | 8.1, 9.1 | US-001, US-007 | test, inspection → unit (generator golden), coverage check |
 | R9 | D6, D20 | 5.2, 8.3, 9.2, 9.5 | US-008 | test, inspection → reviewer script tests, skill review |
-| R10 | D4 | 5.1, 9.1 | US-008 | test → integration (status and PR link) |
+| R10 | D4, D23 | 5.1, 9.1, 9.5 | US-008 | test → integration (status and PR link) |
 | R11 | D2, D4, D18 | 8.1, 9.1 | US-007 | test, inspection → contract coverage check |
 | R12 | D2, D18, D21 | 8.1, 9.3 | US-001 | demo → setup walkthrough from the pasted prompt; unit (no defaults, TD2) |
-| R13 | D15 | 5.1, 9.2 | US-010 | test → skill-level check in the end-to-end mini wave (ledger cleanup) |
+| R13 | D15, D23 | 5.1, 9.2, 9.5 | US-010 | test → skill-level check in the end-to-end mini wave (coder task close and wave-close sweep) |
 | R14 | D9, D17 | 4.3 | US-005 | demo → direct-session walkthrough |
 | R15 | D13 | 8.3 | US-003 | test, demo → integration (no prompt in auto), end-to-end |
 | R16 | D10, D22 | 9.3 | US-001 | test → unit (catalog lookup) |
@@ -441,7 +455,7 @@ Proposed (auto). Reason: traceability pass; every requirement maps to a decision
 | R20 | D14, D19 | 4.1 | US-002 | test, inspection → skill review (traceability instruction), template review |
 | R21 | D18 | 8.3, 9.4 | — | inspection, test → generated-file secret scan |
 | R22 | D6, D20 | 8.3 | US-008 | test, inspection → reviewer script tests (separate clone, home, cache, clean env) |
-| R23 | D13, D15 | 8.3 | US-010 | test → skill-level check in the end-to-end mini wave (deletion outside ledger refused) |
+| R23 | D13, D15, D23 | 8.3 | US-010 | test → skill-level check in the end-to-end mini wave (deletion outside ledger refused) |
 | R24 | D4 | 8.2, 9.1 | — | test → integration (re-read; unverified write reported) |
 | R25 | D17 | 9.1 | US-011 | test, demo → skill-level check in the end-to-end mini wave (resume skips DONE) |
 | R26 | D6, D20 | 9.2 | — | test → reviewer script tests (same head reviewed once) |
@@ -463,8 +477,8 @@ Proposed (auto). Reason: layers linked to the PRD verification column and to qua
 - **Contract coverage check.** An automated check, part of the agent compiler, that an adapter document addresses every operation of its contract; runs inside `gbai generate` during setup and in CI through `gbai generate --check` on adapter changes.
 - **Setup prompt walkthrough (D21).** Demo: the documented setup prompt pasted into Claude Code and into Pi installs gbai, asks the setup questions, writes the config and runs `gbai generate` without manual steps.
 - **Subagent smoke test.** The setup step that runs a harmless operation through a subagent of the working kind is kept as a repeatable step of the `gbai-setup` skill, run by the assistant (no gbai command, D18).
-- **End-to-end.** One mini wave in a sample repository: two dependent tasks, coders, reviewer verdict, tracker updates, cleanup and wave report; repeated with an interruption to prove resume.
-- **Skill-level checks (D15, D17).** The ledger, cleanup and resume are cycle-skill behavior, not Go code, so they have no Go unit tests; they are checked inside the end-to-end mini wave: the memory ledger lists every created resource, only ledger entries are cleaned, a resource outside the ledger is reported and not deleted, and an interrupted wave resumes without reworking DONE tasks.
+- **End-to-end.** One mini wave in a sample repository: two dependent tasks, coders, reviewer verdict, tracker updates, coder task close after each merge, wave-close sweep and wave report; repeated with an interruption to prove resume.
+- **Skill-level checks (D15, D17, D23).** The ledger, task close, sweep and resume are skill behavior, not Go code, so they have no Go unit tests; they are checked inside the end-to-end mini wave: the memory ledger lists every created resource and each coder's resume handle, a resumed coder closes its task after the merge (issue DONE, worktree, local then remote branch) and reports failures as leftovers, the wave-close sweep touches only ledger entries no coder closed and never writes DONE, only ledger entries are cleaned, a resource outside the ledger is reported and not deleted, and an interrupted wave resumes without reworking DONE tasks.
 - **gbai's own PRs.** The reviewer scripts run `go test ./...`, build, lint, the reviewer script tests, config schema validation and the generator no-diff check as the mandatory merge gate.
 
 **PRD verification column.** "test" maps to unit, integration or end-to-end tests; "inspection" to the contract coverage check and document or skill review; "demo" to the end-to-end mini wave, the setup walkthrough and the subagent smoke test. Per-requirement mapping: [Requirement coverage](#requirement-coverage).
@@ -506,6 +520,7 @@ Proposed (auto). Reason: risks extended for D15–D17 and operating rules; techn
 | Runtime install locations change between Claude Code or Pi releases (D21) | One installer table, golden tests per runtime, unverified rows marked as open items until confirmed against the runtime docs |
 | The learning layer stores something sensitive (D22) | The assistant skill forbids secrets and sensitive data in `user/preferences`; observations are short behavioral notes only (R21) |
 | Resource created outside the ledger is never cleaned | Every subagent outcome lists created resources and the cycle appends them to the memory ledger; leftovers appear in the wave report (D15) |
+| A coder cannot be resumed after its PR merges (session ended, resume handle lost) | The wave-close sweep removes its ledger entries; the merged task stays open and is listed in the wave report for the owner, because only the coder writes DONE (D23) |
 | Memory ledger missing or incomplete (memory provider unavailable) | Cleanup deletes only ledger entries, so a missing entry leaves a leftover, never a wrong deletion; resume falls back to tracker state and open PRs (D17) |
 | A plan-change debate waiting for the owner blocks a task indefinitely | Only the affected task is BLOCKED; the wave report lists pending proposals each wave |
 
