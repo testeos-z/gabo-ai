@@ -17,13 +17,11 @@ func NewCommand(factory Factory) *cobra.Command {
 	var in Input
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Install the gbai agent skills locally and register the gbai MCP server",
+		Short: "Install the gbai agent skills locally",
 		Long: "Install the embedded gbai skills for the local agent:\n" +
 			"  claude: ~/.claude/skills/<name>/ (user) or .claude/skills/ (project)\n" +
 			"  pi:     ~/.pi/agent/skills/<name>/ (user) or .pi/skills/ (project)\n" +
-			"A file whose content differs is never overwritten without --force.\n\n" +
-			"Then register the MCP server: for claude, `claude mcp add --scope user gbai -- <gbai> mcp`\n" +
-			"unless `claude mcp get gbai` succeeds; for pi, print the config snippet to add.",
+			"A file whose content differs is never overwritten without --force.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			var err error
@@ -48,7 +46,7 @@ func NewCommand(factory Factory) *cobra.Command {
 	}
 	cmd.Flags().StringVar(&runtime, "runtime", "claude", "claude, pi or both")
 	cmd.Flags().StringVar(&scope, "scope", "user", "user (home skill dirs) or project (current directory)")
-	cmd.Flags().BoolVar(&in.DryRun, "dry-run", false, "print what would be installed and run, changing nothing")
+	cmd.Flags().BoolVar(&in.DryRun, "dry-run", false, "print what would be installed, changing nothing")
 	cmd.Flags().BoolVar(&in.Force, "force", false, "overwrite skill files whose content differs")
 	return cmd
 }

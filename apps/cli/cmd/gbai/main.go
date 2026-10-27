@@ -1,4 +1,4 @@
-// Command gbai provisions and operates autonomous cloud coding agents.
+// Command gbai compiles the gbai agent team (skills and agents) into a project.
 //
 // This package is the only composition root: it builds driven adapters,
 // injects them into slice use cases and registers the driving adapters.

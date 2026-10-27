@@ -39,17 +39,17 @@ func TestMerge(t *testing.T) {
 		},
 		{
 			name: "nested mappings merge key by key",
-			lower: map[string]any{"server": map[string]any{"railway": map[string]any{
-				"project_id": "p1", "environment_id": "e1", "service_id": "s1"}}},
-			higher: map[string]any{"server": map[string]any{"railway": map[string]any{"service_id": "s2"}}},
-			want: map[string]any{"server": map[string]any{"railway": map[string]any{
-				"project_id": "p1", "environment_id": "e1", "service_id": "s2"}}},
+			lower: map[string]any{"repo": map[string]any{
+				"name": "o/r", "integration_branch": "dev"}},
+			higher: map[string]any{"repo": map[string]any{"integration_branch": "main"}},
+			want: map[string]any{"repo": map[string]any{
+				"name": "o/r", "integration_branch": "main"}},
 		},
 		{
 			name:   "a scalar in higher replaces a lower mapping",
-			lower:  map[string]any{"bot": map[string]any{"login": "x"}},
-			higher: map[string]any{"bot": nil},
-			want:   map[string]any{"bot": nil},
+			lower:  map[string]any{"coder": map[string]any{"login": "x"}},
+			higher: map[string]any{"coder": nil},
+			want:   map[string]any{"coder": nil},
 		},
 		{
 			name:   "nil lower",
@@ -99,7 +99,7 @@ func TestLoadLayersHigherLayersWin(t *testing.T) {
 	t.Parallel()
 	r := files{
 		"/etc/gbai/gbai.yaml":              minimal + "parallelism: 2\nreview:\n  checks: [make test]\n  auto_merge: true\n",
-		"/home/o/.config/gbai/config.yaml": "parallelism: 4\nbot:\n  login: owner\n",
+		"/home/o/.config/gbai/config.yaml": "parallelism: 4\ncoder:\n  login: helper\n",
 		"/src/p/gbai.yaml":                 "parallelism: 6\nreview:\n  checks: [go test, go vet]\n",
 	}
 	res, err := LoadLayers(r, threeLayers())
@@ -110,8 +110,8 @@ func TestLoadLayersHigherLayersWin(t *testing.T) {
 	if c.Parallelism != 6 {
 		t.Errorf("parallelism = %d, want project 6", c.Parallelism)
 	}
-	if c.Bot.Login != "owner" {
-		t.Errorf("bot.login = %q, want user layer value", c.Bot.Login)
+	if c.Coder.Login != "helper" {
+		t.Errorf("coder.login = %q, want user layer value", c.Coder.Login)
 	}
 	if !reflect.DeepEqual(c.Review.Checks, []string{"go test", "go vet"}) {
 		t.Errorf("checks = %q, want the project list only", c.Review.Checks)
@@ -119,8 +119,8 @@ func TestLoadLayersHigherLayersWin(t *testing.T) {
 	if !c.Review.AutoMerge {
 		t.Errorf("auto_merge lost: a key absent in higher layers must keep the system value")
 	}
-	if c.Server.Railway.ProjectID != "p1" || c.Repo.IntegrationBranch != "dev" {
-		t.Errorf("system values or defaults lost: %+v %+v", c.Server.Railway, c.Repo)
+	if c.Repo.Name != "cappy-lab/vulcam" || c.Repo.IntegrationBranch != "dev" {
+		t.Errorf("system values or defaults lost: %+v", c.Repo)
 	}
 	for i, l := range res.Layers {
 		if !l.Found || l.Name != threeLayers()[i].Name {
@@ -176,14 +176,14 @@ func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
 	t.Parallel()
 	// Neither file is valid alone; merged they are.
 	r := files{
-		"/etc/gbai/gbai.yaml": "server:\n  railway:\n    project_id: p1\n    environment_id: e1\n    service_id: s1\n",
-		"/src/p/gbai.yaml":    "repo:\n  name: o/r\n",
+		"/etc/gbai/gbai.yaml": "repo:\n  name: o/r\nparallelism: -1\n",
+		"/src/p/gbai.yaml":    "parallelism: 2\n",
 	}
 	if _, err := LoadLayers(r, threeLayers()); err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "repo:\n  name: o/r\n"}, threeLayers()); err == nil ||
-		!strings.Contains(err.Error(), "server.railway.project_id") {
+	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "parallelism: 2\n"}, threeLayers()); err == nil ||
+		!strings.Contains(err.Error(), "repo.name") {
 		t.Fatalf("merged validation error = %v", err)
 	}
 }

@@ -257,7 +257,7 @@ func (u *RunUseCase) thread(ctx context.Context, number int) (string, []Comment,
 		return "", nil, fmt.Errorf("reviewer login: %w", err)
 	}
 	if u.cfg.Login != "" && !strings.EqualFold(login, u.cfg.Login) {
-		return "", nil, fmt.Errorf("gh is logged in as %s, but bot.login is the owner %s", login, u.cfg.Login)
+		return "", nil, fmt.Errorf("gh is logged in as %s, but the configured owner login is %s", login, u.cfg.Login)
 	}
 	comments, err := u.gh.Comments(ctx, number)
 	if err != nil {

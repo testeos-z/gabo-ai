@@ -25,14 +25,10 @@ const (
 
 // Config is the validated content of gbai.yaml.
 type Config struct {
-	Server   Server   `yaml:"server"`
-	Users    Users    `yaml:"users"`
 	Runtimes Runtimes `yaml:"runtimes"`
 	Repo     Repo     `yaml:"repo"`
-	Bot      Bot      `yaml:"bot"`
 	Review   Review   `yaml:"review"`
 	Coder    Coder    `yaml:"coder"`
-	Sessions Sessions `yaml:"sessions"`
 	Worktree Worktree `yaml:"worktree"`
 	// Parallelism is the most coder sessions the cycle runs at once; it
 	// already leaves room for the reviewer's checks. 0 means the default, 3.
@@ -48,62 +44,15 @@ type Config struct {
 	Language         string `yaml:"language,omitempty"`
 }
 
-// Worktree configures `gbai worktree close`.
+// Worktree configures the cycle's wave cleanup.
 type Worktree struct {
 	// Keep lists worktree names (or absolute paths) that are never closed.
 	Keep []string `yaml:"keep,omitempty"`
 }
 
 // Coder is the GitHub identity the coder pushes with; it must never merge.
-// An empty Login skips the coder-merge audit rule.
 type Coder struct {
 	Login string `yaml:"login"`
-}
-
-// Sessions configures the long-lived Orca agent sessions.
-type Sessions struct {
-	// LocalOrca is the Orca CLI used in local mode (orca-ide on Linux
-	// desktops where orca is the screen reader).
-	LocalOrca string  `yaml:"local_orca"`
-	Coder     Session `yaml:"coder"`
-	Reviewer  Session `yaml:"reviewer"`
-	Assistant Session `yaml:"assistant"`
-}
-
-// Session configures one role's session.
-type Session struct {
-	// PromptFile, when set, is read on the session host and passed as the
-	// startup prompt.
-	PromptFile string `yaml:"prompt_file"`
-}
-
-// Server locates the cloud server.
-type Server struct {
-	Railway Railway `yaml:"railway"`
-}
-
-// Railway holds the explicit ids passed to `railway ssh`.
-type Railway struct {
-	ProjectID     string `yaml:"project_id"`
-	EnvironmentID string `yaml:"environment_id"`
-	ServiceID     string `yaml:"service_id"`
-}
-
-// Users lists the OS users on the server. Single-user mode: the reviewer
-// runs as the orca user, the same OS user as the agent sessions.
-type Users struct {
-	Orca User `yaml:"orca"`
-}
-
-// All returns the users in a stable order.
-func (u Users) All() []User { return []User{u.Orca} }
-
-// User is one OS user on the server. UID 0 means the uid is not managed.
-type User struct {
-	Name      string   `yaml:"name"`
-	Home      string   `yaml:"home"`
-	UID       int      `yaml:"uid"`
-	ExtraPath []string `yaml:"extra_path"`
 }
 
 // Runtimes selects the runtime per role.
@@ -124,13 +73,6 @@ func (r Repo) Owner() string { o, _, _ := strings.Cut(r.Name, "/"); return o }
 
 // Repo returns the repository part of Name.
 func (r Repo) Repo() string { _, n, _ := strings.Cut(r.Name, "/"); return n }
-
-// Bot is the owner's GitHub login: in single-user mode the reviewer posts,
-// sets statuses and merges with the owner's own gh login. Empty means the
-// login gh is authenticated as; when set it must equal that login.
-type Bot struct {
-	Login string `yaml:"login"`
-}
 
 // Review configures `gbai review run` and its checks side.
 type Review struct {
@@ -173,13 +115,10 @@ func (r Review) CheckArgv() [][]string {
 
 var (
 	envPattern    = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
-	idPattern     = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
-	userPattern   = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 	pathPattern   = regexp.MustCompile(`^/[A-Za-z0-9._/-]*$`)
 	repoPattern   = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 	branchPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 	loginPattern  = regexp.MustCompile(`^[A-Za-z0-9-]+(\[bot\])?$`)
-	filePattern   = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 )
 
 // Load reads and validates the config file at path.
@@ -220,7 +159,6 @@ func (c Config) Marshal() ([]byte, error) {
 }
 
 func (c *Config) applyDefaults() {
-	defaultUser(&c.Users.Orca, User{Name: "orca", Home: "/data/home", ExtraPath: []string{"/data/home/.local/bin"}})
 	defaultString(&c.Runtimes.Coder, RuntimeClaude)
 	defaultString(&c.Runtimes.Reviewer, RuntimePi)
 	defaultString(&c.Runtimes.Assistant, RuntimeClaude)
@@ -232,20 +170,8 @@ func (c *Config) applyDefaults() {
 		c.Review.HumanOnlyPaths = []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}
 	}
 	defaultString(&c.Review.PiCredentialEnv, "ANTHROPIC_API_KEY")
-	defaultString(&c.Sessions.LocalOrca, "orca")
 	if c.Parallelism == 0 {
 		c.Parallelism = 3
-	}
-}
-
-func defaultUser(u *User, d User) {
-	defaultString(&u.Name, d.Name)
-	defaultString(&u.Home, d.Home)
-	if u.UID == 0 {
-		u.UID = d.UID
-	}
-	if u.ExtraPath == nil {
-		u.ExtraPath = d.ExtraPath
 	}
 }
 
@@ -262,25 +188,11 @@ func (c Config) validate() error {
 			errs = append(errs, fmt.Errorf("%s: %s", field, msg))
 		}
 	}
-	r := c.Server.Railway
-	check(idPattern.MatchString(r.ProjectID), "server.railway.project_id", "required id")
-	check(idPattern.MatchString(r.EnvironmentID), "server.railway.environment_id", "required id")
-	check(idPattern.MatchString(r.ServiceID), "server.railway.service_id", "required id")
-
-	u := c.Users.Orca
-	check(userPattern.MatchString(u.Name), "users.orca.name", "must be a lowercase POSIX user name")
-	check(pathPattern.MatchString(u.Home), "users.orca.home", "must be an absolute path of safe characters")
-	check(u.UID >= 0, "users.orca.uid", "must not be negative")
-	for _, p := range u.ExtraPath {
-		check(pathPattern.MatchString(p), "users.orca.extra_path", "entries must be absolute paths of safe characters")
-	}
-
 	for field, rt := range map[string]Runtime{"runtimes.coder": c.Runtimes.Coder, "runtimes.reviewer": c.Runtimes.Reviewer, "runtimes.assistant": c.Runtimes.Assistant} {
 		check(rt == RuntimeClaude || rt == RuntimePi, field, fmt.Sprintf("must be %q or %q, got %q", RuntimeClaude, RuntimePi, rt))
 	}
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")
-	check(c.Bot.Login == "" || loginPattern.MatchString(c.Bot.Login), "bot.login", "must be the owner's GitHub login")
 
 	check(len(c.Review.Checks) > 0, "review.checks", "at least one check is required")
 	for _, ch := range c.Review.Checks {
@@ -293,13 +205,7 @@ func (c Config) validate() error {
 	}
 	check(envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
 	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")
-	check(c.Coder.Login == "" || !strings.EqualFold(c.Coder.Login, c.Bot.Login), "coder.login",
-		"must differ from bot.login: the audit flags every merge by the coder login")
 	check(c.Review.StateDir == "" || pathPattern.MatchString(c.Review.StateDir), "review.state_dir", "must be an absolute path of safe characters")
-	check(filePattern.MatchString(c.Sessions.LocalOrca), "sessions.local_orca", "must be a command name or path")
-	for key, s := range map[string]Session{"coder": c.Sessions.Coder, "reviewer": c.Sessions.Reviewer, "assistant": c.Sessions.Assistant} {
-		check(s.PromptFile == "" || filePattern.MatchString(s.PromptFile), "sessions."+key+".prompt_file", "must be a path of safe characters")
-	}
 	check(c.Parallelism > 0, "parallelism", "must be a positive number of coder sessions")
 	for _, k := range c.Worktree.Keep {
 		ok := k != "" && !strings.ContainsAny(k, "\n\r") && (path.IsAbs(k) || !strings.Contains(k, "/")) && k != ".." && k != "."
