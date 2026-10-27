@@ -176,14 +176,14 @@ func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
 	t.Parallel()
 	// Neither file is valid alone; merged they are.
 	r := files{
-		"/etc/gbai/gbai.yaml": "server:\n  railway:\n    project_id: p1\n    environment_id: e1\n    service_id: s1\n",
-		"/src/p/gbai.yaml":    "repo:\n  name: o/r\n",
+		"/etc/gbai/gbai.yaml": "repo:\n  name: o/r\nreview:\n  checks: []\n",
+		"/src/p/gbai.yaml":    "review:\n  checks: [go test ./...]\n",
 	}
 	if _, err := LoadLayers(r, threeLayers()); err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "repo:\n  name: o/r\n"}, threeLayers()); err == nil ||
-		!strings.Contains(err.Error(), "server.railway.project_id") {
+	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "review:\n  checks: [go test ./...]\n"}, threeLayers()); err == nil ||
+		!strings.Contains(err.Error(), "repo.name") {
 		t.Fatalf("merged validation error = %v", err)
 	}
 }
