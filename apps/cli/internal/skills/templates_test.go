@@ -323,3 +323,54 @@ func fixedQuestions(doc string) ([][3]string, error) {
 	}
 	return rows, nil
 }
+
+// traceabilityGaps is the gap list of the traceability check (D19, T031):
+// every directiva skill carries it word for word, so the four skills block a
+// planning step on the same gaps.
+var traceabilityGaps = []string{
+	"story without requirement",
+	"requirement without decision, task or verification",
+	"task without story",
+	"dependency cycle",
+	"dangling id",
+	"`depends_on` / `unblocks` mismatch",
+	"Rows marked removed",
+	"blocks the next planning step",
+}
+
+// T031 (J2, J6): the directiva skills ask their template's fixed questions one
+// at a time, mark auto-mode answers as proposals and run the traceability check
+// before each next planning step.
+func TestDirectivaSkillsAskFixedQuestionsAndRunTheTraceabilityCheck(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for _, skill := range []string{
+		"gabo-pm/SKILL.md", "gabo-dev-lead/SKILL.md", "gabo-db-master/SKILL.md", "gabo-frontend/SKILL.md",
+	} {
+		doc := byPath[skill]
+		for _, s := range slices.Concat([]string{
+			"one at a time", "**Proposed (auto)**", "## Traceability check", "before each next planning step",
+		}, traceabilityGaps) {
+			if !strings.Contains(doc, s) {
+				t.Errorf("%s: missing %q", skill, s)
+			}
+		}
+	}
+}
+
+// T031 (J2, J6): dev-lead creates tasks through the `tasks` contract with
+// blocked-by / unblocks verified by re-read, adjusts tasks keeping their
+// identity and answers research requests with sources.
+func TestDevLeadCreatesAndAdjustsTasksAndResearches(t *testing.T) {
+	t.Parallel()
+	doc := embeddedByPath(t)["gabo-dev-lead/SKILL.md"]
+	for _, s := range []string{
+		"`tasks` contract", "blocked-by", "unblocks", "re-read", "unverified",
+		"keep their identity", "never renumber", "(removed <date>)", "never recreate the plan",
+		"researched answer", "sources",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-dev-lead/SKILL.md: missing %q", s)
+		}
+	}
+}
