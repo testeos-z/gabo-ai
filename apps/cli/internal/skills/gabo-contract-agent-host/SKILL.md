@@ -1,6 +1,6 @@
 ---
 name: gabo-contract-agent-host
-description: "Trigger: agent host contract, agent_host slot, cloud, server, where agents run, Railway, adapter coverage. Operations every gbai agent host adapter must cover."
+description: "Trigger: agent host contract, agent_host slot, local agents, cloud, server, where agents run, Railway, adapter coverage. Operations every gbai agent host adapter must cover."
 license: Apache-2.0
 metadata:
   author: gbai-team
@@ -8,12 +8,12 @@ metadata:
 ---
 ## Activation Contract
 
-Load when writing, checking or using the adapter of the optional cloud slot `agent_host` (`slots.agent_host.adapter`, TRD 9.1). This contract states WHAT gbai needs from a host that runs agents away from the owner's machine; the adapter states WHERE and HOW, and holds every cloud setting. A local-only team needs no `agent_host` adapter, or points it at the shipped `gabo-agent-host-local` when a role must run as its own local session process. The slot is configured in a separate assistant session, never during first setup.
+Load when writing, checking or using the adapter of the optional slot `agent_host` (`slots.agent_host.adapter`, TRD 9.1). This contract states WHAT gbai needs from a host that runs agents as their own sessions, on the owner's machine or on a server; the adapter states WHERE and HOW, and holds every host setting. A local-only team needs no `agent_host` adapter, or points it at the shipped `gabo-agent-host-local` when a role must run as its own local session process. The slot is configured in a separate assistant session, never during first setup.
 
 ## Hard Rules
 
 - An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
-- Cloud settings live in the adapter, never in the core config: `gbai.yaml` holds only `slots.agent_host.adapter`.
+- Host settings (cloud or local) live in the adapter, never in the core config: `gbai.yaml` holds only `slots.agent_host.adapter`.
 - The adapter names secrets only by environment variable name or reference, never by value (R21).
 - Starting or stopping a remote session needs the owner's explicit authorization of the host, the operation and the credential to use; an adapter never discovers or reuses ambient credentials.
 

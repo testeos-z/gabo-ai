@@ -390,9 +390,16 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 		"gabo-contract-agent-host", "`not used`", "single-user", "ledger",
 		// claude and pi command lines, each with its session id and the prompt kept off argv.
 		// Only the agent command is backgrounded, so $! is the agent, not a subshell.
-		`{ nohup claude --print --agent <role agent> --session-id "$sid" <"$dir/prompt.md"`,
-		`{ nohup pi --print --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md"`,
+		`{ nohup claude --print --agent <role agent> --session-id "$sid" --permission-mode dontAsk --permission-prompts none --allowedTools "$tools" <"$dir/prompt.md"`,
+		`{ nohup pi --print --approve --tools read,bash,edit,write,grep,find,ls --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md"`,
 		"</dev/null",
+		// a headless session cannot answer a permission prompt: the tools it may use are
+		// pinned on the command line and checked before the session starts.
+		`tools=$(sed -n 's/^tools: *//p' <role agent file>)`,
+		`claude --help | grep -qF -- --permission-prompts`,
+		`pi --help | grep -qF -- --approve`,
+		// the start check and the report never print the process arguments.
+		`ps -o args= -p "$(cat "$dir/pid")" | grep -qF -- "--session-id $sid"`,
 		// a reused process id is never signalled: the session id is matched before kill.
 		`grep -qF -- "--session-id <sid>" && kill -TERM <pid>`,
 		// every former cloud field of the contract is stated as not used.
@@ -406,6 +413,9 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-agent-host-local/SKILL.md: missing %q", s)
 		}
+	}
+	if strings.Contains(adapter, "| grep -F --") {
+		t.Errorf("gabo-agent-host-local/SKILL.md: a ps check prints the process arguments; use grep -qF")
 	}
 	for _, s := range []string{"railway status", "railway mcp", "--environment", "ssh ", "orca "} {
 		if strings.Contains(strings.ToLower(adapter), s) {
