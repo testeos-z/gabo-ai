@@ -1,6 +1,8 @@
 // Package skills embeds the agent skills shipped with gbai. Each skill is a
 // directory holding a SKILL.md; contract skills also hold example adapters
-// under examples/, and directiva skills hold plan templates under templates/.
+// under examples/, directiva skills hold plan templates under templates/, and
+// gabo-reviewer holds the reviewer scripts and their shell tests under
+// scripts/ (TRD D20).
 package skills
 
 import (
@@ -14,6 +16,7 @@ import (
 )
 
 //go:embed */SKILL.md */examples/*.md */templates/*.md
+//go:embed gabo-reviewer/README.md gabo-reviewer/scripts/*.sh gabo-reviewer/scripts/config.env gabo-reviewer/scripts/tests/*.sh
 var content embed.FS
 
 // File is one embedded file; Path is relative, like gabo-setup/SKILL.md or
