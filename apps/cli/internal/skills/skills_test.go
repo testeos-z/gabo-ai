@@ -13,7 +13,7 @@ import (
 )
 
 var want = []string{
-	"gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-agent-host-local", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
 	"gabo-direct-sessions-orca", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup",
@@ -305,6 +305,35 @@ func TestDirectSessionsOrcaAdapter(t *testing.T) {
 	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-direct-sessions-orca/SKILL.md: missing %q", s)
+		}
+	}
+}
+
+// The shipped local agent_host adapter (T058) covers every contract operation
+// for agents on the owner's machine and fills no server field.
+func TestAgentHostLocalAdapter(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var adapter string
+	for _, f := range files {
+		if f.Path == "gabo-agent-host-local/SKILL.md" {
+			adapter = string(f.Data)
+		}
+	}
+	if got, want := operations(adapter), contracts["gabo-contract-agent-host"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-agent-host-local/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{"gabo-contract-agent-host", "`not used`", "--session-id", "kill -0", "single-user", "ledger"} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-agent-host-local/SKILL.md: missing %q", s)
+		}
+	}
+	for _, s := range []string{"railway", "--environment", "ssh ", "project_id", "users.orca", "bot.login"} {
+		if strings.Contains(strings.ToLower(adapter), s) {
+			t.Errorf("gabo-agent-host-local/SKILL.md: holds server field or remote host %q", s)
 		}
 	}
 }

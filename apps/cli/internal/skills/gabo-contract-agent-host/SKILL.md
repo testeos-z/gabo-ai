@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load when writing, checking or using the adapter of the optional cloud slot `agent_host` (`slots.agent_host.adapter`, TRD 9.1). This contract states WHAT gbai needs from a host that runs agents away from the owner's machine; the adapter states WHERE and HOW, and holds every cloud setting. A local-only team has no `agent_host` adapter. The slot is configured in a separate assistant session, never during first setup.
+Load when writing, checking or using the adapter of the optional cloud slot `agent_host` (`slots.agent_host.adapter`, TRD 9.1). This contract states WHAT gbai needs from a host that runs agents away from the owner's machine; the adapter states WHERE and HOW, and holds every cloud setting. A local-only team needs no `agent_host` adapter, or points it at the shipped `gabo-agent-host-local` when a role must run as its own local session process. The slot is configured in a separate assistant session, never during first setup.
 
 ## Hard Rules
 
