@@ -7,16 +7,18 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/execrunner"
 )
 
-// buildVersion is injected at build time with -ldflags "-X main.buildVersion=<v>".
+// buildVersion is injected at build time with -ldflags "-X main.buildVersion=<v>";
+// without it the go install module version is used (resolveVersion).
 var buildVersion = ""
 
 func main() {
 	root := newRootCommand(deps{
-		version: buildVersion,
+		version: resolveVersion(buildVersion, debug.ReadBuildInfo),
 		runner:  execrunner.New(),
 		stdin:   os.Stdin,
 		stderr:  os.Stderr,
