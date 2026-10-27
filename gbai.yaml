@@ -4,7 +4,7 @@
 # Personal keys (alias, interaction_level, tone, language) do not belong here:
 # they live in ~/.config/gbai/config.yaml (TRD D11, D22).
 version: 1
-mode: manual
+mode: auto
 
 repo:
   name: testeos-z/gbai-team
@@ -45,9 +45,10 @@ review:
     - go -C apps/cli build ./...
     - go -C apps/cli vet ./...
     - go -C apps/cli test ./...
-  # OWNER: set true (here and REVIEWER_AUTO_MERGE in the reviewer skill config.env)
-  # to let the reviewer merge clean heads into dev; it never merges into main (TRD D13).
-  auto_merge: false
+  # 2026-10-27 owner decision (plan change #83, T069): the reviewer merges clean
+  # heads into dev, never into main (TRD D13). The hand-installed reviewer scripts
+  # also need REVIEWER_AUTO_MERGE=true in the user-level skill config.env.
+  auto_merge: true
   human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gbai.yaml, .claude/]
 
 # Git email -> alias (TRD D10). OWNER: change "Leo" if you prefer another alias.
