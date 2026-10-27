@@ -8,7 +8,7 @@
 | date | 2026-10-27 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [DB_SCHEMA](DB_SCHEMA.md), [APP_FLOW](APP_FLOW.md) |
 
-gbai is a CLI plus an agent framework with no graphical UI, so `DESIGN.md`, CSS tokens and Storybook do not apply. This document adapts the template to what gbai actually presents: the assistant's conversation, the CLI command surface (three commands: `gbai init`, `gbai check` and `gbai version`, owner 2026-10-27, PRD R31; earlier an agent compiler used only for the initial configuration, TRD D18) and its messages. Approved (owner 2026-10-26): the proposed terminal UI (TUI) is withdrawn; setup starts from a prompt the user pastes into Claude Code or Pi (section 1.8, TRD D21). Every gap this document had to fill is marked **Proposed (auto)**.
+gbai is a CLI plus an agent framework with no graphical UI, so `DESIGN.md`, CSS tokens and Storybook do not apply. This document adapts the template to what gbai actually presents: the assistant's conversation, the CLI command surface (three commands: `gbai init`, `gbai check` and `gbai version`, owner 2026-10-27, PRD R31; earlier an agent compiler used only for the initial configuration, TRD D18) and its messages. Approved (owner 2026-10-26): the proposed terminal UI (TUI) is withdrawn. Superseded (owner 2026-10-27): setup starts from a prompt the user pastes into Claude Code or Pi (TRD D21); setup now starts with `gbai init` and the user's own agent (section 1.8), and whether the pasted prompt stays as an alternative entry is PRD open question 10. Every gap this document had to fill is marked **Proposed (auto)**.
 
 ## Auto-mode proposals
 
@@ -96,7 +96,7 @@ Conversation in the owner's `language` (BCP 47, global file); all generated arti
 
 Amended (owner 2026-10-27), U16, PRD R32, R34. There is still no setup screen.
 
-1. The user installs gbai and runs `gbai init` in the project. It copies the skill catalog, writes the short neutral entry file, installs the user-level `gbai-reviewer` skill and ends with the next step: `next: open your agent in this project and ask it to configure gbai`. If a config already exists it changes nothing in the config and says `next: run gbai check`.
+1. The user installs gbai and runs `gbai init` in the project. It copies the skill catalog, writes the short neutral entry file, installs the user-level `gbai-reviewer` skill and ends with the next step: `next: open your agent in this project and ask it to configure gbai`. If a config already exists it writes nothing (no catalog copy, no entry file, no `gbai-reviewer` reinstall), exits non-zero and says `next: run gbai check`. Refreshing the catalog after an upgrade is PRD open question 11.
 2. The user opens their agent (Claude Code, Pi or another engine with a runtime skill) and asks it to configure gbai.
 3. The agent follows the entry file. The setup skill runs the setup question burst one question at a time (identity, slots and adapters, runtimes, `mode`, `plan_change.*`, `language`), with suggestions and no preselected value (R12).
 4. The config-writer skill writes the global user file and `gbai.yaml`.
@@ -122,7 +122,7 @@ Amended (owner 2026-10-27, U7, PRD R31–R33). The CLI has three commands. It wr
 
 | command | purpose | source |
 |---|---|---|
-| `gbai init` | Copies the embedded skill catalog into a neutral project location, byte for byte and deterministically; writes the short engine-neutral entry file (which skills to load, which agents to create, which config files to write, how to verify); installs the user-level `gbai-reviewer` skill; prints the next step. Never overwrites an existing config: if one exists it points to `gbai check` | PRD R32 |
+| `gbai init` | Copies the embedded skill catalog into a neutral project location, byte for byte and deterministically; writes the short engine-neutral entry file (which skills to load, which agents to create, which config files to write, how to verify); installs the user-level `gbai-reviewer` skill; prints the next step. If a config already exists it writes nothing, exits non-zero and points to `gbai check` | PRD R32 |
 | `gbai check` | Read-only, engine-neutral validation: the global user file and `gbai.yaml` against their JSON Schemas, every agent of the neutral agent spec present, nothing stale against the templates. Writes nothing; non-zero exit on any failure. Usable by the user, agents, the reviewer and CI | PRD R33 |
 | `gbai version` | Print the version | — |
 
@@ -181,7 +181,7 @@ Format: `✗ <what happened>` on one line, then `why:` and `next:` lines, then o
 | Coverage gap (setup agent; earlier `gbai generate`) | `✗ adapter tasks-gh.md does not cover: link PR, verify by re-read` · `next: add those operations or write them with the assistant` |
 | Traceability gap (reported by the directiva agent, D19) | `✗ planning step blocked` · `why: R7 has no task; US-012 has no requirement` · `next: close the gaps; the check reruns before the next step` |
 | Missing config (`gbai check`) | `✗ no gbai.yaml found` · `next: run gbai init, then ask your agent to configure gbai` (updated owner 2026-10-27; earlier: paste the setup prompt) |
-| Existing config (`gbai init`) | `✗ gbai.yaml already exists; nothing overwritten` · `next: run gbai check` |
+| Existing config (`gbai init`, non-zero exit) | `✗ gbai.yaml already exists; nothing written` · `why: gbai init only sets up a project without a config` · `next: run gbai check` |
 | Missing or stale agent (`gbai check`) | `✗ agent gbai-reviewer is stale against its template` · `next: ask your agent to rebuild it with the runtime skill, then rerun gbai check` |
 | Engine not supported (runtime builder) | `✗ cannot add a runtime for <engine>` · `why: it has no subagent and skill support, or an equivalent` · `next: use Claude Code, Pi or another engine with subagents and skills` |
 | Invalid config (agent edited the YAML during the work) | `✗ gbai.yaml: plan_change.scope: "teams" is not one of task, group, global` · `next: fix the key, then rerun gbai check` |
