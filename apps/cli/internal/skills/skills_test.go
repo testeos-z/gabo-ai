@@ -13,7 +13,7 @@ import (
 )
 
 var want = []string{
-	"gabo-agent-host-local", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
 	"gabo-direct-sessions-orca", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup",
@@ -305,6 +305,35 @@ func TestDirectSessionsOrcaAdapter(t *testing.T) {
 	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-direct-sessions-orca/SKILL.md: missing %q", s)
+		}
+	}
+}
+
+// The shipped agent_host adapter (T059) covers every contract operation for
+// agents on a Railway server driven through Orca, holds the former cloud
+// fields, and names secrets only by env var.
+func TestAgentHostRailwayOrcaAdapter(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var adapter string
+	for _, f := range files {
+		if f.Path == "gabo-agent-host-railway-orca/SKILL.md" {
+			adapter = string(f.Data)
+		}
+	}
+	if got, want := operations(adapter), contracts["gabo-contract-agent-host"].ops; !slices.Equal(got, want) {
+		t.Errorf("gabo-agent-host-railway-orca/SKILL.md: operations %q, want %q", got, want)
+	}
+	for _, s := range []string{
+		"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gbai/gbai.yaml",
+		"RAILWAY_TOKEN", "railway status", "Railway MCP", "orca terminal create", "--environment",
+		"orca terminal close", "orca terminal list", "single-user", "isolated",
+	} {
+		if !strings.Contains(adapter, s) {
+			t.Errorf("gabo-agent-host-railway-orca/SKILL.md: missing %q", s)
 		}
 	}
 }
