@@ -41,6 +41,13 @@ type Config struct {
 	// Version is the schema version of the file; a file without it is
 	// version 0, the current shape (see keyclass.go).
 	Version int `yaml:"version"`
+	// Project keys of DB_SCHEMA migration step 3 (see projectkeys.go).
+	Mode       Mode              `yaml:"mode,omitempty"`
+	Slots      map[string]Slot   `yaml:"slots,omitempty"`
+	Reviewer   Reviewer          `yaml:"reviewer,omitempty"`
+	Developers map[string]string `yaml:"developers,omitempty"`
+	PlanChange PlanChange        `yaml:"plan_change,omitempty"`
+	Generation Generation        `yaml:"generation,omitempty"`
 	// Personal keys (see PersonalKeys): read from the global layers only.
 	Alias            string `yaml:"alias,omitempty"`
 	InteractionLevel string `yaml:"interaction_level,omitempty"`
@@ -263,9 +270,11 @@ func (c Config) validate() error {
 		}
 	}
 	r := c.Server.Railway
-	check(idPattern.MatchString(r.ProjectID), "server.railway.project_id", "required id")
-	check(idPattern.MatchString(r.EnvironmentID), "server.railway.environment_id", "required id")
-	check(idPattern.MatchString(r.ServiceID), "server.railway.service_id", "required id")
+	// Railway ids are optional so a local-only project file (DB_SCHEMA 4.2)
+	// loads; T042 removes these cloud fields entirely.
+	check(r.ProjectID == "" || idPattern.MatchString(r.ProjectID), "server.railway.project_id", "must be an id")
+	check(r.EnvironmentID == "" || idPattern.MatchString(r.EnvironmentID), "server.railway.environment_id", "must be an id")
+	check(r.ServiceID == "" || idPattern.MatchString(r.ServiceID), "server.railway.service_id", "must be an id")
 
 	u := c.Users.Orca
 	check(userPattern.MatchString(u.Name), "users.orca.name", "must be a lowercase POSIX user name")
@@ -306,5 +315,6 @@ func (c Config) validate() error {
 		check(ok, "worktree.keep", fmt.Sprintf("entry %q must be a worktree name or an absolute path", k))
 	}
 	errs = append(errs, c.validateKeyClasses()...)
+	errs = append(errs, c.validateProjectKeys()...)
 	return errors.Join(errs...)
 }
