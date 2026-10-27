@@ -13,7 +13,7 @@ import (
 )
 
 var want = []string{
-	"gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
 	"gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup", "gbai-orca-inbox",
@@ -409,5 +409,22 @@ func TestReviewerScriptsShellTests(t *testing.T) {
 				t.Fatalf("bash %s: %v\n%s", p, err, out)
 			}
 		})
+	}
+}
+
+// The neutral agent spec ships with the catalog, so the project copy under
+// .gbai/skills/ holds it too (TRD 8.1, D24).
+func TestCatalogShipsTheAgentSpec(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, f := range files {
+		paths = append(paths, f.Path)
+	}
+	if !slices.Contains(paths, "gabo-agent-templates/agents.yaml") {
+		t.Fatalf("Files() misses gabo-agent-templates/agents.yaml (has %v)", paths)
 	}
 }
