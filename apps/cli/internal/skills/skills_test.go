@@ -11,10 +11,10 @@ import (
 )
 
 var want = []string{
-	"gbai-assistant", "gbai-coder", "gbai-contract-agent-host", "gbai-contract-direct-sessions",
-	"gbai-contract-memory", "gbai-contract-methodology", "gbai-contract-notifications",
-	"gbai-contract-repository-host", "gbai-contract-reviewer-placement", "gbai-contract-tasks", "gbai-cycle", "gbai-db-master", "gbai-dev-lead",
-	"gbai-frontend", "gbai-orca-inbox", "gbai-pm", "gbai-reviewer-notes", "gbai-setup",
+	"gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
+	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
+	"gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-setup", "gbai-orca-inbox",
 }
 
 // contracts maps each contract skill to its TRD 9.1 operations, in order, and
@@ -23,25 +23,25 @@ var contracts = map[string]struct {
 	ops      []string
 	examples []string
 }{
-	"gbai-contract-tasks": {
+	"gabo-contract-tasks": {
 		ops: []string{
 			"create", "read unblocked", "read one", "claim", "log progress",
 			"change status", "link PR", "verify by re-read",
 		},
 		examples: []string{"tasks-gh.md"},
 	},
-	"gbai-contract-repository-host": {
+	"gabo-contract-repository-host": {
 		ops: []string{
 			"open PR", "comment on PR", "read PR status and checks",
 			"merge into integration branch", "delete branch",
 		},
 		examples: []string{"host-github.md"},
 	},
-	"gbai-contract-reviewer-placement": {
+	"gabo-contract-reviewer-placement": {
 		ops:      []string{"trigger review", "report placement", "return verdict"},
 		examples: []string{"reviewer-local.md"},
 	},
-	"gbai-contract-memory": {
+	"gabo-contract-memory": {
 		ops: []string{
 			"save decision", "list decisions", "search", "read one",
 			"save ledger", "read ledger", "save wave trace", "read wave trace",
@@ -49,19 +49,19 @@ var contracts = map[string]struct {
 		},
 		examples: []string{"memory-engram.md"},
 	},
-	"gbai-contract-notifications": {
+	"gabo-contract-notifications": {
 		ops:      []string{"notify owner", "notify developer by alias"},
 		examples: []string{"notify-task-comment.md"},
 	},
-	"gbai-contract-direct-sessions": {
+	"gabo-contract-direct-sessions": {
 		ops:      []string{"open session", "send message", "read state", "close session"},
 		examples: []string{"sessions-orca.md"},
 	},
-	"gbai-contract-methodology": {
+	"gabo-contract-methodology": {
 		ops:      []string{"coder instructions", "coder-side review", "report per task"},
 		examples: []string{"methodology-tdd.md"},
 	},
-	"gbai-contract-agent-host": {
+	"gabo-contract-agent-host": {
 		ops:      []string{"start agent session", "stop agent session", "report where agents run"},
 		examples: []string{"agent-host-railway.md"},
 	},
@@ -121,46 +121,46 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := map[string][]string{
-		"gbai-coder/SKILL.md": {
+		"gabo-coder/SKILL.md": {
 			"leftovers:", "containers:", "mktemp -d", "--ignored=matching", "immutable",
 			"## Task Close", "PR #<n> merged", "repository_host", "never `--force`", "--git-common-dir", "resumable",
 			"`worktree.keep`", "before any removal", "unverified:",
 			"D23", "only writer of DONE", "lock error", "retry once",
 		},
-		"gbai-cycle/SKILL.md": {
+		"gabo-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
 			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
 		},
 		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
-		"gbai-assistant/SKILL.md": {
+		"gabo-assistant/SKILL.md": {
 			"default point of contact", "Never block", "only the owner", "user.email",
 			"`developers`", "global `alias` wins", "Ask once", "No `gbai` command",
 			"`tone`", "`language`", "terminal",
 			"resume the owning coder", "PR #<n> merged", "D23", "close report",
 		},
-		"gbai-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
-		"gbai-contract-repository-host/examples/host-github.md": {
+		"gabo-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
+		"gabo-contract-repository-host/examples/host-github.md": {
 			"baseRefName,headRefName,headRefOid", "git branch -d <branch>", "ls-remote", "leftover",
 			"local `origin/<branch>` tracking ref", "--prune",
 		},
-		"gbai-reviewer-notes/SKILL.md": {
+		"gabo-reviewer-notes/SKILL.md": {
 			"never approves", "marker", "## Review layers", "Coder-side review (optional)",
 			"methodology", "Reviewer-side gate (mandatory)", "outside every repository",
 			"own clone", "own `HOME`", "cache", "clean environment", "Single-user mode", "Isolated mode",
 			"sha=<head>", "One verdict per pushed head", "`VERDICT`", "Later",
 		},
 		// TRD 9.2 auto decision record fields and the list filters (R6, R30).
-		"gbai-contract-memory/SKILL.md": {
+		"gabo-contract-memory/SKILL.md": {
 			"`what`", "`question`", "`choice`", "`reason`", "`mode`", "`wave`", "`task`", "`resolver`",
 			"filter by `mode`, `wave` and `task`", "user/preferences",
 		},
-		"gbai-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gbai-methodology"},
+		"gabo-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gabo-methodology"},
 		// The former cloud keys of the core config (DB_SCHEMA 2.3).
-		"gbai-contract-agent-host/SKILL.md": {
+		"gabo-contract-agent-host/SKILL.md": {
 			"server.railway", "users.orca", "bot.login", "sessions.{coder, reviewer, assistant}.prompt_file",
 			"sessions.local_orca", "/etc/gbai/gbai.yaml",
 		},
-		"gbai-contract-agent-host/examples/agent-host-railway.md": {
+		"gabo-contract-agent-host/examples/agent-host-railway.md": {
 			"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gbai/gbai.yaml",
 		},
 	}
@@ -182,8 +182,8 @@ func TestTaskCloseNeverForceDeletesBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 	guarded := []string{
-		"gbai-coder/SKILL.md", "gbai-cycle/SKILL.md",
-		"gbai-contract-repository-host/SKILL.md", "gbai-contract-repository-host/examples/host-github.md",
+		"gabo-coder/SKILL.md", "gabo-cycle/SKILL.md",
+		"gabo-contract-repository-host/SKILL.md", "gabo-contract-repository-host/examples/host-github.md",
 	}
 	seen := 0
 	for _, f := range files {
@@ -201,8 +201,8 @@ func TestTaskCloseNeverForceDeletesBranches(t *testing.T) {
 	// The Claude Code adapter and agent are not embedded; they live in the
 	// repository checkout, three levels above this package's module dir.
 	for _, p := range []string{
-		"../../../../.claude/skills/gbai-repository-host-github/SKILL.md",
-		"../../../../.claude/agents/gbai-coder.md",
+		"../../../../.claude/skills/gabo-repository-host-github/SKILL.md",
+		"../../../../.claude/agents/gabo-coder.md",
 	} {
 		b, err := os.ReadFile(p)
 		if err != nil {
@@ -223,7 +223,7 @@ func TestContractsListOperationsAndExamplesCoverThem(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, n := range Names() {
-		if _, ok := contracts[n]; strings.HasPrefix(n, "gbai-contract-") && !ok {
+		if _, ok := contracts[n]; strings.HasPrefix(n, "gabo-contract-") && !ok {
 			t.Errorf("%s: contract skill not listed in contracts", n)
 		}
 	}

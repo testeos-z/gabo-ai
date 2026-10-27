@@ -90,7 +90,7 @@ func TestInitDryRunChangesNothing(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	for _, want := range []string{"would install " + home + "/.claude/skills/gbai-setup/SKILL.md", "would install " + home + "/.pi/agent/skills/gbai-coder/SKILL.md"} {
+	for _, want := range []string{"would install " + home + "/.claude/skills/gabo-setup/SKILL.md", "would install " + home + "/.pi/agent/skills/gabo-coder/SKILL.md"} {
 		if !strings.Contains(out.String(), want) {
 			t.Fatalf("missing %q:\n%s", want, out.String())
 		}

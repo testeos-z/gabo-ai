@@ -21,17 +21,17 @@ generation:
 # Adapters are the Claude Code skills that fill each slot contract (TRD 9.1).
 slots:
   tasks:
-    adapter: .claude/skills/gbai-tasks-github/SKILL.md
+    adapter: .claude/skills/gabo-tasks-github/SKILL.md
   repository_host:
-    adapter: .claude/skills/gbai-repository-host-github/SKILL.md
+    adapter: .claude/skills/gabo-repository-host-github/SKILL.md
   memory:
-    adapter: .claude/skills/gbai-memory-engram/SKILL.md
+    adapter: .claude/skills/gabo-memory-engram/SKILL.md
   methodology:
-    adapter: .claude/skills/gbai-methodology-gentle-ai/SKILL.md
+    adapter: .claude/skills/gabo-methodology-gentle-ai/SKILL.md
   # The reviewer agent covers the reviewer_placement contract: it invokes the
   # user-level gbai-reviewer skill scripts and relays the VERDICT line.
   reviewer_placement:
-    adapter: .claude/agents/gbai-reviewer.md
+    adapter: .claude/agents/gabo-reviewer.md
 
 reviewer:
   # local in single-user mode: the scripts run as the owner with the owner's gh login.

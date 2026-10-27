@@ -16,8 +16,8 @@ import (
 //go:embed */SKILL.md */examples/*.md */templates/*.md
 var content embed.FS
 
-// File is one embedded file; Path is relative, like gbai-setup/SKILL.md or
-// gbai-contract-tasks/examples/tasks-gh.md.
+// File is one embedded file; Path is relative, like gabo-setup/SKILL.md or
+// gabo-contract-tasks/examples/tasks-gh.md.
 type File struct {
 	Path string
 	Data []byte
