@@ -50,6 +50,107 @@ var templates = map[string]struct {
 			"## Notes",
 		},
 	},
+	// T028: arc42 sections, the MADR decision table and the requirement coverage table.
+	"gabo-dev-lead/templates/TRD.md": {
+		columns: []string{
+			"| field | value |",
+			"| quality goal | scenario | requirement ids |",
+			"| constraint | kind | source |",
+			"| id | decision | options considered | choice | consequences | status | requirement ids |",
+			"| req | decisions | sections | stories | verification → test layer |",
+			"| id | risk or debt | requirement and decision ids | mitigation |",
+			"| term | meaning |",
+		},
+		headings: []string{
+			"# Technical Requirements (TRD)",
+			"## 1. Introduction and quality goals",
+			"## 2. Constraints",
+			"## 3. Context and scope",
+			"## 4. Solution strategy",
+			"## 5. Building block view",
+			"## 6. Runtime view",
+			"## 7. Deployment view",
+			"## 8. Crosscutting concepts",
+			"## 9. Architecture decisions",
+			"### Requirement coverage",
+			"## 10. Quality requirements",
+			"### Testing strategy",
+			"## 11. Risks and technical debt",
+			"## 12. Glossary",
+			"## 13. Open questions",
+		},
+	},
+	"gabo-dev-lead/templates/IMPLEMENTATION_PLAN.md": {
+		columns: []string{
+			"| field | value |",
+			"| id | title | stories | requirements | decisions | depends_on | unblocks | acceptance | size |",
+			"| wave | tasks | goal |",
+			"| story | tasks |",
+			"| req | tasks |",
+			"| milestone | goal | tasks | waves | exit check |",
+			"| risk | impact | mitigation |",
+		},
+		headings: []string{
+			"# Implementation Plan",
+			"## Prerequisites",
+			"## Tasks",
+			"## Waves",
+			"## Coverage",
+			"## Roadmap and milestones",
+			"## Risks to the plan",
+			"## Open questions",
+		},
+	},
+	// The data and config schema template keeps the DB_SCHEMA.md file name (plan A8).
+	"gabo-db-master/templates/DB_SCHEMA.md": {
+		columns: []string{
+			"| field | value |",
+			"| store | kind | location | owner / scope | written by | committed? |",
+			"| key | type | required | description | example |",
+			"| column | type | null | default | constraints | description |",
+			"| index | columns | query it serves |",
+			"| order | migration | purpose | rollback |",
+		},
+		headings: []string{
+			"# Data and Config Schema",
+			"## 1. Storage choice",
+			"### Persistence inventory",
+			"## 2. Schema per file",
+			"## 3. Migration",
+			"## 4. Data",
+			"## 5. Open questions",
+		},
+	},
+	"gabo-frontend/templates/APP_FLOW.md": {
+		columns: []string{
+			"| field | value |",
+			"| surface | entry points | primary action | empty and error states |",
+		},
+		headings: []string{
+			"# App Flow",
+			"## Surfaces",
+			"## Journeys",
+			"## Flow",
+			"## Open questions",
+		},
+	},
+	"gabo-frontend/templates/UX_UI.md": {
+		columns: []string{
+			"| field | value |",
+			"| token | custom property | value | use |",
+			"| component | level | states | used by |",
+			"| case | what happened | why | what to do next |",
+		},
+		headings: []string{
+			"# UX and UI",
+			"## 1. Principles",
+			"## 2. Design tokens",
+			"## 3. Component inventory",
+			"## 4. Accessibility",
+			"## 5. Messages and errors",
+			"## 6. Open questions",
+		},
+	},
 }
 
 func embeddedByPath(t *testing.T) map[string]string {
@@ -117,6 +218,38 @@ func TestPMSkillPointsToTemplatesAndStoryNaming(t *testing.T) {
 	} {
 		if !strings.Contains(skill, s) {
 			t.Errorf("gabo-pm/SKILL.md: missing %q", s)
+		}
+	}
+}
+
+// Every directiva skill names its templates, the fixed-questions rule and the
+// stable columns it scaffolds from (T028, D19).
+func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for skill, want := range map[string][]string{
+		"gabo-dev-lead/SKILL.md": {
+			"templates/TRD.md", "templates/IMPLEMENTATION_PLAN.md", "## Fixed questions", "arc42", "MADR",
+			"| id | decision | options considered | choice | consequences | status | requirement ids |",
+			"| req | decisions | sections | stories | verification → test layer |",
+			"| id | title | stories | requirements | decisions | depends_on | unblocks | acceptance | size |",
+		},
+		"gabo-db-master/SKILL.md": {
+			"templates/DB_SCHEMA.md", "## Fixed questions", "config-only", "Persistence inventory",
+		},
+		"gabo-frontend/SKILL.md": {
+			"templates/APP_FLOW.md", "templates/UX_UI.md", "## Fixed questions",
+		},
+	} {
+		doc, ok := byPath[skill]
+		if !ok {
+			t.Errorf("%s: missing", skill)
+			continue
+		}
+		for _, s := range want {
+			if !strings.Contains(doc, s) {
+				t.Errorf("%s: missing %q", skill, s)
+			}
 		}
 	}
 }
