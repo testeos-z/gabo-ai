@@ -339,7 +339,7 @@ func TestAgentHostRailwayOrcaAdapter(t *testing.T) {
 }
 
 // The shipped local agent_host adapter (T058) covers every contract operation
-// for agents on the owner's machine and fills no server field.
+// for agents on the owner's machine and states every server field as not used.
 func TestAgentHostLocalAdapter(t *testing.T) {
 	t.Parallel()
 	files, err := Files()
@@ -358,19 +358,27 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 	for _, s := range []string{
 		"gabo-contract-agent-host", "`not used`", "single-user", "ledger",
 		// claude and pi command lines, each with its session id and the prompt kept off argv.
-		`claude --print --agent <role agent> --session-id "$sid" <"$dir/prompt.md"`,
-		`pi --print --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md"`,
+		// Only the agent command is backgrounded, so $! is the agent, not a subshell.
+		`{ nohup claude --print --agent <role agent> --session-id "$sid" <"$dir/prompt.md"`,
+		`{ nohup pi --print --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md"`,
 		"</dev/null",
 		// a reused process id is never signalled: the session id is matched before kill.
-		`grep -F -- "--session-id <sid>"` + "\nkill -TERM <pid>",
+		`grep -qF -- "--session-id <sid>" && kill -TERM <pid>`,
+		// every former cloud field of the contract is stated as not used.
+		"| `server.railway.{project_id, environment_id, service_id}` | `not used` |",
+		"| `users.orca.{name, home, uid, extra_path}` | `not used` |",
+		"| `bot.login` | `not used` |",
+		"| `sessions.{coder, reviewer, assistant}.prompt_file` | `not used` |",
+		"| `sessions.local_orca` | `not used` |",
+		"| `/etc/gbai/gbai.yaml` | `not used` |",
 	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-agent-host-local/SKILL.md: missing %q", s)
 		}
 	}
-	for _, s := range []string{"railway", "--environment", "ssh ", "project_id", "users.orca", "bot.login"} {
+	for _, s := range []string{"railway status", "railway mcp", "--environment", "ssh ", "orca "} {
 		if strings.Contains(strings.ToLower(adapter), s) {
-			t.Errorf("gabo-agent-host-local/SKILL.md: holds server field or remote host %q", s)
+			t.Errorf("gabo-agent-host-local/SKILL.md: reaches a server or remote host %q", s)
 		}
 	}
 }

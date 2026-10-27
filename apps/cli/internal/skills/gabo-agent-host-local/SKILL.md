@@ -15,13 +15,26 @@ Subagents launched inside the owner's runtime session (for example `gabo-cycle` 
 ## Hard Rules
 
 - Agents run as the owner's OS user on the owner's machine; nothing runs on a server and no remote host is reached.
-- Every former cloud field of the contract is `not used`: no server ids, no separate OS user, no bot identity (the reviewer runs `single-user`), no session prompt files beyond the role's built agent, no Orca CLI name and no system config layer.
+- Every former cloud field of the contract is `not used` (see Fields); the reviewer runs `single-user`.
 - Start a session only in an existing task worktree; never create, move or remove a worktree here, and never touch another task's worktree.
 - Never pass an API key on the command line and never read or copy credentials; the agent CLI uses the owner's existing login. A key the runtime needs is named only by its environment variable (R21).
 - Write the prompt and the session log in a `mktemp -d` dir, outside the worktree.
 - A session is a resource: record its handle (process id, session id, worktree, log path) in the wave ledger when it starts, and stop it or report it as still running.
 - Stop only a process whose handle is in the ledger, and only after its live command line still carries `--session-id <sid>`: a process id can be reused after the session exits. Never kill by name or pattern.
 - Never put the prompt on the command line: it would leak into `ps` output and can exceed the argument length limit.
+
+## Fields
+
+| former key | value |
+|---|---|
+| `server.railway.{project_id, environment_id, service_id}` | `not used` |
+| `users.orca.{name, home, uid, extra_path}` | `not used` |
+| `bot.login` | `not used` |
+| `sessions.{coder, reviewer, assistant}.prompt_file` | `not used` |
+| `sessions.local_orca` | `not used` |
+| `/etc/gbai/gbai.yaml` | `not used` |
+
+The role's prompt comes from its built agent and the brief of the caller; the OS user is the owner.
 
 ## Operations
 
@@ -33,12 +46,12 @@ Generate a session id, write the role's prompt to a file in a scratch dir, then 
 dir=$(mktemp -d)
 sid=$(uuidgen)
 # claude: the role is the built agent of the same name (for example gabo-coder); --print reads the prompt from stdin
-(cd <worktree> && nohup claude --print --agent <role agent> --session-id "$sid" <"$dir/prompt.md" >"$dir/session.log" 2>&1 & echo $! >"$dir/pid")
+(cd <worktree> && { nohup claude --print --agent <role agent> --session-id "$sid" <"$dir/prompt.md" >"$dir/session.log" 2>&1 & echo $! >"$dir/pid"; })
 # pi: append the role's built agent file to the system prompt and attach the prompt file with @
-(cd <worktree> && nohup pi --print --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md" "Follow the attached task prompt." </dev/null >"$dir/session.log" 2>&1 & echo $! >"$dir/pid")
+(cd <worktree> && { nohup pi --print --session-id "$sid" --append-system-prompt <role agent file> @"$dir/prompt.md" "Follow the attached task prompt." </dev/null >"$dir/session.log" 2>&1 & echo $! >"$dir/pid"; })
 ```
 
-The session handle is the process id in `$dir/pid` plus `$sid`. Confirm after a short wait, so an early exit (bad flag, missing login) is caught:
+Only the agent command is backgrounded, so `$!` is the process `nohup` runs the agent in, not a subshell. The session handle is the process id in `$dir/pid` plus `$sid`. Confirm after a short wait, so an early exit (bad flag, missing login) is caught:
 
 ```bash
 sleep 5
@@ -49,16 +62,15 @@ A match means it is running. No match means it failed to start; report the tail 
 
 ### stop agent session
 
-Match the session id first, then stop:
+Signal only when the session id still matches:
 
 ```bash
-ps -o args= -p <pid> | grep -F -- "--session-id <sid>"
-kill -TERM <pid>
+ps -o args= -p <pid> | grep -qF -- "--session-id <sid>" && kill -TERM <pid>
 sleep 10
 ps -o args= -p <pid> | grep -F -- "--session-id <sid>"
 ```
 
-No match before `kill` means the session already exited: report it as `finished` with the tail of its log and send no signal. No match after the wait means it stopped. A match after the wait means it is still running; report that and never escalate to `kill -KILL` without the owner's request.
+No match before `kill` means the session already exited and no signal is sent: report it as `finished` with the tail of its log. No match after the wait means it stopped. A match after the wait means it is still running; report that and never escalate to `kill -KILL` without the owner's request.
 
 ### report where agents run
 
