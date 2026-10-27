@@ -27,7 +27,7 @@ Use whenever a gbai agent works with branches or pull requests. Fills the `repos
 | comment | `gh pr comment <pr> -R $R --body-file <tmp>` |
 | read status and checks | `gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup,comments` |
 | merge into dev | Check `baseRefName == "dev"` first, then `gh pr merge <pr> -R $R --squash --match-head-commit <sha>`; refuse on any other base |
-| delete branch | after merge only: `gh pr view <pr> -R $R --json state,headRefOid` must show `MERGED`; `git fetch origin pull/<pr>/head`. Local: `git merge-base --is-ancestor <branch> <headRefOid>` succeeds ⇒ `git branch -D <branch>`, else `git branch -d <branch>` (a refusal is a leftover). Remote: `git push origin --delete <branch>` only if `git ls-remote --heads origin <branch>` shows exactly `<headRefOid>`; absent ⇒ nothing to do; other SHA ⇒ refuse |
+| delete branch | after merge only: `gh pr view <pr> -R $R --json state,baseRefName,headRefName,headRefOid` must show `MERGED`, base `dev` and head `<branch>`; `git fetch origin pull/<pr>/head`. Local: `git merge-base --is-ancestor <branch> <headRefOid>` succeeds ⇒ `git branch -D <branch>`, else `git branch -d <branch>` (a refusal is a leftover). Remote: `git push origin --delete <branch>` only if `git ls-remote --heads origin <branch>` shows exactly `<headRefOid>`; absent ⇒ nothing to do; other SHA ⇒ refuse |
 
 ## Output Contract
 

@@ -43,7 +43,7 @@ Max 4 fix rounds; then label the issue `needs-user`, report BLOCKED with the que
 
 Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`.
 
-1. Verify through `repository_host` (read status) that the PR is merged, and note its merged head SHA. Not merged ⇒ change nothing, report HANDED "not merged".
+1. Verify through `repository_host` (read status) that the PR is merged into `repo.integration_branch` from your branch, and note its merged head SHA. Not merged, or another base or head branch ⇒ change nothing, report HANDED "not merged".
 2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
 3. Remove the worktree only if all hold, else keep it and its local branch, list them under `leftovers:` and skip the local branch in step 4:
    - it is not in `worktree.keep` (`gbai.yaml`);
