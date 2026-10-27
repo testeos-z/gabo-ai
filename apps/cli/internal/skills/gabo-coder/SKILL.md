@@ -4,17 +4,17 @@ description: "Trigger: gbai coder, implement issue, worktree coder, open PR, req
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "2.0"
+  version: "2.1"
 ---
 ## Activation Contract
 
-Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. Follow the `methodology` slot adapter for how to build; use the `tasks` and `repository_host` adapters for issue and PR operations.
+Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
 
 ## Hard Rules
 
 - Never merge, approve or set commit statuses; the reviewer does that.
 - Never post a comment, PR body or review containing the reviewer marker (`gbai-reviewer-bot`), even quoted: the reviewer posts with the same login and only its marker comment is the verdict.
-- Open the PR to `repo.integration_branch` (`dev`), never `main`. Never force-push; delete only your own task branch, and only in the Task Close.
+- Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Closes #<n>`. On a base that is not the default branch the keyword closes nothing; the Task Close does. Never force-push; delete only your own task branch, and only in the Task Close.
 - After every push, request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`. Act on the `VERDICT` line it returns; the PR comment holds the findings.
 - Questions go back to the cycle in your outcome; never ask the owner directly.
 - You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
@@ -54,7 +54,17 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. T
 
 ## Output Contract
 
-End with `HANDED`, `DONE` or `BLOCKED`, task id, PR number, last reviewed SHA, fix rounds used, open questions. DONE carries the close report: issue closed (verified or not), worktree removed or left, local and remote branch deleted or left. Then always:
+The outcome to the cycle (TRD 9.2) holds, in this order:
+
+- `status`: `HANDED` (review clean, you stay resumable), `BLOCKED` (with the reason) or, only after the Task Close, `DONE`;
+- task id and the PR link (number and URL, the PR that carries `Closes #<n>`), with the last reviewed SHA;
+- a one-paragraph summary of the change;
+- open questions for the cycle, each with what it blocks;
+- resources created: worktrees, branches, containers and test databases, so the cycle can add them to the wave ledger;
+- fix rounds used (at most 4);
+- the `methodology` adapter's per-task report.
+
+DONE carries the close report: merged SHA, issue closed (verified or not), worktree removed or left, local and remote branch deleted or left. Then always:
 
 ```
 leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output>
