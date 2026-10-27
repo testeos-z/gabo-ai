@@ -162,7 +162,7 @@ func TestLoadLayersFailsOnMissingRequiredKey(t *testing.T) {
 		"/home/o/.config/gbai/config.yaml": string(without(t, "parallelism")) + "parallelism: 4\n",
 		"/src/p/gbai.yaml":                 "parallelism: null\n",
 	}
-	_, err := LoadLayers(r, threeLayers())
+	_, err := LoadLayers(r, twoLayers())
 	if err == nil || !strings.Contains(err.Error(), "✗ parallelism missing") || !strings.HasSuffix(err.Error(), NextSetup) {
 		t.Fatalf("LoadLayers() error = %v, want parallelism missing and %q", err, NextSetup)
 	}

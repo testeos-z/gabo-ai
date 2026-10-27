@@ -63,15 +63,18 @@ func TestConfigLayersUseTheGitTopLevel(t *testing.T) {
 	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("/src/p\n")}}
 	env := map[string]string{"XDG_CONFIG_HOME": "/x"}
 	got := configLayers(context.Background(), r, func(k string) string { return env[k] }, func() (string, error) { return "/src/p/sub", nil })
-	want := []string{"/etc/gbai/gbai.yaml", "/x/gbai/config.yaml", "/src/p/gbai.yaml"}
+	want := []string{"/x/gbai/config.yaml", "/src/p/gbai.yaml"}
+	if len(got) != len(want) {
+		t.Fatalf("layers = %+v, want only the user and project layers", got)
+	}
 	for i, l := range got {
 		if l.Path != want[i] {
 			t.Fatalf("layer %d = %+v, want path %s", i, l, want[i])
 		}
 	}
 	got = configLayers(context.Background(), r, func(string) string { return "" }, func() (string, error) { return "", errors.New("gone") })
-	if got[2].Path != "" {
-		t.Fatalf("project layer without a cwd = %+v", got[2])
+	if got[1].Path != "" {
+		t.Fatalf("project layer without a cwd = %+v", got[1])
 	}
 }
 

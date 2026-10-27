@@ -81,11 +81,6 @@ type PlanChange struct {
 	GlobalWithoutOwner bool   `yaml:"global_without_owner,omitempty"`
 }
 
-// Generation selects the runtimes to generate agent files for (D3).
-type Generation struct {
-	Targets []Runtime `yaml:"targets,omitempty"`
-}
-
 var (
 	markerPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	emailPattern  = regexp.MustCompile(`^[^@\s]+@[^@\s]+$`)
@@ -137,14 +132,6 @@ func (c Config) validateProjectKeys() []error {
 	case "", ScopeTask, ScopeGroup, ScopeGlobal:
 	default:
 		fail("plan_change.scope", "must be %q, %q or %q, got %q", ScopeTask, ScopeGroup, ScopeGlobal, c.PlanChange.Scope)
-	}
-
-	for i, t := range c.Generation.Targets {
-		if t != RuntimeClaude && t != RuntimePi {
-			fail("generation.targets", "must list %q or %q, got %q", RuntimeClaude, RuntimePi, t)
-		} else if slices.Contains(c.Generation.Targets[:i], t) {
-			fail("generation.targets", "duplicate target %q", t)
-		}
 	}
 	return errs
 }

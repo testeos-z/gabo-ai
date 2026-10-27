@@ -87,9 +87,8 @@ func (f files) ReadFile(name string) ([]byte, error) {
 	return []byte(b), nil
 }
 
-func threeLayers() []Layer {
+func twoLayers() []Layer {
 	return []Layer{
-		{Name: LayerSystem, Path: "/etc/gbai/gbai.yaml"},
 		{Name: LayerUser, Path: "/home/o/.config/gbai/config.yaml"},
 		{Name: LayerProject, Path: "/src/p/gbai.yaml"},
 	}
@@ -98,11 +97,10 @@ func threeLayers() []Layer {
 func TestLoadLayersHigherLayersWin(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/etc/gbai/gbai.yaml":              with("parallelism: 2\nreview:\n  checks: [make test]\n  auto_merge: true\n"),
-		"/home/o/.config/gbai/config.yaml": "parallelism: 4\ncoder:\n  login: helper\n",
+		"/home/o/.config/gbai/config.yaml": with("parallelism: 4\ncoder:\n  login: helper\nreview:\n  checks: [make test]\n  auto_merge: true\n"),
 		"/src/p/gbai.yaml":                 "parallelism: 6\nreview:\n  checks: [go test, go vet]\n",
 	}
-	res, err := LoadLayers(r, threeLayers())
+	res, err := LoadLayers(r, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
@@ -117,13 +115,13 @@ func TestLoadLayersHigherLayersWin(t *testing.T) {
 		t.Errorf("checks = %q, want the project list only", c.Review.Checks)
 	}
 	if !c.Review.AutoMerge {
-		t.Errorf("auto_merge lost: a key absent in higher layers must keep the system value")
+		t.Errorf("auto_merge lost: a key absent in higher layers must keep the user value")
 	}
 	if c.Repo.Name != "cappy-lab/vulcam" || c.Repo.IntegrationBranch != "dev" {
-		t.Errorf("system values lost: %+v", c.Repo)
+		t.Errorf("user values lost: %+v", c.Repo)
 	}
 	for i, l := range res.Layers {
-		if !l.Found || l.Name != threeLayers()[i].Name {
+		if !l.Found || l.Name != twoLayers()[i].Name {
 			t.Errorf("layer %d = %+v", i, l)
 		}
 	}
@@ -131,12 +129,12 @@ func TestLoadLayersHigherLayersWin(t *testing.T) {
 
 func TestLoadLayersSkipsMissingFiles(t *testing.T) {
 	t.Parallel()
-	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal}, threeLayers())
+	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	got := []bool{res.Layers[0].Found, res.Layers[1].Found, res.Layers[2].Found}
-	if !reflect.DeepEqual(got, []bool{false, false, true}) {
+	got := []bool{res.Layers[0].Found, res.Layers[1].Found}
+	if !reflect.DeepEqual(got, []bool{false, true}) {
 		t.Fatalf("found = %v", got)
 	}
 	if res.Config.Parallelism != 3 {
@@ -146,13 +144,20 @@ func TestLoadLayersSkipsMissingFiles(t *testing.T) {
 
 func TestLoadLayersEmptyPathAndEmptyFile(t *testing.T) {
 	t.Parallel()
-	layers := threeLayers()
-	layers[1].Path = ""
-	res, err := LoadLayers(files{"/etc/gbai/gbai.yaml": minimal, "/src/p/gbai.yaml": "# nothing yet\n"}, layers)
+	layers := twoLayers()
+	layers[0].Path = ""
+	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal}, layers)
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	if res.Layers[1].Found || !res.Layers[2].Found {
+	if res.Layers[0].Found || !res.Layers[1].Found {
+		t.Fatalf("layers = %+v", res.Layers)
+	}
+	res, err = LoadLayers(files{"/home/o/.config/gbai/config.yaml": minimal, "/src/p/gbai.yaml": "# nothing yet\n"}, twoLayers())
+	if err != nil {
+		t.Fatalf("LoadLayers() with an empty project file error = %v", err)
+	}
+	if !res.Layers[0].Found || !res.Layers[1].Found {
 		t.Fatalf("layers = %+v", res.Layers)
 	}
 }
@@ -160,14 +165,14 @@ func TestLoadLayersEmptyPathAndEmptyFile(t *testing.T) {
 func TestLoadLayersUnknownKeyNamesTheFile(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/etc/gbai/gbai.yaml": minimal,
-		"/src/p/gbai.yaml":    "parallelizm: 4\n",
+		"/home/o/.config/gbai/config.yaml": minimal,
+		"/src/p/gbai.yaml":                 "parallelizm: 4\n",
 	}
-	res, err := LoadLayers(r, threeLayers())
+	res, err := LoadLayers(r, twoLayers())
 	if err == nil || !strings.Contains(err.Error(), "/src/p/gbai.yaml") || !strings.Contains(err.Error(), "parallelizm") {
 		t.Fatalf("error = %v, want unknown key naming the project file", err)
 	}
-	if len(res.Layers) != 3 {
+	if len(res.Layers) != 2 {
 		t.Fatalf("layers not reported on error: %+v", res.Layers)
 	}
 }
@@ -176,13 +181,13 @@ func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
 	t.Parallel()
 	// Neither file is valid alone; merged they are.
 	r := files{
-		"/etc/gbai/gbai.yaml": with("review:\n  checks: []\n"),
-		"/src/p/gbai.yaml":    "review:\n  checks: [go test ./...]\n",
+		"/home/o/.config/gbai/config.yaml": with("review:\n  checks: []\n"),
+		"/src/p/gbai.yaml":                 "review:\n  checks: [go test ./...]\n",
 	}
-	if _, err := LoadLayers(r, threeLayers()); err != nil {
+	if _, err := LoadLayers(r, twoLayers()); err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "review:\n  checks: [go test ./...]\n"}, threeLayers()); err == nil ||
+	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "review:\n  checks: [go test ./...]\n"}, twoLayers()); err == nil ||
 		!strings.Contains(err.Error(), "repo.name") {
 		t.Fatalf("merged validation error = %v", err)
 	}
@@ -190,7 +195,7 @@ func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
 
 func TestLoadLayersNoFileFound(t *testing.T) {
 	t.Parallel()
-	_, err := LoadLayers(files{}, threeLayers())
+	_, err := LoadLayers(files{}, twoLayers())
 	if err == nil || !strings.Contains(err.Error(), "no config file found") || !strings.Contains(err.Error(), "--config") {
 		t.Fatalf("error = %v", err)
 	}
@@ -198,8 +203,8 @@ func TestLoadLayersNoFileFound(t *testing.T) {
 
 func TestLoadLayersReadErrorIsNotSkipped(t *testing.T) {
 	t.Parallel()
-	_, err := LoadLayers(failingReader{}, threeLayers())
-	if err == nil || !strings.Contains(err.Error(), "/etc/gbai/gbai.yaml") {
+	_, err := LoadLayers(failingReader{}, twoLayers())
+	if err == nil || !strings.Contains(err.Error(), "/home/o/.config/gbai/config.yaml") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -227,7 +232,6 @@ func TestLayerPathsOrder(t *testing.T) {
 	env := map[string]string{"HOME": "/home/o"}
 	got := LayerPaths(func(k string) string { return env[k] }, "/src/p")
 	want := []Layer{
-		{Name: LayerSystem, Path: "/etc/gbai/gbai.yaml"},
 		{Name: LayerUser, Path: "/home/o/.config/gbai/config.yaml"},
 		{Name: LayerProject, Path: "/src/p/gbai.yaml"},
 	}
@@ -290,11 +294,10 @@ func TestProjectRoot(t *testing.T) {
 func TestLoadLayersRejectsUnsupportedVersionInAnyLayer(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/etc/gbai/gbai.yaml":              minimal,
 		"/home/o/.config/gbai/config.yaml": "version: 99\n",
 		"/src/p/gbai.yaml":                 "version: 1\n",
 	}
-	_, err := LoadLayers(r, threeLayers())
+	_, err := LoadLayers(r, twoLayers())
 	if err == nil || !strings.Contains(err.Error(), "/home/o/.config/gbai/config.yaml") || !strings.Contains(err.Error(), "version") {
 		t.Fatalf("error = %v, want unsupported version naming the user file", err)
 	}
@@ -303,17 +306,17 @@ func TestLoadLayersRejectsUnsupportedVersionInAnyLayer(t *testing.T) {
 func TestLoadLayersKeepsVersionOutOfTheMergedConfig(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/etc/gbai/gbai.yaml": minimal + "version: 1\n",
-		"/src/p/gbai.yaml":    "parallelism: 4\n",
+		"/home/o/.config/gbai/config.yaml": minimal + "version: 1\n",
+		"/src/p/gbai.yaml":                 "parallelism: 4\n",
 	}
-	res, err := LoadLayers(r, threeLayers())
+	res, err := LoadLayers(r, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
 	if res.Config.Version != 0 {
 		t.Fatalf("merged version = %d, want 0: version is per file", res.Config.Version)
 	}
-	if res.Layers[0].Version != 1 || res.Layers[2].Version != 0 {
-		t.Fatalf("layer versions = %d, %d", res.Layers[0].Version, res.Layers[2].Version)
+	if res.Layers[0].Version != 1 || res.Layers[1].Version != 0 {
+		t.Fatalf("layer versions = %d, %d", res.Layers[0].Version, res.Layers[1].Version)
 	}
 }

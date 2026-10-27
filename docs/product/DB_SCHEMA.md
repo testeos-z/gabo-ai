@@ -135,7 +135,7 @@ Today the user layer accepts the same keys as the project file; under the split 
 | `developers` | map: git email → alias | no | Developer catalog (D10, R16); the assistant adds a missing entry once. Loaded and validated when set (T004); failing when missing is T005 | `{"ana@example.com": "Ana"}` |
 | `plan_change.scope` | enum `task`, `group`, `global` | yes | Widest plan scope that may change (R19, D7). Loaded and validated when set (T004); failing when missing is T005 | `group` |
 | `plan_change.global_without_owner` | boolean | yes | Whether the global plan may change without the owner, still after the plan-change reviewer agrees (D7). Loaded and validated when set (T004); failing when missing is T005 | `false` |
-| `generation.targets` | list of `claude`, `pi` | yes | Concrete runtimes to generate agent files for (D3), never a symbolic value, so a change shows in the diff. Loaded and validated when set (T004); failing when missing is T005 | `[claude]` or `[claude, pi]` |
+| `generation.targets` | removed | — | Removed (owner 2026-10-27, TRD D24; T006): the runtimes to build for come from `runtimes.*`; a file carrying `generation.*` fails as an unknown key | — |
 
 `plan_change.*`, `developers` and `repo.integration_branch` follow the names in TRD [Configuration shapes](TRD.md#93-configuration-shapes).
 
@@ -175,9 +175,6 @@ runtimes:
   coder: claude
   assistant: claude
   reviewer: pi
-
-generation:
-  targets: [claude, pi]
 
 slots:
   tasks:
@@ -245,7 +242,7 @@ Today there is one cloud-shaped `gbai.yaml` whose validation requires the Railwa
 |---|---|---|
 | 1 | Add `version` and the personal / project key classes to the loader | Enable personal-key precedence without breaking existing files |
 | 2 | Make `server.*`, `users.*`, `bot.*`, `sessions.*.prompt_file` optional and stop core validation from requiring them | Local use works with no cloud keys |
-| 3 | Add the new project keys (`mode`, `slots` including `slots.methodology` and `slots.agent_host`, `reviewer.{placement, signing}`, `developers`, `plan_change.*`, `generation.targets`) | Record setup answers |
+| 3 | Add the new project keys (`mode`, `slots` including `slots.methodology` and `slots.agent_host`, `reviewer.{placement, signing}`, `developers`, `plan_change.*`; `generation.targets`, added here, was removed by T006 per TRD D24) | Record setup answers |
 | 4 | Move cloud keys, `sessions.local_orca` and the system layer `/etc/gbai/gbai.yaml` into the `slots.agent_host` adapter; drop the system layer from the core loader; the assistant runs that session for existing server users | Clean core config |
 | 5 | Replace silent code defaults with suggestions the assistant asks about (R12); missing required keys fail with "run setup" instead of being filled | No silent defaults |
 | 6 | Publish the JSON Schemas and write the `$schema` comment | Editor validation |

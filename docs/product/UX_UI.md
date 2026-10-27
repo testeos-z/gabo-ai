@@ -112,7 +112,7 @@ PRD open question 12 (pending owner decision, not applied): the CLI may be renam
 **Superseded (owner 2026-10-27), setup entry of 2026-10-26.** Approved (owner 2026-10-26), U16. There is no setup screen. The gbai documentation publishes one setup prompt with a link. The user pastes it into Claude Code or Pi, and that agent:
 
 1. installs gbai;
-2. runs the setup question burst one question at a time (identity, slots and adapters, runtimes and `generation.targets`, `mode`, `plan_change.*`, `language`), with suggestions and no preselected value (R12);
+2. runs the setup question burst one question at a time (identity, slots and adapters, runtimes (`runtimes.*`), `mode`, `plan_change.*`, `language`), with suggestions and no preselected value (R12);
 3. writes the global user file and `gbai.yaml` by editing them directly;
 4. runs `gbai generate`, which validates the config and installs the per-runtime artifacts (TRD D21), and reports errors in the section 4 shape;
 5. verifies each slot through a subagent (APP_FLOW J1).

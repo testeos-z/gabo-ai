@@ -15,9 +15,6 @@ runtimes:
   reviewer: claude
   assistant: claude
 
-generation:
-  targets: [claude]
-
 # Adapters are the Claude Code skills that fill each slot contract (TRD 9.1).
 slots:
   tasks:
