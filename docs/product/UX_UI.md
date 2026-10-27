@@ -128,7 +128,7 @@ Amended (owner 2026-10-27, U7, PRD R31–R33). The CLI has three commands. It wr
 | command | purpose | source |
 |---|---|---|
 | `gabo init` | Fresh project: copies the embedded skill catalog into a neutral project location, writes the version stamp, installs the user-level `gabo-reviewer` skill and prints the embedded setup prompt. Existing project: never touches the config; refreshes the catalog and reinstalls the reviewer skill when the stamp differs from the CLI version or is missing, otherwise changes nothing and exits 0. A refresh replaces the copied catalog folder wholesale: skills removed in the new version are deleted and local edits to copied skills are overwritten, because customization belongs in adapters, not in the catalog. The same version always produces the same files (updated issue #74; the entry file is superseded) | PRD R32 |
-| `gabo check` | Read-only, engine-neutral validation of four things: the global user file and `gabo.yaml` against their JSON Schemas, every agent of the neutral agent spec present, slot coverage, and the catalog version stamp matching the CLI version; a missing stamp is a mismatch (updated issue #74). Writes nothing; non-zero exit on any failure. Usable by the user, agents, the reviewer and CI | PRD R33 |
+| `gabo check` | Read-only, engine-neutral validation of five things: the global user file and `gabo.yaml` against their JSON Schemas, every agent of the neutral agent spec present, slot coverage, the catalog version stamp matching the CLI version (a missing stamp is a mismatch), and every agent's version line present and matching the catalog stamp (updated issue #74, PRD O11; no template hashes). Writes nothing; non-zero exit on any failure. Usable by the user, agents, the reviewer and CI | PRD R33 |
 | `gabo version` | Print the version | — |
 
 The CLI also carries the setup prompt as embedded text, identical to the one published in the documentation (PRD R36); this adds no command. Command flags and how the embedded text is exposed are TRD details.
@@ -190,6 +190,7 @@ Format: `✗ <what happened>` on one line, then `why:` and `next:` lines, then o
 | Already up to date (`gabo init`, exit 0) | `catalog already at <version>; nothing changed` |
 | Version stamp mismatch (`gabo check`) | `✗ catalog version <stamp> does not match gabo <version>` · `next: run gabo init, then ask your agent to rebuild` |
 | Missing agent (`gabo check`) | `✗ agent gabo-reviewer is missing` · `next: ask your agent to build it with the runtime skill, then rerun gabo check` |
+| Agent not rebuilt (`gabo check`) | `✗ agent <id> built with <v>, catalog is <w>: ask your agent to rebuild` · `next: ask your agent to rebuild the agents, then rerun gabo check` (also when the agent's version line is missing; PRD O11) |
 | Engine not supported (runtime builder) | `✗ cannot add a runtime for <engine>` · `why: it has no subagent and skill support, or an equivalent` · `next: use Claude Code, Pi or another engine with subagents and skills` |
 | Invalid config (agent edited the YAML during the work) | `✗ gbai.yaml: plan_change.scope: "teams" is not one of task, group, global` · `next: fix the key, then rerun gbai check` |
 
