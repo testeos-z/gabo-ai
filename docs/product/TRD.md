@@ -308,7 +308,7 @@ Generated files are committed so PRs show agent changes. A config change require
 | file | holds | precedence |
 |---|---|---|
 | Global user file | Personal preferences, the stable personalization layer: alias or name, tone, interaction level, language (R16, R17, D22) | Personal keys: global always wins |
-| Project `gbai.yaml` | Team and repository settings: `slots`, `reviewer`, `runtimes`, `developers`, `mode`, `plan_change`, `generation`, `repo` | Project keys: local wins |
+| Project `gbai.yaml` | Team and repository settings: `slots`, `reviewer`, `runtimes`, `developers`, `mode`, `plan_change`, `repo` (`generation` removed, D24) | Project keys: local wins |
 
 #### Loading cost
 

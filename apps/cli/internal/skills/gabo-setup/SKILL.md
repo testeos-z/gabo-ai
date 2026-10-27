@@ -22,7 +22,7 @@ Load in the assistant when there is no config, a key is missing, or the owner wa
 
 1. Identity: `git config user.email`; ask the alias once; add it to `developers` and to the global file.
 2. Personal keys → global file.
-3. Project keys → `gbai.yaml`: `mode`, `repo.{name, integration_branch}`, `runtimes.*`, `generation.targets`, `reviewer.{placement, signing}`, `review.checks`, `plan_change.*`, `parallelism`.
+3. Project keys → `gbai.yaml`: `mode`, `repo.{name, integration_branch}`, `runtimes.*`, `reviewer.{placement, signing}`, `review.checks`, `plan_change.*`, `parallelism`.
 4. Slots (`tasks`, `repository_host`, `memory`, `methodology`, `reviewer_placement`): pick an existing adapter or co-write one; check it covers every operation of its contract (TRD 9.1).
 5. Verify each slot with one harmless round trip (for example read one issue, read one PR, save and read a memory note). A failed slot stays unverified: name the failing operation and ask how to fix the adapter.
 6. Ensure the user-level `gbai-reviewer` skill is installed (`~/.claude/skills/gbai-reviewer/`).

@@ -18,6 +18,7 @@ var FormerCloudKeys = []string{"server", "users", "bot", "sessions"}
 func formerCloudKeyErrors(b []byte) error {
 	var doc map[string]any
 	if err := yaml.Unmarshal(b, &doc); err != nil {
+		// Intentional: the regular decoder reports malformed YAML.
 		return nil
 	}
 	var errs []error
