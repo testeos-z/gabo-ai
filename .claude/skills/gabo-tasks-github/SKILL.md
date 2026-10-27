@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use whenever a gbai agent reads or writes tasks. This adapter fills the `tasks` slot contract (TRD 9.1) with GitHub Issues through the `gh` CLI. Repository: `repo.name` in `gbai.yaml` (below `R=testeos-z/gbai-team`).
+Use whenever a gbai agent reads or writes tasks. This adapter fills the `tasks` slot contract (TRD 9.1) with GitHub Issues through the `gh` CLI. Repository: `repo.name` in `gbai.yaml` (below `R=testeos-z/gabo-ai`).
 
 ## Hard Rules
 

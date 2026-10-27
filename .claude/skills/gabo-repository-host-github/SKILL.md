@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use whenever a gbai agent works with branches or pull requests. Fills the `repository_host` slot contract (TRD 9.1). Repository `repo.name`, integration branch `repo.integration_branch` from `gbai.yaml` (here `R=testeos-z/gbai-team`, `dev`).
+Use whenever a gbai agent works with branches or pull requests. Fills the `repository_host` slot contract (TRD 9.1). Repository `repo.name`, integration branch `repo.integration_branch` from `gbai.yaml` (here `R=testeos-z/gabo-ai`, `dev`).
 
 ## Hard Rules
 
