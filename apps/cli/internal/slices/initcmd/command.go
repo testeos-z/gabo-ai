@@ -23,6 +23,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"and write the catalog version to " + StampFile + "; commit both.\n" +
 			"An older or missing stamp refreshes the catalog; a matching stamp changes nothing;\n" +
 			"a newer stamp changes nothing and exits 1 with the upgrade command.\n" +
+			"On a fresh project (no stamp, no " + ConfigFile + ") it prints the setup prompt to paste\n" +
+			"into your agent; it writes the prompt nowhere.\n" +
 			"init never creates or edits " + ConfigFile + " or the user config.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
