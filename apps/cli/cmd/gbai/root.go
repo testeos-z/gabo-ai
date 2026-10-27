@@ -38,8 +38,7 @@ func newRootCommand(d deps) *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().StringVar(&configPath, "config", "",
-		"load exactly this config file; when not set the layers "+kernel.ServerConfigPath+
-			", the user config ($XDG_CONFIG_HOME/gbai/config.yaml) and the project "+config.ProjectFile+
+		"load exactly this config file; when not set the user config ($XDG_CONFIG_HOME/gbai/config.yaml) and the project "+config.ProjectFile+
 			" are merged")
 
 	resolveConfig := newWarnOnceResolver(d.stderr, func(ctx context.Context) (config.Resolution, error) {
@@ -60,7 +59,7 @@ func newRootCommand(d deps) *cobra.Command {
 	return root
 }
 
-// configLayers returns the system, user and project layers; the project root
+// configLayers returns the user and project layers; the project root
 // is the git top-level of the working directory, or the directory itself.
 func configLayers(ctx context.Context, runner kernel.Runner, getenv func(string) string, getwd func() (string, error)) []config.Layer {
 	root := ""

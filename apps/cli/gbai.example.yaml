@@ -1,14 +1,16 @@
 # gbai configuration example. Secrets never go here, in any layer: only the
 # names of the environment variables that carry them.
 #
-# Without --config, gbai merges up to three layers, lowest to highest precedence:
-#   1. system:  /etc/gbai/gbai.yaml
-#   2. user:    $XDG_CONFIG_HOME/gbai/config.yaml, else ~/.config/gbai/config.yaml
-#   3. project: gbai.yaml at the git top-level of the current directory
+# Without --config, gbai merges up to two layers, lowest to highest precedence
+# (there is no system layer: /etc/gbai/gbai.yaml is never read):
+#   1. user:    $XDG_CONFIG_HOME/gbai/config.yaml, else ~/.config/gbai/config.yaml
+#   2. project: gbai.yaml at the git top-level of the current directory
 #               (the current directory itself outside a git repository)
 # A higher layer overrides only the keys it sets: mappings merge key by key,
 # scalars and lists replace the lower value, `key: null` unsets it.
-# Missing files are skipped; an unknown key fails and names its file.
+# Missing files are skipped; an unknown key fails and names its file. The
+# former cloud keys (server, users, bot, sessions) fail naming their key path
+# and slots.agent_host; gbai never rewrites a config file.
 # Validation runs once on the merged result. gbai fills no key: a missing
 # required key fails with `✗ <key> missing` and `next: run setup`. `--config <file>` reads exactly
 # that one file.

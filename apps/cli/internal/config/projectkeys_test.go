@@ -19,9 +19,6 @@ runtimes:
   assistant: claude
   reviewer: pi
 
-generation:
-  targets: [claude, pi]
-
 slots:
   tasks:
     adapter: .gbai/adapters/tasks-gh.md
@@ -85,9 +82,6 @@ func TestParseDBSchemaExample(t *testing.T) {
 	if cfg.PlanChange.Scope != ScopeGroup || cfg.PlanChange.GlobalWithoutOwner {
 		t.Errorf("plan_change = %+v", cfg.PlanChange)
 	}
-	if got := cfg.Generation.Targets; len(got) != 2 || got[0] != RuntimeClaude || got[1] != RuntimePi {
-		t.Errorf("generation.targets = %v", got)
-	}
 }
 
 func TestParseAcceptsEverySlotName(t *testing.T) {
@@ -130,8 +124,6 @@ func TestParseRejectsBadProjectKeys(t *testing.T) {
 		{"bad developer email", "developers:\n  leo: Leo\n", []string{"developers", "leo"}},
 		{"blank developer alias", "developers:\n  \"leo@example.com\": \"\"\n", []string{"developers.leo@example.com"}},
 		{"bad scope", "plan_change:\n  scope: everything\n", []string{"plan_change.scope", "everything"}},
-		{"bad target", "generation:\n  targets: [claude, opencode]\n", []string{"generation.targets", "opencode"}},
-		{"duplicate target", "generation:\n  targets: [pi, pi]\n", []string{"generation.targets", "duplicate"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -155,7 +147,7 @@ func TestParseNewProjectKeysOptional(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse() error = %v", err)
 	}
-	if cfg.Mode != "" || cfg.Slots != nil || cfg.Reviewer.Placement != "" || cfg.Generation.Targets != nil {
+	if cfg.Mode != "" || cfg.Slots != nil || cfg.Reviewer.Placement != "" {
 		t.Errorf("new keys got values without being set: %+v", cfg)
 	}
 }

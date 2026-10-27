@@ -16,9 +16,9 @@ import (
 )
 
 // Layer names, lowest to highest precedence. LayerFlag is the single file
-// given with --config, which replaces the layered lookup.
+// given with --config, which replaces the layered lookup. There is no system
+// layer: /etc/gbai/gbai.yaml is never read (T006).
 const (
-	LayerSystem  = "system"
 	LayerUser    = "user"
 	LayerProject = "project"
 	LayerFlag    = "flag"
@@ -53,14 +53,13 @@ type Reader interface {
 	ReadFile(name string) ([]byte, error)
 }
 
-// LayerPaths returns the system, user and project layers in precedence order.
+// LayerPaths returns the user and project layers in precedence order.
 func LayerPaths(getenv func(string) string, projectRoot string) []Layer {
 	project := ""
 	if projectRoot != "" {
 		project = path.Join(projectRoot, ProjectFile)
 	}
 	return []Layer{
-		{Name: LayerSystem, Path: kernel.ServerConfigPath},
 		{Name: LayerUser, Path: UserPath(getenv)},
 		{Name: LayerProject, Path: project},
 	}
@@ -174,6 +173,9 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 // returns it as a generic mapping with its schema version. An empty document
 // is an empty layer of version 0.
 func decodeLayer(b []byte) (map[string]any, int, error) {
+	if err := formerCloudKeyErrors(b); err != nil {
+		return nil, 0, err
+	}
 	var probe Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)

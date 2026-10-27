@@ -15,14 +15,14 @@ func TestFileWithoutVersionReadsAsVersionZero(t *testing.T) {
 		t.Fatalf("version = %d, want 0", cfg.Version)
 	}
 	res, err := LoadLayers(files{
-		"/etc/gbai/gbai.yaml":              minimal,
-		"/home/o/.config/gbai/config.yaml": "version: 1\nalias: Leo\n",
-	}, threeLayers())
+		"/home/o/.config/gbai/config.yaml": minimal + "version: 1\nalias: Leo\n",
+		"/src/p/gbai.yaml":                 "parallelism: 3\n",
+	}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	if got := []int{res.Layers[0].Version, res.Layers[1].Version}; got[0] != 0 || got[1] != 1 {
-		t.Fatalf("layer versions = %v, want [0 1]", got)
+	if got := []int{res.Layers[0].Version, res.Layers[1].Version}; got[0] != 1 || got[1] != 0 {
+		t.Fatalf("layer versions = %v, want [1 0]", got)
 	}
 }
 
@@ -41,11 +41,10 @@ func TestVersionMustBeSupported(t *testing.T) {
 func TestPersonalKeysResolveGlobalFirst(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/etc/gbai/gbai.yaml":              minimal,
-		"/home/o/.config/gbai/config.yaml": "alias: Leo\ninteraction_level: balanced\ntone: direct, brief\nlanguage: es\n",
+		"/home/o/.config/gbai/config.yaml": minimal + "alias: Leo\ninteraction_level: balanced\ntone: direct, brief\nlanguage: es\n",
 		"/src/p/gbai.yaml":                 "alias: Other\ninteraction_level: high\ntone: chatty\nlanguage: en\nparallelism: 5\n",
 	}
-	res, err := LoadLayers(r, threeLayers())
+	res, err := LoadLayers(r, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
@@ -68,7 +67,7 @@ func TestPersonalKeysResolveGlobalFirst(t *testing.T) {
 
 func TestProjectPersonalKeyIsIgnoredEvenWithoutAGlobalValue(t *testing.T) {
 	t.Parallel()
-	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal + "alias: Other\n"}, threeLayers())
+	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal + "alias: Other\n"}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
@@ -83,9 +82,8 @@ func TestProjectPersonalKeyIsIgnoredEvenWithoutAGlobalValue(t *testing.T) {
 func TestNoWarningsWithoutProjectPersonalKeys(t *testing.T) {
 	t.Parallel()
 	res, err := LoadLayers(files{
-		"/etc/gbai/gbai.yaml":              minimal,
-		"/home/o/.config/gbai/config.yaml": "alias: Leo\n",
-	}, threeLayers())
+		"/home/o/.config/gbai/config.yaml": minimal + "alias: Leo\n",
+	}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
