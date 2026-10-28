@@ -148,6 +148,19 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"`developers`", "global `alias` wins", "Ask once", "No `gbai` command",
 			"`tone`", "`language`", "terminal",
 			"resume the owning coder", "PR #<n> merged", "D23", "close report",
+			// T026: J3 and J4 wave start and report, modes, decision records, comfort
+			// question and the personalization layers (D22).
+			"## Wave Start", "launch `gabo-cycle`", "## Wave Close", "UX 1.5",
+			"`Wave <n>: <done> done, <blocked> blocked`", "answer and resolver",
+			"one question at a time", "`interaction_level`", "`low`", "`balanced`", "`high`",
+			"never prompt", "save decision", "`what`, `question`, `choice`, `reason`, `mode`, `wave`, `task`",
+			"list decisions", "filter", "critical question", "directiva",
+			"comfort question", "fewer, about right, or more", "`gbai check`",
+			"## Personalization", "stable layer", "learning layer", "`user/preferences`",
+			"global scope", "project scope", "about 3 times", "read preferences", "save preference",
+			"secrets", "sensitive", "setup start", "time since setup start", "first wave report",
+			// The setup start is saved only once a memory slot exists; the wave start survives a restart.
+			"after `gabo-setup` verifies the `memory` slot", "save wave trace",
 		},
 		"gabo-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
 		"gabo-contract-repository-host/examples/host-github.md": {
