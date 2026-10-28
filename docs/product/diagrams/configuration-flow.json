@@ -2,7 +2,7 @@
   "schema_version": 2,
   "diagram_type": "workflow",
   "meta": {
-    "title": "Configuración de gbai: detectar, proponer, activar, verificar",
+    "title": "Configuración de gabo-ai: detectar, proponer, activar, verificar",
     "output": ".archify/workflow-gbai-config-20261025-2210/gbai-config.html",
     "quality_profile": "showcase",
     "locale": "es"
@@ -10,7 +10,7 @@
   "lanes": [
     { "id": "owner", "label": "Owner" },
     { "id": "asis", "label": "Asistente" },
-    { "id": "gbai", "label": "Programa gbai" },
+    { "id": "gabo-ai", "label": "Programa gabo-ai" },
     { "id": "files", "label": "Archivos" }
   ],
   "phases": [
@@ -23,13 +23,13 @@
   "nodes": [
     { "id": "asis_start", "lane": "asis", "col": 0, "type": "frontend", "label": "Asistente", "sublabel": "inicia la configuración" },
     { "id": "providers", "lane": "files", "col": 0, "type": "database", "label": "Proveedores", "sublabel": "skill + ficha por opción", "tag": "incluidos o carpeta local" },
-    { "id": "detect", "lane": "gbai", "col": 1, "type": "backend", "label": "Detectar", "sublabel": "git, binarios, MCP, remoto" },
+    { "id": "detect", "lane": "gabo-ai", "col": 1, "type": "backend", "label": "Detectar", "sublabel": "git, binarios, MCP, remoto" },
     { "id": "propose", "lane": "asis", "col": 2, "type": "frontend", "label": "Proponer", "sublabel": "hallazgos y sugerencias" },
     { "id": "owner_choice", "lane": "owner", "col": 3, "type": "external", "label": "Owner", "sublabel": "decide lo que falta" },
-    { "id": "activate", "lane": "gbai", "col": 3, "type": "backend", "label": "Activar", "sublabel": "escribe y enlaza skills" },
+    { "id": "activate", "lane": "gabo-ai", "col": 3, "type": "backend", "label": "Activar", "sublabel": "escribe y enlaza skills" },
     { "id": "global", "lane": "files", "col": 3, "type": "database", "label": "Config global", "sublabel": "nombre, tono, interacciones", "tag": "personal: siempre gana" },
-    { "id": "local", "lane": "files", "col": 4, "type": "database", "label": "gbai.yaml del repo", "sublabel": "tracker, revisor, metodología", "tag": "equipo: gana en el proyecto" },
-    { "id": "verify", "lane": "gbai", "col": 5, "type": "security", "label": "Verificar", "sublabel": "prueba de cada ficha" },
+    { "id": "local", "lane": "files", "col": 4, "type": "database", "label": "gabo.yaml del repo", "sublabel": "tracker, revisor, metodología", "tag": "equipo: gana en el proyecto" },
+    { "id": "verify", "lane": "gabo-ai", "col": 5, "type": "security", "label": "Verificar", "sublabel": "prueba de cada ficha" },
     { "id": "asis_done", "lane": "asis", "col": 5, "type": "frontend", "label": "Asistente", "sublabel": "listo o qué falló" }
   ],
   "edges": [
@@ -45,7 +45,7 @@
   ],
   "cards": [
     { "dot": "cyan", "title": "Proveedores", "items": ["Cada parte configurable (tracker, revisor, memoria, sesiones) se llena con un proveedor", "Proveedor = skill para los agentes + ficha con señales, requisitos y prueba"] },
-    { "dot": "emerald", "title": "Activar", "items": ["Escribe la elección en el archivo que corresponde", "Enlaza el skill del proveedor con un nombre fijo, por ejemplo gbai-tracker o gbai-methodology"] },
+    { "dot": "emerald", "title": "Activar", "items": ["Escribe la elección en el archivo que corresponde", "Enlaza el skill del proveedor con un nombre fijo, por ejemplo gabo-tracker o gabo-methodology"] },
     { "dot": "violet", "title": "Cambiar y extender", "items": ["Cambiar de proveedor: una línea y repetir activar y verificar", "Proveedor propio: carpeta local nombrada en la configuración"] },
     { "dot": "amber", "title": "Contexto", "items": ["Las fichas las lee el programa, no los agentes", "Los agentes cargan solo el skill activo y solo cuando lo usan", "Sin valores por defecto silenciosos: el asistente siempre pregunta"] }
   ]
