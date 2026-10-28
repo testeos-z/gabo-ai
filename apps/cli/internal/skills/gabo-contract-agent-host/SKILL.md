@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the optional slot `agent_hos
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
 - Host settings (cloud or local) live in the adapter, never in the core config: `gbai.yaml` holds only `slots.agent_host.adapter`.
 - The adapter names secrets only by environment variable name or reference, never by value (R21).
 - Starting or stopping a remote session needs the owner's explicit authorization of the host, the operation and the credential to use; an adapter never discovers or reuses ambient credentials.

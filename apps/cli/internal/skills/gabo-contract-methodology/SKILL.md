@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the `methodology` slot (`slo
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
 - The adapter must declare coder-side review explicitly: either `none`, or the tool (for example GGA or RDD), when it runs and what the coder does with its result. Silence is not a declaration.
 - Coder-side review never replaces the gbai reviewer, which stays the only merge gate (R9); a coder never merges or approves.
 - The methodology never weakens the coder's hard rules: clean worktree, no force-push, PR to `repo.integration_branch`, at most 4 reviewer fix rounds.

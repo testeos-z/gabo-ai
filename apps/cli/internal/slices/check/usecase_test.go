@@ -365,3 +365,91 @@ func TestUpgradePRValidatesOnlyTheConfig(t *testing.T) {
 	r = run(t, broken, configFiles{projectFile: bad}, Settings{UpgradePR: true})
 	wantFailed(t, r, UpgradePRLine)
 }
+
+// slotConfig wires the tasks and methodology slots to adapters in the repo.
+const slotConfig = validConfig + `slots:
+  tasks:
+    adapter: docs/adapters/tasks.md
+  methodology:
+    adapter: docs/adapters/methodology.md
+`
+
+const methodologyContract = "---\nname: gabo-contract-methodology\n---\n## Operations\n\n### coder instructions\n\n### report per task\n"
+
+// slotProject adds both contracts to the catalog copy and an adapter
+// covering each.
+func slotProject() fstest.MapFS {
+	return with(project(), map[string]string{
+		".gbai/skills/gabo-contract-tasks/SKILL.md":       tasksContract,
+		".gbai/skills/gabo-contract-methodology/SKILL.md": methodologyContract,
+		"docs/adapters/tasks.md":                          "## Operations\n\n### create\n\n### read one\n\n### claim\n",
+		"docs/adapters/methodology.md":                    "## Operations\n\n### coder instructions\n\n### report per task\n",
+	})
+}
+
+func TestSlotWithCompleteAdapterPasses(t *testing.T) {
+	t.Parallel()
+	r := run(t, slotProject(), configFiles{projectFile: slotConfig}, Settings{})
+	wantPassed(t, r, PassedLine)
+}
+
+func TestSlotWithGappedAdapterListsMissingOperations(t *testing.T) {
+	t.Parallel()
+	proj := with(slotProject(), map[string]string{"docs/adapters/tasks.md": "## Operations\n\n### create\n"})
+	r := run(t, proj, configFiles{projectFile: slotConfig}, Settings{})
+	wantFailed(t, r,
+		"✗ adapter docs/adapters/tasks.md does not cover: read one, claim",
+		"why: slots.tasks.adapter, contract "+CatalogDir+"/gabo-contract-tasks/SKILL.md",
+		NextCoverAdapter)
+	if strings.Contains(joined(r), "methodology.md") {
+		t.Fatalf("a complete adapter was reported:\n%s", joined(r))
+	}
+}
+
+func TestSlotWithMissingAdapterNamesTheSlot(t *testing.T) {
+	t.Parallel()
+	proj := with(slotProject(), map[string]string{"docs/adapters/methodology.md": ""})
+	r := run(t, proj, configFiles{projectFile: slotConfig}, Settings{})
+	wantFailed(t, r,
+		"✗ slot methodology: adapter docs/adapters/methodology.md not found",
+		"next: write it with gabo-adapter-writer or fix slots.methodology.adapter, then rerun gabo check")
+}
+
+func TestSlotWithoutContractInTheCatalog(t *testing.T) {
+	t.Parallel()
+	proj := with(slotProject(), map[string]string{".gbai/skills/gabo-contract-tasks/SKILL.md": ""})
+	r := run(t, proj, configFiles{projectFile: slotConfig}, Settings{})
+	wantFailed(t, r,
+		"✗ slot tasks: contract gabo-contract-tasks missing from "+CatalogDir,
+		"next: run gabo init to restore the catalog, then rerun gabo check")
+}
+
+// The contract comes from the project's catalog copy: an operation the
+// project's contract lacks is not required.
+func TestSlotUsesTheProjectContract(t *testing.T) {
+	t.Parallel()
+	proj := with(slotProject(), map[string]string{
+		".gbai/skills/gabo-contract-tasks/SKILL.md": "## Operations\n\n### create\n",
+		"docs/adapters/tasks.md":                    "## Operations\n\n### create\n",
+	})
+	r := run(t, proj, configFiles{projectFile: slotConfig}, Settings{})
+	wantPassed(t, r, PassedLine)
+}
+
+func TestUpgradePRSkipsSlotCoverage(t *testing.T) {
+	t.Parallel()
+	proj := with(slotProject(), map[string]string{"docs/adapters/tasks.md": ""})
+	r := run(t, proj, configFiles{projectFile: slotConfig}, Settings{UpgradePR: true})
+	wantPassed(t, r, UpgradePRLine)
+}
+
+// A methodology adapter may be a bare skill name in the catalog copy.
+func TestMethodologyAdapterAsSkillName(t *testing.T) {
+	t.Parallel()
+	cfg := strings.Replace(slotConfig, "adapter: docs/adapters/methodology.md", "adapter: gabo-methodology-tdd", 1)
+	proj := with(slotProject(), map[string]string{
+		".gbai/skills/gabo-methodology-tdd/SKILL.md": "## Operations\n\n### coder instructions\n",
+	})
+	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
+	wantFailed(t, r, "✗ adapter "+CatalogDir+"/gabo-methodology-tdd/SKILL.md does not cover: report per task")
+}
