@@ -1,1 +1,1 @@
-# gbai-team
+# gabo-ai

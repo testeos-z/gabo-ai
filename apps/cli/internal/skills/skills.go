@@ -1,4 +1,4 @@
-// Package skills embeds the agent skills shipped with gbai. Each skill is a
+// Package skills embeds the agent skills shipped with gabo. Each skill is a
 // directory holding a SKILL.md; contract skills also hold example adapters
 // under examples/, directiva skills hold plan templates under templates/, and
 // gabo-reviewer holds the reviewer scripts and their shell tests under
@@ -34,7 +34,7 @@ type File struct {
 const reviewerSkill = "gabo-reviewer"
 
 // Catalog returns the embedded catalog as a filesystem rooted like the
-// project's .gbai/skills/ copy, so without the reviewer skill.
+// project's .gabo/skills/ copy, so without the reviewer skill.
 func Catalog() fs.FS { return catalogFS{} }
 
 type catalogFS struct{}

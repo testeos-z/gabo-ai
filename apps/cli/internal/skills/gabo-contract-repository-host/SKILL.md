@@ -1,14 +1,14 @@
 ---
 name: gabo-contract-repository-host
-description: "Trigger: repository host contract, repository_host slot, PR adapter, adapter coverage, write a host adapter. Operations every gbai repository host adapter must cover."
+description: "Trigger: repository host contract, repository_host slot, PR adapter, adapter coverage, write a host adapter. Operations every gabo repository host adapter must cover."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
 
-Load when writing, checking or using the adapter of the `repository_host` slot (`slots.repository_host.adapter`, TRD 9.1). This contract states WHAT agents must be able to do with branches and pull requests; the adapter states HOW with the user's host (D2). gbai ships no host code.
+Load when writing, checking or using the adapter of the `repository_host` slot (`slots.repository_host.adapter`, TRD 9.1). This contract states WHAT agents must be able to do with branches and pull requests; the adapter states HOW with the user's host (D2). gabo ships no host code.
 
 ## Hard Rules
 

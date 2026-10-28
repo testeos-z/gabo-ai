@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 )
 
 // NextCoverAdapter follows a gapped adapter.

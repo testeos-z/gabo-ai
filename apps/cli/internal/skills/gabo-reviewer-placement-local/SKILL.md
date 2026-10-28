@@ -1,9 +1,9 @@
 ---
 name: gabo-reviewer-placement-local
-description: "Trigger: reviewer placement, local reviewer, where the reviewer runs, single-user review, reviewer_placement adapter. Local single-user adapter for the gbai reviewer_placement slot."
+description: "Trigger: reviewer placement, local reviewer, where the reviewer runs, single-user review, reviewer_placement adapter. Local single-user adapter for the gabo reviewer_placement slot."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
@@ -15,8 +15,8 @@ Isolated two-user mode (a separate reviewer user and identity) is another adapte
 ## Hard Rules
 
 - Accept only a request of exactly the form `PR #<n> head <40-hex sha>`; refuse anything else before running any command.
-- Run only the installed user-level copy of the scripts, `${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/scripts/` (installed by `gabo init`, T041), never a copy from a repository checkout, never edited, with no extra arguments or environment.
-- Run from the repository's main checkout (its `gbai.yaml` names `repo.name` and `repo.integration_branch`), never from a task worktree, and never through `sudo`.
+- Run only the installed user-level copy of the scripts, `${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/` (installed by `gabo init`, T041), never a copy from a repository checkout, never edited, with no extra arguments or environment.
+- Run from the repository's main checkout (its `gabo.yaml` names `repo.name` and `repo.integration_branch`), never from a task worktree, and never through `sudo`.
 - One run per request: the scripts skip a head that moved or already has a verdict (R26); never retry in a loop.
 - The relaying agent never reviews, edits, comments, approves or merges itself, and never posts the reviewer marker; the scripts own the verdict comment and the merge gate.
 - Never paste PR output, check logs or secrets into the reply; the findings live in the PR comment.
@@ -28,10 +28,10 @@ Isolated two-user mode (a separate reviewer user and identity) is another adapte
 Validate the request, then run one command from the main checkout:
 
 ```bash
-bash "${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha>
+bash "${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha>
 ```
 
-The output goes to stdout; its last line is the `VERDICT` line. The scripts work in their own state dir (`${XDG_STATE_HOME:-$HOME/.local/state}/gbai/reviewer`) with their own clone, home and cache, never in the caller's checkout.
+The output goes to stdout; its last line is the `VERDICT` line. The scripts work in their own state dir (`${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer`) with their own clone, home and cache, never in the caller's checkout.
 
 ### report placement
 
@@ -41,7 +41,7 @@ Report one line:
 placement=local mode=single-user
 ```
 
-The preflight refuses any other `reviewer.placement` or `REVIEWER_MODE`, so every run that passed it ran here, as the owner, in single-user mode. To confirm the settings without reviewing, run `bash "${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/scripts/reviewer.sh" preflight`; its `PREFLIGHT-OK` line shows `mode=` and `placement=`.
+The preflight refuses any other `reviewer.placement` or `REVIEWER_MODE`, so every run that passed it ran here, as the owner, in single-user mode. To confirm the settings without reviewing, run `bash "${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh" preflight`; its `PREFLIGHT-OK` line shows `mode=` and `placement=`.
 
 ### return verdict
 

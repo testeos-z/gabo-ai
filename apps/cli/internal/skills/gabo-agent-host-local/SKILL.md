@@ -1,9 +1,9 @@
 ---
 name: gabo-agent-host-local
-description: "Trigger: agent host local, agent_host slot, agents on my machine, local agents, start agent session, stop agent session, where agents run. Local adapter for the gbai agent_host slot."
+description: "Trigger: agent host local, agent_host slot, agents on my machine, local agents, start agent session, stop agent session, where agents run. Local adapter for the gabo agent_host slot."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
@@ -33,7 +33,7 @@ Subagents launched inside the owner's runtime session (for example `gabo-cycle` 
 | `bot.login` | `not used` |
 | `sessions.{coder, reviewer, assistant}.prompt_file` | `not used` |
 | `sessions.local_orca` | `not used` |
-| `/etc/gbai/gbai.yaml` | `not used` |
+| `/etc/gabo/gabo.yaml` | `not used` |
 
 The role's prompt comes from its built agent and the brief of the caller; the OS user is the owner.
 

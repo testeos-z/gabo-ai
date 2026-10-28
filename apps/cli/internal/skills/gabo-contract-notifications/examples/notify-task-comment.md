@@ -1,6 +1,6 @@
-# notify-task-comment: example adapter for the gbai notifications contract
+# notify-task-comment: example adapter for the gabo notifications contract
 
-Fills the `notifications` slot with a GitHub mention in a comment on the task issue, so the recipient gets GitHub's own notification. Copy it to `.gbai/adapters/notify-task-comment.md` and point `slots.notifications.adapter` at it. Repository `R=<owner>/<repo>` (`repo.name` in `gbai.yaml`).
+Fills the `notifications` slot with a GitHub mention in a comment on the task issue, so the recipient gets GitHub's own notification. Copy it to `.gabo/adapters/notify-task-comment.md` and point `slots.notifications.adapter` at it. Repository `R=<owner>/<repo>` (`repo.name` in `gabo.yaml`).
 
 Notes:
 

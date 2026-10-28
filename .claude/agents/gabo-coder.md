@@ -1,6 +1,6 @@
 ---
 name: gabo-coder
-description: gbai coder for one task in its own git worktree. Use from gabo-cycle to implement a task issue test-first, open a PR to dev, request review from gabo-reviewer and fix findings for at most 4 rounds.
+description: gabo coder for one task in its own git worktree. Use from gabo-cycle to implement a task issue test-first, open a PR to dev, request review from gabo-reviewer and fix findings for at most 4 rounds.
 tools: Read, Grep, Glob, Edit, Write, Bash, Skill, Agent
 skills:
   - gabo-coder

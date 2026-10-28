@@ -1,9 +1,9 @@
 ---
 name: gabo-wave-report
-description: "Trigger: gbai wave report, build wave report, save wave report, wave summary, wave close report. Formats the TRD 9.2 wave report and its summary and saves it through the memory slot."
+description: "Trigger: gabo wave report, build wave report, save wave report, wave summary, wave close report. Formats the TRD 9.2 wave report and its summary and saves it through the memory slot."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
@@ -15,11 +15,11 @@ Load in `gabo-cycle` when it builds the wave report (J3) and in the assistant wh
 - Every section below appears, in this order. A section with nothing to report says `none`; never drop it.
 - Report only what the outcomes, the tracker, the host and the `memory` slot show. Never guess a status, verdict or answer; a missing value is `unknown` with the source that lacked it.
 - Never include secrets, tokens, credentials or sensitive personal data (R21).
-- Save it through `memory` (`save wave trace`) as the last entry of `gbai/trace/<wave>`, then read it back (`read wave trace`). A save that does not show up after one retry is listed under Unverified writes in the report you return, never claimed as saved.
+- Save it through `memory` (`save wave trace`) as the last entry of `gabo/trace/<wave>`, then read it back (`read wave trace`). A save that does not show up after one retry is listed under Unverified writes in the report you return, never claimed as saved.
 
 ## Report Format (TRD 9.2)
 
-1. **Wave**: wave id, mode, start time from `gbai/trace/<wave>`.
+1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`.
 2. **Tasks**: one line per task: task id, status (DONE, HANDED, BLOCKED), PR, last verdict, fix rounds, coder handle. A BLOCKED task adds its reason.
 3. **Questions**: each question raised with its answer and resolver (R5), and whether it was a manual answer or an auto decision record.
 4. **Interactions**: interaction count with the reasons for each interaction with the owner (R29).
@@ -37,10 +37,10 @@ The assistant shows the owner this summary, not the full report:
 - `Wave <n>: <done> done, <blocked> blocked`
 - questions with answer and resolver; decisions taken in auto mode (`list decisions` filtered by `mode: auto` and the wave);
 - unverified writes; cleanup leftovers; interaction count;
-- where the full report lives: the last entry of `gbai/trace/<wave>`.
+- where the full report lives: the last entry of `gabo/trace/<wave>`.
 
 Escalations use `<task>: BLOCKED — <reason>` · what was tried · the one decision needed.
 
 ## Output Contract
 
-Return the full report in the format above, the `gbai/trace/<wave>` key written, and the save as `verified` or `unverified`.
+Return the full report in the format above, the `gabo/trace/<wave>` key written, and the save as `verified` or `unverified`.

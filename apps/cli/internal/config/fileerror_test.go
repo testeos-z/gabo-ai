@@ -18,20 +18,20 @@ func TestLoadLayersReportsAFileError(t *testing.T) {
 	}{
 		{
 			name:     "invalid value in the project file",
-			files:    files{"/home/o/.config/gbai/config.yaml": minimal, "/src/p/gbai.yaml": "parallelism: 0\n"},
-			wantFile: "/src/p/gbai.yaml",
+			files:    files{"/home/o/.config/gabo/config.yaml": minimal, "/src/p/gabo.yaml": "parallelism: 0\n"},
+			wantFile: "/src/p/gabo.yaml",
 			wantLine: "parallelism",
 		},
 		{
 			name:     "former cloud key in the user file",
-			files:    files{"/home/o/.config/gbai/config.yaml": "server:\n  host: x\n", "/src/p/gbai.yaml": minimal},
-			wantFile: "/home/o/.config/gbai/config.yaml",
+			files:    files{"/home/o/.config/gabo/config.yaml": "server:\n  host: x\n", "/src/p/gabo.yaml": minimal},
+			wantFile: "/home/o/.config/gabo/config.yaml",
 			wantLine: "slots.agent_host",
 		},
 		{
 			name:     "missing key in the merged result",
-			files:    files{"/src/p/gbai.yaml": string(without(t, "repo.name"))},
-			wantFile: "merged from /src/p/gbai.yaml",
+			files:    files{"/src/p/gabo.yaml": string(without(t, "repo.name"))},
+			wantFile: "merged from /src/p/gabo.yaml",
 			wantLine: "repo.name",
 		},
 	}

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 )
 
 const validSpec = `agents:
@@ -119,7 +119,7 @@ func TestLoadReportsEveryProblem(t *testing.T) {
 	}
 }
 
-// The spec shipped in the embedded catalog lists every gbai agent that runs
+// The spec shipped in the embedded catalog lists every gabo agent that runs
 // from an agent file (TRD 4.3) and validates against that catalog.
 func TestEmbeddedSpecIsValid(t *testing.T) {
 	t.Parallel()
@@ -141,7 +141,7 @@ func TestEmbeddedSpecIsValid(t *testing.T) {
 	}
 }
 
-// The project copy under .gbai/skills/ never holds the reviewer skill, so the
+// The project copy under .gabo/skills/ never holds the reviewer skill, so the
 // embedded catalog root must not expose it either.
 func TestEmbeddedCatalogHidesTheReviewerSkill(t *testing.T) {
 	t.Parallel()

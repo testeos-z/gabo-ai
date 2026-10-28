@@ -4,7 +4,7 @@
 // version line, every slot adapter's contract coverage and the catalog
 // version stamp.
 //
-// The spec and the contracts come from the project's catalog copy (.gbai/skills/), never from
+// The spec and the contracts come from the project's catalog copy (.gabo/skills/), never from
 // the binary, so a newer CLI checks an older project against its own version.
 package check
 
@@ -21,18 +21,18 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/agentspec"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 )
 
 // Project-relative locations (TRD 9.4).
 const (
-	CatalogDir  = ".gbai/skills"
-	RuntimesDir = ".gbai/runtimes"
-	StampFile   = ".gbai/VERSION"
-	// installPath is the module path of the binary for the upgrade command;
-	// T062 switches it to the gabo-ai path, as in initcmd.
-	installPath = "github.com/testeos-z/gbai-team/apps/cli/cmd/gbai"
+	CatalogDir  = ".gabo/skills"
+	RuntimesDir = ".gabo/runtimes"
+	StampFile   = ".gabo/VERSION"
+	// installPath is the module path of the binary for the upgrade command
+	// (TRD 9.4), as in initcmd.
+	installPath = "github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo"
 	// runtimeBuilder writes a runtime skill for an engine without one.
 	runtimeBuilder = "gabo-runtime-builder"
 )
@@ -55,6 +55,9 @@ type Settings struct {
 	Layers []config.Layer
 	// UpgradePR (GABO_UPGRADE_PR=1) runs only the config validation.
 	UpgradePR bool
+	// Former are the config locations from before the gabo-ai rename
+	// (config.FormerNames); any that exists fails and is never read.
+	Former []config.FormerName
 }
 
 // Report is the human-readable result. Failed is true when any check failed.
@@ -80,6 +83,9 @@ func NewUseCase(project fs.FS, cfg config.Reader, s Settings) *UseCase {
 // failures are in the report.
 func (u *UseCase) Run() (Report, error) {
 	var r Report
+	if err := u.checkFormer(&r); err != nil {
+		return Report{}, err
+	}
 	cfg, ok, err := u.checkConfig(&r)
 	if err != nil {
 		return Report{}, err
@@ -109,6 +115,29 @@ func (r *Report) fail(lines ...string) {
 }
 
 func (r *Report) warn(line string) { r.Lines = append(r.Lines, "! "+line) }
+
+// checkFormer fails for each config location still under its name from
+// before the gabo-ai rename, with the rename to make, once per location. It
+// only probes.
+func (u *UseCase) checkFormer(r *Report) error {
+	var reported []string
+	for _, f := range u.s.Former {
+		if slices.Contains(reported, f.From) {
+			continue
+		}
+		_, err := u.config.ReadFile(f.Probe)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("read config %s: %w", f.Probe, err)
+		}
+		reported = append(reported, f.From)
+		r.fail("✗ "+f.Probe+" uses a name from before the gabo-ai rename and is not read",
+			"next: rename "+f.From+" to "+f.To+", then rerun gabo check")
+	}
+	return nil
+}
 
 // checkConfig loads the layers through the config package: each layer and
 // the merged result are validated against their schemas, personal keys in

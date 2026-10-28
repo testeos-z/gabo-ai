@@ -23,8 +23,8 @@ pre() {
   (
     cd "$caller" || exit 1
     export HOME="$fake_home" STUB_LOG="$fx/calls.log" FIXTURE="$fx" REVIEWER_GH="$work/bin/gh" \
-      GBAI_REVIEWER_STATE_DIR="${PRE_STATE:-$work/state}" REVIEWER_REMOTE_URL="${PRE_ORIGIN:-$work/origin.git}" \
-      REVIEWER_GABO_BIN="$work/bin/gbai" GBAI_VERSION="${PRE_GBAI_VERSION:-0.4.0}" PATH="$work/bin:$PATH"
+      GABO_REVIEWER_STATE_DIR="${PRE_STATE:-$work/state}" REVIEWER_REMOTE_URL="${PRE_ORIGIN:-$work/origin.git}" \
+      REVIEWER_GABO_BIN="$work/bin/gabo" GABO_VERSION="${PRE_GABO_VERSION:-0.4.0}" PATH="$work/bin:$PATH"
     while [[ "${1:-}" == *=* ]]; do export "${1?}"; shift; done
     "$@"
   )
@@ -32,22 +32,22 @@ pre() {
 sha=0123456789abcdef0123456789abcdef01234567
 
 echo "# preflight"
-expect_match '^PREFLIGHT-OK repo=testeos-z/gabo-ai base=dev login=owner mode=single-user engine=claude placement=local minimum=none$' \
-  "$(pre bash "$skill/reviewer.sh" preflight)" "installed skill passes; repo, base and placement come from gbai.yaml"
-check "the reviewer keeps its own checkout of the integration branch" test -f "$work/state/base/gbai.yaml"
+expect_match '^PREFLIGHT-OK repo=example-org/example-repo base=dev login=owner mode=single-user engine=claude placement=local minimum=none$' \
+  "$(pre bash "$skill/reviewer.sh" preflight)" "installed skill passes; repo, base and placement come from gabo.yaml"
+check "the reviewer keeps its own checkout of the integration branch" test -f "$work/state/base/gabo.yaml"
 expect_eq "$DEV_SHA" "$(git -C "$work/state/base" rev-parse HEAD)" "its checkout is the integration branch tip"
 expect_match '^PREFLIGHT-OK repo=other/repo ' "$(pre REVIEWER_REPO=other/repo bash "$skill/reviewer.sh" preflight)" \
   "REVIEWER_REPO overrides the caller's repo.name"
 expect_match '^PREFLIGHT-FAILED no repository' \
-  "$(cd "$work" && HOME="$fake_home" REVIEWER_GH="$work/bin/gh" GBAI_REVIEWER_STATE_DIR="$work/state" bash "$skill/reviewer.sh" preflight)" \
-  "outside a checkout with gbai.yaml and without REVIEWER_REPO it refuses"
+  "$(cd "$work" && HOME="$fake_home" REVIEWER_GH="$work/bin/gh" GABO_REVIEWER_STATE_DIR="$work/state" bash "$skill/reviewer.sh" preflight)" \
+  "outside a checkout with gabo.yaml and without REVIEWER_REPO it refuses"
 
 echo "# location and trust"
-inrepo="$caller/.gbai/skills/gabo-reviewer/scripts"
+inrepo="$caller/.gabo/skills/gabo-reviewer/scripts"
 mkdir -p "$inrepo" && cp "$skill"/*.sh "$skill/config.env" "$inrepo/"
 expect_match '^PREFLIGHT-FAILED .*inside the repository under review' \
   "$(pre bash "$inrepo/reviewer.sh" preflight)" "a copy inside the repository under review is refused"
-rm -rf "$caller/.gbai/skills/gabo-reviewer"
+rm -rf "$caller/.gabo/skills/gabo-reviewer"
 other="$work/elsewhere"
 mkdir -p "$other" && cp "$skill"/*.sh "$skill/config.env" "$other/"
 expect_match '^PREFLIGHT-FAILED .*not from the user-level skill' "$(pre bash "$other/reviewer.sh" preflight)" \
@@ -102,20 +102,20 @@ expect_match '^PREFLIGHT-FAILED reviewer.placement github-actions is planned for
 echo "# base version minimum"
 O_STAMP=0.4.0 make_origin "$work/origin-stamp.git"
 stamp() { PRE_ORIGIN="$work/origin-stamp.git" PRE_STATE="$work/state-stamp" pre "$@"; }
-expect_match '^PREFLIGHT-OK .* minimum=0.4.0$' "$(PRE_GBAI_VERSION=0.4.0 stamp bash "$skill/reviewer.sh" preflight)" \
+expect_match '^PREFLIGHT-OK .* minimum=0.4.0$' "$(PRE_GABO_VERSION=0.4.0 stamp bash "$skill/reviewer.sh" preflight)" \
   "a binary equal to the base stamp passes"
-expect_match '^PREFLIGHT-OK .* minimum=0.4.0$' "$(PRE_GBAI_VERSION=0.10.1 stamp bash "$skill/reviewer.sh" preflight)" \
+expect_match '^PREFLIGHT-OK .* minimum=0.4.0$' "$(PRE_GABO_VERSION=0.10.1 stamp bash "$skill/reviewer.sh" preflight)" \
   "a newer binary passes (versions compare numerically)"
-out="$(PRE_GBAI_VERSION=0.3.9 stamp bash "$skill/reviewer.sh" preflight)"
-expect_match '^PREFLIGHT-FAILED gbai 0.3.9 is older than the minimum 0.4.0 .*: go install github.com/testeos-z/gbai-team/apps/cli/cmd/gbai@v0.4.0$' \
+out="$(PRE_GABO_VERSION=0.3.9 stamp bash "$skill/reviewer.sh" preflight)"
+expect_match '^PREFLIGHT-FAILED gabo 0.3.9 is older than the minimum 0.4.0 .*: go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@v0.4.0$' \
   "$out" "an older binary is refused with the TRD 9.4 upgrade command"
-out="$(PRE_GBAI_VERSION=dev stamp bash "$skill/reviewer.sh" preflight)"
+out="$(PRE_GABO_VERSION=dev stamp bash "$skill/reviewer.sh" preflight)"
 expect_match '^PREFLIGHT-FAILED .*go install .*@v0.4.0$' "$out" "a binary without a release version is refused"
-out="$(stamp REVIEWER_GABO_BIN="$work/missing/gbai" bash "$skill/reviewer.sh" preflight)"
-expect_match '^PREFLIGHT-FAILED no gbai binary .*go install .*@v0.4.0$' "$out" "no binary with a base stamp is refused"
-expect_match '^PREFLIGHT-OK .* minimum=none$' "$(pre REVIEWER_GABO_BIN="$work/missing/gbai" bash "$skill/reviewer.sh" preflight)" \
+out="$(stamp REVIEWER_GABO_BIN="$work/missing/gabo" bash "$skill/reviewer.sh" preflight)"
+expect_match '^PREFLIGHT-FAILED no gabo binary .*go install .*@v0.4.0$' "$out" "no binary with a base stamp is refused"
+expect_match '^PREFLIGHT-OK .* minimum=none$' "$(pre REVIEWER_GABO_BIN="$work/missing/gabo" bash "$skill/reviewer.sh" preflight)" \
   "no stamp on the base means no minimum"
-check "the reviewer never updates the binary" bash -c "! grep -E '^gbai-call (init|upgrade|install|update)' '$fx/calls.log'"
+check "the reviewer never updates the binary" bash -c "! grep -E '^gabo-call (init|upgrade|install|update)' '$fx/calls.log'"
 
 echo "# env file"
 envf="$work/reviewer.env"
@@ -129,12 +129,12 @@ check "env files are read as data, never executed" bash -c "! test -e '$work/pwn
 
 echo "# helpers"
 helpers() { HOME="$fake_home" REVIEWER_BOT_LOGIN=owner bash -c "source '$skill/common.sh'; $1"; }
-y="$caller/gbai.yaml"
-expect_eq "testeos-z/gabo-ai" "$(helpers "yaml_get '$y' repo.name")" "yaml_get reads a nested scalar"
+y="$caller/gabo.yaml"
+expect_eq "example-org/example-repo" "$(helpers "yaml_get '$y' repo.name")" "yaml_get reads a nested scalar"
 expect_eq "false" "$(helpers "yaml_get '$y' review.auto_merge")" "yaml_get drops a trailing comment"
 expect_eq "go -C apps/cli build ./...|go -C apps/cli vet ./...|go -C apps/cli test ./..." \
   "$(helpers "yaml_get '$y' review.checks | paste -sd'|'")" "yaml_get reads a block list"
-expect_eq ".github/|AGENTS.md|CLAUDE.md|gbai.yaml|.claude/" \
+expect_eq ".github/|AGENTS.md|CLAUDE.md|gabo.yaml|.claude/" \
   "$(helpers "yaml_get '$y' review.human_only_paths | paste -sd'|'")" "yaml_get reads a flow list"
 expect_eq "gbai-reviewer-bot" "$(helpers "yaml_get '$y' reviewer.signing.marker")" "yaml_get reads three levels"
 expect_eq "" "$(helpers "yaml_get '$y' review.missing")" "a missing key is empty"
@@ -142,16 +142,16 @@ expect_eq "env-wins" "$(HOME="$fake_home" REVIEWER_REPO=env-wins bash -c "source
 expect_eq "go -C apps/cli build ./...|go -C apps/cli vet ./..." \
   "$(HOME="$fake_home" REVIEWER_CHECKS='go -C apps/cli build ./...; go -C apps/cli vet ./...' bash -c "source '$skill/common.sh'; parse_checks | paste -sd'|'")" \
   "checks split on ';'"
-hop() { HOME="$fake_home" REVIEWER_HUMAN_ONLY_PATHS="${HOP:-.github/ AGENTS.md CLAUDE.md gbai.yaml .claude/}" bash -c "source '$skill/common.sh'; $1"; }
-for p in .github/workflows/x.yml .claude/agents/a.md AGENTS.md apps/cli/CLAUDE.md gbai.yaml .gbai/VERSION .gbai/skills/gabo-coder/SKILL.md; do
+hop() { HOME="$fake_home" REVIEWER_HUMAN_ONLY_PATHS="${HOP:-.github/ AGENTS.md CLAUDE.md gabo.yaml .claude/}" bash -c "source '$skill/common.sh'; $1"; }
+for p in .github/workflows/x.yml .claude/agents/a.md AGENTS.md apps/cli/CLAUDE.md gabo.yaml .gabo/VERSION .gabo/skills/gabo-coder/SKILL.md; do
   check "human-only: $p" hop "is_human_only '$p'"
 done
-for p in .gbai/VERSION .gbai/skills/gabo-coder/SKILL.md apps/cli/internal/skills/gabo-reviewer/scripts/common.sh \
+for p in .gabo/VERSION .gabo/skills/gabo-coder/SKILL.md apps/cli/internal/skills/gabo-reviewer/scripts/common.sh \
   skills/gabo-reviewer/SKILL.md; do
   check "always human-only, even with no configured paths: $p" \
     env HOME="$fake_home" REVIEWER_HUMAN_ONLY_PATHS=" " bash -c "source '$skill/common.sh'; is_human_only '$p'"
 done
-for p in apps/cli/main.go docs/product/PRD.md xAGENTS.md apps/VERSION .gbai/skillsx/a .gbai/VERSION.bak; do
+for p in apps/cli/main.go docs/product/PRD.md xAGENTS.md apps/VERSION .gabo/skillsx/a .gabo/VERSION.bak; do
   check "not human-only: $p" hop "! is_human_only '$p'"
 done
 vge() { HOME="$fake_home" bash -c "source '$skill/common.sh'; version_at_least '$1' '$2'"; }

@@ -2,15 +2,15 @@
 # Shared helpers for the gabo-reviewer tests. Source it; do not run it.
 # Every test installs a copy of the scripts into a fake HOME, at the
 # user-level location the trust check expects
-# (${XDG_DATA_HOME:-~/.local/share}/gbai/skills/gabo-reviewer/scripts).
+# (${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer/scripts).
 
 src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 failures=0
 passes=0
 export REVIEWER_ENV_FILE="/nonexistent/gabo-reviewer-test-env"
-unset GH_TOKEN REVIEWER_GH_TOKEN CLAUDE_CODE_OAUTH_TOKEN GBAI_REVIEWER_STATE_DIR XDG_DATA_HOME XDG_STATE_HOME SUDO_USER \
+unset GH_TOKEN REVIEWER_GH_TOKEN CLAUDE_CODE_OAUTH_TOKEN GABO_REVIEWER_STATE_DIR XDG_DATA_HOME XDG_STATE_HOME SUDO_USER \
   GABO_UPGRADE_PR
-# Repository-level settings come from the fixture's gbai.yaml, never from the
+# Repository-level settings come from the fixture's gabo.yaml, never from the
 # environment of whoever runs the tests.
 for _v in $(compgen -v REVIEWER_); do
   [[ "$_v" == REVIEWER_ENV_FILE ]] || unset "$_v"
@@ -19,13 +19,13 @@ done
 new_tmp() { mktemp -d "${TMPDIR:-/tmp}/gabo-reviewer-test.XXXXXX"; }
 
 # install_skill <home>: copies the scripts to
-# <home>/.local/share/gbai/skills/gabo-reviewer/scripts with safe modes and
+# <home>/.local/share/gabo/skills/gabo-reviewer/scripts with safe modes and
 # prints that directory.
 install_skill() {
-  local d="$1/.local/share/gbai/skills/gabo-reviewer/scripts"
+  local d="$1/.local/share/gabo/skills/gabo-reviewer/scripts"
   mkdir -p "$d"
-  chmod 755 "$1" "$1/.local" "$1/.local/share" "$1/.local/share/gbai" "$1/.local/share/gbai/skills" \
-    "$1/.local/share/gbai/skills/gabo-reviewer" "$d"
+  chmod 755 "$1" "$1/.local" "$1/.local/share" "$1/.local/share/gabo" "$1/.local/share/gabo/skills" \
+    "$1/.local/share/gabo/skills/gabo-reviewer" "$d"
   cp "$src"/*.sh "$src/config.env" "$d/"
   chmod 755 "$d"/*.sh
   chmod 644 "$d/config.env"

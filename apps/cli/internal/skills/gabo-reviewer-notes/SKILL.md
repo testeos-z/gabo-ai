@@ -1,9 +1,9 @@
 ---
 name: gabo-reviewer-notes
-description: "Trigger: how the reviewer works, review layers, coder-side review, review verdict, VERDICT line, reviewer marker comment, why blocked, merge gate. Explains both gbai review layers for other agents."
+description: "Trigger: how the reviewer works, review layers, coder-side review, review verdict, VERDICT line, reviewer marker comment, why blocked, merge gate. Explains both gabo review layers for other agents."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "2.1"
 ---
 ## Activation Contract
@@ -27,11 +27,11 @@ Use when an agent needs to understand or explain a review result. Agents never r
 
 - The `gabo-reviewer` subagent only validates `PR #<n> head <40-hex sha>`, runs the scripts of the user-level `gbai-reviewer` skill (`~/.claude/skills/gbai-reviewer/scripts/`) and relays their final `VERDICT` line (D20). It never reviews, edits, comments or merges itself.
 - The scripts live outside every repository, so PR code cannot modify the code that reviews it. They refuse to run when they are not under the user-level skills dir or are writable by others.
-- Each run has two parts: the repository checks (`review.checks` in `gbai.yaml`) and an agent review of the diff. Both must pass for a clean verdict.
+- Each run has two parts: the repository checks (`review.checks` in `gabo.yaml`) and an agent review of the diff. Both must pass for a clean verdict.
 
 ## Reviewer isolation
 
-- Own clone: the scripts work in their own state dir (`~/.local/state/gbai/reviewer`) with their own clone of the repository, never the coder's worktree; never edit or build inside it.
+- Own clone: the scripts work in their own state dir (`~/.local/state/gabo/reviewer`) with their own clone of the repository, never the coder's worktree; never edit or build inside it.
 - They re-read the PR and skip a head that moved; they test-merge the pinned head into a fresh `dev`. A merge conflict is blocking.
 - Checks run with their own `HOME`, their own build and module cache and `CI=true`, in a clean environment (`env -i`) inside a credential-free copy of the merged tree.
 - The agent review runs read-only in a clean environment with no `gh` or git credentials: with a model token configured it gets an empty `HOME` of its own and only that token; without one it uses the owner's model login.
@@ -46,7 +46,7 @@ Use when an agent needs to understand or explain a review result. Agents never r
 ## Verdict
 
 - The verdict comes from local evidence (checks, conflict, findings), never from an agent's message. One verdict per pushed head (R26); a head that already has one is skipped.
-- The verdict comment carries the marker `<!-- gbai-reviewer-bot sha=<head> -->` with the reviewed head SHA and the footer `🤖 gbai reviewer`. It never approves: GitHub forbids approving your own PR.
+- The verdict comment carries the marker `<!-- gbai-reviewer-bot sha=<head> -->` with the reviewed head SHA and the footer `🤖 gabo reviewer`. It never approves: GitHub forbids approving your own PR.
 - The run ends with one `VERDICT` line: `VERDICT PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>`.
 - Merge gate: the newest marker comment by the owner's login must sign the current head and be clean; merges go only into `dev`, pinned to the reviewed SHA, never `main`, never PRs touching `review.human_only_paths`.
 

@@ -1,14 +1,14 @@
 ---
 name: gabo-tasks-github
-description: "Trigger: gbai tasks, create issue, sub-issue, blocked-by, claim task, close task, unblocked tasks, tracker. GitHub Issues adapter for the gbai tasks slot via gh."
+description: "Trigger: gabo tasks, create issue, sub-issue, blocked-by, claim task, close task, unblocked tasks, tracker. GitHub Issues adapter for the gabo tasks slot via gh."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "0.1"
 ---
 ## Activation Contract
 
-Use whenever a gbai agent reads or writes tasks. This adapter fills the `tasks` slot contract (TRD 9.1) with GitHub Issues through the `gh` CLI. Repository: `repo.name` in `gbai.yaml` (below `R=testeos-z/gabo-ai`).
+Use whenever a gabo agent reads or writes tasks. This adapter fills the `tasks` slot contract (TRD 9.1) with GitHub Issues through the `gh` CLI. Repository: `repo.name` in `gabo.yaml` (below `R=testeos-z/gabo-ai`).
 
 ## Hard Rules
 
@@ -36,7 +36,7 @@ gh label create "<name>" -R $R --color <hex> --description "<why>"
 | read one | `gh issue view <n> -R $R --json number,title,state,labels,assignees,body,comments` |
 | read unblocked | open issues without `status:*`/`needs-user` whose `gh api repos/$R/issues/<n>/dependencies/blocked_by --jq '[.[]|select(.state=="open")]|length'` is `0` |
 | claim | `gh issue edit <n> -R $R --add-assignee @me --add-label status:in-progress`, then a comment `claimed by <agent> (wave <w>)` |
-| log progress | `gh issue comment <n> -R $R --body "<!-- gbai-progress --> <one line>"` |
+| log progress | `gh issue comment <n> -R $R --body "<!-- gabo-progress --> <one line>"` |
 | link PR | PR body carries `Refs #<n>`; comment `PR #<pr>` on the issue |
 | change status DONE | `gh issue close <n> -R $R --reason completed --comment "DONE via PR #<pr>"` (only after the PR merged) |
 | change status BLOCKED | `gh issue edit <n> -R $R --add-label status:blocked --remove-label status:in-progress` plus a comment with the reason |

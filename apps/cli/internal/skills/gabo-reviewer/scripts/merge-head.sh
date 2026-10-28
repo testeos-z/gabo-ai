@@ -9,8 +9,8 @@
 # reviewer/tests and reviewer/review statuses by the bot login on that SHA are
 # success, the newest marker comment by the bot login newer than the head
 # commit opens with the clean verdict and signs that SHA, and no changed path
-# is human-only: review.human_only_paths plus the built-in .gbai/VERSION and
-# .gbai/skills/ (then it comments "needs human merge" and merges nothing).
+# is human-only: review.human_only_paths plus the built-in .gabo/VERSION and
+# .gabo/skills/ (then it comments "needs human merge" and merges nothing).
 # The merge is exactly
 #   gh pr merge <pr> --repo <repo> --merge --match-head-commit <sha>
 # (never --admin, --auto, --squash, --rebase, or branch deletion).

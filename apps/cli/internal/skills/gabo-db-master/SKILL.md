@@ -3,7 +3,7 @@ name: gabo-db-master
 description: "Trigger: database, schema, migrations, DB extensions, data model, seed data, db master. Designs DB configuration, schema, migrations and the data doc."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.2"
 ---
 ## Activation Contract

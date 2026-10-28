@@ -9,7 +9,7 @@ import (
 
 // FormerCloudKeys are the top-level keys of the retired cloud config
 // (removed from Config by T042). A file still carrying them fails as unknown
-// keys that point to slots.agent_host; gbai never rewrites or migrates it.
+// keys that point to slots.agent_host; gabo never rewrites or migrates it.
 var FormerCloudKeys = []string{"server", "users", "bot", "sessions"}
 
 // formerCloudKeyErrors names every former cloud key path in the document

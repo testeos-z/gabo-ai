@@ -12,12 +12,12 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
 )
 
 // Layer names, lowest to highest precedence. LayerFlag is the single file
 // given with --config, which replaces the layered lookup. There is no system
-// layer: /etc/gbai/gbai.yaml is never read (T006).
+// layer: no file under /etc is ever read (T006).
 const (
 	LayerUser    = "user"
 	LayerProject = "project"
@@ -25,7 +25,42 @@ const (
 )
 
 // ProjectFile is the project layer's file name at the project root.
-const ProjectFile = "gbai.yaml"
+const ProjectFile = "gabo.yaml"
+
+// Names from before the gabo-ai rename (TRD D26): never read, only reported.
+const (
+	formerProjectFile = "gbai.yaml"
+	formerDir         = "gbai"
+	userDir           = "gabo"
+)
+
+// FormerName is a config location from before the gabo-ai rename: Probe is
+// the file whose presence shows the former name is still in use, From is
+// what to rename and To its new name.
+type FormerName struct {
+	Probe string
+	From  string
+	To    string
+}
+
+// FormerNames returns the former user dir and project file locations that
+// resolve, in the order of LayerPaths. The former user dir is probed through
+// each file gabo keeps there: the user config and the reviewer's secrets
+// file (reviewer.env).
+func FormerNames(getenv func(string) string, projectRoot string) []FormerName {
+	var out []FormerName
+	if base := userBase(getenv); base != "" {
+		from := path.Join(base, formerDir)
+		for _, f := range []string{"config.yaml", "reviewer.env"} {
+			out = append(out, FormerName{Probe: path.Join(from, f), From: from, To: path.Join(base, userDir)})
+		}
+	}
+	if projectRoot != "" {
+		from := path.Join(projectRoot, formerProjectFile)
+		out = append(out, FormerName{Probe: from, From: from, To: path.Join(projectRoot, ProjectFile)})
+	}
+	return out
+}
 
 // Layer is one config file in the resolution order. An empty Path means the
 // location could not be resolved (for example no HOME) and is skipped.
@@ -78,14 +113,22 @@ func LayerPaths(getenv func(string) string, projectRoot string) []Layer {
 	}
 }
 
-// UserPath is $XDG_CONFIG_HOME/gbai/config.yaml, else ~/.config/gbai/config.yaml;
+// UserPath is $XDG_CONFIG_HOME/gabo/config.yaml, else ~/.config/gabo/config.yaml;
 // relative values are ignored, as the XDG spec requires. Empty when neither resolves.
 func UserPath(getenv func(string) string) string {
+	if base := userBase(getenv); base != "" {
+		return path.Join(base, userDir, "config.yaml")
+	}
+	return ""
+}
+
+// userBase is $XDG_CONFIG_HOME, else ~/.config; empty when neither is absolute.
+func userBase(getenv func(string) string) string {
 	if xdg := getenv("XDG_CONFIG_HOME"); path.IsAbs(xdg) {
-		return path.Join(xdg, "gbai", "config.yaml")
+		return xdg
 	}
 	if home := getenv("HOME"); path.IsAbs(home) {
-		return path.Join(home, ".config", "gbai", "config.yaml")
+		return path.Join(home, ".config")
 	}
 	return ""
 }

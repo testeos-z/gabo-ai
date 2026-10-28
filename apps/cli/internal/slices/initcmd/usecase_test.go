@@ -7,17 +7,17 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel/kerneltest"
 )
 
 const (
 	root    = "/work/p"
-	config  = root + "/gbai.yaml"
-	stamp   = root + "/.gbai/VERSION"
-	setup   = root + "/.gbai/skills/gabo-setup/SKILL.md"
-	coder   = root + "/.gbai/skills/gabo-coder/SKILL.md"
-	stale   = root + "/.gbai/skills/old-skill/SKILL.md"
-	userCfg = "/home/u/.config/gbai/config.yaml"
+	config  = root + "/gabo.yaml"
+	stamp   = root + "/.gabo/VERSION"
+	setup   = root + "/.gabo/skills/gabo-setup/SKILL.md"
+	coder   = root + "/.gabo/skills/gabo-coder/SKILL.md"
+	stale   = root + "/.gabo/skills/old-skill/SKILL.md"
+	userCfg = "/home/u/.config/gabo/config.yaml"
 	cfgYAML = "repo:\n  name: o/r\n"
 )
 
@@ -90,14 +90,14 @@ func TestFreshProjectCopiesCatalogAndStamp(t *testing.T) {
 	}
 	assertCatalog(t, s, "1.2.3")
 	if _, ok := s.Files[config]; ok {
-		t.Fatal("init created gbai.yaml")
+		t.Fatal("init created gabo.yaml")
 	}
 	if s.Files[userCfg] != "user" {
 		t.Fatal("init changed the global user file")
 	}
 	for _, w := range s.Writes {
-		if !strings.HasPrefix(w, root+"/.gbai/") {
-			t.Fatalf("write outside .gbai/: %s", w)
+		if !strings.HasPrefix(w, root+"/.gabo/") {
+			t.Fatalf("write outside .gabo/: %s", w)
 		}
 	}
 	if last := out.Lines[len(out.Lines)-1]; last != "next: open your agent in this project and paste this prompt" {
@@ -195,8 +195,8 @@ func TestNewerStampChangesNothingAndFails(t *testing.T) {
 		}
 		w := strings.TrimSpace(files[stamp])
 		for _, want := range []string{
-			"catalog version " + w + " is newer than gbai 1.2.3",
-			"go install github.com/testeos-z/gbai-team/apps/cli/cmd/gbai@v" + w,
+			"catalog version " + w + " is newer than gabo 1.2.3",
+			"go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@v" + w,
 		} {
 			if !strings.Contains(err.Error(), want) {
 				t.Fatalf("error %q lacks %q", err, want)
@@ -214,7 +214,7 @@ func TestUnusableVersionsChangeNothing(t *testing.T) {
 	}{
 		{"dev binary", "dev", map[string]string{}, `binary version "dev"`},
 		{"vcs pseudo-version", "v1.4.1-0.20261027120000-abc123def456+dirty", map[string]string{}, `binary version "v1.4.1-0.20261027120000-abc123def456+dirty"`},
-		{"garbage stamp", "1.2.3", map[string]string{stamp: "latest\n"}, `.gbai/VERSION holds "latest"`},
+		{"garbage stamp", "1.2.3", map[string]string{stamp: "latest\n"}, `.gabo/VERSION holds "latest"`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -231,8 +231,8 @@ func TestUnusableVersionsChangeNothing(t *testing.T) {
 	}
 }
 
-// gbai no longer ships an MCP server (T042) nor places skills in runtime
-// folders (T039): every write stays under .gbai/.
+// gabo no longer ships an MCP server (T042) nor places skills in runtime
+// folders (T039): every write stays under .gabo/.
 func TestWritesNoRuntimeFoldersNorMCP(t *testing.T) {
 	t.Parallel()
 	s := newStore(nil)
@@ -250,11 +250,11 @@ func TestWritesNoRuntimeFoldersNorMCP(t *testing.T) {
 	}
 }
 
-// A symlinked .gbai, .gbai/skills or stamp would make init delete or write
+// A symlinked .gabo, .gabo/skills or stamp would make init delete or write
 // outside the project, so init refuses before any change.
 func TestRefusesSymlinkedCatalogPaths(t *testing.T) {
 	t.Parallel()
-	for _, p := range []string{root + "/.gbai", root + "/.gbai/skills", stamp} {
+	for _, p := range []string{root + "/.gabo", root + "/.gabo/skills", stamp} {
 		for _, files := range []map[string]string{{}, {config: cfgYAML}} {
 			s := newStore(files)
 			s.Modes = map[string]fs.FileMode{p: fs.ModeSymlink}
@@ -268,9 +268,9 @@ func TestRefusesSymlinkedCatalogPaths(t *testing.T) {
 		}
 	}
 	s := newStore(nil)
-	s.Modes = map[string]fs.FileMode{root + "/.gbai": 0}
+	s.Modes = map[string]fs.FileMode{root + "/.gabo": 0}
 	if _, err := run(t, s, "1.2.3"); err == nil || len(s.Writes) != 0 {
-		t.Fatalf(".gbai as a file: err %v writes %v", err, s.Writes)
+		t.Fatalf(".gabo as a file: err %v writes %v", err, s.Writes)
 	}
 }
 
@@ -288,7 +288,7 @@ func TestSetupPromptPrintedOnlyOnFreshProject(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "catalog copied to .gbai/skills (1.2.3)\n" +
+	want := "catalog copied to .gabo/skills (1.2.3)\n" +
 		"next: open your agent in this project and paste this prompt\n" + prompt
 	if got := joined(out) + "\n"; got != want {
 		t.Fatalf("output:\n%q\nwant:\n%q", got, want)

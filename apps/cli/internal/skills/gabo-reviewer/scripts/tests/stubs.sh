@@ -3,7 +3,7 @@
 # it after lib.sh. git itself is real; the origin is a local bare repository
 # standing in for GitHub, so every test runs offline.
 #
-# make_stubs <dir>: writes fake gh, claude, go and gbai into <dir>. Every call
+# make_stubs <dir>: writes fake gh, claude, go and gabo into <dir>. Every call
 # is appended to $STUB_LOG. The checks and the review run with a scrubbed
 # environment, so the stubs read their settings from <dir>/stub-context when
 # STUB_LOG is unset; write_stub_context <dir> refreshes that file.
@@ -17,13 +17,13 @@
 # Fake claude: prints one JSON result per $CLAUDE_MODE (pass | fail | error |
 # garbage | modify | preamble | both | forge) and records its prompt and
 # environment.
-# Fake go and gbai: fail when their args match $FAIL_CHECK and record their
-# argv, cwd and whether a credential leaked into their environment. `gbai
-# version` prints "gbai $GBAI_VERSION" (default 0.4.0).
+# Fake go and gabo: fail when their args match $FAIL_CHECK and record their
+# argv, cwd and whether a credential leaked into their environment. `gabo
+# version` prints "gabo $GABO_VERSION" (default 0.4.0).
 
 write_stub_context() {
   local v
-  for v in STUB_LOG FIXTURE FAIL_CHECK CLAUDE_MODE GBAI_VERSION; do
+  for v in STUB_LOG FIXTURE FAIL_CHECK CLAUDE_MODE GABO_VERSION; do
     printf '%s=%q\n' "$v" "${!v:-}"
   done >"$1/stub-context"
 }
@@ -97,13 +97,13 @@ if [[ -n "${FAIL_CHECK:-}" ]] && grep -Eq -- "$FAIL_CHECK" <<<"$args"; then
 fi
 echo "ok: $args"
 GO
-  cat >"$dir/gbai" <<'GBAI'
+  cat >"$dir/gabo" <<'GABO'
 #!/usr/bin/env bash
 [[ -n "${STUB_LOG:-}" ]] || source "$(dirname "$0")/stub-context"
-args="gbai $*"
-echo "gbai-call $* GABO_UPGRADE_PR=${GABO_UPGRADE_PR:-unset} GH_TOKEN=${GH_TOKEN:-unset} HOME=$HOME" >>"$STUB_LOG"
+args="gabo $*"
+echo "gabo-call $* GABO_UPGRADE_PR=${GABO_UPGRADE_PR:-unset} GH_TOKEN=${GH_TOKEN:-unset} HOME=$HOME" >>"$STUB_LOG"
 case "${1:-}" in
-  version) echo "gbai ${GBAI_VERSION:-0.4.0}" ;;
+  version) echo "gabo ${GABO_VERSION:-0.4.0}" ;;
   check)
     if [[ -n "${FAIL_CHECK:-}" ]] && grep -Eq -- "$FAIL_CHECK" <<<"$args"; then
       echo "error: $args failed"
@@ -111,16 +111,16 @@ case "${1:-}" in
     fi
     [[ "${GABO_UPGRADE_PR:-}" != 1 ]] || echo "upgrade PR: only config validated, human merge required"
     echo "ok: $args" ;;
-  *) echo "unexpected gbai call: $args" >&2; exit 3 ;;
+  *) echo "unexpected gabo call: $args" >&2; exit 3 ;;
 esac
-GBAI
-  chmod +x "$dir/gh" "$dir/claude" "$dir/go" "$dir/gbai"
+GABO
+  chmod +x "$dir/gh" "$dir/claude" "$dir/go" "$dir/gabo"
 }
 
-# write_yaml <file>: a gbai.yaml for the fixture repository. Knobs (env):
+# write_yaml <file>: a gabo.yaml for the fixture repository. Knobs (env):
 # O_AUTO_MERGE (false), O_PLACEMENT (local), O_MARKER (gbai-reviewer-bot),
 # O_CHECKS (newline-separated; default the three go checks), O_REPO
-# (testeos-z/gabo-ai).
+# (example-org/example-repo).
 write_yaml() {
   local checks="${O_CHECKS:-go -C apps/cli build ./...
 go -C apps/cli vet ./...
@@ -131,7 +131,7 @@ go -C apps/cli test ./...}"
     echo "mode: auto"
     echo
     echo "repo:"
-    echo "  name: ${O_REPO:-testeos-z/gabo-ai}"
+    echo "  name: ${O_REPO:-example-org/example-repo}"
     echo "  integration_branch: dev"
     echo
     echo "runtimes:"
@@ -152,7 +152,7 @@ go -C apps/cli test ./...}"
       [[ -n "$c" ]] && echo "    - $c"
     done <<<"$checks"
     echo "  auto_merge: ${O_AUTO_MERGE:-false} # owner note"
-    echo "  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gbai.yaml, .claude/]"
+    echo "  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/]"
     echo
     echo "developers:"
     echo "  \"owner@example.com\": Owner"
@@ -161,38 +161,38 @@ go -C apps/cli test ./...}"
 
 # make_origin <dir>: a bare repository with a dev branch, a PR head at
 # refs/pull/7/head and GitHub's merge result at refs/pull/7/merge (parents:
-# dev tip, head); dev moved on after the merge base. The base holds gbai.yaml
-# (write_yaml), a catalog copy under .gbai/skills/ whose runtime skill
+# dev tip, head); dev moved on after the merge base. The base holds gabo.yaml
+# (write_yaml), a catalog copy under .gabo/skills/ whose runtime skill
 # declares the agent directory .claude/agents, and, when O_STAMP is set, the
-# stamp .gbai/VERSION. O_PR picks what the PR head changes:
+# stamp .gabo/VERSION. O_PR picks what the PR head changes:
 #   code     apps/cli/main.go (default)
-#   skills   only .gbai/skills/gabo-coder/SKILL.md
-#   upgrade  .gbai/VERSION (to O_HEAD_STAMP, default 9.9.9), a catalog skill,
+#   skills   only .gabo/skills/gabo-coder/SKILL.md
+#   upgrade  .gabo/VERSION (to O_HEAD_STAMP, default 9.9.9), a catalog skill,
 #            an agent file and apps/cli/main.go
 # Sets BASE_SHA, DEV_SHA, HEAD_SHA, MERGE_SHA.
 make_origin() {
   local dir="$1" src="$1-src"
   local g=(git -c user.name=test -c user.email=test@example.com -c commit.gpgsign=false -c init.defaultBranch=dev)
   "${g[@]}" init -q "$src"
-  mkdir -p "$src/apps/cli" "$src/.gbai/skills/gabo-coder" "$src/.gbai/skills/gabo-runtime-claude" "$src/.claude/agents"
+  mkdir -p "$src/apps/cli" "$src/.gabo/skills/gabo-coder" "$src/.gabo/skills/gabo-runtime-claude" "$src/.claude/agents"
   echo "# Base rules" >"$src/AGENTS.md"
   echo "package main" >"$src/apps/cli/main.go"
-  write_yaml "$src/gbai.yaml"
-  printf -- '---\nname: gabo-coder\n---\nCoder rules.\n' >"$src/.gbai/skills/gabo-coder/SKILL.md"
+  write_yaml "$src/gabo.yaml"
+  printf -- '---\nname: gabo-coder\n---\nCoder rules.\n' >"$src/.gabo/skills/gabo-coder/SKILL.md"
   printf -- '---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\nRuntime.\n' \
-    >"$src/.gbai/skills/gabo-runtime-claude/SKILL.md"
+    >"$src/.gabo/skills/gabo-runtime-claude/SKILL.md"
   printf -- '---\nname: gabo-coder\n---\ngabo-version: 0.4.0\n' >"$src/.claude/agents/gabo-coder.md"
-  [[ -z "${O_STAMP:-}" ]] || echo "$O_STAMP" >"$src/.gbai/VERSION"
+  [[ -z "${O_STAMP:-}" ]] || echo "$O_STAMP" >"$src/.gabo/VERSION"
   "${g[@]}" -C "$src" add -A
   "${g[@]}" -C "$src" commit -qm base
   BASE_SHA="$(git -C "$src" rev-parse HEAD)"
   "${g[@]}" -C "$src" checkout -qb feature
   case "${O_PR:-code}" in
     code) printf 'package main\n\nfunc main() {}\n' >"$src/apps/cli/main.go" ;;
-    skills) echo "Edited coder rules." >>"$src/.gbai/skills/gabo-coder/SKILL.md" ;;
+    skills) echo "Edited coder rules." >>"$src/.gabo/skills/gabo-coder/SKILL.md" ;;
     upgrade)
-      echo "${O_HEAD_STAMP:-9.9.9}" >"$src/.gbai/VERSION"
-      echo "New coder rules." >>"$src/.gbai/skills/gabo-coder/SKILL.md"
+      echo "${O_HEAD_STAMP:-9.9.9}" >"$src/.gabo/VERSION"
+      echo "New coder rules." >>"$src/.gabo/skills/gabo-coder/SKILL.md"
       printf -- '---\nname: gabo-coder\n---\ngabo-version: 9.9.9\n' >"$src/.claude/agents/gabo-coder.md"
       printf 'package main\n\nfunc main() {}\n' >"$src/apps/cli/main.go"
       ;;

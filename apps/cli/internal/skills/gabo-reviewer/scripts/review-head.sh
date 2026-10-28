@@ -8,7 +8,7 @@
 #    merged with this head; a conflicting PR gets a blocking comment only.
 # 3. Runs review.checks (argv, no shell) in a fresh worktree of the merge
 #    result with a scrubbed, credential-free environment; a "gabo check"
-#    entry runs REVIEWER_GABO_BIN. A PR that changes .gbai/VERSION is an
+#    entry runs REVIEWER_GABO_BIN. A PR that changes .gabo/VERSION is an
 #    upgrade PR: its checks get GABO_UPGRADE_PR=1 and the comment reports
 #    "upgrade PR: only config validated, human merge required" with the
 #    changed paths outside the catalog and the agent directories. The
@@ -220,7 +220,7 @@ while IFS= read -r check; do
   i=$((i + 1))
   read -ra argv <<<"$check"
   # "gabo check" runs only when review.checks lists it, with the configured
-  # binary (gbai until T062).
+  # binary.
   ! is_gabo_check "${argv[0]}" "${argv[1]:-}" || argv[0]="$GABO_BIN"
   name="check-$i"
   started=$SECONDS

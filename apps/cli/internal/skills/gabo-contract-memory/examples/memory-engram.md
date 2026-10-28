@@ -1,6 +1,6 @@
-# memory-engram: example adapter for the gbai memory contract
+# memory-engram: example adapter for the gabo memory contract
 
-Fills the `memory` slot with the Engram MCP tools (`mem_save`, `mem_update`, `mem_search`, `mem_get_observation`). Copy it to `.gbai/adapters/memory-engram.md` and point `slots.memory.adapter` at it.
+Fills the `memory` slot with the Engram MCP tools (`mem_save`, `mem_update`, `mem_search`, `mem_get_observation`). Copy it to `.gabo/adapters/memory-engram.md` and point `slots.memory.adapter` at it.
 
 Notes:
 
@@ -10,20 +10,20 @@ Notes:
 
 | record | topic key |
 |---|---|
-| decision | `gbai/decision/<wave>/<task or global>/<slug>` |
-| resource ledger | `gbai/ledger/<wave>` |
-| wave trace | `gbai/trace/<wave>` |
+| decision | `gabo/decision/<wave>/<task or global>/<slug>` |
+| resource ledger | `gabo/ledger/<wave>` |
+| wave trace | `gabo/trace/<wave>` |
 | preference | `user/preferences` |
 
 ## Operations
 
 ### save decision
 
-`mem_save` with `type: decision`, `topic_key: gbai/decision/<wave>/<task>/<slug>`, title `<what>` and content lines `what:`, `question:`, `choice:`, `reason:`, `mode:`, `wave:`, `task:`, `resolver:`.
+`mem_save` with `type: decision`, `topic_key: gabo/decision/<wave>/<task>/<slug>`, title `<what>` and content lines `what:`, `question:`, `choice:`, `reason:`, `mode:`, `wave:`, `task:`, `resolver:`.
 
 ### list decisions
 
-`mem_search` with query `gbai/decision/<wave>` (add `/<task>` to narrow) plus `mode: <manual|auto>` when filtering by mode; open each hit with `mem_get_observation` and drop records whose fields do not match the filter.
+`mem_search` with query `gabo/decision/<wave>` (add `/<task>` to narrow) plus `mode: <manual|auto>` when filtering by mode; open each hit with `mem_get_observation` and drop records whose fields do not match the filter.
 
 ### search
 
@@ -35,19 +35,19 @@ Notes:
 
 ### save ledger
 
-`mem_search` for `gbai/ledger/<wave>`; if found, `mem_get_observation`, append the new lines and `mem_update`; otherwise `mem_save` with `topic_key: gbai/ledger/<wave>`. Line format: `<kind> <name or path> creator=<agent> task=<T###> state=<live|removed|leftover>`.
+`mem_search` for `gabo/ledger/<wave>`; if found, `mem_get_observation`, append the new lines and `mem_update`; otherwise `mem_save` with `topic_key: gabo/ledger/<wave>`. Line format: `<kind> <name or path> creator=<agent> task=<T###> state=<live|removed|leftover>`.
 
 ### read ledger
 
-`mem_search` for `gbai/ledger/<wave>`, then `mem_get_observation`.
+`mem_search` for `gabo/ledger/<wave>`, then `mem_get_observation`.
 
 ### save wave trace
 
-Same pattern as `save ledger` on `gbai/trace/<wave>`; the content is one line per task: `<T###> status=<s> pr=#<n> verdict=<v> questions=<n>`.
+Same pattern as `save ledger` on `gabo/trace/<wave>`; the content is one line per task: `<T###> status=<s> pr=#<n> verdict=<v> questions=<n>`.
 
 ### read wave trace
 
-`mem_search` for `gbai/trace/<wave>` (or `gbai/trace/` for the latest), then `mem_get_observation`.
+`mem_search` for `gabo/trace/<wave>` (or `gabo/trace/` for the latest), then `mem_get_observation`.
 
 ### save preference
 

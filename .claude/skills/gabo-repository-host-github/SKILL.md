@@ -1,14 +1,14 @@
 ---
 name: gabo-repository-host-github
-description: "Trigger: gbai repository host, open PR, PR status, PR checks, merge into dev, delete branch. GitHub adapter for the gbai repository_host slot via gh and git."
+description: "Trigger: gabo repository host, open PR, PR status, PR checks, merge into dev, delete branch. GitHub adapter for the gabo repository_host slot via gh and git."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "0.1"
 ---
 ## Activation Contract
 
-Use whenever a gbai agent works with branches or pull requests. Fills the `repository_host` slot contract (TRD 9.1). Repository `repo.name`, integration branch `repo.integration_branch` from `gbai.yaml` (here `R=testeos-z/gabo-ai`, `dev`).
+Use whenever a gabo agent works with branches or pull requests. Fills the `repository_host` slot contract (TRD 9.1). Repository `repo.name`, integration branch `repo.integration_branch` from `gabo.yaml` (here `R=testeos-z/gabo-ai`, `dev`).
 
 ## Hard Rules
 

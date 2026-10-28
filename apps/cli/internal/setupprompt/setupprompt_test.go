@@ -60,7 +60,7 @@ func TestPromptTellsTheStepsInOrder(t *testing.T) {
 		"`gabo-agent-templates`",
 		"`gabo-runtime-builder`",
 		"global user file",
-		"`gbai.yaml`",
+		"`gabo.yaml`",
 		"build every agent",
 		"run `gabo check`",
 		"smoke test",
@@ -73,7 +73,7 @@ func TestPromptTellsTheStepsInOrder(t *testing.T) {
 		}
 		rest = rest[i+len(s):]
 	}
-	for _, want := range []string{".gbai/skills/", "https://"} {
+	for _, want := range []string{".gabo/skills/", "https://"} {
 		if !strings.Contains(Text, want) {
 			t.Errorf("prompt lacks %q", want)
 		}

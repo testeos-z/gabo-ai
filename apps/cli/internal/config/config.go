@@ -1,4 +1,4 @@
-// Package config loads and validates gbai.yaml.
+// Package config loads and validates gabo.yaml.
 package config
 
 import (
@@ -23,7 +23,7 @@ const (
 	RuntimePi     Runtime = "pi"
 )
 
-// Config is the validated content of gbai.yaml.
+// Config is the validated content of gabo.yaml.
 type Config struct {
 	Runtimes Runtimes `yaml:"runtimes"`
 	Repo     Repo     `yaml:"repo"`

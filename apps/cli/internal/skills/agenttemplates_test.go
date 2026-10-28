@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/agentspec"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
 )
 
 // agentSlots are the named slots an agent template may carry (TRD 8.1, D24):
@@ -124,7 +124,7 @@ func TestAgentTemplatesSkillTellsToFillOnlyTheSlots(t *testing.T) {
 	t.Parallel()
 	skill := embeddedByPath(t)[agentspec.Dir+"/SKILL.md"]
 	want := []string{
-		"Fill only the named slots", "invent nothing", ".gbai/VERSION", versionLine,
+		"Fill only the named slots", "invent nothing", ".gabo/VERSION", versionLine,
 		"named after its spec `id`", "## Slots",
 	}
 	for _, s := range agentSlots {

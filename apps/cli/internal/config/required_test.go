@@ -159,8 +159,8 @@ func TestSuggestionsAreReadOnly(t *testing.T) {
 func TestLoadLayersFailsOnMissingRequiredKey(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gbai/config.yaml": string(without(t, "parallelism")) + "parallelism: 4\n",
-		"/src/p/gbai.yaml":                 "parallelism: null\n",
+		"/home/o/.config/gabo/config.yaml": string(without(t, "parallelism")) + "parallelism: 4\n",
+		"/src/p/gabo.yaml":                 "parallelism: null\n",
 	}
 	_, err := LoadLayers(r, twoLayers())
 	if err == nil || !strings.Contains(err.Error(), "✗ parallelism missing") || !strings.HasSuffix(err.Error(), NextSetup) {

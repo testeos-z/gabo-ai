@@ -1,9 +1,9 @@
 ---
 name: gabo-direct-sessions-orca
-description: "Trigger: direct session, talk to the coder, intervene in a task, open a session in a worktree, Orca terminal, direct_sessions adapter. Orca CLI adapter for the gbai direct_sessions slot."
+description: "Trigger: direct session, talk to the coder, intervene in a task, open a session in a worktree, Orca terminal, direct_sessions adapter. Orca CLI adapter for the gabo direct_sessions slot."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract

@@ -133,22 +133,22 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"`gabo-methodology`", "`Closes #<n>`", "summary", "resources created", "test databases",
 			"fix rounds used", "Max 4 fix rounds",
 		},
-		// T051: J1 step 7 and J4 step 5; replaces `gbai config set` (T015).
+		// T051: J1 step 7 and J4 step 5; replaces `gabo config set` (T015).
 		"gabo-config-writer/SKILL.md": {
-			"personal keys", "global user file", "`gbai.yaml`", "`alias`, `interaction_level`, `tone`, `language`",
+			"personal keys", "global user file", "`gabo.yaml`", "`alias`, `interaction_level`, `tone`, `language`",
 			"Keep every comment", "`# yaml-language-server: $schema=", "R12", "auto mode", "save decision",
 			"R21", "env var name", "refuse", "outside the schemas", "`gabo check`", "after each write",
-			"`gbai config set`", "`additionalProperties: false`",
+			"`gabo config set`", "`additionalProperties: false`",
 		},
 		"gabo-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
 			"handle", "fallback sweep", "in-process", "D23", "never writes DONE",
-			// T024: J3, J8, J10 and J11 through the skill alone (no gbai command, no state dir).
+			// T024: J3, J8, J10 and J11 through the skill alone (no gabo command, no state dir).
 			"blocked-by links", "before each coder round", "rule 1", "rule 2", "rule 3",
-			"4 fix rounds", "Unverified writes", "test databases", "no `gbai` command",
+			"4 fix rounds", "Unverified writes", "test databases", "no `gabo` command",
 			"no state dir", "D15", "D17", "skips DONE", "reattach", "disagreement",
-			"never guess", "TRD 9.2", "save the wave report", "`gbai/trace/<wave>`",
-			"`gbai/ledger/<wave>`",
+			"never guess", "TRD 9.2", "save the wave report", "`gabo/trace/<wave>`",
+			"`gabo/ledger/<wave>`",
 			// T061: the report format lives in gabo-wave-report.
 			"`gabo-wave-report`",
 		},
@@ -158,13 +158,13 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"answer and resolver", "R5", "interaction count", "reasons", "R29",
 			"Unverified writes", "R24", "leftovers", "test databases", "merged tasks still open", "R13",
 			"plan-change proposals", "denied board moves", "resume disagreements", "comfort answer", "R17",
-			"`memory`", "save wave trace", "last entry of `gbai/trace/<wave>`", "read it back", "unverified",
+			"`memory`", "save wave trace", "last entry of `gabo/trace/<wave>`", "read it back", "unverified",
 			"`Wave <n>: <done> done, <blocked> blocked`", "UX 1.5", "none",
 		},
 		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
 		"gabo-assistant/SKILL.md": {
 			"default point of contact", "Never block", "only the owner", "user.email",
-			"`developers`", "global `alias` wins", "Ask once", "No `gbai` command",
+			"`developers`", "global `alias` wins", "Ask once", "No `gabo` command",
 			"`tone`", "`language`", "terminal",
 			"resume the owning coder", "PR #<n> merged", "D23", "close report",
 			// T026: J3 and J4 wave start and report, modes, decision records, comfort
@@ -174,7 +174,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"one question at a time", "`interaction_level`", "`low`", "`balanced`", "`high`",
 			"never prompt", "save decision", "`what`, `question`, `choice`, `reason`, `mode`, `wave`, `task`",
 			"list decisions", "filter", "critical question", "directiva",
-			"comfort question", "fewer, about right, or more", "`gbai check`",
+			"comfort question", "fewer, about right, or more", "`gabo check`",
 			"## Personalization", "stable layer", "learning layer", "`user/preferences`",
 			"global scope", "project scope", "about 3 times", "read preferences", "save preference",
 			"secrets", "sensitive", "setup start", "time since setup start", "first wave report",
@@ -188,7 +188,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"## Intervene in a Task (J5)", "mediate by default", "three mediated exchanges",
 			"offer a direct session once", "APP_FLOW A5", "`direct_sessions` slot",
 			"`gabo-direct-sessions-orca`", "open session", "`gabo-<task id>`", "context brief",
-			"no `gbai` command", "Orca is unavailable", "keep mediating", "say why",
+			"no `gabo` command", "Orca is unavailable", "keep mediating", "say why",
 			"commits, task and memory", "without redoing work", "close session",
 			"only your own terminal", "only on the owner's request", "R14", "R18", "D9",
 		},
@@ -225,15 +225,15 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		"gabo-doc-guide/SKILL.md": {
 			"docs/product/PRD.md", "docs/product/stories/", "docs/product/TRD.md", "docs/product/IMPLEMENTATION_PLAN.md",
 			"docs/product/DB_SCHEMA.md", "docs/product/UX_UI.md", "docs/product/APP_FLOW.md", "DESIGN.md",
-			"setup prompt", ".gbai/skills/", "adds no rule", "`gabo-plan-reviewer`",
+			"setup prompt", ".gabo/skills/", "adds no rule", "`gabo-plan-reviewer`",
 		},
 		// The former cloud keys of the core config (DB_SCHEMA 2.3).
 		"gabo-contract-agent-host/SKILL.md": {
 			"server.railway", "users.orca", "bot.login", "sessions.{coder, reviewer, assistant}.prompt_file",
-			"sessions.local_orca", "/etc/gbai/gbai.yaml",
+			"sessions.local_orca", "/etc/gabo/gabo.yaml",
 		},
 		"gabo-contract-agent-host/examples/agent-host-railway.md": {
-			"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gbai/gbai.yaml",
+			"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gabo/gabo.yaml",
 		},
 	}
 	for _, f := range files {
@@ -345,7 +345,7 @@ func TestContractsListOperationsAndExamplesCoverThem(t *testing.T) {
 }
 
 // The shipped direct_sessions adapter (T060) covers every contract operation
-// with the Orca CLI, and the retired gbai-orca-inbox skill is named nowhere in
+// with the Orca CLI, and the retired gabo-orca-inbox skill is named nowhere in
 // the catalog.
 func TestDirectSessionsOrcaAdapter(t *testing.T) {
 	t.Parallel()
@@ -390,10 +390,10 @@ func TestReviewerPlacementLocalAdapter(t *testing.T) {
 		t.Errorf("gabo-reviewer-placement-local/SKILL.md: operations %q, want %q", got, want)
 	}
 	for _, s := range []string{
-		`bash "${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha>`,
+		`bash "${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha>`,
 		"PR #<n> head <40-hex sha>", "placement=local mode=single-user", "PREFLIGHT-FAILED",
 		"VERDICT PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>",
-		"gbai/reviewer", "isolated", "another adapter", "merges itself", "never posts the reviewer marker",
+		"gabo/reviewer", "isolated", "another adapter", "merges itself", "never posts the reviewer marker",
 	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-reviewer-placement-local/SKILL.md: missing %q", s)
@@ -420,7 +420,7 @@ func TestAgentHostRailwayOrcaAdapter(t *testing.T) {
 		t.Errorf("gabo-agent-host-railway-orca/SKILL.md: operations %q, want %q", got, want)
 	}
 	for _, s := range []string{
-		"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gbai/gbai.yaml",
+		"server.railway", "users.orca", "bot.login", "prompt_file", "sessions.local_orca", "/etc/gabo/gabo.yaml",
 		"RAILWAY_TOKEN", "railway status", "Railway MCP", "orca terminal create", "--environment",
 		"orca terminal close", "orca terminal list", "single-user", "isolated",
 	} {
@@ -486,7 +486,7 @@ func TestAgentHostLocalAdapter(t *testing.T) {
 		"| `bot.login` | `not used` |",
 		"| `sessions.{coder, reviewer, assistant}.prompt_file` | `not used` |",
 		"| `sessions.local_orca` | `not used` |",
-		"| `/etc/gbai/gbai.yaml` | `not used` |",
+		"| `/etc/gabo/gabo.yaml` | `not used` |",
 	} {
 		if !strings.Contains(adapter, s) {
 			t.Errorf("gabo-agent-host-local/SKILL.md: missing %q", s)
@@ -593,11 +593,11 @@ func TestReviewerSkillShipsItsScripts(t *testing.T) {
 	var got []string
 	for _, f := range files {
 		got = append(got, f.Path)
-		// The repository comes from gbai.yaml; only the TRD 9.4 module path
-		// of the upgrade command may name the old repository.
-		rest := strings.ReplaceAll(string(f.Data), "github.com/testeos-z/gbai-team/apps/cli/cmd/gbai", "")
-		if strings.Contains(rest, "testeos-z/gbai-team") {
-			t.Errorf("%s: hardcodes the repository testeos-z/gbai-team", f.Path)
+		// The repository comes from gabo.yaml; only the TRD 9.4 module path
+		// of the upgrade command may name the repository.
+		rest := strings.ReplaceAll(string(f.Data), "github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo", "")
+		if strings.Contains(rest, "testeos-z/gabo-ai") {
+			t.Errorf("%s: hardcodes the repository testeos-z/gabo-ai", f.Path)
 		}
 		if f.Path == "gabo-reviewer/SKILL.md" {
 			fm, ok := frontmatter(string(f.Data))
@@ -631,7 +631,7 @@ func TestCatalogLeavesOutTheReviewerSkill(t *testing.T) {
 }
 
 // The shell tests of the reviewer scripts run against fake gh, claude, go and
-// gbai and a local bare repository, so they run with the Go suite (and in
+// gabo and a local bare repository, so they run with the Go suite (and in
 // review.checks) wherever their tools exist.
 func TestReviewerScriptsShellTests(t *testing.T) {
 	t.Parallel()
@@ -659,7 +659,7 @@ func TestReviewerScriptsShellTests(t *testing.T) {
 }
 
 // The neutral agent spec ships with the catalog, so the project copy under
-// .gbai/skills/ holds it too (TRD 8.1, D24).
+// .gabo/skills/ holds it too (TRD 8.1, D24).
 func TestCatalogShipsTheAgentSpec(t *testing.T) {
 	t.Parallel()
 	files, err := Files()

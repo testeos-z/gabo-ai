@@ -3,7 +3,7 @@ name: gabo-frontend
 description: "Trigger: UX, UI, Storybook, components, design tokens, CSS, DESIGN.md, app flow, frontend. Designs UX/UI, components, tokens and the app flow."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.2"
 ---
 ## Activation Contract

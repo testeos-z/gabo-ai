@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-// dbSchemaExample is the project gbai.yaml example of DB_SCHEMA 4.2.
-const dbSchemaExample = `# yaml-language-server: $schema=https://raw.githubusercontent.com/testeos-z/gbai-team/main/schemas/gbai.project.schema.json
+// dbSchemaExample is the project gabo.yaml example of DB_SCHEMA 4.2.
+const dbSchemaExample = `# yaml-language-server: $schema=https://raw.githubusercontent.com/testeos-z/gabo-ai/main/schemas/gabo.project.schema.json
 version: 1
 mode: manual
 
 repo:
-  name: testeos-z/gbai-team
+  name: testeos-z/gabo-ai
   integration_branch: dev
 
 runtimes:
@@ -21,24 +21,24 @@ runtimes:
 
 slots:
   tasks:
-    adapter: .gbai/adapters/tasks-gh.md
+    adapter: .gabo/adapters/tasks-gh.md
   memory:
-    adapter: .gbai/adapters/memory-engram.md
+    adapter: .gabo/adapters/memory-engram.md
   notifications:
-    adapter: .gbai/adapters/notify-task-comment.md
+    adapter: .gabo/adapters/notify-task-comment.md
   direct_sessions:
-    adapter: .gbai/adapters/sessions-orca.md
+    adapter: .gabo/adapters/sessions-orca.md
   methodology:
-    adapter: .gbai/adapters/methodology-tdd.md
+    adapter: .gabo/adapters/methodology-tdd.md
   repository_host:
-    adapter: .gbai/adapters/host-github.md
+    adapter: .gabo/adapters/host-github.md
   reviewer_placement:
-    adapter: .gbai/adapters/reviewer-local.md
+    adapter: .gabo/adapters/reviewer-local.md
 
 reviewer:
   placement: local
   signing:
-    marker: gbai-review
+    marker: gabo-review
 
 review:
   checks:
@@ -70,10 +70,10 @@ func TestParseDBSchemaExample(t *testing.T) {
 	if got := len(cfg.Slots); got != 7 {
 		t.Errorf("slots = %d, want 7", got)
 	}
-	if got := cfg.Slots[SlotMethodology].Adapter; got != ".gbai/adapters/methodology-tdd.md" {
+	if got := cfg.Slots[SlotMethodology].Adapter; got != ".gabo/adapters/methodology-tdd.md" {
 		t.Errorf("slots.methodology.adapter = %q", got)
 	}
-	if cfg.Reviewer.Placement != PlacementLocal || cfg.Reviewer.Signing.Marker != "gbai-review" {
+	if cfg.Reviewer.Placement != PlacementLocal || cfg.Reviewer.Signing.Marker != "gabo-review" {
 		t.Errorf("reviewer = %+v", cfg.Reviewer)
 	}
 	if cfg.Developers["leo@example.com"] != "Leo" {
@@ -92,7 +92,7 @@ func TestParseAcceptsEverySlotName(t *testing.T) {
 	var b strings.Builder
 	b.WriteString(minimal + "slots:\n")
 	for _, s := range SlotNames {
-		b.WriteString("  " + s + ":\n    adapter: .gbai/adapters/" + s + ".md\n")
+		b.WriteString("  " + s + ":\n    adapter: .gabo/adapters/" + s + ".md\n")
 	}
 	cfg, err := Parse([]byte(b.String()))
 	if err != nil {

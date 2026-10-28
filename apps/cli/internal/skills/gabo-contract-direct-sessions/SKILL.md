@@ -1,9 +1,9 @@
 ---
 name: gabo-contract-direct-sessions
-description: "Trigger: direct sessions contract, direct_sessions slot, talk to a coder, intervene in a task, session in a worktree, adapter coverage. Operations every gbai direct sessions adapter must cover."
+description: "Trigger: direct sessions contract, direct_sessions slot, talk to a coder, intervene in a task, session in a worktree, adapter coverage. Operations every gabo direct sessions adapter must cover."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract

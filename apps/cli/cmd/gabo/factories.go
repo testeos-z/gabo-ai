@@ -7,17 +7,17 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/setupprompt"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/check"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel/osfs"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/setupprompt"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/initcmd"
 )
 
 // reviewerSkillDir is the user-level location of the gabo-reviewer skill
-// (TRD 9.4): ${XDG_DATA_HOME:-~/.local/share}/gbai/skills/gabo-reviewer. A
+// (TRD 9.4): ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer. A
 // relative XDG_DATA_HOME is ignored, as the XDG spec requires.
 func reviewerSkillDir(getenv func(string) string) (string, error) {
 	data := getenv("XDG_DATA_HOME")
@@ -28,7 +28,7 @@ func reviewerSkillDir(getenv func(string) string) (string, error) {
 		}
 		data = filepath.Join(home, ".local", "share")
 	}
-	return filepath.Join(data, "gbai", "skills", "gabo-reviewer"), nil
+	return filepath.Join(data, "gabo", "skills", "gabo-reviewer"), nil
 }
 
 // initFactory builds the init run lazily, so help and usage errors never
@@ -79,6 +79,7 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 			Version:   version,
 			Layers:    config.LayerPaths(getenv, project),
 			UpgradePR: getenv("GABO_UPGRADE_PR") == "1",
+			Former:    config.FormerNames(getenv, project),
 		}), nil
 	}
 }

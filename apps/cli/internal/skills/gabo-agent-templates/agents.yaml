@@ -1,4 +1,4 @@
-# Neutral agent spec (TRD 8.1, D24): every gbai agent that runs from an agent
+# Neutral agent spec (TRD 8.1, D24): every gabo agent that runs from an agent
 # file. Engine-independent: runtime skills turn each entry and its template
 # into the engine's agent format, naming the agent file after its id.
 #

@@ -102,8 +102,8 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"null optional values":    with("mode:\ncoder:\nworktree:\nslots:\nreviewer:\ndevelopers:\nplan_change:\nversion:\nalias:\nlanguage:\n"),
 		"empty optional strings":  with(`{mode: "", coder: {login: ""}, reviewer: {placement: "", signing: {marker: ""}}, plan_change: {scope: ""}, interaction_level: "", language: ""}`),
 		"pi reviewer with env":    with("runtimes: {reviewer: pi}\nreview: {pi_credential_env: ANTHROPIC_API_KEY}"),
-		"bot coder login":         with("coder: {login: 'gbai-coder[bot]'}"),
-		"state dir":               with("review: {state_dir: /data/gbai/reviewer}"),
+		"bot coder login":         with("coder: {login: 'gabo-coder[bot]'}"),
+		"state dir":               with("review: {state_dir: /data/gabo/reviewer}"),
 		"keep name and abs path":  with("worktree: {keep: [main, /srv/wt/x]}"),
 		"methodology skill name":  with("slots: {methodology: {adapter: gabo-methodology}}"),
 		"human only dir and file": with("review: {human_only_paths: [.github/, AGENTS.md, ..x/]}"),
@@ -148,7 +148,7 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"escaping human_only path":    with("review: {human_only_paths: [../x/]}"),
 		"bad pi env":                  with("review: {pi_credential_env: anthropic-key}"),
 		"relative state dir":          with("review: {state_dir: data/reviewer}"),
-		"bad coder login":             with("coder: {login: 'gbai coder'}"),
+		"bad coder login":             with("coder: {login: 'gabo coder'}"),
 		"keep with slash":             with("worktree: {keep: [a/b]}"),
 		"keep dot":                    with("worktree: {keep: [..]}"),
 		"blank keep":                  with(`worktree: {keep: [""]}`),
@@ -201,7 +201,7 @@ const dbSchemaProjectExample = `
 version: 1
 mode: manual
 repo:
-  name: testeos-z/gbai-team
+  name: testeos-z/gabo-ai
   integration_branch: dev
 runtimes:
   coder: claude
@@ -209,25 +209,25 @@ runtimes:
   reviewer: pi
 slots:
   tasks:
-    adapter: .gbai/adapters/tasks-gh.md
+    adapter: .gabo/adapters/tasks-gh.md
   memory:
-    adapter: .gbai/adapters/memory-engram.md
+    adapter: .gabo/adapters/memory-engram.md
   notifications:
-    adapter: .gbai/adapters/notify-task-comment.md
+    adapter: .gabo/adapters/notify-task-comment.md
   direct_sessions:
-    adapter: .gbai/adapters/sessions-orca.md
+    adapter: .gabo/adapters/sessions-orca.md
   methodology:
-    adapter: .gbai/adapters/methodology-tdd.md
+    adapter: .gabo/adapters/methodology-tdd.md
   repository_host:
-    adapter: .gbai/adapters/host-github.md
+    adapter: .gabo/adapters/host-github.md
   reviewer_placement:
-    adapter: .gbai/adapters/reviewer-local.md
+    adapter: .gabo/adapters/reviewer-local.md
   agent_host:
-    adapter: .gbai/adapters/agent-host-local.md
+    adapter: .gabo/adapters/agent-host-local.md
 reviewer:
   placement: local
   signing:
-    marker: gbai-review
+    marker: gabo-review
 review:
   checks:
     - go test ./...
@@ -235,9 +235,9 @@ review:
   auto_merge: false
   human_only_paths: [.github/, AGENTS.md, CLAUDE.md]
   pi_credential_env: ANTHROPIC_API_KEY
-  state_dir: /data/gbai/reviewer
+  state_dir: /data/gabo/reviewer
 coder:
-  login: gbai-coder
+  login: gabo-coder
 worktree:
   keep: [main]
 developers:
@@ -248,7 +248,7 @@ plan_change:
 parallelism: 3
 `
 
-// The editor-facing project schema accepts the repository's own gbai.yaml
+// The editor-facing project schema accepts the repository's own gabo.yaml
 // and the DB_SCHEMA example, and flags personal keys, which belong in the
 // user file.
 func TestProjectSchema(t *testing.T) {
@@ -257,7 +257,7 @@ func TestProjectSchema(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, doc := range map[string]string{"gbai.yaml": string(own), "example": dbSchemaProjectExample} {
+	for name, doc := range map[string]string{"gabo.yaml": string(own), "example": dbSchemaProjectExample} {
 		if err := ValidateSchema(SchemaProject, []byte(doc)); err != nil {
 			t.Errorf("%s: ValidateSchema(project) error = %v", name, err)
 		}
@@ -361,20 +361,20 @@ func walkSchema(s map[string]any, path string, fn func(string, map[string]any)) 
 func TestLoadLayersValidatesEveryLayerAgainstItsSchema(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gbai/config.yaml": "runtimes: {coder: codex}\n",
-		"/src/p/gbai.yaml":                 minimal,
+		"/home/o/.config/gabo/config.yaml": "runtimes: {coder: codex}\n",
+		"/src/p/gabo.yaml":                 minimal,
 	}
 	_, err := LoadLayers(r, twoLayers())
-	if err == nil || !strings.Contains(err.Error(), "config /home/o/.config/gbai/config.yaml: runtimes.coder: ") {
+	if err == nil || !strings.Contains(err.Error(), "config /home/o/.config/gabo/config.yaml: runtimes.coder: ") {
 		t.Fatalf("LoadLayers() error = %v, want the user layer's schema error", err)
 	}
-	r = files{"/src/p/gbai.yaml": minimal + "review_typo: 1\n"}
-	if _, err := LoadLayers(r, twoLayers()); err == nil || !strings.Contains(err.Error(), "config /src/p/gbai.yaml: ") {
+	r = files{"/src/p/gabo.yaml": minimal + "review_typo: 1\n"}
+	if _, err := LoadLayers(r, twoLayers()); err == nil || !strings.Contains(err.Error(), "config /src/p/gabo.yaml: ") {
 		t.Fatalf("LoadLayers() error = %v, want the project layer named", err)
 	}
 	// A personal key in the project file is still only a warning, whatever
 	// its value: it is dropped before the project layer is validated.
-	r = files{"/src/p/gbai.yaml": minimal + "interaction_level: 7\n"}
+	r = files{"/src/p/gabo.yaml": minimal + "interaction_level: 7\n"}
 	res, err := LoadLayers(r, twoLayers())
 	if err != nil || len(res.Warnings) != 1 {
 		t.Fatalf("LoadLayers() = %v, %v; want one warning and no error", res.Warnings, err)

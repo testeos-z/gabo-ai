@@ -1,9 +1,9 @@
 ---
 name: gabo-coder
-description: "Trigger: gbai coder, implement issue, worktree coder, open PR, request review, fix review findings. Rules for a coder subagent working one task in its own worktree."
+description: "Trigger: gabo coder, implement issue, worktree coder, open PR, request review, fix review findings. Rules for a coder subagent working one task in its own worktree."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "2.1"
 ---
 ## Activation Contract
@@ -46,7 +46,7 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. T
 1. Verify through `repository_host` (read status) that the PR is merged into `repo.integration_branch` from your branch, and note its merged head SHA. Not merged, or another base or head branch ⇒ change nothing, report HANDED "not merged".
 2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
 3. Remove the worktree only if all hold, else keep it and its local branch, list them under `leftovers:` and skip the local branch in step 4:
-   - it is not in `worktree.keep` (`gbai.yaml`);
+   - it is not in `worktree.keep` (`gabo.yaml`);
    - `git -C <wt> status --porcelain --ignored=matching`, run before any removal, shows only committed work and rebuildable output (removal deletes ignored files);
    - `git worktree remove <wt>` succeeds, never `--force`.
 4. Delete the branch through `repository_host` (delete branch). A refused branch goes under `leftovers:`.

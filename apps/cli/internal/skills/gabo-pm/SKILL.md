@@ -1,9 +1,9 @@
 ---
 name: gabo-pm
-description: "Trigger: PRD, product requirements, user stories, product manager, scope definition, plan change. Writes the PRD and stories for a gbai project."
+description: "Trigger: PRD, product requirements, user stories, product manager, scope definition, plan change. Writes the PRD and stories for a gabo project."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "2.3"
 ---
 ## Activation Contract

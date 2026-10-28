@@ -1,14 +1,14 @@
 ---
 name: gabo-doc-guide
-description: "Trigger: which doc to read, where is it documented, doc map, find the right skill, product docs, setup prompt, gbai documents. Map of the gbai documents: which one answers which question."
+description: "Trigger: which doc to read, where is it documented, doc map, find the right skill, product docs, setup prompt, gabo documents. Map of the gabo documents: which one answers which question."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
 
-Load when an agent or the owner needs to know which gbai document answers a question. This guide is only a map: it adds no rule, and every rule stays in the document it points to. When a document and this map disagree, the document wins.
+Load when an agent or the owner needs to know which gabo document answers a question. This guide is only a map: it adds no rule, and every rule stays in the document it points to. When a document and this map disagree, the document wins.
 
 ## Product docs
 
@@ -29,12 +29,12 @@ Each project keeps its product docs in `docs/product/`, written from the templat
 
 | question | read |
 |---|---|
-| How does a project start using gbai, in which order, and which skills does setup load? | The setup prompt: `gabo init` prints it on a fresh project; the gabo-ai repository keeps it in `docs/setup-prompt.md`. |
+| How does a project start using gabo, in which order, and which skills does setup load? | The setup prompt: `gabo init` prints it on a fresh project; the gabo-ai repository keeps it in `docs/setup-prompt.md`. |
 | How are the config files and slot adapters chosen and verified? | `gabo-setup` |
 
 ## Catalog skills
 
-`gabo init` copies the skill catalog into `.gbai/skills/`. Each skill's frontmatter `description` starts with `Trigger:` and lists the questions it answers; for a skill not listed below, read that line.
+`gabo init` copies the skill catalog into `.gabo/skills/`. Each skill's frontmatter `description` starts with `Trigger:` and lists the questions it answers; for a skill not listed below, read that line.
 
 | question | skill |
 |---|---|

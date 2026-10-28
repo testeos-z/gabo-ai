@@ -1,9 +1,9 @@
 ---
 name: gabo-agent-host-railway-orca
-description: "Trigger: agent host, agent_host adapter, cloud agents, Railway server, remote Orca, start agent session, stop agent session, where agents run. Railway plus Orca adapter for the gbai agent_host slot."
+description: "Trigger: agent host, agent_host adapter, cloud agents, Railway server, remote Orca, start agent session, stop agent session, where agents run. Railway plus Orca adapter for the gabo agent_host slot."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
@@ -35,7 +35,7 @@ The former cloud keys of the core config (DB_SCHEMA 2.3, TRD 9.3) live here. Val
 | `sessions.reviewer.prompt_file` | `not used`: the reviewer prompt is in Session prompts below |
 | `sessions.assistant.prompt_file` | `not used`: the assistant prompt is in Session prompts below |
 | `sessions.local_orca` | `orca` (local CLI), saved environment named by env var `GABO_ORCA_ENVIRONMENT` |
-| `/etc/gbai/gbai.yaml` | `not used`: its values are the fields above |
+| `/etc/gabo/gabo.yaml` | `not used`: its values are the fields above |
 
 Credentials, by name only:
 

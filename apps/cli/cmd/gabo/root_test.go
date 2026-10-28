@@ -11,8 +11,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/setupprompt"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/setupprompt"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 )
 
 // The work-time (T042) and the review and plan commands (T043) were retired
@@ -52,12 +52,12 @@ func TestRootVersionSubcommand(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got := out.String(); got != "gbai 1.2.3\n" {
+	if got := out.String(); got != "gabo 1.2.3\n" {
 		t.Fatalf("output = %q", got)
 	}
 }
 
-// runInit runs `gbai init` in a temporary project with a temporary HOME and
+// runInit runs `gabo init` in a temporary project with a temporary HOME and
 // XDG_DATA_HOME, so the user-level reviewer install never reaches real data.
 func runInit(t *testing.T, project, version string) (string, error) {
 	t.Helper()
@@ -83,21 +83,21 @@ func TestInitCopiesEmbeddedCatalogWithoutReviewer(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, f := range embedded {
-		got, err := os.ReadFile(filepath.Join(project, ".gbai", "skills", filepath.FromSlash(f.Path)))
+		got, err := os.ReadFile(filepath.Join(project, ".gabo", "skills", filepath.FromSlash(f.Path)))
 		if err != nil || !bytes.Equal(got, f.Data) {
 			t.Fatalf("%s not copied byte for byte: %v", f.Path, err)
 		}
 	}
 	// The reviewer skill and its scripts never enter the repository (D20).
-	if _, err := os.Stat(filepath.Join(project, ".gbai", "skills", "gabo-reviewer")); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(filepath.Join(project, ".gabo", "skills", "gabo-reviewer")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("gabo-reviewer copied into the project: %v", err)
 	}
-	if stamp, _ := os.ReadFile(filepath.Join(project, ".gbai", "VERSION")); string(stamp) != "1.2.3\n" {
+	if stamp, _ := os.ReadFile(filepath.Join(project, ".gabo", "VERSION")); string(stamp) != "1.2.3\n" {
 		t.Fatalf("stamp = %q", stamp)
 	}
 	entries, _ := os.ReadDir(project)
-	if len(entries) != 1 || entries[0].Name() != ".gbai" {
-		t.Fatalf("project holds %v, want only .gbai", entries)
+	if len(entries) != 1 || entries[0].Name() != ".gabo" {
+		t.Fatalf("project holds %v, want only .gabo", entries)
 	}
 	// The setup prompt follows the next step verbatim and is written nowhere (D25).
 	if !strings.HasSuffix(out, "next: open your agent in this project and paste this prompt\n"+setupprompt.Text) {
@@ -111,24 +111,24 @@ func TestInitCopiesEmbeddedCatalogWithoutReviewer(t *testing.T) {
 func TestInitNewerStampExitsWithUpgradeCommand(t *testing.T) {
 	project := t.TempDir()
 	cfg := []byte("repo:\n  name: o/r\n")
-	if err := os.WriteFile(filepath.Join(project, "gbai.yaml"), cfg, 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(project, "gabo.yaml"), cfg, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if out, err := runInit(t, project, "1.2.3"); err != nil {
 		t.Fatalf("restore on missing stamp: %v\n%s", err, out)
 	}
-	if err := os.WriteFile(filepath.Join(project, ".gbai", "VERSION"), []byte("9.0.0\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(project, ".gabo", "VERSION"), []byte("9.0.0\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	before := snapshot(t, project)
 	_, err := runInit(t, project, "1.2.3")
-	if err == nil || !strings.Contains(err.Error(), "go install github.com/testeos-z/gbai-team/apps/cli/cmd/gbai@v9.0.0") {
+	if err == nil || !strings.Contains(err.Error(), "go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@v9.0.0") {
 		t.Fatalf("err = %v", err)
 	}
 	if after := snapshot(t, project); !maps.Equal(before, after) {
 		t.Fatal("newer stamp changed the project")
 	}
-	if got, _ := os.ReadFile(filepath.Join(project, "gbai.yaml")); !bytes.Equal(got, cfg) {
+	if got, _ := os.ReadFile(filepath.Join(project, "gabo.yaml")); !bytes.Equal(got, cfg) {
 		t.Fatalf("config changed: %q", got)
 	}
 }
@@ -151,9 +151,9 @@ func snapshot(t *testing.T, dir string) map[string]string {
 	return m
 }
 
-// A committed .gbai symlink must not let init delete or write outside the
+// A committed .gabo symlink must not let init delete or write outside the
 // project.
-func TestInitRefusesSymlinkedGbaiDir(t *testing.T) {
+func TestInitRefusesSymlinkedGaboDir(t *testing.T) {
 	project, outside := t.TempDir(), t.TempDir()
 	keep := filepath.Join(outside, "skills", "mine", "SKILL.md")
 	if err := os.MkdirAll(filepath.Dir(keep), 0o755); err != nil {
@@ -162,12 +162,12 @@ func TestInitRefusesSymlinkedGbaiDir(t *testing.T) {
 	if err := os.WriteFile(keep, []byte("mine"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(outside, filepath.Join(project, ".gbai")); err != nil {
+	if err := os.Symlink(outside, filepath.Join(project, ".gabo")); err != nil {
 		t.Fatal(err)
 	}
 	before := snapshot(t, outside)
 	if _, err := runInit(t, project, "1.2.3"); err == nil {
-		t.Fatal("init accepted a symlinked .gbai")
+		t.Fatal("init accepted a symlinked .gabo")
 	}
 	if after := snapshot(t, outside); !maps.Equal(before, after) {
 		t.Fatalf("outside changed:\n%v\n%v", before, after)
@@ -223,7 +223,7 @@ func TestInitInstallsReviewerUnderXDGDataHome(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("init: %v\n%s", err, out.String())
 	}
-	dir := filepath.Join(data, "gbai", "skills", "gabo-reviewer")
+	dir := filepath.Join(data, "gabo", "skills", "gabo-reviewer")
 	assertUserReviewer(t, dir, "1.2.3")
 	if !strings.HasPrefix(out.String(), "reviewer skill installed to "+dir+" (1.2.3)\n") {
 		t.Fatalf("output:\n%s", out.String())
@@ -239,13 +239,13 @@ func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
 		t.Setenv("XDG_DATA_HOME", xdg)
 		t.Chdir(project)
 		cfg := []byte("repo:\n  name: o/r\n")
-		if err := os.WriteFile(filepath.Join(project, "gbai.yaml"), cfg, 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(project, "gabo.yaml"), cfg, 0o644); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.MkdirAll(filepath.Join(project, ".gbai"), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Join(project, ".gabo"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(project, ".gbai", "VERSION"), []byte("1.2.3\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(project, ".gabo", "VERSION"), []byte("1.2.3\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		before := snapshot(t, project)
@@ -256,7 +256,7 @@ func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
 		if err := root.Execute(); err != nil {
 			t.Fatalf("XDG_DATA_HOME=%q: %v\n%s", xdg, err, out.String())
 		}
-		assertUserReviewer(t, filepath.Join(home, ".local", "share", "gbai", "skills", "gabo-reviewer"), "1.2.3")
+		assertUserReviewer(t, filepath.Join(home, ".local", "share", "gabo", "skills", "gabo-reviewer"), "1.2.3")
 		if after := snapshot(t, project); !maps.Equal(before, after) {
 			t.Fatalf("XDG_DATA_HOME=%q: matching stamp changed the project", xdg)
 		}
@@ -267,7 +267,7 @@ func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
 // has; a second run leaves the current copy untouched.
 func TestInitReplacesOlderUserReviewerThenLeavesItAlone(t *testing.T) {
 	project, data := t.TempDir(), t.TempDir()
-	dir := filepath.Join(data, "gbai", "skills", "gabo-reviewer")
+	dir := filepath.Join(data, "gabo", "skills", "gabo-reviewer")
 	if err := os.MkdirAll(filepath.Join(dir, "scripts"), 0o755); err != nil {
 		t.Fatal(err)
 	}
