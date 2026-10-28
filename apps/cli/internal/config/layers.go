@@ -103,6 +103,10 @@ func LoadFile(r Reader, name string) (Resolution, error) {
 	}
 	res.Layers[0].Found = true
 	cfg, err := Parse(b)
+	if err == nil {
+		// The Go errors come first: they carry the R12 "✗ <key> missing" form.
+		err = ValidateSchema(SchemaLayer, b)
+	}
 	if err != nil {
 		return res, fmt.Errorf("config %s: %w", name, err)
 	}
@@ -115,7 +119,8 @@ func LoadFile(r Reader, name string) (Resolution, error) {
 // layer overrides a lower one field by field (see Merge). Missing files are
 // skipped; unknown keys and an unsupported version fail per file, and
 // version is kept out of the merged document. Validation runs once on the
-// merged result; no layer value is filled in. Layers are returned with Found set, even on error.
+// merged result; no layer value is filled in. Every layer is also validated
+// against its JSON Schema before the merge. Layers are returned with Found set, even on error.
 func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 	res := Resolution{Layers: append([]Layer(nil), layers...)}
 	var merged map[string]any
@@ -140,11 +145,17 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 		if version < 0 || version > MaxVersion {
 			return res, fmt.Errorf("config %s: version: must be between 0 and %d, got %d", l.Path, MaxVersion, version)
 		}
-		// version describes one file, not the merged document.
-		delete(doc, "version")
 		if l.Name == LayerProject {
 			res.Warnings = append(res.Warnings, dropPersonalKeys(doc, l.Path)...)
 		}
+		// Each layer is checked against its schema on its own, so a bad
+		// value fails in the file that holds it even when a higher layer
+		// overrides it. Personal keys are already gone from the project layer.
+		if err := validateLayer(l.Name, doc); err != nil {
+			return res, fmt.Errorf("config %s: %w", l.Path, err)
+		}
+		// version describes one file, not the merged document.
+		delete(doc, "version")
 		merged = Merge(merged, doc)
 		used = append(used, l.Path)
 	}
@@ -167,6 +178,19 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 	}
 	res.Config = cfg
 	return res, nil
+}
+
+// validateLayer validates one decoded layer: the user file against the user
+// schema, any other layer against the layer schema. Required keys are left to
+// the merged result.
+func validateLayer(name string, doc map[string]any) error {
+	if doc == nil {
+		return nil
+	}
+	if name == LayerUser {
+		return validateValue(SchemaUser, doc)
+	}
+	return validateValue(SchemaLayer, doc)
 }
 
 // decodeLayer checks a layer's keys against Config (unknown keys fail) and
