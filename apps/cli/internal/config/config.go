@@ -80,7 +80,8 @@ func (r Repo) Owner() string { o, _, _ := strings.Cut(r.Name, "/"); return o }
 // Repo returns the repository part of Name.
 func (r Repo) Repo() string { _, n, _ := strings.Cut(r.Name, "/"); return n }
 
-// Review configures `gbai review run` and its checks side.
+// Review configures the user-level reviewer scripts (gabo-reviewer skill,
+// D20), which read these keys from the project config.
 type Review struct {
 	// Checks are run in order inside a copy of the merged tree, without
 	// GitHub credentials. Each is split on whitespace into argv; no shell is
@@ -92,32 +93,8 @@ type Review struct {
 	// credential; required when runtimes.reviewer is pi.
 	PiCredentialEnv string `yaml:"pi_credential_env"`
 	// StateDir holds the reviewer's own clone, worktrees and check
-	// workspaces. Empty means $XDG_STATE_HOME/gbai/reviewer, else
-	// ~/.local/state/gbai/reviewer, resolved on the host that runs the review.
+	// workspaces. Empty means the reviewer scripts' default state dir.
 	StateDir string `yaml:"state_dir,omitempty"`
-}
-
-// StateDirFrom resolves the reviewer state dir with getenv (os.Getenv).
-func (r Review) StateDirFrom(getenv func(string) string) (string, error) {
-	if r.StateDir != "" {
-		return r.StateDir, nil
-	}
-	if xdg := getenv("XDG_STATE_HOME"); path.IsAbs(xdg) {
-		return path.Join(xdg, "gbai", "reviewer"), nil
-	}
-	if home := getenv("HOME"); path.IsAbs(home) {
-		return path.Join(home, ".local", "state", "gbai", "reviewer"), nil
-	}
-	return "", errors.New("reviewer state dir: set review.state_dir, XDG_STATE_HOME or HOME")
-}
-
-// CheckArgv returns each check split into argv.
-func (r Review) CheckArgv() [][]string {
-	out := make([][]string, 0, len(r.Checks))
-	for _, c := range r.Checks {
-		out = append(out, strings.Fields(c))
-	}
-	return out
 }
 
 var (

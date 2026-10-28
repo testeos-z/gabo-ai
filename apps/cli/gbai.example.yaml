@@ -1,7 +1,7 @@
 # gbai configuration example. Secrets never go here, in any layer: only the
 # names of the environment variables that carry them.
 #
-# Without --config, gbai merges up to two layers, lowest to highest precedence
+# gbai merges up to two layers, lowest to highest precedence
 # (there is no system layer: /etc/gbai/gbai.yaml is never read):
 #   1. user:    $XDG_CONFIG_HOME/gbai/config.yaml, else ~/.config/gbai/config.yaml
 #   2. project: gbai.yaml at the git top-level of the current directory
@@ -12,8 +12,7 @@
 # former cloud keys (server, users, bot, sessions) fail naming their key path
 # and slots.agent_host; gbai never rewrites a config file.
 # Validation runs once on the merged result. gbai fills no key: a missing
-# required key fails with `✗ <key> missing` and `next: run setup`. `--config <file>` reads exactly
-# that one file.
+# required key fails with `✗ <key> missing` and `next: run setup`.
 
 runtimes:
   coder: claude
@@ -24,7 +23,7 @@ repo:
   name: cappy-lab/vulcam
   integration_branch: dev
 
-# `gbai review run` and its checks side.
+# Read by the user-level reviewer scripts (gabo-reviewer skill, D20).
 review:
   # Run in order inside a copy of the merged tree, with GitHub credentials
   # stripped from the environment; split on whitespace, no shell.
