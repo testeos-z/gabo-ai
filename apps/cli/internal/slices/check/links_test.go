@@ -339,16 +339,14 @@ func TestReviewerLinkWithoutAHomeFails(t *testing.T) {
 	wantFailed(t, r, "✗ reviewer skill dir unknown: set XDG_DATA_HOME or HOME to an absolute path")
 }
 
-// Only the reviewer runtime's skill decides the reviewer link.
+// Only the reviewer runtime's skill decides the reviewer link: a pi coder
+// runtime declaring another reviewer link is not checked for it.
 func TestReviewerLinkOnlyForTheReviewerRuntime(t *testing.T) {
 	t.Parallel()
 	p := linkedProject()
-	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n---\n")
-	cfg := strings.Replace(linkedConfig, "  reviewer: claude", "  reviewer: pi", 1)
-	cfg = strings.Replace(cfg, "  human_only_paths: [.github/]\n", "  human_only_paths: [.github/]\n  pi_credential_env: PI_TOKEN\n", 1)
-	u := goodUser().clone()
-	delete(u.links, userLink)
-	rep, err := NewUseCase(p, configFiles{projectFile: cfg}, u, Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
+	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  reviewer_link: $HOME/.pi/skills/gabo-reviewer\n---\n")
+	cfg := strings.Replace(linkedConfig, "  coder: claude", "  coder: pi", 1)
+	rep, err := NewUseCase(p, configFiles{projectFile: cfg}, goodUser(), Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
 	if err != nil {
 		t.Fatal(err)
 	}

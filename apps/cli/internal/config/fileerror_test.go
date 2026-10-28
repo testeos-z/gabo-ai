@@ -62,3 +62,34 @@ func TestLoadLayersReadErrorIsNoFileError(t *testing.T) {
 		t.Fatalf("error = %v, want a plain read error", err)
 	}
 }
+
+// A pi reviewer fails in the file that sets it, even when a higher layer
+// overrides it, with its key path and its own next step (T072).
+func TestLoadLayersRejectsPiReviewerInItsFile(t *testing.T) {
+	t.Parallel()
+	pi := "runtimes:\n  reviewer: pi\n"
+	for name, tt := range map[string]struct {
+		files    files
+		wantFile string
+	}{
+		"project file": {files{"/src/p/gabo.yaml": strings.Replace(minimal, "reviewer: claude", "reviewer: pi", 1)}, "/src/p/gabo.yaml"},
+		"user file":    {files{"/home/o/.config/gabo/config.yaml": pi, "/src/p/gabo.yaml": minimal}, "/home/o/.config/gabo/config.yaml"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := LoadLayers(tt.files, twoLayers())
+			var fe *FileError
+			if !errors.As(err, &fe) {
+				t.Fatalf("error = %v (%T), want *FileError", err, err)
+			}
+			msg := fe.Err.Error()
+			if fe.File != tt.wantFile || !strings.Contains(msg, `runtimes.reviewer: must be "claude", got "pi"`) || !strings.HasSuffix(msg, NextReviewerClaude) {
+				t.Fatalf("FileError = {%q, %q}, want file %q, the key path and %q last", fe.File, msg, tt.wantFile, NextReviewerClaude)
+			}
+		})
+	}
+	_, err := LoadFile(files{"/x/gabo.yaml": strings.Replace(minimal, "reviewer: claude", "reviewer: pi", 1)}, "/x/gabo.yaml")
+	if err == nil || !strings.Contains(err.Error(), "config /x/gabo.yaml: ") || !strings.Contains(err.Error(), NextReviewerClaude) {
+		t.Fatalf("LoadFile() error = %v, want the file and %q", err, NextReviewerClaude)
+	}
+}

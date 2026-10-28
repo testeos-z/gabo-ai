@@ -47,7 +47,10 @@
           "additionalProperties": false,
           "properties": {
             "coder": { "$ref": "#/$defs/runtime" },
-            "reviewer": { "$ref": "#/$defs/runtime" },
+            "reviewer": {
+              "description": "Reviewer runtime. Only claude: the reviewer scripts run only Claude; a Pi reviewer is not supported yet (T073).",
+              "enum": ["claude", null]
+            },
             "assistant": { "$ref": "#/$defs/runtime" }
           }
         },
@@ -83,7 +86,7 @@
               "items": { "$ref": "#/$defs/relativePath" }
             },
             "pi_credential_env": {
-              "description": "Name of the environment variable that receives the pi model credential; required when runtimes.reviewer is pi. The value never enters the config (R21).",
+              "description": "Name of an environment variable for a future pi reviewer (T073). Optional and without effect: the reviewer scripts run only Claude. The value never enters the config (R21).",
               "type": ["string", "null"],
               "pattern": "^([A-Z_][A-Z0-9_]*)?$"
             },
@@ -204,18 +207,6 @@
           }
         },
         "parallelism": { "type": "integer" }
-      },
-      "if": {
-        "required": ["runtimes"],
-        "properties": { "runtimes": { "required": ["reviewer"], "properties": { "reviewer": { "const": "pi" } } } }
-      },
-      "then": {
-        "properties": {
-          "review": {
-            "required": ["pi_credential_env"],
-            "properties": { "pi_credential_env": { "type": "string", "minLength": 1 } }
-          }
-        }
       }
     },
     "layer": {

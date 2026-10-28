@@ -54,7 +54,7 @@ Write the role's prompt to a file in a `mktemp -d` dir on the owner's machine, n
 | role | agent cli | prompt |
 |---|---|---|
 | coder | `claude` (from `runtimes.coder`) | `You are gabo-coder for task <task id>. Worktree <worktree>, branch <branch>, PR base dev. Follow the gabo-coder skill. Never merge, never force-push, never post the reviewer marker.` |
-| reviewer | `pi` or `claude` (from `runtimes.reviewer`) | `You are gabo-reviewer. Review PR #<pr> head <sha> with the user-level gabo-reviewer scripts and return their VERDICT line. Do not edit, comment or merge yourself.` |
+| reviewer | `claude` (from `runtimes.reviewer`; a Pi reviewer is not supported yet, T073) | `You are gabo-reviewer. Review PR #<pr> head <sha> with the user-level gabo-reviewer scripts and return their VERDICT line. Do not edit, comment or merge yourself.` |
 | assistant | `claude` (from `runtimes.assistant`) | `You are gabo-assistant for this project. Follow the gabo-assistant skill.` |
 
 ## Operations

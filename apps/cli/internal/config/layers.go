@@ -270,6 +270,11 @@ func decodeLayer(b []byte) (map[string]any, int, error) {
 		}
 		return nil, 0, fmt.Errorf("decode yaml: %w", err)
 	}
+	// A pi reviewer fails before the schema so the file gets its own next
+	// step instead of a bare enum error.
+	if probe.Runtimes.Reviewer == RuntimePi {
+		return nil, 0, piReviewerError()
+	}
 	var doc map[string]any
 	if err := yaml.Unmarshal(b, &doc); err != nil {
 		return nil, 0, fmt.Errorf("decode yaml: %w", err)

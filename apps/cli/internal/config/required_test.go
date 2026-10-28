@@ -69,22 +69,50 @@ func TestParseReportsAllMissingKeysAndOneNextStep(t *testing.T) {
 	}
 }
 
-// review.pi_credential_env is only read for the pi reviewer runtime, so it is
-// required exactly then.
-func TestParsePiCredentialEnvRequiredOnlyForPiReviewer(t *testing.T) {
+// The reviewer scripts run only Claude (T072, D27): a pi reviewer fails with
+// the key path and its own next step, while coder and assistant still accept
+// pi.
+func TestParseRejectsPiReviewer(t *testing.T) {
 	t.Parallel()
 	pi := strings.Replace(minimal, "reviewer: claude", "reviewer: pi", 1)
-	_, err := Parse([]byte(pi))
-	if err == nil || !strings.Contains(err.Error(), "✗ review.pi_credential_env missing") || !strings.Contains(err.Error(), "next: run setup") {
-		t.Fatalf("pi reviewer without pi_credential_env: error = %v", err)
+	for name, doc := range map[string]string{
+		"without env": pi,
+		"with env":    pi + "  pi_credential_env: ANTHROPIC_API_KEY\n",
+	} {
+		_, err := Parse([]byte(doc))
+		if err == nil {
+			t.Fatalf("%s: Parse() error = nil, want the pi reviewer rejected", name)
+		}
+		msg := err.Error()
+		for _, want := range []string{`runtimes.reviewer: must be "claude", got "pi"`, NextReviewerClaude} {
+			if !strings.Contains(msg, want) {
+				t.Errorf("%s: error = %q, want %q", name, msg, want)
+			}
+		}
+		if strings.Contains(msg, "pi_credential_env") {
+			t.Errorf("%s: error = %q, want no pi_credential_env requirement", name, msg)
+		}
 	}
-	cfg, err := Parse([]byte(pi + "  pi_credential_env: OPENAI_API_KEY\n"))
-	if err != nil || cfg.Review.PiCredentialEnv != "OPENAI_API_KEY" {
-		t.Fatalf("pi reviewer with pi_credential_env = %q, %v", cfg.Review.PiCredentialEnv, err)
+	if NextReviewerClaude != "next: set runtimes.reviewer to claude; a Pi reviewer is not supported yet (T073)" {
+		t.Errorf("NextReviewerClaude = %q", NextReviewerClaude)
 	}
-	cfg, err = Parse([]byte(minimal))
+	cfg, err := Parse([]byte(strings.NewReplacer("coder: claude", "coder: pi", "assistant: claude", "assistant: pi").Replace(minimal)))
+	if err != nil || cfg.Runtimes.Coder != RuntimePi || cfg.Runtimes.Assistant != RuntimePi {
+		t.Fatalf("pi coder and assistant = %+v, %v; want accepted", cfg.Runtimes, err)
+	}
+}
+
+// review.pi_credential_env is no longer required; when present it still
+// parses and has no effect.
+func TestParsePiCredentialEnvOptional(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal))
 	if err != nil || cfg.Review.PiCredentialEnv != "" {
-		t.Fatalf("claude reviewer: pi_credential_env = %q, %v; want empty and no error", cfg.Review.PiCredentialEnv, err)
+		t.Fatalf("claude reviewer without pi_credential_env = %q, %v; want empty and no error", cfg.Review.PiCredentialEnv, err)
+	}
+	cfg, err = Parse([]byte(minimal + "  pi_credential_env: OPENAI_API_KEY\n"))
+	if err != nil || cfg.Review.PiCredentialEnv != "OPENAI_API_KEY" {
+		t.Fatalf("claude reviewer with pi_credential_env = %q, %v", cfg.Review.PiCredentialEnv, err)
 	}
 }
 
@@ -130,12 +158,11 @@ func TestSuggestionsListFormerDefaults(t *testing.T) {
 	t.Parallel()
 	want := []Suggestion{
 		{Key: "runtimes.coder", Values: []string{"claude"}},
-		{Key: "runtimes.reviewer", Values: []string{"pi"}},
+		{Key: "runtimes.reviewer", Values: []string{"claude"}},
 		{Key: "runtimes.assistant", Values: []string{"claude"}},
 		{Key: "repo.integration_branch", Values: []string{"dev"}},
 		{Key: "review.checks", Values: []string{"bun install --frozen-lockfile", "bun run build", "bun run check-types", "bun run lint", "bun run test"}},
 		{Key: "review.human_only_paths", Values: []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}},
-		{Key: "review.pi_credential_env", Values: []string{"ANTHROPIC_API_KEY"}},
 		{Key: "parallelism", Values: []string{"3"}},
 	}
 	if got := Suggestions(); !reflect.DeepEqual(got, want) {

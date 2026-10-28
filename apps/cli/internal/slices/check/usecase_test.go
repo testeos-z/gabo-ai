@@ -205,6 +205,17 @@ func TestConfigFailureNamesKeyFileAndNext(t *testing.T) {
 	wantLines(t, r, NextFixConfig)
 }
 
+// The reviewer scripts run only Claude (T072): a pi reviewer fails with the
+// file, the key path and its own next step, in any layer.
+func TestPiReviewerFailsWithItsNext(t *testing.T) {
+	t.Parallel()
+	pi := strings.Replace(validConfig, "reviewer: claude", "reviewer: pi", 1)
+	r := run(t, project(), configFiles{projectFile: pi}, Settings{})
+	wantFailed(t, r, "✗ "+projectFile+`: runtimes.reviewer: must be "claude", got "pi"`, config.NextReviewerClaude)
+	r = run(t, project(), configFiles{userFile: "runtimes:\n  reviewer: pi\n", projectFile: validConfig}, Settings{})
+	wantFailed(t, r, "✗ "+userFile+`: runtimes.reviewer: must be "claude", got "pi"`, config.NextReviewerClaude)
+}
+
 func TestFormerCloudKeyFailsNamingAgentHost(t *testing.T) {
 	t.Parallel()
 	r := run(t, project(), configFiles{projectFile: validConfig + "server:\n  host: x\n"}, Settings{})
@@ -287,7 +298,7 @@ func TestRuntimeSkillWithoutAgentDirNamesTheBuilder(t *testing.T) {
 // A runtime skill written by the runtime builder lives in .gabo/runtimes/.
 func TestBuilderWrittenRuntimeSkill(t *testing.T) {
 	t.Parallel()
-	pi := strings.ReplaceAll(validConfig, "reviewer: claude", "reviewer: pi") + "  pi_credential_env: ANTHROPIC_API_KEY\n"
+	pi := strings.ReplaceAll(validConfig, "coder: claude", "coder: pi")
 	proj := with(project(), map[string]string{
 		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n---\n",
 		".pi/agents/alpha.md":                     "---\ngabo-version: 1.2.3\n---\n",
