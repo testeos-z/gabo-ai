@@ -155,6 +155,17 @@ func TestParseReviewExplicit(t *testing.T) {
 	}
 }
 
+func TestParseReviewCheckEnv(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(with("review:\n  check_env: [AISHARE_TEST_DATABASE_URL]\n")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := cfg.Review.CheckEnv; len(got) != 1 || got[0] != "AISHARE_TEST_DATABASE_URL" {
+		t.Fatalf("check_env = %q", got)
+	}
+}
+
 func TestParseReviewValidation(t *testing.T) {
 	t.Parallel()
 	for name, tt := range map[string]struct{ yaml, want string }{
@@ -164,6 +175,8 @@ func TestParseReviewValidation(t *testing.T) {
 		"traversal path":  {"review:\n  human_only_paths: [../x]\n", "review.human_only_paths"},
 		"empty path list": {"review:\n  human_only_paths: []\n", "review.human_only_paths"},
 		"bad env":         {"review:\n  pi_credential_env: \"A=B\"\n", "review.pi_credential_env"},
+		"check env value": {"review:\n  check_env: [\"A=B\"]\n", "review.check_env: entry \"A=B\" must be an environment variable name"},
+		"reserved env":    {"review:\n  check_env: [GH_TOKEN]\n", "review.check_env: entry \"GH_TOKEN\" is reserved"},
 	} {
 		if _, err := Parse([]byte(with(tt.yaml))); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%s: error = %v, want %q", name, err, tt.want)

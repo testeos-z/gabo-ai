@@ -87,6 +87,20 @@
               "type": ["string", "null"],
               "pattern": "^([A-Z_][A-Z0-9_]*)?$"
             },
+            "check_env": {
+              "description": "Names of environment variables the reviewer passes from its own environment into the checks, never into the agent review; a listed variable unset or empty at review time fails the checks. Names only: values never enter the config (R21). The reviewer's own variables and credentials are reserved.",
+              "type": ["array", "null"],
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Z_][A-Z0-9_]*$",
+                "not": {
+                  "anyOf": [
+                    { "enum": ["PATH", "HOME", "CI", "GOCACHE", "GOMODCACHE", "GOPATH", "GABO_UPGRADE_PR"] },
+                    { "pattern": "^(GH|GITHUB|CLAUDE|REVIEWER)_" }
+                  ]
+                }
+              }
+            },
             "state_dir": {
               "description": "Absolute path of the reviewer's clone and workspaces.",
               "type": ["string", "null"],
