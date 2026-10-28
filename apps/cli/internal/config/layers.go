@@ -44,12 +44,16 @@ type FormerName struct {
 }
 
 // FormerNames returns the former user dir and project file locations that
-// resolve, in the order of LayerPaths.
+// resolve, in the order of LayerPaths. The former user dir is probed through
+// each file gabo keeps there: the user config and the reviewer's secrets
+// file (reviewer.env).
 func FormerNames(getenv func(string) string, projectRoot string) []FormerName {
 	var out []FormerName
 	if base := userBase(getenv); base != "" {
 		from := path.Join(base, formerDir)
-		out = append(out, FormerName{Probe: path.Join(from, "config.yaml"), From: from, To: path.Join(base, userDir)})
+		for _, f := range []string{"config.yaml", "reviewer.env"} {
+			out = append(out, FormerName{Probe: path.Join(from, f), From: from, To: path.Join(base, userDir)})
+		}
 	}
 	if projectRoot != "" {
 		from := path.Join(projectRoot, formerProjectFile)

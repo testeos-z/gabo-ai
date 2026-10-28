@@ -171,6 +171,18 @@ func TestFormerConfigNamesFailWithTheRename(t *testing.T) {
 	}
 	r := run(t, project(), configFiles{projectFile: validConfig}, Settings{Former: former})
 	wantPassed(t, r, PassedLine)
+	// Several probes of one former dir (config.yaml, reviewer.env) report it once.
+	twice := []config.FormerName{
+		{Probe: "/home/o/.config/gbai/config.yaml", From: "/home/o/.config/gbai", To: "/home/o/.config/gabo"},
+		{Probe: "/home/o/.config/gbai/reviewer.env", From: "/home/o/.config/gbai", To: "/home/o/.config/gabo"},
+	}
+	r = run(t, project(), configFiles{projectFile: validConfig, "/home/o/.config/gbai/reviewer.env": "X=1\n"}, Settings{Former: twice})
+	wantFailed(t, r, "✗ /home/o/.config/gbai/reviewer.env uses a name from before the gabo-ai rename and is not read",
+		"next: rename /home/o/.config/gbai to /home/o/.config/gabo, then rerun gabo check")
+	r = run(t, project(), configFiles{projectFile: validConfig, "/home/o/.config/gbai/config.yaml": "", "/home/o/.config/gbai/reviewer.env": "X=1\n"}, Settings{Former: twice})
+	if n := strings.Count(joined(r), "next: rename /home/o/.config/gbai to"); n != 1 {
+		t.Fatalf("former dir reported %d times, want 1:\n%s", n, joined(r))
+	}
 	_, err := NewUseCase(project(), failingReader{}, Settings{Version: "1.2.3", Layers: layers(), Former: former}).Run()
 	if err == nil || !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("error = %v, want the read error", err)

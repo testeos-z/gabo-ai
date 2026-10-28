@@ -117,9 +117,14 @@ func (r *Report) fail(lines ...string) {
 func (r *Report) warn(line string) { r.Lines = append(r.Lines, "! "+line) }
 
 // checkFormer fails for each config location still under its name from
-// before the gabo-ai rename, with the rename to make. It only probes.
+// before the gabo-ai rename, with the rename to make, once per location. It
+// only probes.
 func (u *UseCase) checkFormer(r *Report) error {
+	var reported []string
 	for _, f := range u.s.Former {
+		if slices.Contains(reported, f.From) {
+			continue
+		}
 		_, err := u.config.ReadFile(f.Probe)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
@@ -127,6 +132,7 @@ func (u *UseCase) checkFormer(r *Report) error {
 		if err != nil {
 			return fmt.Errorf("read config %s: %w", f.Probe, err)
 		}
+		reported = append(reported, f.From)
 		r.fail("✗ "+f.Probe+" uses a name from before the gabo-ai rename and is not read",
 			"next: rename "+f.From+" to "+f.To+", then rerun gabo check")
 	}

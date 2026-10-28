@@ -250,6 +250,7 @@ func TestFormerNames(t *testing.T) {
 	got := FormerNames(func(k string) string { return env[k] }, "/src/p")
 	want := []FormerName{
 		{Probe: "/home/o/.config/gbai/config.yaml", From: "/home/o/.config/gbai", To: "/home/o/.config/gabo"},
+		{Probe: "/home/o/.config/gbai/reviewer.env", From: "/home/o/.config/gbai", To: "/home/o/.config/gabo"},
 		{Probe: "/src/p/gbai.yaml", From: "/src/p/gbai.yaml", To: "/src/p/gabo.yaml"},
 	}
 	if !reflect.DeepEqual(got, want) {
@@ -257,7 +258,10 @@ func TestFormerNames(t *testing.T) {
 	}
 	env = map[string]string{"XDG_CONFIG_HOME": "/x"}
 	got = FormerNames(func(k string) string { return env[k] }, "")
-	want = []FormerName{{Probe: "/x/gbai/config.yaml", From: "/x/gbai", To: "/x/gabo"}}
+	want = []FormerName{
+		{Probe: "/x/gbai/config.yaml", From: "/x/gbai", To: "/x/gabo"},
+		{Probe: "/x/gbai/reviewer.env", From: "/x/gbai", To: "/x/gabo"},
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("FormerNames() without HOME or project = %+v, want %+v", got, want)
 	}

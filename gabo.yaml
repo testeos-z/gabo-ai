@@ -26,7 +26,9 @@ slots:
   methodology:
     adapter: .claude/skills/gabo-methodology-gentle-ai/SKILL.md
   # The reviewer agent covers the reviewer_placement contract: it invokes the
-  # user-level gbai-reviewer skill scripts and relays the VERDICT line.
+  # user-level gbai-reviewer skill scripts and relays the VERDICT line. Those
+  # hand-installed scripts must read gabo.yaml (not the former name) before this
+  # file reaches dev, or every review ends verdict=error (T062; T052 rebuilds them).
   reviewer_placement:
     adapter: .claude/agents/gabo-reviewer.md
 

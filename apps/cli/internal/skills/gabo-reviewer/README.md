@@ -32,7 +32,7 @@ A conflict is `blocking`; a retryable failure or a refused preflight is `error`;
 1. Preflight: no `sudo`; the trusted location; `jq`, `flock`, `git`, `setsid`; fetches the integration branch into its own mirror and moves its own checkout (`<state>/base`) to the tip, refusing when that checkout is not clean; reads the repository settings from `gabo.yaml` there; `reviewer.placement` must be `local`; the base minimum (below); the `gh` login.
 2. Skips a head that moved, a draft, a fork, a PR to another base, and a head that already has a final `reviewer/review` status or a verdict comment by the bot login.
 3. Fetches GitHub's merge result `refs/pull/<n>/merge` and trusts it only when it is the integration-branch tip merged with the head; a conflict gets a blocking comment.
-4. Runs `review.checks` as argv (no shell) in a fresh worktree of the merge result with `env -i`, its own `HOME`, Go caches under the state dir, `CI=true` and no credential. A `gabo check` or `gabo check` entry runs `REVIEWER_GABO_BIN`; `gabo check` never runs unless listed.
+4. Runs `review.checks` as argv (no shell) in a fresh worktree of the merge result with `env -i`, its own `HOME`, Go caches under the state dir, `CI=true` and no credential. A `gabo check` entry runs `REVIEWER_GABO_BIN`; `gabo check` never runs unless listed.
 5. Reviews the diff with Claude Code, read-only, in the head checkout, with no GitHub token.
 6. Posts one comment (first line the verdict, last lines the marker `<!-- <reviewer.signing.marker> sha=<head> -->` and the footer `🤖 gabo reviewer`), sets `reviewer/tests` and `reviewer/review`, and on a clean head runs the merge gate.
 7. Merge gate (`merge-head.sh`): only with `review.auto_merge: true`, PR open, base the integration branch (never `main` or `master`), same repository, head still the reviewed SHA, both statuses `success` by the bot login, the newest marker comment clean and signing that SHA, and no human-only path; then `gh pr merge <pr> --merge --match-head-commit <sha>`. Human-only paths get a "needs human merge" comment instead.
@@ -72,6 +72,15 @@ Script defaults: `scripts/config.env` (plain `KEY=value`, read as data, never ex
 | `GABO_REVIEWER_STATE_DIR` | `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer` | Own mirror, base checkout, worktrees, caches, logs |
 
 Secrets go only in `${XDG_CONFIG_HOME:-~/.config}/gabo/reviewer.env` (mode 600, refused otherwise; override the path with `REVIEWER_ENV_FILE`): `CLAUDE_CODE_OAUTH_TOKEN` (optional; with it the review runs with an empty HOME, without it the owner's Claude Code login is used) and `REVIEWER_GH_TOKEN` (optional; else gh's stored login). Neither reaches the checks.
+
+## Migrating from the gbai names
+
+The gabo-ai rename (TRD D26) changed every name these scripts read; nothing falls back to the former ones:
+
+- the project config is `gabo.yaml` (was `gbai.yaml`): a reviewer that still reads `gbai.yaml` finds no `repo.name` on the integration branch and every head ends `verdict=error`, so update or reinstall the user-level scripts (`gabo init`) before the rename reaches the integration branch;
+- the user-level copy is `${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer/`; settings in a former `config.env` (for example `REVIEWER_AUTO_MERGE=true`) must be set again in the new one;
+- the secrets file is `${XDG_CONFIG_HOME:-~/.config}/gabo/reviewer.env` and the state dir `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer` (`GABO_REVIEWER_STATE_DIR`); `gabo check` fails while the former config dir still exists;
+- a `review.checks` entry `gbai check` is no longer recognised and runs a `gbai` binary as written: change it to `gabo check`.
 
 ## Tests
 

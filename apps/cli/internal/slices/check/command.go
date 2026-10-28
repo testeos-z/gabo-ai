@@ -49,8 +49,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
 			"    against the embedded JSON Schemas;\n" +
 			"  - no config left under its name from before the gabo-ai rename (a project\n" +
-			"    gbai.yaml or a global gbai config dir): it fails with the rename to make\n" +
-			"    and is never read;\n" +
+			"    gbai.yaml, or a global gbai config dir holding config.yaml or\n" +
+			"    reviewer.env): it fails with the rename to make and is never read;\n" +
 			"  - every agent of the neutral agent spec (" + CatalogDir + "/) in the agent\n" +
 			"    directory each runtime skill declares (metadata.agent_dir);\n" +
 			"  - each agent's gabo-version line against " + StampFile + ";\n" +

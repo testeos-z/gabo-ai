@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load whenever an agent writes a gabo config value: the setup skill at J1 step 7 (write the config), the assistant at J4 step 5 (comfort answer: `interaction_level` and `tone`) and when it stores an alias, and any later slot or runtime change (J7). This skill replaces `gabo config set` (T015, withdrawn; TRD D24): there is no config command, the agent edits the YAML directly and `gabo check` validates it. Until the rename lands the binary also answers to `gabo`, so `gabo check` is the same command. It uses the `memory` slot adapter only in auto mode.
+Load whenever an agent writes a gabo config value: the setup skill at J1 step 7 (write the config), the assistant at J4 step 5 (comfort answer: `interaction_level` and `tone`) and when it stores an alias, and any later slot or runtime change (J7). This skill replaces `gabo config set` (T015, withdrawn; TRD D24): there is no config command, the agent edits the YAML directly and `gabo check` validates it. It uses the `memory` slot adapter only in auto mode.
 
 ## Files
 
