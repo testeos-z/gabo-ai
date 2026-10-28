@@ -13,7 +13,7 @@ import (
 )
 
 var want = []string{
-	"gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-config-writer", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
 	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
@@ -132,6 +132,13 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			// T016: the methodology comes from the slot; the TRD 9.2 outcome and the round limit stay.
 			"`gabo-methodology`", "`Closes #<n>`", "summary", "resources created", "test databases",
 			"fix rounds used", "Max 4 fix rounds",
+		},
+		// T051: J1 step 7 and J4 step 5; replaces `gbai config set` (T015).
+		"gabo-config-writer/SKILL.md": {
+			"personal keys", "global user file", "`gbai.yaml`", "`alias`, `interaction_level`, `tone`, `language`",
+			"Keep every comment", "`# yaml-language-server: $schema=", "R12", "auto mode", "save decision",
+			"R21", "env var name", "refuse", "outside the schemas", "`gabo check`", "after each write",
+			"`gbai config set`", "`additionalProperties: false`",
 		},
 		"gabo-cycle/SKILL.md": {
 			"ledger", "worktree.keep", "Backlog", "Ready", "parallelism", "REFUSED",
