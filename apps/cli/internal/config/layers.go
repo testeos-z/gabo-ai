@@ -47,6 +47,19 @@ type Resolution struct {
 	Warnings []string
 }
 
+// FileError is a config problem in one file: File is its path, or "merged
+// from <paths>" for the merged result. Err holds one "<key path>: <reason>"
+// line per problem (or the R12 "✗ <key> missing" lines). Read errors are
+// never a FileError.
+type FileError struct {
+	File string
+	Err  error
+}
+
+func (e *FileError) Error() string { return "config " + e.File + ": " + e.Err.Error() }
+
+func (e *FileError) Unwrap() error { return e.Err }
+
 // Reader reads a file; a missing file is reported with an error matching
 // fs.ErrNotExist (kernel.FileSystem satisfies it).
 type Reader interface {
@@ -139,11 +152,11 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 		res.Layers[i].Found = true
 		doc, version, err := decodeLayer(b)
 		if err != nil {
-			return res, fmt.Errorf("config %s: %w", l.Path, err)
+			return res, &FileError{File: l.Path, Err: err}
 		}
 		res.Layers[i].Version = version
 		if version < 0 || version > MaxVersion {
-			return res, fmt.Errorf("config %s: version: must be between 0 and %d, got %d", l.Path, MaxVersion, version)
+			return res, &FileError{File: l.Path, Err: fmt.Errorf("version: must be between 0 and %d, got %d", MaxVersion, version)}
 		}
 		if l.Name == LayerProject {
 			res.Warnings = append(res.Warnings, dropPersonalKeys(doc, l.Path)...)
@@ -152,7 +165,7 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 		// value fails in the file that holds it even when a higher layer
 		// overrides it. Personal keys are already gone from the project layer.
 		if err := validateLayer(l.Name, doc); err != nil {
-			return res, fmt.Errorf("config %s: %w", l.Path, err)
+			return res, &FileError{File: l.Path, Err: err}
 		}
 		// version describes one file, not the merged document.
 		delete(doc, "version")
@@ -173,8 +186,13 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 		return res, fmt.Errorf("encode merged config: %w", err)
 	}
 	cfg, err := Parse(b)
+	if err == nil {
+		// The Go errors come first, as in LoadFile; by the parity test the
+		// schema agrees, and this keeps the merged result schema-checked too.
+		err = validateValue(SchemaFile, merged)
+	}
 	if err != nil {
-		return res, fmt.Errorf("config merged from %s: %w", strings.Join(used, ", "), err)
+		return res, &FileError{File: "merged from " + strings.Join(used, ", "), Err: err}
 	}
 	res.Config = cfg
 	return res, nil
