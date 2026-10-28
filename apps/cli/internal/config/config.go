@@ -89,8 +89,8 @@ type Review struct {
 	Checks         []string `yaml:"checks"`
 	AutoMerge      bool     `yaml:"auto_merge"`
 	HumanOnlyPaths []string `yaml:"human_only_paths"`
-	// PiCredentialEnv names the env var that receives the pi model
-	// credential; required when runtimes.reviewer is pi.
+	// PiCredentialEnv names an env var for a future pi reviewer (T073). It
+	// is optional and has no effect: the reviewer scripts run only Claude.
 	PiCredentialEnv string `yaml:"pi_credential_env"`
 	// CheckEnv names environment variables the reviewer passes from its own
 	// environment into the checks (never into the agent review). Names only,
@@ -186,9 +186,10 @@ func (c Config) validate(parallelismSet bool) error {
 	for _, rt := range []struct {
 		field string
 		value Runtime
-	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.reviewer", c.Runtimes.Reviewer}, {"runtimes.assistant", c.Runtimes.Assistant}} {
+	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.assistant", c.Runtimes.Assistant}} {
 		check(rt.value == RuntimeClaude || rt.value == RuntimePi, rt.field, fmt.Sprintf("must be %q or %q, got %q", RuntimeClaude, RuntimePi, rt.value))
 	}
+	check(c.Runtimes.Reviewer == RuntimeClaude, "runtimes.reviewer", fmt.Sprintf("must be %q, got %q", RuntimeClaude, c.Runtimes.Reviewer))
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")
 
@@ -219,5 +220,8 @@ func (c Config) validate(parallelismSet bool) error {
 	}
 	errs = append(errs, c.validateKeyClasses()...)
 	errs = append(errs, c.validateProjectKeys()...)
+	if c.Runtimes.Reviewer == RuntimePi {
+		errs = append(errs, errors.New(NextReviewerClaude))
+	}
 	return withNextSetup(errors.Join(errs...), missing)
 }

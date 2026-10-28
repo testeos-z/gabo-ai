@@ -179,12 +179,22 @@ func (u *UseCase) checkConfig(r *Report) (config.Config, bool, error) {
 	}
 	var fe *config.FileError
 	if errors.As(err, &fe) {
+		// A key's own next step (other than "run setup") is kept, before the
+		// general one.
+		var next []string
 		for _, line := range strings.Split(fe.Err.Error(), "\n") {
 			line = strings.TrimPrefix(strings.TrimSpace(line), "✗ ")
-			if line == "" || strings.HasPrefix(line, "next:") {
+			if line == "" || line == config.NextSetup {
+				continue
+			}
+			if strings.HasPrefix(line, "next:") {
+				next = append(next, line)
 				continue
 			}
 			r.fail("✗ " + fe.File + ": " + line)
+		}
+		for _, line := range next {
+			r.fail(line)
 		}
 		r.fail(NextFixConfig)
 		return config.Config{}, false, nil
