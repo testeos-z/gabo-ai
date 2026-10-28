@@ -1,8 +1,8 @@
-# gbai project config (v0, hand-written before the compiler exists).
+# gabo project config (v0, hand-written before the compiler exists).
 # Keys follow docs/product/DB_SCHEMA.md 3.2 and TRD 9.3. Agents may edit this
-# file directly during the work; `gbai generate` validates it later (TRD D18).
+# file directly during the work; `gabo generate` validates it later (TRD D18).
 # Personal keys (alias, interaction_level, tone, language) do not belong here:
-# they live in ~/.config/gbai/config.yaml (TRD D11, D22).
+# they live in ~/.config/gabo/config.yaml (TRD D11, D22).
 version: 1
 mode: auto
 
@@ -46,7 +46,7 @@ review:
   # heads into dev, never into main (TRD D13). The hand-installed reviewer scripts
   # also need REVIEWER_AUTO_MERGE=true in the user-level skill config.env.
   auto_merge: true
-  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gbai.yaml, .claude/]
+  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/]
 
 # Git email -> alias (TRD D10). OWNER: change "Leo" if you prefer another alias.
 # The local git user.email is dimasmerida15@gmail.com; both emails map to the owner.

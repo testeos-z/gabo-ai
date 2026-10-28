@@ -2,7 +2,7 @@
 
 A container image that brings up a cloud agent ready to work on gabo-ai (T071). It replaces the hand setup on the persistent volume of the current Railway server, which was built from gbai-alejandria `infra/orca-server` and has no Engram in its image.
 
-This image is **not a reviewer environment**: the reviewer gate keeps its own clone, home and scripts (TRD 8.3, D20). Agents in this image follow the gbai rules, so they merge only into `dev`, never `main` (D13).
+This image is **not a reviewer environment**: the reviewer gate keeps its own clone, home and scripts (TRD 8.3, D20). Agents in this image follow the gabo rules, so they merge only into `dev`, never `main` (D13).
 
 ## What the image holds
 
@@ -91,4 +91,4 @@ Download the file and compare `sha256sum` with the published value before commit
 
 ## Review policy
 
-The image runs agents unattended and handles a run-time credential, so this directory should be a human-only path. That is a separate `gbai.yaml` change (add `infra/cloud-agent/` to `review.human_only_paths`) that the owner merges; T071 does not edit `gbai.yaml`.
+The image runs agents unattended and handles a run-time credential, so this directory should be a human-only path. That is a separate `gabo.yaml` change (add `infra/cloud-agent/` to `review.human_only_paths`) that the owner merges; T071 does not edit `gabo.yaml`.

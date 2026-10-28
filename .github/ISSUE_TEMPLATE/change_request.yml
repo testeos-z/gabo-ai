@@ -1,5 +1,5 @@
 name: Change request
-description: Propose a scoped feature, bug fix, documentation, or maintenance change for gbai-team.
+description: Propose a scoped feature, bug fix, documentation, or maintenance change for gabo-ai.
 body:
   - type: markdown
     attributes:

@@ -9,20 +9,18 @@ The block between the two marker comments is the prompt, byte for byte the file 
 The CLI needs Go. Install it with:
 
 ```sh
-go install github.com/testeos-z/gbai-team/apps/cli/cmd/gbai@latest
+go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
 ```
-
-Until the gabo-ai rename lands, the installed command is `gbai`; the prompt says `gabo` and tells the agent to use `gbai` when only that exists.
 
 ## Prompt
 
 <!-- gabo-setup-prompt:begin -->
 Set up gabo-ai in this project. Work in this project's root directory, follow the steps in order, and skip any step whose result already holds, so running this prompt again is safe. Ask me before every choice and apply no value I did not accept. Never write a secret value anywhere; config files hold only the names of environment variables.
 
-1. If the `gabo` command is missing, install the gabo CLI from https://github.com/testeos-z/gabo-ai/blob/main/docs/setup-prompt.md#install-the-cli and check that it runs. Releases before the gabo-ai rename install the command as `gbai`; if only `gbai` exists, use it wherever these steps say `gabo`.
-2. If `.gbai/skills/` is missing, run `gabo init` here.
-3. Load these skills from `.gbai/skills/`: `gabo-setup`, `gabo-config-writer`, `gabo-agent-templates`, and the runtime skill for the engine you are running in; if `.gbai/skills/` holds none for your engine, load `gabo-runtime-builder` and write that runtime skill first.
-4. Following `gabo-setup` and `gabo-config-writer`, ask me the setup questions one at a time, then write the global user file and the project config `gbai.yaml`.
+1. If the `gabo` command is missing, install the gabo CLI from https://github.com/testeos-z/gabo-ai/blob/main/docs/setup-prompt.md#install-the-cli and check that it runs.
+2. If `.gabo/skills/` is missing, run `gabo init` here.
+3. Load these skills from `.gabo/skills/`: `gabo-setup`, `gabo-config-writer`, `gabo-agent-templates`, and the runtime skill for the engine you are running in; if `.gabo/skills/` holds none for your engine, load `gabo-runtime-builder` and write that runtime skill first.
+4. Following `gabo-setup` and `gabo-config-writer`, ask me the setup questions one at a time, then write the global user file and the project config `gabo.yaml`.
 5. With `gabo-agent-templates` and the runtime skill, build every agent of the neutral agent spec in this engine's format.
 6. Run `gabo check`, fix every failure it reports and rerun it until it passes.
 7. Run the per-slot smoke test from `gabo-setup` and report each slot as verified or unverified with the reason.

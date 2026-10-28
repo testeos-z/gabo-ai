@@ -1,6 +1,6 @@
 ---
 name: gabo-reviewer
-description: 'gbai review relay. Use with exactly "PR #<n> head <40-hex sha>" to run the user-level gbai-reviewer scripts for that pinned head and return their VERDICT line. Does not review, edit, comment or merge itself.'
+description: 'gabo review relay. Use with exactly "PR #<n> head <40-hex sha>" to run the user-level gbai-reviewer scripts for that pinned head and return their VERDICT line. Does not review, edit, comment or merge itself.'
 tools: Bash
 model: haiku
 skills:
