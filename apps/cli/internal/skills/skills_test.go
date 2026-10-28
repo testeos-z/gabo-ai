@@ -13,7 +13,7 @@ import (
 )
 
 var want = []string{
-	"gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-config-writer", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
+	"gabo-adapter-writer", "gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-config-writer", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
 	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
@@ -132,6 +132,17 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			// T016: the methodology comes from the slot; the TRD 9.2 outcome and the round limit stay.
 			"`gabo-methodology`", "`Closes #<n>`", "summary", "resources created", "test databases",
 			"fix rounds used", "Max 4 fix rounds",
+		},
+		// T056: J1 steps 5 and 6 and J7: co-write an adapter from its contract,
+		// never invent a command, record it through the config writer, then check.
+		"gabo-adapter-writer/SKILL.md": {
+			"J1 steps 5 and 6", "J7", "`gabo-contract-<slot>`", "`## Operations`",
+			"one `### <operation>` heading per contract operation", "spelled exactly",
+			"fenced code block", "exact commands", "Never invent a command",
+			"one question at a time", "R12", "auto mode", "save decision", "R21", "env var name",
+			"`.gabo/adapters/<slot>-<tool>.md`", "never under `.gabo/skills/`",
+			"`gabo-config-writer`", "`slots.<slot>.adapter`", "`gabo check`",
+			"does not cover", "rerun `gabo check`", "until it passes", "unverified",
 		},
 		// T051: J1 step 7 and J4 step 5; replaces `gabo config set` (T015).
 		"gabo-config-writer/SKILL.md": {
