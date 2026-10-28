@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# Entrypoint of the gabo-ai cloud agent image. Started as root it fixes the
+# ownership of the agent home (a fresh volume is owned by root) and re-runs
+# itself as the agent user. As the agent user it makes sure that:
+#   1. engram is registered as a user-scope Claude Code MCP server;
+#   2. the gabo-ai repository is checked out (from the image seed, else cloned);
+#   3. one Engram Cloud sync runs in the background (skipped when not configured);
+# and then runs the given command (default: keep the container alive).
+# It never reads, writes or prints a credential.
+set -euo pipefail
+
+agent_user="${GABO_AGENT_USER:-agent}"
+
+if [ "$(id -u)" = 0 ]; then
+  home="$(getent passwd "$agent_user" | cut -d: -f6)"
+  mkdir -p "$home"
+  if [ "$(stat -c %U "$home")" != "$agent_user" ]; then
+    chown -R "$agent_user:$agent_user" "$home"
+  fi
+  exec setpriv --reuid="$agent_user" --regid="$agent_user" --init-groups \
+    env HOME="$home" USER="$agent_user" LOGNAME="$agent_user" "$0" "$@"
+fi
+
+log() { echo "gabo-agent-start: $*" >&2; }
+
+repo_dir="${GABO_REPO_DIR:-$HOME/gabo-ai}"
+repo_url="${GABO_REPO_URL:-https://github.com/testeos-z/gabo-ai.git}"
+repo_branch="${GABO_REPO_BRANCH:-dev}"
+repo_seed="${GABO_REPO_SEED:-/opt/gabo-agent/seed.git}"
+
+# 1. Engram MCP server (user scope lives in ~/.claude.json, so a volume mounted
+#    on the home hides the build-time registration; register it again).
+if ! claude mcp get engram >/dev/null 2>&1; then
+  engram_bin="$(command -v engram)"
+  claude mcp add --transport stdio --scope user engram -- "$engram_bin" mcp --tools=agent >/dev/null
+  log "registered engram as a user-scope MCP server"
+fi
+
+# 2. Repository checkout. The seed is a clone made at build time from the
+#    build context; without it, cloning needs whatever git credential the
+#    operator configured at run time.
+if [ ! -e "$repo_dir/.git" ]; then
+  if [ -d "$repo_seed" ]; then
+    git clone --quiet "$repo_seed" "$repo_dir"
+    git -C "$repo_dir" remote set-url origin "$repo_url"
+    if [ "$(git -C "$repo_dir" branch --show-current)" != "$repo_branch" ] &&
+       git -C "$repo_dir" rev-parse --verify --quiet "refs/remotes/origin/$repo_branch" >/dev/null; then
+      git -C "$repo_dir" checkout --quiet "$repo_branch"
+    fi
+    log "checked out ${repo_url} at ${repo_dir} from the image seed"
+  elif git clone --quiet --branch "$repo_branch" "$repo_url" "$repo_dir"; then
+    log "cloned ${repo_url} at ${repo_dir}"
+  else
+    log "could not clone ${repo_url}; the repository is not checked out"
+  fi
+fi
+
+# 3. One Engram Cloud sync at start (a startup reconcile, not a loop).
+if [ "${GABO_ENGRAM_SYNC_ON_START:-1}" != 0 ]; then
+  (gabo-engram-sync || log "Engram Cloud sync failed; run gabo-engram-sync to retry") &
+fi
+
+if [ $# -eq 0 ]; then
+  set -- sleep infinity
+fi
+exec "$@"

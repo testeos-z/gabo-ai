@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Start checks of the gabo-ai cloud agent image: the pinned engram version,
+# engram in `claude mcp list`, the tooling on PATH and the repository checkout.
+# Prints one line per check and exits non-zero when any check fails.
+set -uo pipefail
+
+repo_dir="${GABO_REPO_DIR:-$HOME/gabo-ai}"
+tools="${GABO_REQUIRED_TOOLS:-gentle-ai engram claude codegraph gh git go node npm bun}"
+failures=0
+
+ok() { printf 'ok   %s\n' "$1"; }
+fail() { printf 'FAIL %s\n' "$1"; failures=$((failures + 1)); }
+
+version="$(engram version 2>&1)"
+if [ -n "${GABO_ENGRAM_VERSION:-}" ] && [ "$version" = "engram ${GABO_ENGRAM_VERSION}" ]; then
+  ok "engram version: ${version}"
+else
+  fail "engram version: got '${version}', pinned '${GABO_ENGRAM_VERSION:-<unset>}'"
+fi
+
+if claude mcp list 2>/dev/null | grep -q '^engram: '; then
+  ok "engram MCP server: $(claude mcp list 2>/dev/null | grep '^engram: ')"
+else
+  fail "engram MCP server: not in 'claude mcp list'"
+fi
+
+for tool in $tools; do
+  if path="$(command -v "$tool")"; then
+    ok "on PATH: ${tool} (${path})"
+  else
+    fail "on PATH: ${tool} missing"
+  fi
+done
+
+if git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  ok "repository: ${repo_dir} ($(git -C "$repo_dir" branch --show-current) $(git -C "$repo_dir" rev-parse --short HEAD), origin $(git -C "$repo_dir" remote get-url origin))"
+else
+  fail "repository: ${repo_dir} is not a checkout"
+fi
+
+exit $((failures > 0))

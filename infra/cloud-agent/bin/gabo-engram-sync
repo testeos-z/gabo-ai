@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# One Engram Cloud sync for a project: push local memories, then import what
+# other clients pushed. Skips (exit 0) when Engram reports no cloud
+# configuration; the operator configures Engram Cloud at run time, never the
+# image. Usage: gabo-engram-sync [project]   (default: gabo-ai)
+set -euo pipefail
+
+project="${1:-${GABO_ENGRAM_PROJECT:-gabo-ai}}"
+
+status="$(engram cloud status 2>&1)" || {
+  echo "engram-sync: ${project}: cannot read the Engram Cloud status" >&2
+  exit 1
+}
+if grep -q '^Cloud status: not configured' <<<"$status"; then
+  echo "engram-sync: ${project}: Engram Cloud is not configured; skipped"
+  exit 0
+fi
+
+if ! engram sync --cloud --project "$project"; then
+  echo "engram-sync: ${project}: export failed; import skipped" >&2
+  exit 1
+fi
+if ! engram sync --cloud --import --project "$project"; then
+  echo "engram-sync: ${project}: import failed" >&2
+  exit 1
+fi
+echo "engram-sync: ${project}: ok"
