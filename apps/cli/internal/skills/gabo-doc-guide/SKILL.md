@@ -45,6 +45,7 @@ Each project keeps its product docs in `docs/product/`, written from the templat
 | How does the review gate work, and what does a `VERDICT` line mean? | `gabo-reviewer-notes` |
 | How are product requirements and stories written? | `gabo-pm` |
 | How are the TRD, the plan and the task issues written? | `gabo-dev-lead` |
+| How does a plan change travel, which approval scale applies, and how does the plan reviewer decide? | `gabo-plan-reviewer` |
 | How is the database or configuration schema designed? | `gabo-db-master` |
 | How are UX, UI, tokens and the app flow designed? | `gabo-frontend` |
 | Which agents exist and what is each one's body template? | `gabo-agent-templates` |

@@ -4,7 +4,7 @@ description: "Trigger: TRD, technical design, implementation plan, task breakdow
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "2.2"
+  version: "2.3"
 ---
 ## Activation Contract
 
@@ -21,6 +21,10 @@ Load in the `gabo-dev-lead` subagent to write `docs/product/TRD.md` and `docs/pr
 - Adjustment (J6): adjust tasks in place and never recreate the plan; existing tasks keep their identity: never renumber a `T###` or create a second task for it. A dropped task stays as a row titled `(removed <date>) <title>` with `—` links and the reason, and its tracker task is closed through the `tasks` contract with that reason; a new task takes the next free id. Update `depends_on` and `unblocks` on both sides and the tracker links, re-read them, then run the traceability check. A change to a task in progress applies when its coder finishes the current round.
 - Research request: return a researched answer (findings, sources as URLs or code locations, recommendation, remaining uncertainty); it changes no document or task by itself.
 - Plan changes after the plan exists: own branch, issue and PR touching only `docs/product` and tasks (D7); never inside a code PR.
+
+## Plan-Change Flow
+
+A critical question (it changes scope, the plan or other tasks) follows the `## Plan-Change Flow` of `gabo-plan-reviewer`: one issue and one PR per proposal, the approval scale against `plan_change.*`, and the plan reviewer only when the owner is absent.
 
 ## Traceability check
 

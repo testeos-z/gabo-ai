@@ -15,13 +15,13 @@
 agents:
   - id: gabo-pm
     role: Directiva product manager; writes the PRD and user stories and opens plan-change proposals.
-    skills: [gabo-pm]
+    skills: [gabo-pm, gabo-plan-reviewer]
     tools: [read, search, edit, shell, web, tracker, repository-host, memory, skills]
     launched_by: main-session
     template: agents/gabo-pm.md
   - id: gabo-dev-lead
     role: Directiva dev lead; writes the TRD, the implementation plan and the task issues with dependencies.
-    skills: [gabo-dev-lead]
+    skills: [gabo-dev-lead, gabo-plan-reviewer]
     tools: [read, search, edit, shell, web, tracker, repository-host, memory, skills]
     launched_by: main-session
     template: agents/gabo-dev-lead.md
@@ -39,7 +39,7 @@ agents:
     template: agents/gabo-frontend.md
   - id: gabo-plan-reviewer
     role: Fresh clean-context reviewer of one plan-change proposal; returns agree or a counter-proposal. Read-only.
-    skills: []
+    skills: [gabo-plan-reviewer]
     tools: [read, search, shell]
     launched_by: main-session
     template: agents/gabo-plan-reviewer.md
