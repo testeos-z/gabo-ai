@@ -144,7 +144,8 @@ func TestRuntimeClaudeProbesEveryLink(t *testing.T) {
 		"Probe, on every build", "every fixed-name link made in step 3",
 		"delete the file whatever the result", "the adapter's frontmatter `name` instead of the link name",
 		"still failing, stop and report the link", "probe not run: restart Claude Code and rebuild",
-		"Only a probe that ran in such a session can fail a link", "except the `✗ agent <id> missing` lines of agents you skipped",
+		"Only a probe that ran in such a session can fail a link", "repeat step 7 and probe once more",
+		"remove each `.claude/skills/gabo-*` symlink that no spec skill or slot asks for any more", "except the `✗ agent <id> missing` lines of agents you skipped",
 	} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("%s: missing %q", runtimeClaude, s)
