@@ -80,10 +80,23 @@ printf -- '---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agent
 for id in $(sed -n 's/^  - id: //p; s/^- id: //p' "$sample/.gabo/skills/gabo-agent-templates/agents.yaml"); do
   printf -- '---\nname: %s\ngabo-version: %s\n---\n' "$id" "$version" >"$sample/.claude/agents/$id.md"
 done
+# The links gabo-runtime-claude makes and gabo check requires: each spec
+# skill under .claude/skills, and the user-level reviewer link (kept in the
+# scratch dir unless GABO_DEMO_REAL_HOME=1, where the real one must exist).
+mkdir -p "$sample/.claude/skills"
+for name in $(sed -n 's/^    skills: \[\(.*\)\]$/\1/p' "$sample/.gabo/skills/gabo-agent-templates/agents.yaml" | tr ',' '\n' | tr -d ' ' | sort -u); do
+  ln -s "../../.gabo/skills/$name" "$sample/.claude/skills/$name"
+done
+check_env=()
+if [[ "${GABO_DEMO_REAL_HOME:-}" != 1 ]]; then
+  mkdir -p "$scratch/claude/skills"
+  ln -s "$XDG_DATA_HOME/gabo/skills/gabo-reviewer" "$scratch/claude/skills/gabo-reviewer"
+  check_env=("CLAUDE_CONFIG_DIR=$scratch/claude")
+fi
 echo "# sample for the gabo mini wave demo" >"$sample/README.md"
 git -C "$sample" add -A
 git -C "$sample" -c user.name=demo -c user.email=demo@example.com -c commit.gpgsign=false commit -qm "chore: sample repository"
-(cd "$sample" && XDG_CONFIG_HOME="$scratch/config" "$gabo" check)
+(cd "$sample" && env "${check_env[@]}" XDG_CONFIG_HOME="$scratch/config" "$gabo" check)
 
 cat <<STEPS
 

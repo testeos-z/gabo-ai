@@ -61,14 +61,41 @@ func checkProject(t *testing.T, version string) string {
 	}
 	write("gabo.yaml", checkConfig)
 	write(".gabo/runtimes/gabo-runtime-claude/SKILL.md", "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\n")
+	// The catalog copy's gabo-runtime-claude wins over .gabo/runtimes: its
+	// skill links and reviewer link are made below.
 	spec, err := agentspec.Load(skills.Catalog())
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, id := range spec.IDs() {
-		write(".claude/agents/"+id+".md", "---\nname: "+id+"\ngabo-version: "+version+"\n---\n")
+	for _, a := range spec.Agents {
+		write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\ngabo-version: "+version+"\n---\n")
+		for _, name := range a.Skills {
+			link(t, "../../.gabo/skills/"+name, filepath.Join(project, ".claude", "skills", name))
+		}
 	}
+	// The user-level reviewer link into the copy runInit installed under the
+	// temporary HOME and XDG_DATA_HOME.
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	dir, err := reviewerSkillDir(os.Getenv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	link(t, dir, filepath.Join(os.Getenv("HOME"), ".claude", "skills", "gabo-reviewer"))
 	return project
+}
+
+// link makes the symlink name -> target, replacing an existing link.
+func link(t *testing.T, target, name string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(name), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Lstat(name); err == nil {
+		return
+	}
+	if err := os.Symlink(target, name); err != nil {
+		t.Fatal(err)
+	}
 }
 
 // runCheck runs `gabo check` in project with a temporary user config dir.
@@ -137,6 +164,29 @@ func TestCheckFailureExitsOne(t *testing.T) {
 	out, err := runCheck(t, project, "1.2.3")
 	if exitOf(err) != 1 || !strings.Contains(out, "✗ agent gabo-coder missing") {
 		t.Fatalf("exit %d: %v\n%s", exitOf(err), err, out)
+	}
+}
+
+// #135: a missing skill link or reviewer link fails the check instead of
+// passing it.
+func TestCheckMissingLinksExitOne(t *testing.T) {
+	t.Setenv("CI", "")
+	project := checkProject(t, "1.2.3")
+	if err := os.Remove(filepath.Join(project, ".claude", "skills", "gabo-wave-report")); err != nil {
+		t.Fatal(err)
+	}
+	reviewer := filepath.Join(os.Getenv("HOME"), ".claude", "skills", "gabo-reviewer")
+	if err := os.Remove(reviewer); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runCheck(t, project, "1.2.3")
+	for _, want := range []string{
+		"✗ skill link .claude/skills/gabo-wave-report missing",
+		"✗ reviewer link " + reviewer + " missing",
+	} {
+		if exitOf(err) != 1 || !strings.Contains(out, want) {
+			t.Fatalf("exit %d: %v, want %q in:\n%s", exitOf(err), err, want, out)
+		}
 	}
 }
 

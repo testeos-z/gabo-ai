@@ -39,3 +39,15 @@ func (FS) Lstat(name string) (fs.FileMode, error) {
 	}
 	return info.Mode(), nil
 }
+
+// Stat returns the mode of name, following every symlink.
+func (FS) Stat(name string) (fs.FileMode, error) {
+	info, err := os.Stat(name)
+	if err != nil {
+		return 0, err
+	}
+	return info.Mode(), nil
+}
+
+// ReadLink returns the raw target of the symlink name.
+func (FS) ReadLink(name string) (string, error) { return os.Readlink(name) }

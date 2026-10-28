@@ -54,6 +54,12 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - every agent of the neutral agent spec (" + CatalogDir + "/) in the agent\n" +
 			"    directory each runtime skill declares (metadata.agent_dir);\n" +
 			"  - each agent's gabo-version line against " + StampFile + ";\n" +
+			"  - for a runtime skill declaring metadata.skill_dir, a link <skill_dir>/<name>\n" +
+			"    to " + CatalogDir + "/<name> for each skill a spec agent lists, and a link\n" +
+			"    <skill_dir>/gabo-<slot> to each slot adapter that is a skill folder;\n" +
+			"  - for the reviewer runtime's metadata.reviewer_link, a user-level link to\n" +
+			"    ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer holding\n" +
+			"    scripts/reviewer.sh (not checked with CI set);\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +

@@ -16,7 +16,9 @@ import (
 
 // claudeBuilt is a project with the real embedded catalog and every spec
 // agent built in the shape gabo-runtime-claude writes: a frontmatter with
-// name, description and the gabo-version line, then the filled body.
+// name, description and the gabo-version line, then the filled body; and
+// each spec skill linked as .claude/skills/<name> -> ../../.gabo/skills/<name>
+// (build step 2).
 func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
 	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n")}
@@ -38,6 +40,9 @@ func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 		}
 		_, rest, _ := strings.Cut(string(body), "\n")
 		proj[".claude/agents/"+a.ID+".md"] = file(claudeFrontmatter(a, string(body), version) + strings.TrimPrefix(rest, "\n"))
+		for _, name := range a.Skills {
+			proj[".claude/skills/"+name] = symlink("../../.gabo/skills/" + name)
+		}
 	}
 	return proj
 }
@@ -128,4 +133,29 @@ func TestClaudeBuiltSetFromAnotherVersionFails(t *testing.T) {
 	t.Parallel()
 	r := run(t, with(claudeBuilt(t, "1.2.3"), map[string]string{".gabo/VERSION": "1.2.4\n"}), configFiles{projectFile: validConfig}, Settings{Version: "1.2.4"})
 	wantFailed(t, r, "✗ agent gabo-coder built with 1.2.3, catalog is 1.2.4: ask your agent to rebuild")
+}
+
+// #135: a spec skill without its .claude/skills link (gabo-wave-report) and
+// a link left pointing at the CLI source fail the shipped runtime's check.
+func TestClaudeBuiltSetWithMissingOrStaleLinksFails(t *testing.T) {
+	t.Parallel()
+	proj := claudeBuilt(t, "1.2.3")
+	delete(proj, ".claude/skills/gabo-wave-report")
+	proj[".claude/skills/gabo-coder"] = symlink("../../apps/cli/internal/skills/gabo-coder")
+	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+	wantFailed(t, r,
+		"✗ skill link .claude/skills/gabo-wave-report missing",
+		"✗ skill link .claude/skills/gabo-coder points to ../../apps/cli/internal/skills/gabo-coder, not ../../.gabo/skills/gabo-coder")
+}
+
+// The shipped runtime declares the user-level reviewer link the reviewer
+// agent runs through; without it the check fails.
+func TestClaudeBuiltSetWithoutReviewerLinkFails(t *testing.T) {
+	t.Parallel()
+	rep, err := NewUseCase(claudeBuilt(t, "1.2.3"), configFiles{projectFile: validConfig}, userFS{},
+		Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFailed(t, rep, "✗ reviewer link "+userLink+" missing", NextLink)
 }

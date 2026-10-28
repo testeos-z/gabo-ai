@@ -53,12 +53,7 @@ func operations(doc []byte) []string {
 // checkSlots requires every configured slot adapter to exist and to cover
 // every operation of its contract skill, read from the catalog copy.
 func (u *UseCase) checkSlots(r *Report, cfg config.Config) error {
-	names := make([]string, 0, len(cfg.Slots))
-	for name := range cfg.Slots {
-		names = append(names, name)
-	}
-	slices.Sort(names)
-	for _, name := range names {
+	for _, name := range slotNames(cfg) {
 		skill := "gabo-contract-" + strings.ReplaceAll(name, "_", "-")
 		contractPath := path.Join(CatalogDir, skill, "SKILL.md")
 		contract, err := fs.ReadFile(u.project, contractPath)

@@ -88,7 +88,10 @@ func run(t *testing.T, proj fs.FS, cfg config.Reader, s Settings) Report {
 		s.Version = "1.2.3"
 	}
 	s.Layers = layers()
-	rep, err := NewUseCase(proj, cfg, s).Run()
+	if s.Getenv == nil && s.ReviewerDir == "" {
+		s.Getenv, s.ReviewerDir = env("HOME", home), reviewerDir
+	}
+	rep, err := NewUseCase(proj, cfg, goodUser(), s).Run()
 	if err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
@@ -183,7 +186,7 @@ func TestFormerConfigNamesFailWithTheRename(t *testing.T) {
 	if n := strings.Count(joined(r), "next: rename /home/o/.config/gbai to"); n != 1 {
 		t.Fatalf("former dir reported %d times, want 1:\n%s", n, joined(r))
 	}
-	_, err := NewUseCase(project(), failingReader{}, Settings{Version: "1.2.3", Layers: layers(), Former: former}).Run()
+	_, err := NewUseCase(project(), failingReader{}, userFS{}, Settings{Version: "1.2.3", Layers: layers(), Former: former}).Run()
 	if err == nil || !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("error = %v, want the read error", err)
 	}
@@ -229,7 +232,7 @@ func TestUserFileIsValidated(t *testing.T) {
 
 func TestConfigReadErrorIsAnError(t *testing.T) {
 	t.Parallel()
-	_, err := NewUseCase(project(), failingReader{}, Settings{Version: "1.2.3", Layers: layers()}).Run()
+	_, err := NewUseCase(project(), failingReader{}, userFS{}, Settings{Version: "1.2.3", Layers: layers()}).Run()
 	if err == nil || !strings.Contains(err.Error(), "permission denied") {
 		t.Fatalf("error = %v, want the read error", err)
 	}

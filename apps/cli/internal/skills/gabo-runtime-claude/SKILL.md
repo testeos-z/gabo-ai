@@ -1,17 +1,19 @@
 ---
 name: gabo-runtime-claude
-description: "Trigger: build gabo agents for Claude Code, rebuild agents after gabo init, runtime claude, gabo check reports a missing agent on claude. Builds the gabo agents, skills and fixed-name links for Claude Code."
+description: "Trigger: build gabo agents for Claude Code, rebuild agents after gabo init, runtime claude, gabo check reports a missing agent, skill link or reviewer link on claude. Builds the gabo agents, skills and fixed-name links for Claude Code."
 license: Apache-2.0
 metadata:
   author: gabo-ai
   version: "0.1"
   agent_dir: .claude/agents
+  skill_dir: .claude/skills
+  reviewer_link: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer
 ---
 ## Activation Contract
 
 Load when any of `runtimes.coder`, `runtimes.reviewer` or `runtimes.assistant` in `gabo.yaml` is `claude` and the gabo agents must be built or rebuilt: after setup, after `gabo init` refreshed the catalog, or when `gabo check` reports `✗ agent <id> missing` or an agent built with another version (TRD 8.1, 9.4, D24). Load `gabo-agent-templates` with it: that skill owns the spec, the templates and the slot rules; this skill only turns them into Claude Code files.
 
-`metadata.agent_dir` above is the directory `gabo check` searches for the agent files of this runtime. Never change it without changing where you build.
+`metadata.agent_dir` above is the directory `gabo check` searches for the agent files of this runtime; `metadata.skill_dir` is where it requires the links of build steps 2 and 3, and `metadata.reviewer_link` the user-level link of step 4 (outside CI). Never change them without changing where you build. `gabo check` reports a missing or wrong link as `✗ skill link <path> …` or `✗ reviewer link <path> …`: rebuild with this skill.
 
 ## Hard Rules
 
@@ -20,6 +22,7 @@ Load when any of `runtimes.coder`, `runtimes.reviewer` or `runtimes.assistant` i
 - Fill only the template slots, as below, and invent nothing: no frontmatter key, tool, skill, model or rule the spec and template do not give.
 - Never place `gabo-reviewer` in the project: no `.claude/skills/gabo-reviewer`, no copy of its scripts, and never in an agent's `skills`. Only link the user-level copy that `gabo init` installs (D20).
 - Overwrite only the agent files named after a spec id, the links this skill makes and the probe file it writes. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
+- Make every link of steps 2 to 4 on every build, also when the agent files are already current, and run the probe of step 8; a build that skips one is not finished.
 - Write no secret into any file (R21).
 
 ## Sources
@@ -66,7 +69,7 @@ Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/S
 ## Build Steps
 
 1. Recheck the sources. Read `gabo.yaml`, `.gabo/VERSION` and the spec.
-2. Catalog skills: for each skill in any agent's spec `skills`, make `.claude/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`, so a later `gabo init` refresh reaches it. An entry that already resolves to that folder is kept.
+2. Catalog skills: for each skill in any agent's spec `skills`, make `.claude/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`, so a later `gabo init` refresh reaches it. An entry that already resolves to that folder is kept. A symlink this skill made earlier to another folder (for example the CLI source `apps/cli/internal/skills/<name>`) is replaced; a real folder or file is left and reported.
 3. Fixed-name links as above. Then remove each `.claude/skills/gabo-*` symlink that no spec skill or slot asks for any more; never remove a real folder or file.
 4. Reviewer link: make `~/.claude/skills/gabo-reviewer` (with `CLAUDE_CONFIG_DIR` set: `$CLAUDE_CONFIG_DIR/skills/gabo-reviewer`) a symlink to `${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer` with the absolute path. That folder missing: stop and tell the user to run `gabo init`. An existing entry with another target: leave it and report it.
 5. For each spec agent, fill its template:
@@ -95,9 +98,9 @@ Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/S
    ```
 
    Omit `skills` when the list is empty (the reviewer agent).
-7. Verify: run `claude plugin validate .claude/agents`, then `gabo check`. Fix every failure this skill caused and rerun until `gabo check` passes, except the `✗ agent <id> missing` lines of agents you skipped and reported in step 5; report any other failure.
+7. Verify: run `claude plugin validate .claude/agents`, then `gabo check`, which also checks every link of steps 2 to 4. Fix every failure this skill caused and rerun until `gabo check` passes, except the `✗ agent <id> missing` lines of agents you skipped and reported in step 5; report any other failure.
 8. Probe, on every build. When `.claude/agents` or `.claude/skills` did not exist when this Claude Code session started (you created it in this build), the session cannot see the new agent or links: skip the probe, change nothing, and report `probe not run: restart Claude Code and rebuild`. Otherwise write `.claude/agents/gabo-probe.md` in the same format, with `tools: Bash`, `skills:` listing every fixed-name link made in step 3, and the body: run `git rev-parse --show-toplevel` once and reply with its output, then one line per preloaded skill with the name it was listed under and its first Markdown heading. Launch it once, then delete the file whatever the result. It passes when it ran the command and every link shows its adapter's heading. Only a probe that ran in such a session can fail a link. A link that does not preload: in `skills:` and in its slot fill, use the adapter's frontmatter `name` instead of the link name, rebuild the affected agents, repeat step 7 and probe once more; still failing, stop and report the link. A `gabo-probe.md` that this skill did not write: leave it and report it, and report the probe as not run.
 
 ## Output Contract
 
-Report the Claude Code version and whether the sources were rechecked; each agent file written with its id and `gabo-version`; each link made; each entry left or slot not filled, with why; the `claude plugin validate` and `gabo check` results; and the probe result when it ran.
+Report the Claude Code version and whether the sources were rechecked; each agent file written with its id and `gabo-version`; each link made (catalog, fixed-name and reviewer); each entry left or slot not filled, with why; the `claude plugin validate` and `gabo check` results; and the probe result when it ran.

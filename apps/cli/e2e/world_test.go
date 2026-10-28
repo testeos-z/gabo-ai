@@ -146,6 +146,15 @@ func (w *world) git(dir string, args ...string) string {
 	return strings.TrimSpace(w.run(dir, nil, "git", append([]string{"-c", "commit.gpgsign=false"}, args...)...))
 }
 
+// link makes the symlink name -> target, keeping an existing one.
+func (w *world) link(target, name string) {
+	w.mkdir(filepath.Dir(name))
+	if _, err := os.Lstat(name); err == nil {
+		return
+	}
+	w.must(os.Symlink(target, name))
+}
+
 func (w *world) write(rel, data string) {
 	p := filepath.Join(w.main, filepath.FromSlash(rel))
 	w.mkdir(filepath.Dir(p))
@@ -163,9 +172,15 @@ func (w *world) sample() {
 		"---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\n")
 	spec, err := agentspec.Load(skills.Catalog())
 	w.must(err)
-	for _, id := range spec.IDs() {
-		w.write(".claude/agents/"+id+".md", "---\nname: "+id+"\ngabo-version: "+version+"\n---\n")
+	for _, a := range spec.Agents {
+		w.write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\ngabo-version: "+version+"\n---\n")
+		for _, name := range a.Skills {
+			w.link("../../.gabo/skills/"+name, filepath.Join(w.main, ".claude", "skills", name))
+		}
 	}
+	// The user-level reviewer link gabo-runtime-claude makes (build step 4).
+	w.link(filepath.Join(w.home, ".local", "share", "gabo", "skills", "gabo-reviewer"),
+		filepath.Join(w.home, ".claude", "skills", "gabo-reviewer"))
 	w.write(".gabo/adapters/tasks-fake.md", fakeAdapter("tasks", w.contractOps("gabo-contract-tasks")))
 	w.write(".gabo/adapters/memory-fake.md", fakeAdapter("memory", w.contractOps("gabo-contract-memory")))
 	w.write("README.md", "# sample\n")

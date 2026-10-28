@@ -141,6 +141,11 @@ func snapshot(t *testing.T, dir string) map[string]string {
 		if err != nil || d.IsDir() {
 			return err
 		}
+		if d.Type()&fs.ModeSymlink != 0 {
+			target, err := os.Readlink(p)
+			m[p] = "-> " + target
+			return err
+		}
 		b, err := os.ReadFile(p)
 		m[p] = string(b)
 		return err

@@ -37,6 +37,7 @@ Establish each fact below, one `## Sources` row each, before you build:
 |---|---|
 | installed version, CLI help | the version every row cites |
 | project agent directory; agents are flat files named after their id | `metadata.agent_dir` (repository-relative; `gabo check` looks for `<id>.<ext>` directly in it) |
+| project skill directory, when the engine links skills as `<dir>/<name>` folders; the user-level path the reviewer agent runs the reviewer skill from | optional `metadata.skill_dir` (repository-relative) and `metadata.reviewer_link` (`${NAME:-default}`, `${NAME}` and `$NAME` are expanded); when set, `gabo check` requires the catalog, fixed-name and reviewer links there |
 | agent file format and required keys; a key or field that may hold `gabo-version: <x.y.z>` and that the engine ignores or keeps | the frontmatter of each agent |
 | how a parent launches a subagent, and the tool name | the `subagents` row and the probe |
 | tool names, and how one agent's tools are restricted | the Tool Map |
@@ -60,7 +61,7 @@ A missing subagent or skill fact after the docs and the installed engine: that i
 
 The skill written in step 7 follows `gabo-runtime-claude` and `gabo-runtime-pi`:
 
-- Frontmatter: `name: gabo-runtime-<engine>`, `description: "Trigger: build gabo agents for <Engine>, rebuild <Engine> agents, runtimes <engine>. …"` (one line, at most 250 characters), `license: Apache-2.0`, and `metadata` with `author: gabo-ai`, `version` and `metadata.agent_dir`.
+- Frontmatter: `name: gabo-runtime-<engine>`, `description: "Trigger: build gabo agents for <Engine>, rebuild <Engine> agents, runtimes <engine>. …"` (one line, at most 250 characters), `license: Apache-2.0`, and `metadata` with `author: gabo-ai`, `version` and `metadata.agent_dir`, plus `metadata.skill_dir` and `metadata.reviewer_link` when the facts give them.
 - `## Activation Contract`: when to load it (a `runtimes.*` value is `<engine>` and the agents must be built or rebuilt), with `gabo-agent-templates`, and that `gabo check` reads `metadata.agent_dir`.
 - `## Hard Rules`: the build rules above, plus the engine's own (for example a package it needs, a config it must not touch).
 - `## Sources`: `Checked on <date> against <Engine> <version>`, a table of fact and source URL for every fact used, and the recheck rule: when `<engine> --version` differs, reread the sources and its help, and stop on a row that no longer holds.
