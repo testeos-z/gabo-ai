@@ -86,6 +86,7 @@ func initFactory(runner kernel.Runner, version string, upd updateDeps) initcmd.F
 // checkFactory builds the check run lazily. The project is the git top-level
 // of the working directory, or the directory itself; GABO_UPGRADE_PR=1 (set
 // by the reviewer scripts and CI on an upgrade PR) validates only the config.
+// With CI set the user-level reviewer link is not checked.
 func checkFactory(runner kernel.Runner, version string, getenv func(string) string, getwd func() (string, error)) check.Factory {
 	return func(ctx context.Context) (*check.UseCase, error) {
 		wd, err := getwd()
@@ -93,11 +94,16 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 			return nil, err
 		}
 		project := config.ProjectRoot(ctx, runner, wd)
-		return check.NewUseCase(os.DirFS(project), osfs.FS{}, check.Settings{
-			Version:   version,
-			Layers:    config.LayerPaths(getenv, project),
-			UpgradePR: getenv("GABO_UPGRADE_PR") == "1",
-			Former:    config.FormerNames(getenv, project),
+		// An unknown reviewer dir is reported by the check, not here.
+		reviewerDir, _ := reviewerSkillDir(getenv)
+		return check.NewUseCase(os.DirFS(project), osfs.FS{}, osfs.FS{}, check.Settings{
+			Version:     version,
+			Layers:      config.LayerPaths(getenv, project),
+			UpgradePR:   getenv("GABO_UPGRADE_PR") == "1",
+			Former:      config.FormerNames(getenv, project),
+			Getenv:      getenv,
+			ReviewerDir: reviewerDir,
+			CI:          getenv("CI") != "",
 		}), nil
 	}
 }

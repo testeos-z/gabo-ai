@@ -33,7 +33,9 @@ func TestRuntimeClaudeDeclaresItsAgentDir(t *testing.T) {
 	}
 	var fm struct {
 		Metadata struct {
-			AgentDir string `yaml:"agent_dir"`
+			AgentDir     string `yaml:"agent_dir"`
+			SkillDir     string `yaml:"skill_dir"`
+			ReviewerLink string `yaml:"reviewer_link"`
 		} `yaml:"metadata"`
 	}
 	if err := yaml.Unmarshal([]byte(head), &fm); err != nil {
@@ -41,6 +43,13 @@ func TestRuntimeClaudeDeclaresItsAgentDir(t *testing.T) {
 	}
 	if fm.Metadata.AgentDir != ".claude/agents" {
 		t.Fatalf("metadata.agent_dir = %q, want .claude/agents", fm.Metadata.AgentDir)
+	}
+	// gabo check requires the skill links and the reviewer link there (#135).
+	if fm.Metadata.SkillDir != ".claude/skills" {
+		t.Fatalf("metadata.skill_dir = %q, want .claude/skills", fm.Metadata.SkillDir)
+	}
+	if want := "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer"; fm.Metadata.ReviewerLink != want {
+		t.Fatalf("metadata.reviewer_link = %q, want %q", fm.Metadata.ReviewerLink, want)
 	}
 }
 

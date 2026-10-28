@@ -45,3 +45,28 @@ func TestRemoveAllDeletesTreeAndIgnoresMissing(t *testing.T) {
 		t.Fatalf("missing dir: %v", err)
 	}
 }
+
+func TestStatFollowsLinksAndReadLinkReturnsTheRawTarget(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	f := FS{}
+	if err := f.WriteFile(filepath.Join(dir, "real", "s.sh"), []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(dir, "link")
+	if err := os.Symlink("real", link); err != nil {
+		t.Fatal(err)
+	}
+	if m, err := f.Stat(filepath.Join(link, "s.sh")); err != nil || !m.IsRegular() {
+		t.Fatalf("Stat through link = %v, %v", m, err)
+	}
+	if m, err := f.Lstat(link); err != nil || m&fs.ModeSymlink == 0 {
+		t.Fatalf("Lstat = %v, %v", m, err)
+	}
+	if got, err := f.ReadLink(link); err != nil || got != "real" {
+		t.Fatalf("ReadLink = %q, %v", got, err)
+	}
+	if _, err := f.Stat(filepath.Join(dir, "none")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("missing Stat error = %v", err)
+	}
+}

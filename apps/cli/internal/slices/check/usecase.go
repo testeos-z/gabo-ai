@@ -1,15 +1,15 @@
 // Package check validates a project read-only and engine-neutral (`gabo
 // check`, PRD R33, TRD 9.4): the config files, every agent of the neutral
 // agent spec in each runtime's declared agent directory, each agent's
-// version line, every slot adapter's contract coverage and the catalog
-// version stamp.
+// version line, the skill and reviewer links a runtime skill declares
+// (metadata.skill_dir, metadata.reviewer_link), every slot adapter's
+// contract coverage and the catalog version stamp.
 //
 // The spec and the contracts come from the project's catalog copy (.gabo/skills/), never from
 // the binary, so a newer CLI checks an older project against its own version.
 package check
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -18,8 +18,6 @@ import (
 	"slices"
 	"strconv"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
@@ -58,6 +56,15 @@ type Settings struct {
 	// Former are the config locations from before the gabo-ai rename
 	// (config.FormerNames); any that exists fails and is never read.
 	Former []config.FormerName
+	// Getenv expands the reviewer link a runtime skill declares.
+	Getenv func(string) string
+	// ReviewerDir is the user-level reviewer skill dir gabo init installs,
+	// ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer; empty when
+	// it cannot be known.
+	ReviewerDir string
+	// CI (CI set) skips the user-level reviewer link: the reviewer scripts
+	// and CI run with their own HOME.
+	CI bool
 }
 
 // Report is the human-readable result. Failed is true when any check failed.
@@ -70,13 +77,15 @@ type Report struct {
 type UseCase struct {
 	project fs.FS
 	config  config.Reader
+	user    UserFS
 	s       Settings
 }
 
-// NewUseCase wires the use case: project is rooted at the project directory,
-// cfg reads the config layers by their paths.
-func NewUseCase(project fs.FS, cfg config.Reader, s Settings) *UseCase {
-	return &UseCase{project: project, config: cfg, s: s}
+// NewUseCase wires the use case: project is rooted at the project directory
+// (symlinks are read through fs.ReadLinkFS), cfg reads the config layers by
+// their paths and user reads the user-level reviewer link.
+func NewUseCase(project fs.FS, cfg config.Reader, user UserFS, s Settings) *UseCase {
+	return &UseCase{project: project, config: cfg, user: user, s: s}
 }
 
 // Run checks the project. A returned error is a read error (exit 2); check
@@ -97,6 +106,9 @@ func (u *UseCase) Run() (Report, error) {
 	stamp, hasStamp := u.checkStamp(&r)
 	if ok {
 		if err := u.checkAgents(&r, cfg, stamp, hasStamp); err != nil {
+			return Report{}, err
+		}
+		if err := u.checkLinks(&r, cfg); err != nil {
 			return Report{}, err
 		}
 		if err := u.checkSlots(&r, cfg); err != nil {
@@ -227,14 +239,8 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 		r.fail("✗ agent spec: "+err.Error(), "next: run gabo init to restore the catalog, then rerun gabo check")
 		return nil
 	}
-	var runtimes []string
-	for _, rt := range []config.Runtime{cfg.Runtimes.Coder, cfg.Runtimes.Reviewer, cfg.Runtimes.Assistant} {
-		if rt != "" && !slices.Contains(runtimes, string(rt)) {
-			runtimes = append(runtimes, string(rt))
-		}
-	}
 	var checked []string
-	for _, rt := range runtimes {
+	for _, rt := range runtimesOf(cfg) {
 		dir, ok := u.agentDir(r, rt)
 		if !ok || slices.Contains(checked, dir) {
 			continue
@@ -272,19 +278,13 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 // a failure and returns false when there is none or it leaves the repository.
 func (u *UseCase) agentDir(r *Report, rt string) (string, bool) {
 	skill := "gabo-runtime-" + rt
-	var b []byte
-	var err error
-	for _, dir := range []string{CatalogDir, RuntimesDir} {
-		b, err = fs.ReadFile(u.project, path.Join(dir, skill, "SKILL.md"))
-		if !errors.Is(err, fs.ErrNotExist) {
-			break
-		}
-	}
+	b, err := u.runtimeSkill(rt)
 	if err != nil {
 		r.fail("✗ runtime "+rt+" has no runtime skill "+skill, NextRuntimeBuilder)
 		return "", false
 	}
-	dir, err := frontmatterAgentDir(b)
+	meta, err := parseRuntimeMeta(b)
+	dir := meta.AgentDir
 	if err != nil {
 		r.fail("✗ runtime "+rt+": "+skill+" frontmatter: "+err.Error(), NextRuntimeBuilder)
 		return "", false
@@ -293,7 +293,7 @@ func (u *UseCase) agentDir(r *Report, rt string) (string, bool) {
 		r.fail("✗ runtime "+rt+": "+skill+" declares no metadata.agent_dir", NextRuntimeBuilder)
 		return "", false
 	}
-	if path.IsAbs(dir) || slices.Contains(strings.Split(dir, "/"), "..") || !fs.ValidPath(path.Clean(dir)) {
+	if !insideRepo(dir) {
 		r.fail("✗ runtime "+rt+": agent_dir must stay inside the repository",
 			"next: set metadata.agent_dir in "+skill+" to a repository-relative path, then rerun gabo check")
 		return "", false
@@ -320,27 +320,6 @@ func (u *UseCase) agentFiles(dir string) (map[string][]string, error) {
 		files[id] = append(files[id], e.Name())
 	}
 	return files, nil
-}
-
-// frontmatterAgentDir reads metadata.agent_dir from a SKILL.md frontmatter.
-func frontmatterAgentDir(b []byte) (string, error) {
-	rest, ok := bytes.CutPrefix(bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n")), []byte("---\n"))
-	if !ok {
-		return "", errors.New("missing --- frontmatter")
-	}
-	front, _, ok := bytes.Cut(rest, []byte("\n---"))
-	if !ok {
-		return "", errors.New("unterminated frontmatter")
-	}
-	var fm struct {
-		Metadata struct {
-			AgentDir string `yaml:"agent_dir"`
-		} `yaml:"metadata"`
-	}
-	if err := yaml.Unmarshal(front, &fm); err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(fm.Metadata.AgentDir), nil
 }
 
 // versionRE finds the agent version line in a frontmatter or a comment.
