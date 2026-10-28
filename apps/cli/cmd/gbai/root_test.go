@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io/fs"
 	"maps"
@@ -12,15 +11,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
 )
 
-// The work-time commands were retired (T042, D18): the CLI is an agent
-// compiler, and `review` and `plan` remain only until T043 retires them.
+// The work-time (T042) and the review and plan commands (T043) were retired
+// (D18, D24): the CLI is an agent compiler with init, check and version.
 func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	t.Parallel()
 	root := newRootCommand(deps{version: "1.2.3"})
@@ -28,7 +24,7 @@ func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	for _, c := range root.Commands() {
 		got = append(got, c.Name())
 	}
-	if want := []string{"check", "init", "plan", "review", "version"}; !slices.Equal(got, want) {
+	if want := []string{"check", "init", "version"}; !slices.Equal(got, want) {
 		t.Fatalf("commands = %v, want %v", got, want)
 	}
 	var out bytes.Buffer
@@ -40,7 +36,7 @@ func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	if !strings.Contains(out.String(), "  check ") {
 		t.Fatalf("help does not list check:\n%s", out.String())
 	}
-	for _, removed := range []string{"secrets", "provision", "repo", "sessions", "status", "audit", "doctor", "mcp", "worktree", "config "} {
+	for _, removed := range []string{"secrets", "provision", "repo", "sessions", "status", "audit", "doctor", "mcp", "worktree", "config ", "review", "plan"} {
 		if strings.Contains(out.String(), "  "+removed) {
 			t.Fatalf("help still lists %s:\n%s", removed, out.String())
 		}
@@ -58,36 +54,6 @@ func TestRootVersionSubcommand(t *testing.T) {
 	}
 	if got := out.String(); got != "gbai 1.2.3\n" {
 		t.Fatalf("output = %q", got)
-	}
-}
-
-func TestConfigLayersUseTheGitTopLevel(t *testing.T) {
-	t.Parallel()
-	r := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte("/src/p\n")}}
-	env := map[string]string{"XDG_CONFIG_HOME": "/x"}
-	got := configLayers(context.Background(), r, func(k string) string { return env[k] }, func() (string, error) { return "/src/p/sub", nil })
-	want := []string{"/x/gbai/config.yaml", "/src/p/gbai.yaml"}
-	if len(got) != len(want) {
-		t.Fatalf("layers = %+v, want only the user and project layers", got)
-	}
-	for i, l := range got {
-		if l.Path != want[i] {
-			t.Fatalf("layer %d = %+v, want path %s", i, l, want[i])
-		}
-	}
-	got = configLayers(context.Background(), r, func(string) string { return "" }, func() (string, error) { return "", errors.New("gone") })
-	if got[1].Path != "" {
-		t.Fatalf("project layer without a cwd = %+v", got[1])
-	}
-}
-
-func TestReviewNotifyNeedsNoConfig(t *testing.T) {
-	t.Parallel()
-	root := newRootCommand(deps{version: "1.2.3"})
-	root.SetArgs([]string{"review", "notify", "--to", "bad", "--pr", "1", "--sha", "x"})
-	err := root.Execute()
-	if err == nil || strings.Contains(err.Error(), "config") {
-		t.Fatalf("Execute() error = %v, want validation error without config", err)
 	}
 }
 
@@ -183,61 +149,6 @@ func snapshot(t *testing.T, dir string) map[string]string {
 		t.Fatal(err)
 	}
 	return m
-}
-
-func TestConfigWarningsGoToStderr(t *testing.T) {
-	t.Parallel()
-	var errOut bytes.Buffer
-	printWarnings(&errOut, []string{"a: ignored", "b: ignored"})
-	if got, want := errOut.String(), "gbai: warning: a: ignored\ngbai: warning: b: ignored\n"; got != want {
-		t.Fatalf("stderr = %q, want %q", got, want)
-	}
-	printWarnings(nil, []string{"no writer must not panic"})
-}
-
-func TestProjectPersonalKeyWarnsOnceOnStderr(t *testing.T) {
-	example, err := os.ReadFile("../../gbai.example.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	dir := t.TempDir()
-	if err := os.WriteFile(dir+"/gbai.yaml", append(example, []byte("\nalias: Leo\n")...), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
-	t.Chdir(dir)
-	var out, errOut bytes.Buffer
-	root := newRootCommand(deps{version: "1.2.3", stderr: &errOut})
-	root.SetOut(&out)
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	// review ci cleanup loads the config before it validates the workspace
-	// name; the command's own outcome does not matter here.
-	root.SetArgs([]string{"review", "ci", "cleanup", "--dir", "../outside"})
-	_ = root.Execute()
-	if got := strings.Count(errOut.String(), `personal key "alias" is ignored`); got != 1 {
-		t.Fatalf("warning printed %d times, want 1:\n%s", got, errOut.String())
-	}
-}
-
-func TestConfigLoaderPrintsWarningsOncePerProcess(t *testing.T) {
-	t.Parallel()
-	var errOut bytes.Buffer
-	calls := 0
-	resolve := newWarnOnceResolver(&errOut, func(context.Context) (config.Resolution, error) {
-		calls++
-		return config.Resolution{Warnings: []string{"p: ignored"}}, nil
-	})
-	for range 3 {
-		if _, err := resolve(context.Background()); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if calls != 3 {
-		t.Fatalf("resolver ran %d times, want 3 (config is re-read on each load)", calls)
-	}
-	if got, want := errOut.String(), "gbai: warning: p: ignored\n"; got != want {
-		t.Fatalf("stderr = %q, want %q", got, want)
-	}
 }
 
 // A committed .gbai symlink must not let init delete or write outside the

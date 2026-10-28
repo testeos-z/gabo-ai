@@ -22,8 +22,6 @@ func main() {
 	root := newRootCommand(deps{
 		version: resolveVersion(buildVersion, debug.ReadBuildInfo),
 		runner:  execrunner.New(),
-		stdin:   os.Stdin,
-		stderr:  os.Stderr,
 	})
 	if err := root.Execute(); err != nil {
 		os.Exit(exitCode(os.Stderr, err))

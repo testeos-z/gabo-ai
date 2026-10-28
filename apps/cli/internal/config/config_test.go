@@ -153,9 +153,6 @@ func TestParseReviewExplicit(t *testing.T) {
 	if len(r.Checks) != 1 || !r.AutoMerge || r.HumanOnlyPaths[0] != "secret/" || r.PiCredentialEnv != "OPENAI_API_KEY" {
 		t.Fatalf("review = %+v", r)
 	}
-	if argv := r.CheckArgv(); len(argv) != 1 || strings.Join(argv[0], "|") != "go|test|./..." {
-		t.Fatalf("CheckArgv() = %q", argv)
-	}
 }
 
 func TestParseReviewValidation(t *testing.T) {
@@ -202,29 +199,6 @@ func TestParseRejectsRemovedCloudKeys(t *testing.T) {
 	} {
 		if _, err := Parse([]byte(minimal + doc)); err == nil || !strings.Contains(err.Error(), key) {
 			t.Errorf("%s: error = %v, want unknown key", key, err)
-		}
-	}
-}
-
-func TestReviewStateDir(t *testing.T) {
-	t.Parallel()
-	env := func(m map[string]string) func(string) string { return func(k string) string { return m[k] } }
-	for name, tt := range map[string]struct {
-		review Review
-		env    map[string]string
-		want   string
-		err    bool
-	}{
-		"configured":    {Review{StateDir: "/srv/state"}, map[string]string{"XDG_STATE_HOME": "/x", "HOME": "/h"}, "/srv/state", false},
-		"xdg":           {Review{}, map[string]string{"XDG_STATE_HOME": "/x", "HOME": "/h"}, "/x/gbai/reviewer", false},
-		"home":          {Review{}, map[string]string{"HOME": "/data/home"}, "/data/home/.local/state/gbai/reviewer", false},
-		"relative xdg":  {Review{}, map[string]string{"XDG_STATE_HOME": "x", "HOME": "/h"}, "/h/.local/state/gbai/reviewer", false},
-		"no home":       {Review{}, map[string]string{}, "", true},
-		"relative home": {Review{}, map[string]string{"HOME": "h"}, "", true},
-	} {
-		got, err := tt.review.StateDirFrom(env(tt.env))
-		if got != tt.want || (err != nil) != tt.err {
-			t.Errorf("%s: StateDirFrom() = %q, %v; want %q (error %v)", name, got, err, tt.want, tt.err)
 		}
 	}
 }
