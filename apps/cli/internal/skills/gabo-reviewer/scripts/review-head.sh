@@ -219,11 +219,14 @@ results=()
 failed=()
 # review.check_env: names from the base gabo.yaml, values from the reviewer's
 # own environment, for the checks only (the review step's env -i never gets
-# them). Only names are ever reported, never values (R21).
+# them). Only names are ever reported, never values (R21): a value a check
+# prints is redacted from the failure output before it is posted.
 missing_env=()
+passed_env=()
 for name in $CHECK_ENV; do
   if [[ -n "${!name:-}" ]]; then
     check_env+=("$name=${!name}")
+    passed_env+=("$name")
   else
     missing_env+=("$name")
   fi
@@ -472,6 +475,18 @@ body="$logs/comment.md"
     echo "_Note: the review prompt's diff was truncated to $diff_truncated of $diff_bytes bytes._"
   fi
 } >"$body"
+# redact_check_env <log>: the last MiB of <log> with every value passed through
+# review.check_env replaced, literally, by [review.check_env:<name>].
+redact_check_env() {
+  local text name val
+  text="$(tail -c 1048576 "$1" 2>/dev/null; printf x)"
+  text="${text%x}"
+  for name in "${passed_env[@]}"; do
+    val="${!name}"
+    text="${text//"$val"/"[review.check_env:$name]"}"
+  done
+  printf '%s' "$text"
+}
 budget=$((60000 - $(wc -c <"$body")))
 tails=("${failed[@]}")
 [[ "$review_state" == error ]] && tails+=(review)
@@ -484,7 +499,8 @@ if ((${#tails[@]})); then
       echo "<details><summary>Failure output: $name (last lines)</summary>"
       echo
       echo '```text'
-      tail_chars "$per" "$logs/$name.log" | grep -vF "$MARKER_PREFIX"
+      redact_check_env "$logs/$name.log" >"$logs/$name.redacted.log"
+      tail_chars "$per" "$logs/$name.redacted.log" | grep -vF "$MARKER_PREFIX"
       echo '```'
       echo
       echo "</details>"

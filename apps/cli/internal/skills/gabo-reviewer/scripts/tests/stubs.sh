@@ -95,6 +95,8 @@ echo "check-env GH_TOKEN=${GH_TOKEN:-unset} REVIEWER_GH_TOKEN=${REVIEWER_GH_TOKE
 echo "check-vars TEST_DB_URL=${TEST_DB_URL:-unset} UNLISTED_VAR=${UNLISTED_VAR:-unset}" >>"$STUB_LOG"
 if [[ -n "${FAIL_CHECK:-}" ]] && grep -Eq -- "$FAIL_CHECK" <<<"$args"; then
   echo "error: $args failed at main.go:3"
+  # A failing check that prints a listed value (a DSN in a connection error).
+  [[ -z "${TEST_DB_URL:-}" ]] || echo "open ${TEST_DB_URL}: connection refused"
   exit 1
 fi
 echo "ok: $args"

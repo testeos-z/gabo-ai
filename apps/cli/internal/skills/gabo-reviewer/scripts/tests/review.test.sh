@@ -180,6 +180,12 @@ check "the comment names the unset variable" grep -qF 'TEST_DB_URL' "$work/check
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario checkenv_empty TEST_DB_URL=)" \
   "a listed, empty variable fails the checks"
 check "no check runs when a listed variable is empty" bash -c "! grep -q '^go-argc' '$work/checkenv_empty/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" \
+  "$(scenario checkenv_failing TEST_DB_URL=listed-value FAIL_CHECK=vet)" "a failing check with a listed variable is blocking"
+check "the failure output is posted" grep -qF 'connection refused' "$work/checkenv_failing/posted_7.md"
+check "a listed value printed by a failing check never reaches the comment" \
+  bash -c "! grep -q listed-value '$work/checkenv_failing/all_posted_7.md'"
+check "the failure output names the redacted variable" grep -qF 'open [review.check_env:TEST_DB_URL]: connection refused' "$work/checkenv_failing/posted_7.md"
 
 echo "# base version minimum"
 origin stamped O_STAMP=0.4.0
