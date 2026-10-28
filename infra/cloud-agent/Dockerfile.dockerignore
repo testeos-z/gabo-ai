@@ -1,0 +1,5 @@
+# Build context of infra/cloud-agent/Dockerfile (BuildKit reads <Dockerfile>.dockerignore).
+# Only the git history (for the repository seed) and this directory are sent.
+*
+!.git
+!infra/cloud-agent
