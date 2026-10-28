@@ -12,14 +12,15 @@ This image is **not a reviewer environment**: the reviewer gate keeps its own cl
 | Ubuntu packages (`ca-certificates curl git jq less openssh-client procps tini unzip xz-utils`) | dated snapshot of the archive (`UBUNTU_SNAPSHOT`); apt checks the signed index with the base image keyring and every package against its SHA-256 |
 | Engram, gentle-ai, gh, Go, Node.js, Bun | version and SHA-256 build args; `bin/fetch-verified` fails the build on a mismatch |
 | Claude Code, codegraph | `npm/package-lock.json` (`npm ci` checks every package against its integrity hash) |
-| gabo-ai repository | a bare clone of the build context's own git history in `/opt/gabo-agent/seed.git` |
+| gabo-ai repository | a seed built from the build context's own git history in `/opt/gabo-agent/seed.git` (`bin/gabo-make-seed`) |
 
 At build time Engram is registered as a user-scope Claude Code MCP server (`claude mcp add --transport stdio --scope user engram -- /usr/local/bin/engram mcp --tools=agent`).
 
 Scripts in `bin/` (installed to `/usr/local/bin`):
 
-- `gabo-agent-start`: the entrypoint. Started as root it fixes the ownership of the agent home (`/home/agent`, a fresh volume is owned by root) and continues as user `agent`. It registers the Engram MCP server again if the home does not have it, checks the repository out at `~/gabo-ai` on `dev` from the seed (or clones it when the image has no seed), runs one Engram Cloud sync in the background and then runs the container command (default `sleep infinity`).
-- `gabo-agent-check`: the start checks (pinned `engram version`, `engram` in `claude mcp list`, tooling on `PATH`, repository checkout). Exits non-zero when one fails.
+- `gabo-agent-start`: the entrypoint. Started as root it fixes the ownership of the agent home (`/home/agent`, a fresh volume is owned by root) and continues as user `agent`. It registers the Engram MCP server again if the home does not have it, checks the repository out at `~/gabo-ai` on `dev` from the seed, first fetching `dev` from GitHub when the run-time git access allows it (or clones it when the image has no seed; without `dev` from either it logs a `WARNING` and leaves no checkout), runs one Engram Cloud sync in the background and then runs the container command (default `sleep infinity`).
+- `gabo-agent-check`: the start checks (pinned `engram version`, `engram` in `claude mcp list`, tooling on `PATH`, repository checked out on `GABO_REPO_BRANCH`). Exits non-zero when one fails.
+- `gabo-make-seed <git dir> <seed> <url> [branch]`: builds the seed at build time; local branches and the source's `origin` remote-tracking branches become seed branches, so a fresh clone of the default branch still yields `dev`.
 - `gabo-engram-sync [project]`: one Engram Cloud sync (export, then import) for `gabo-ai`. It skips with exit 0 when Engram reports that Engram Cloud is not configured.
 - `fetch-verified <url> <sha256> <out>`: the checksum-verified download used by the build.
 
@@ -33,7 +34,7 @@ From the root of a clean checkout of this repository, with BuildKit (the default
 docker build -f infra/cloud-agent/Dockerfile -t gabo-cloud-agent .
 ```
 
-`Dockerfile.dockerignore` sends only `.git` and `infra/cloud-agent/` as the build context. The repository seed is cloned from that `.git` without network or credential; the source's git config is not copied and `origin` points at `https://github.com/testeos-z/gabo-ai.git`. If the builder sends no `.git`, the build still succeeds and the entrypoint clones the repository at start, which then needs the operator's run-time GitHub access because the repository is private.
+`Dockerfile.dockerignore` sends only `.git` and `infra/cloud-agent/` as the build context. The repository seed is built from that `.git` with the network disabled and no credential; the source's git config is not copied and `origin` points at `https://github.com/testeos-z/gabo-ai.git`. The Claude Code install script also runs with the network disabled. If the builder sends no `.git`, the build still succeeds and the entrypoint clones the repository at start, which then needs the operator's run-time GitHub access because the repository is private.
 
 Only `linux/amd64` is pinned; other platforms fail the build.
 

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Builds the repository seed of the image: a bare repository holding the
+# branches and tags of a source git dir (the build context's .git). Its local
+# branches and its remote-tracking branches of origin both become branches of
+# the seed, so a fresh single-branch clone or a CI checkout still yields `dev`
+# when the source knows it. No network; the source's git config is not copied.
+# Usage: gabo-make-seed <source git dir> <seed dir> <origin url> [branch]
+set -euo pipefail
+
+if [ $# -lt 3 ] || [ $# -gt 4 ]; then
+  echo "usage: gabo-make-seed <source git dir> <seed dir> <origin url> [branch]" >&2
+  exit 2
+fi
+src="$1" seed="$2" url="$3" branch="${4:-dev}"
+
+git init --quiet --bare "$seed"
+# Remote-tracking branches first, then local branches, which win on a clash.
+git -C "$seed" -c safe.directory='*' fetch --quiet --no-tags "$src" \
+  '+refs/remotes/origin/*:refs/heads/*' '^refs/remotes/origin/HEAD'
+git -C "$seed" -c safe.directory='*' fetch --quiet --no-tags "$src" \
+  '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+git -C "$seed" remote add origin "$url"
+
+if git -C "$seed" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null; then
+  git -C "$seed" symbolic-ref HEAD "refs/heads/$branch"
+else
+  echo "gabo-make-seed: the source has no branch ${branch}; the agent fetches it at start" >&2
+fi

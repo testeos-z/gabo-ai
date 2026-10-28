@@ -32,8 +32,15 @@ for tool in $tools; do
   fi
 done
 
-if git -C "$repo_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  ok "repository: ${repo_dir} ($(git -C "$repo_dir" branch --show-current) $(git -C "$repo_dir" rev-parse --short HEAD), origin $(git -C "$repo_dir" remote get-url origin))"
+repo_branch="${GABO_REPO_BRANCH:-dev}"
+if git -C "$repo_dir" rev-parse --verify --quiet HEAD >/dev/null 2>&1; then
+  current="$(git -C "$repo_dir" branch --show-current)"
+  detail="${repo_dir} (${current:-detached} $(git -C "$repo_dir" rev-parse --short HEAD), origin $(git -C "$repo_dir" remote get-url origin))"
+  if [ "$current" = "$repo_branch" ]; then
+    ok "repository: ${detail}"
+  else
+    fail "repository: ${detail} is not on ${repo_branch}"
+  fi
 else
   fail "repository: ${repo_dir} is not a checkout"
 fi

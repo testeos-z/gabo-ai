@@ -3,7 +3,8 @@
 # ownership of the agent home (a fresh volume is owned by root) and re-runs
 # itself as the agent user. As the agent user it makes sure that:
 #   1. engram is registered as a user-scope Claude Code MCP server;
-#   2. the gabo-ai repository is checked out (from the image seed, else cloned);
+#   2. the gabo-ai repository is checked out on dev (image seed updated by a
+#      fetch when git access allows it, else a clone);
 #   3. one Engram Cloud sync runs in the background (skipped when not configured);
 # and then runs the given command (default: keep the container alive).
 # It never reads, writes or prints a credential.
@@ -11,10 +12,12 @@ set -euo pipefail
 
 agent_user="${GABO_AGENT_USER:-agent}"
 
-if [ "$(id -u)" = 0 ]; then
+if [ "$(id -u)" = 0 ] && [ "$agent_user" != root ]; then
   home="$(getent passwd "$agent_user" | cut -d: -f6)"
   mkdir -p "$home"
-  if [ "$(stat -c %U "$home")" != "$agent_user" ]; then
+  # Repair any part of the home not owned by the agent (a fresh volume, or a
+  # file written by an earlier root `docker exec`).
+  if [ -n "$(find "$home" ! -user "$agent_user" -print -quit)" ]; then
     chown -R "$agent_user:$agent_user" "$home"
   fi
   exec setpriv --reuid="$agent_user" --regid="$agent_user" --init-groups \
@@ -36,22 +39,26 @@ if ! claude mcp get engram >/dev/null 2>&1; then
   log "registered engram as a user-scope MCP server"
 fi
 
-# 2. Repository checkout. The seed is a clone made at build time from the
-#    build context; without it, cloning needs whatever git credential the
-#    operator configured at run time.
+# 2. Repository checkout on $repo_branch. The seed is made at build time from
+#    the build context; the fetch and the clone without a seed need whatever
+#    git access the operator configured at run time, and only warn without it.
 if [ ! -e "$repo_dir/.git" ]; then
   if [ -d "$repo_seed" ]; then
-    git clone --quiet "$repo_seed" "$repo_dir"
+    git clone --quiet --no-checkout "$repo_seed" "$repo_dir"
     git -C "$repo_dir" remote set-url origin "$repo_url"
-    if [ "$(git -C "$repo_dir" branch --show-current)" != "$repo_branch" ] &&
-       git -C "$repo_dir" rev-parse --verify --quiet "refs/remotes/origin/$repo_branch" >/dev/null; then
-      git -C "$repo_dir" checkout --quiet "$repo_branch"
+    if ! git -C "$repo_dir" fetch --quiet origin "+refs/heads/$repo_branch:refs/remotes/origin/$repo_branch"; then
+      log "could not fetch ${repo_branch} from ${repo_url}; using the image seed as built"
     fi
-    log "checked out ${repo_url} at ${repo_dir} from the image seed"
+    if git -C "$repo_dir" rev-parse --verify --quiet "refs/remotes/origin/$repo_branch" >/dev/null; then
+      git -C "$repo_dir" checkout --quiet -B "$repo_branch" "origin/$repo_branch"
+      log "checked out ${repo_branch} of ${repo_url} at ${repo_dir}"
+    else
+      log "WARNING: neither the image seed nor ${repo_url} gave branch ${repo_branch}; ${repo_dir} has no checkout"
+    fi
   elif git clone --quiet --branch "$repo_branch" "$repo_url" "$repo_dir"; then
-    log "cloned ${repo_url} at ${repo_dir}"
+    log "cloned ${repo_branch} of ${repo_url} at ${repo_dir}"
   else
-    log "could not clone ${repo_url}; the repository is not checked out"
+    log "WARNING: could not clone ${repo_url}; the repository is not checked out"
   fi
 fi
 

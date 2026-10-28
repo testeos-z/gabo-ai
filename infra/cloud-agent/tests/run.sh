@@ -123,16 +123,53 @@ else
   fail "gabo-engram-sync fails without importing when the export fails"
 fi
 
-# --- gabo-agent-start -------------------------------------------------------
+# --- gabo-make-seed --------------------------------------------------------
+
+gitc() { git -c user.name=t -c user.email=t@example.invalid "$@"; }
+
+# "GitHub": main is the default branch, dev is one commit ahead of main.
+upstream="$scratch/upstream.git"
+work="$scratch/work"
+git init -q -b main "$work"
+gitc -C "$work" commit -q --allow-empty -m init
+gitc -C "$work" checkout -q -b dev
+gitc -C "$work" commit -q --allow-empty -m dev-work
+git clone -q --bare "$work" "$upstream"
+git -C "$upstream" symbolic-ref HEAD refs/heads/main
+
+# A fresh clone of the default branch: dev is only a remote-tracking branch.
+checkout="$scratch/checkout"
+git clone -q "$upstream" "$checkout"
+git -C "$checkout" config gabo.test.private-setting must-not-be-copied
 
 seed="$scratch/seed.git"
-src="$scratch/src"
-git init -q -b dev "$src"
-git -C "$src" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m init
-git clone -q --bare --no-local "$src" "$seed"
+if run gabo-make-seed "$checkout/.git" "$seed" https://github.com/testeos-z/gabo-ai.git >/dev/null 2>&1 &&
+   [ "$(git -C "$seed" symbolic-ref HEAD)" = refs/heads/dev ] &&
+   [ "$(git -C "$seed" rev-parse dev)" = "$(git -C "$upstream" rev-parse dev)" ] &&
+   [ "$(git -C "$seed" remote get-url origin)" = https://github.com/testeos-z/gabo-ai.git ] &&
+   ! git -C "$seed" config --local --get gabo.test.private-setting >/dev/null; then
+  pass "gabo-make-seed keeps dev from a default-branch clone and not the source git config"
+else
+  fail "gabo-make-seed keeps dev from a default-branch clone and not the source git config"
+fi
+
+# A seed without dev whose HEAD is main (the source only knew main).
+nodev_src="$scratch/nodev"
+git clone -q --single-branch --branch main "$upstream" "$nodev_src"
+nodev_seed="$scratch/nodev-seed.git"
+run gabo-make-seed "$nodev_src/.git" "$nodev_seed" https://github.com/testeos-z/gabo-ai.git >/dev/null 2>&1 || true
+if ! git -C "$nodev_seed" rev-parse --verify --quiet refs/heads/dev >/dev/null &&
+   git -C "$nodev_seed" rev-parse --verify --quiet refs/heads/main >/dev/null; then
+  pass "gabo-make-seed builds a seed without dev when the source has none"
+else
+  fail "gabo-make-seed builds a seed without dev when the source has none"
+fi
+
+# --- gabo-agent-start -------------------------------------------------------
 
 start_env() {
-  run env GABO_REPO_SEED="$seed" GABO_REPO_URL=https://github.com/testeos-z/gabo-ai.git \
+  run env GABO_AGENT_USER="$(id -un)" GABO_REPO_SEED="$seed" \
+    GABO_REPO_URL=https://github.com/testeos-z/gabo-ai.git \
     GABO_ENGRAM_SYNC_ON_START=0 "$@"
 }
 
@@ -159,6 +196,23 @@ if start_env gabo-agent-start true >/dev/null 2>&1 &&
   pass "gabo-agent-start keeps an existing registration and checkout"
 else
   fail "gabo-agent-start keeps an existing registration and checkout"
+fi
+
+new_case
+if start_env GABO_REPO_SEED="$nodev_seed" GABO_REPO_URL="$upstream" gabo-agent-start true >/dev/null 2>&1 &&
+   [ "$(git -C "$STUB_STATE/home/gabo-ai" branch --show-current)" = dev ] &&
+   [ "$(git -C "$STUB_STATE/home/gabo-ai" rev-parse HEAD)" = "$(git -C "$upstream" rev-parse dev)" ]; then
+  pass "gabo-agent-start fetches dev from origin when the seed lacks it"
+else
+  fail "gabo-agent-start fetches dev from origin when the seed lacks it"
+fi
+
+new_case
+if out="$(start_env GABO_REPO_SEED="$nodev_seed" GABO_REPO_URL="$scratch/missing.git" gabo-agent-start true 2>&1)" &&
+   grep -q 'WARNING: neither the image seed nor .* gave branch dev' <<<"$out"; then
+  pass "gabo-agent-start warns when neither the seed nor origin has dev"
+else
+  fail "gabo-agent-start warns when neither the seed nor origin has dev"
 fi
 
 # --- gabo-agent-check -------------------------------------------------------
@@ -188,6 +242,15 @@ if ! out="$(check_env gabo-agent-check 2>&1)" && grep -q 'FAIL engram MCP server
   pass "gabo-agent-check fails before the agent was started"
 else
   fail "gabo-agent-check fails before the agent was started"
+fi
+
+new_case
+start_env gabo-agent-start true >/dev/null 2>&1
+git -C "$STUB_STATE/home/gabo-ai" checkout -q -b feature
+if ! out="$(check_env gabo-agent-check 2>&1)" && grep -q 'FAIL repository: .* is not on dev' <<<"$out"; then
+  pass "gabo-agent-check fails when the checkout is not on dev"
+else
+  fail "gabo-agent-check fails when the checkout is not on dev"
 fi
 
 if [ "$failures" -gt 0 ]; then

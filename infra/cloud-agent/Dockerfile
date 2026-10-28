@@ -75,23 +75,24 @@ RUN tmp="$(mktemp -d)"; cd "$tmp"; \
 # lockfile that does not match package.json and checks every package against
 # its lockfile integrity hash. Install scripts are off; the one Claude Code
 # needs (it links the native binary from the already verified platform
-# package) runs explicitly and downloads nothing.
+# package) runs explicitly with the network disabled, so it cannot download.
 COPY infra/cloud-agent/npm/package.json infra/cloud-agent/npm/package-lock.json /opt/gabo-agent/npm/
 RUN cd /opt/gabo-agent/npm; \
     npm ci --ignore-scripts --no-audit --no-fund --update-notifier=false; \
-    (cd node_modules/@anthropic-ai/claude-code && node install.cjs); \
-    ln -s /opt/gabo-agent/npm/node_modules/.bin/claude /usr/local/bin/claude; \
-    ln -s /opt/gabo-agent/npm/node_modules/.bin/codegraph /usr/local/bin/codegraph; \
     npm cache clean --force
+RUN --network=none cd /opt/gabo-agent/npm/node_modules/@anthropic-ai/claude-code; \
+    node install.cjs; \
+    ln -s /opt/gabo-agent/npm/node_modules/.bin/claude /usr/local/bin/claude; \
+    ln -s /opt/gabo-agent/npm/node_modules/.bin/codegraph /usr/local/bin/codegraph
 
-# Repository seed: a bare clone of the build context's own git history (no
-# network, no credential; the source's git config is not copied). The
-# entrypoint checks it out under the agent home and points origin at GitHub.
+# Repository seed from the build context's own git history (bin/gabo-make-seed:
+# local and origin remote-tracking branches, no network, no credential, the
+# source's git config is not copied). The entrypoint checks out dev from it
+# under the agent home, after fetching dev from GitHub when git access allows.
 ARG GABO_REPO_URL=https://github.com/testeos-z/gabo-ai.git
-RUN --mount=type=bind,source=.,target=/tmp/context \
+RUN --network=none --mount=type=bind,source=.,target=/tmp/context \
     if [ -d /tmp/context/.git ]; then \
-      git -c safe.directory='*' clone --quiet --bare --no-local /tmp/context/.git /opt/gabo-agent/seed.git; \
-      git -C /opt/gabo-agent/seed.git remote set-url origin "$GABO_REPO_URL"; \
+      gabo-make-seed /tmp/context/.git /opt/gabo-agent/seed.git "$GABO_REPO_URL" dev; \
       chmod -R a+rX /opt/gabo-agent/seed.git; \
     else \
       echo "no .git in the build context: the repository is cloned at start instead" >&2; \
