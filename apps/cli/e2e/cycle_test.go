@@ -286,7 +286,10 @@ func (c *cycle) coder(i issue, wt, branch string) *result {
 		func(got issue) bool { return slices.Contains(got.Comments, "PR #"+itoa(r.pr)) })
 	v := c.w.review(r.pr, head)
 	c.onVerdict(r.pr, head, v)
-	r.verdict = strings.TrimPrefix(strings.Fields(v)[5], "verdict=")
+	r.verdict = fields(v)["verdict"]
+	if r.verdict == "" {
+		c.w.t.Fatalf("VERDICT line without verdict=: %s", v)
+	}
 	if !strings.HasSuffix(v, "verdict=clean merge=merged") {
 		return r
 	}

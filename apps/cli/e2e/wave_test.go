@@ -125,18 +125,27 @@ func TestMiniWaveInterruptedAndResumed(t *testing.T) {
 		for _, e := range second.resources() {
 			ledger[e.kind+" "+e.name] = e.state
 		}
+		created := 0
 		for _, cmd := range w.gitLog {
+			// worktree add -q <path> -b <branch> origin/dev
 			f := strings.Fields(cmd)
-			if len(f) == 6 && f[0] == "worktree" && f[1] == "add" && f[3] != stray {
-				for _, res := range []string{"worktree " + f[3], "branch " + f[5]} {
-					if ledger[res] != "removed" {
-						t.Errorf("%s: ledger state %q, want removed", res, ledger[res])
-					}
-				}
-				if exists(f[3]) {
-					t.Errorf("ledger worktree %s still exists", f[3])
+			b := slices.Index(f, "-b")
+			if len(f) < 2 || f[0] != "worktree" || f[1] != "add" || b < 1 || b+1 >= len(f) {
+				continue
+			}
+			created++
+			path, branch := f[b-1], f[b+1]
+			for _, res := range []string{"worktree " + path, "branch " + branch} {
+				if ledger[res] != "removed" {
+					t.Errorf("%s: ledger state %q, want removed", res, ledger[res])
 				}
 			}
+			if exists(path) {
+				t.Errorf("ledger worktree %s still exists", path)
+			}
+		}
+		if created != 2 {
+			t.Fatalf("the wave created %d worktrees, want 2 (one per task); git log: %v", created, w.gitLog)
 		}
 		if wts := w.worktrees(); !slices.Equal(wts, []string{stray}) {
 			t.Errorf("worktrees left: %v", wts)
@@ -169,6 +178,7 @@ func TestMiniWaveInterruptedAndResumed(t *testing.T) {
 			"T001 DONE PR #101 verdict=clean", "T002 DONE PR #102 verdict=clean",
 			"## Interactions\n0\n", "## Unverified writes\nnone", "## Comfort answer\npending",
 			"T001: where-does-the-feature-live -> src/t001.txt (resolver gabo-coder, auto decision record)",
+			"T002: where-does-the-feature-live -> src/t002.txt (resolver gabo-coder, auto decision record)",
 		} {
 			if !strings.Contains(report, want) {
 				t.Errorf("report misses %q:\n%s", want, report)
