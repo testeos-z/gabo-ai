@@ -82,7 +82,7 @@ The current config is cloud-shaped. Under the approved split, cloud fields leave
 | `runtimes.{coder, reviewer, assistant}` | Core | Runtime per agent; `runtimes.reviewer` is the only reviewer runtime key |
 | `repo.{name, integration_branch}` | Core | Target repository and auto-mode merge branch (D13) |
 | `coder.login` | Core | Coder-merge audit rule |
-| `review.{checks, auto_merge, human_only_paths, pi_credential_env, state_dir}` | Core | Read by the installed reviewer scripts (Approved (owner 2026-10-26), TRD D20) |
+| `review.{checks, check_env, auto_merge, human_only_paths, pi_credential_env, state_dir}` | Core | Read by the installed reviewer scripts from the base branch (Approved (owner 2026-10-26), TRD D20; `check_env` added and `pi_credential_env` made optional by TRD D27) |
 | `parallelism` | Core | Coder sessions per wave |
 | `worktree.keep` | Core | Read by the owning coder at task close and by the cycle skill at the wave-close sweep; `gbai worktree close` is removed (Approved (owner 2026-10-26), TRD D15, D18; amended (owner 2026-10-27), TRD D23) |
 
@@ -115,13 +115,14 @@ Today the user layer accepts the same keys as the project file; under the split 
 | `repo.name` | string `owner/name` | yes | Target GitHub repository | `testeos-z/gabo-ai` |
 | `repo.integration_branch` | string | yes (suggestion `dev`) | Only branch auto mode may merge into, never main (D13) | `dev` |
 | `runtimes.coder` | enum `claude`, `pi` | yes (suggestion `claude`) | Coder runtime | `claude` |
-| `runtimes.reviewer` | enum `claude`, `pi` | yes (suggestion `pi`) | Reviewer runtime, the only key for it (no separate engine key under `reviewer`); TRD requires the assistant to ask (no default) | `pi` |
+| `runtimes.reviewer` | enum `claude` (`pi` once T073 adds the Pi engine) | yes (suggestion `claude`) | Reviewer runtime, the only key for it (no separate engine key under `reviewer`); TRD requires the assistant to ask (no default). Until T073 lands, config validation, the JSON Schemas and `gabo check` reject `pi` because the reviewer scripts are Claude-only (TRD D27, T072); `runtimes.coder` and `runtimes.assistant` keep accepting `pi` | `claude` |
 | `runtimes.assistant` | enum `claude`, `pi` | yes (suggestion `claude`) | Assistant runtime | `claude` |
 | `coder.login` | string | no | Coder GitHub login; audit flags merges by it; must differ from `bot.login` | `gabo-coder` |
 | `review.checks` | list of string | yes (suggestion: bun install, build, check-types, lint, test) | Commands run in order in a credential-free copy of the merged tree; split on whitespace, no shell | `["go test ./..."]` |
 | `review.auto_merge` | boolean | no (`false`) | Reviewer merges on approve | `false` |
 | `review.human_only_paths` | list of relative path | yes (suggestion: the former default list) | Paths only a human may change | `[".github/", "AGENTS.md"]` |
-| `review.pi_credential_env` | env var name | when `runtimes.reviewer` is `pi` (suggestion `ANTHROPIC_API_KEY`) | Env var that receives the pi model credential; the value never enters config (R21) | `ANTHROPIC_API_KEY` |
+| `review.pi_credential_env` | env var name | no | Until T073 it parses and has no effect (T072). Once T073 adds the Pi engine, it names an env var passed only to the Pi review step, for when the owner's existing Pi login is not reused; when unset, the Pi engine reuses that login, as the Claude path reuses HOME (TRD D27). The value never enters config (R21) | `PI_REVIEW_KEY` |
+| `review.check_env` | list of env var names (pattern `^[A-Z_][A-Z0-9_]*$`) | no | **Proposed (not implemented, T074).** Names of env vars the reviewer passes from its own environment into the checks, never into the review step; read from the base branch `gabo.yaml`, never the PR head. Names only: a value-looking entry (`A=B`) and the reserved names `PATH`, `HOME`, `CI`, `GOCACHE`, `GOMODCACHE`, `GOPATH`, `GABO_UPGRADE_PR` and any `GH_*`, `GITHUB_*`, `CLAUDE_*` or `REVIEWER_*` name are rejected. A listed variable unset or empty at review time fails the checks before any check runs, naming the variable, never its value (TRD D27, R21) | `["TEST_DATABASE_URL"]` |
 | `review.state_dir` | absolute path | no | Reviewer clone and workspaces; see inventory | `/data/gabo/reviewer` |
 | `parallelism` | positive integer | yes (suggestion `3`) | Most coder sessions at once | `3` |
 | `worktree.keep` | list of string | no | Worktree names or absolute paths never closed | `["main"]` |
@@ -183,7 +184,7 @@ repo:
 runtimes:
   coder: claude
   assistant: claude
-  reviewer: pi
+  reviewer: claude
 
 slots:
   tasks:
@@ -212,7 +213,7 @@ review:
     - go vet ./...
   auto_merge: false
   human_only_paths: [.github/, AGENTS.md, CLAUDE.md]
-  pi_credential_env: ANTHROPIC_API_KEY
+  check_env: [TEST_DATABASE_URL]   # names only; export the value where the reviewer runs
 
 developers:
   "leo@example.com": Leo
@@ -265,7 +266,7 @@ Today there is one cloud-shaped `gabo.yaml` whose validation requires the Railwa
 
 - **Seed and reference data.** None. Setup starts from the owner's answers; documented values are suggestions.
 - **PII.** The developer catalog stores git emails and aliases in a committed file, so it is visible to everyone with repository read access. The global user file holds an alias and preferences, readable only by that OS user. Preference observations (`user/preferences`, TRD D22) live in the memory provider, follow its access rules and never hold secrets or sensitive personal data.
-- **Secrets.** Never stored in any gabo-ai file or generated agent file (R21). Config holds only the name of an env var (`review.pi_credential_env`), never its value.
+- **Secrets.** Never stored in any gabo-ai file or generated agent file (R21). Config holds only env var names (`review.pi_credential_env`, `review.check_env`), never their values. The reviewer reads both from the base branch and takes the values from its own environment: `review.check_env` variables reach only the checks, and `review.pi_credential_env` (once T073 lands) reaches only the Pi review step. A missing `review.check_env` variable fails the checks and is reported by name, never by value (TRD D27).
 - **Retention.** Config and adapters live as long as the repository; history is git history. Reviewer state is disposable. Decisions and tasks follow the retention of the external memory provider and tracker.
 
 ## 8. Open questions
