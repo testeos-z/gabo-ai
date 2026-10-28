@@ -16,8 +16,8 @@
 
 runtimes:
   coder: claude
-  # Only claude: the reviewer scripts run only Claude; a Pi reviewer is not
-  # supported yet (T073). coder and assistant accept claude or pi.
+  # claude or pi; a pi reviewer reuses the owner's Pi login unless
+  # review.pi_credential_env is set.
   reviewer: claude
   assistant: claude
 
@@ -48,7 +48,8 @@ review:
     - docs/policies/
     - tools/hook-tests/
     - agents/
-  # Optional, no effect yet: reserved for a future Pi reviewer (T073).
+  # Optional, read only by a pi reviewer: the env var whose value the review
+  # step gets instead of the owner's Pi login (the value never goes here).
   # pi_credential_env: ANTHROPIC_API_KEY
   # Reviewer state (its own clone/, worktrees/ and ci/ workspaces), 0700.
   # Default: $XDG_STATE_HOME/gabo/reviewer, else ~/.local/state/gabo/reviewer.

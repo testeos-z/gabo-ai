@@ -69,41 +69,31 @@ func TestParseReportsAllMissingKeysAndOneNextStep(t *testing.T) {
 	}
 }
 
-// The reviewer scripts run only Claude (T072, D27): a pi reviewer fails with
-// the key path and its own next step, while coder and assistant still accept
-// pi.
-func TestParseRejectsPiReviewer(t *testing.T) {
+// The reviewer scripts run Claude or Pi (T073, D27): every runtime accepts
+// pi, a pi reviewer with or without review.pi_credential_env.
+func TestParseAcceptsPiReviewer(t *testing.T) {
 	t.Parallel()
 	pi := strings.Replace(minimal, "reviewer: claude", "reviewer: pi", 1)
-	for name, doc := range map[string]string{
-		"without env": pi,
-		"with env":    pi + "  pi_credential_env: ANTHROPIC_API_KEY\n",
+	for name, tt := range map[string]struct{ doc, env string }{
+		"without env": {pi, ""},
+		"with env":    {pi + "  pi_credential_env: OPENAI_API_KEY\n", "OPENAI_API_KEY"},
 	} {
-		_, err := Parse([]byte(doc))
-		if err == nil {
-			t.Fatalf("%s: Parse() error = nil, want the pi reviewer rejected", name)
+		cfg, err := Parse([]byte(tt.doc))
+		if err != nil || cfg.Runtimes.Reviewer != RuntimePi || cfg.Review.PiCredentialEnv != tt.env {
+			t.Errorf("%s: Parse() = %+v, %q, %v; want a pi reviewer with env %q", name, cfg.Runtimes, cfg.Review.PiCredentialEnv, err, tt.env)
 		}
-		msg := err.Error()
-		for _, want := range []string{`runtimes.reviewer: must be "claude", got "pi"`, NextReviewerClaude} {
-			if !strings.Contains(msg, want) {
-				t.Errorf("%s: error = %q, want %q", name, msg, want)
-			}
-		}
-		if strings.Contains(msg, "pi_credential_env") {
-			t.Errorf("%s: error = %q, want no pi_credential_env requirement", name, msg)
-		}
-	}
-	if NextReviewerClaude != "next: set runtimes.reviewer to claude; a Pi reviewer is not supported yet (T073)" {
-		t.Errorf("NextReviewerClaude = %q", NextReviewerClaude)
 	}
 	cfg, err := Parse([]byte(strings.NewReplacer("coder: claude", "coder: pi", "assistant: claude", "assistant: pi").Replace(minimal)))
 	if err != nil || cfg.Runtimes.Coder != RuntimePi || cfg.Runtimes.Assistant != RuntimePi {
 		t.Fatalf("pi coder and assistant = %+v, %v; want accepted", cfg.Runtimes, err)
 	}
+	_, err = Parse([]byte(strings.Replace(minimal, "reviewer: claude", "reviewer: codex", 1)))
+	if err == nil || !strings.Contains(err.Error(), `runtimes.reviewer: must be "claude" or "pi", got "codex"`) {
+		t.Fatalf("codex reviewer: error = %v, want the runtime enum", err)
+	}
 }
 
-// review.pi_credential_env is no longer required; when present it still
-// parses and has no effect.
+// review.pi_credential_env is optional for every reviewer runtime.
 func TestParsePiCredentialEnvOptional(t *testing.T) {
 	t.Parallel()
 	cfg, err := Parse([]byte(minimal))
