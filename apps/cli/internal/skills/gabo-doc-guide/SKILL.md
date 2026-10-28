@@ -41,6 +41,7 @@ Each project keeps its product docs in `docs/product/`, written from the templat
 | Who talks to the owner, and how are questions resolved by mode? | `gabo-assistant` |
 | How does a wave run, and how are worktrees, the ledger and cleanup handled? | `gabo-cycle` |
 | What does a wave report hold, and how is it saved and summarized? | `gabo-wave-report` |
+| How is a config key written, in which file, and what happens after the write? | `gabo-config-writer` |
 | How does a coder work one task, open its PR and close the task? | `gabo-coder` |
 | How does the review gate work, and what does a `VERDICT` line mean? | `gabo-reviewer-notes` |
 | How are product requirements and stories written? | `gabo-pm` |
