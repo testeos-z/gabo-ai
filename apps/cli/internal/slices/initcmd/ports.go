@@ -1,6 +1,9 @@
 package initcmd
 
-import "io/fs"
+import (
+	"context"
+	"io/fs"
+)
 
 // Store reads and writes the project files init owns.
 type Store interface {
@@ -13,4 +16,12 @@ type Store interface {
 	// Lstat returns the mode of name without following a final symlink, or an
 	// error matching fs.ErrNotExist.
 	Lstat(name string) (fs.FileMode, error)
+}
+
+// Updater replaces the running gabo with exactly version want of a newer
+// catalog stamp and re-executes init (TRD 9.4). updated is false when nothing
+// changed, with lines that say why; when true the binary was replaced and
+// err reports a failed restart.
+type Updater interface {
+	Update(ctx context.Context, want, have string) (lines []string, updated bool, err error)
 }
