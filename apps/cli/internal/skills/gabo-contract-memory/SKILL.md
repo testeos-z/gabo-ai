@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the `memory` slot (`slots.me
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
 - Never store secrets, tokens, credentials or sensitive personal data (R21).
 - Every save is read back; a record that does not show up after one retry is reported as unverified, never as saved.
 - Project scope for everything about the repository; global (personal) scope only for preference observations.

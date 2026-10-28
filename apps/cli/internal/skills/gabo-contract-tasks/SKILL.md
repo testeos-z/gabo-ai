@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the `tasks` slot (`slots.tas
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
 - Every write is verified by re-reading it (R24). A write that does not show up after one retry is reported as an unverified write, never as a success.
 - A task is identified by a stable id the tracker returns (for example an issue number); plan task ids (`T###`) appear in the title.
 - Never close, relabel or reassign a task the agent was not asked to work on.

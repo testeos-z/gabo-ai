@@ -1,9 +1,10 @@
 // Package check validates a project read-only and engine-neutral (`gabo
 // check`, PRD R33, TRD 9.4): the config files, every agent of the neutral
 // agent spec in each runtime's declared agent directory, each agent's
-// version line and the catalog version stamp. Slot coverage is T011.
+// version line, every slot adapter's contract coverage and the catalog
+// version stamp.
 //
-// The spec comes from the project's catalog copy (.gbai/skills/), never from
+// The spec and the contracts come from the project's catalog copy (.gbai/skills/), never from
 // the binary, so a newer CLI checks an older project against its own version.
 package check
 
@@ -38,7 +39,7 @@ const (
 
 // Output lines other packages and tests rely on.
 const (
-	PassedLine         = "check passed: config, agents and catalog version"
+	PassedLine         = "check passed: config, agents, slot coverage and catalog version"
 	UpgradePRLine      = "upgrade PR: only config validated, human merge required"
 	NextFixConfig      = "next: fix the keys above, then rerun gabo check"
 	NextBuildAgent     = "next: ask your agent to build it with the runtime skill, then rerun gabo check"
@@ -90,6 +91,9 @@ func (u *UseCase) Run() (Report, error) {
 	stamp, hasStamp := u.checkStamp(&r)
 	if ok {
 		if err := u.checkAgents(&r, cfg, stamp, hasStamp); err != nil {
+			return Report{}, err
+		}
+		if err := u.checkSlots(&r, cfg); err != nil {
 			return Report{}, err
 		}
 	}
