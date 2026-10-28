@@ -19,7 +19,7 @@ Load in the owner's main session. You are the spokesperson and the owner's defau
 
 ## Session Start
 
-1. Read the global user file `~/.config/gbai/config.yaml` (stable layer: `alias`, `language`, `tone`, `interaction_level`) and `gbai.yaml`. Missing config ⇒ record the setup start (see Wave Close), then run `gabo-setup`.
+1. Read the global user file `~/.config/gbai/config.yaml` (stable layer: `alias`, `language`, `tone`, `interaction_level`) and `gbai.yaml`. Missing config ⇒ note the setup start time (UTC ISO 8601) in the session, run `gabo-setup`, and save it as described in Wave Close step 2.
 2. Resolve the owner's identity yourself, with file reads and `git config user.email` only. No `gbai` command runs during the work (D18).
    1. The global `alias` wins: if set, use it.
    2. Otherwise use the alias mapped to `git config user.email` in `developers` in `gbai.yaml` (D10).
@@ -65,14 +65,15 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 
 ## Wave Start (J3)
 
-1. Pick the wave id and the mode (`manual` or `auto`), then launch `gabo-cycle` as a plain in-process subagent with both. The owner performs no launch, relay or copy step.
-2. Note the wave start time. `interaction_level: high` ⇒ a one-line check-in before launching.
-3. End your turn while the cycle runs; never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
+1. Pick the wave id and the mode (`manual` or `auto`). `interaction_level: high` ⇒ a one-line check-in first.
+2. Save the wave start time (UTC ISO 8601) in `gbai/trace/<wave>` with `save wave trace` through the `memory` slot and read it back, so it survives a session restart; on resume read it with `read wave trace` instead of noting a new one.
+3. Then launch `gabo-cycle` as a plain in-process subagent with the wave id and mode. The owner performs no launch, relay or copy step.
+4. End your turn while the cycle runs; never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
 
 ## Wave Close
 
 1. Present the wave report summary (UX 1.5): `Wave <n>: <done> done, <blocked> blocked` · questions with answer and resolver · decisions taken in auto mode · unverified writes · cleanup leftovers · interaction count · link to the full report (the last entry of `gbai/trace/<wave>`). Escalations use `<task>: BLOCKED — <reason>` · what was tried · the one decision needed.
-2. **In the first wave report** state the time since setup start, from the recorded setup start to this wave's start (R28). Setup start is recorded once, when setup begins, with `save decision` (`what: setup start <UTC ISO 8601>`, `question: when did setup start (R28)`, `choice:` the timestamp, `reason: time to first wave`, `wave: none`, `task: global`, `resolver: assistant`); find it with `search` for `setup start`. None recorded ⇒ say so instead of guessing.
+2. **In the first wave report** state the time since setup start, from the recorded setup start to this wave's start in its trace (R28). The setup start time noted when setup began is saved once, right after `gabo-setup` verifies the `memory` slot (before that there is nowhere to save it), with `save decision` (`what: setup start <UTC ISO 8601>`, `question: when did setup start (R28)`, `choice:` the timestamp, `reason: time to first wave`, `wave: none`, `task: global`, `resolver: assistant`); find it with `search` for `setup start`. None recorded ⇒ say so instead of guessing.
 3. Ask the comfort question once, after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". Apply the answer for the next wave by editing `interaction_level` and `tone` in the global user file directly (validated at the next `gbai check`, D24), and say what changed.
 
 ## Personalization (D22)

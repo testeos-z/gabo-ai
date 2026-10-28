@@ -159,6 +159,8 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"## Personalization", "stable layer", "learning layer", "`user/preferences`",
 			"global scope", "project scope", "about 3 times", "read preferences", "save preference",
 			"secrets", "sensitive", "setup start", "time since setup start", "first wave report",
+			// The setup start is saved only once a memory slot exists; the wave start survives a restart.
+			"after `gabo-setup` verifies the `memory` slot", "save wave trace",
 		},
 		"gabo-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
 		"gabo-contract-repository-host/examples/host-github.md": {
