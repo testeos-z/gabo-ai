@@ -213,16 +213,48 @@ func TestSetupMemoryProbeUsesAScratchTopicAndDeletesIt(t *testing.T) {
 	}
 	smoke, _, _ = strings.Cut(smoke, "\n7. ")
 	at := 0
-	for _, s := range []string{"`gabo/setup-probe/<timestamp>`", "read it back", "delete the probe", "reads back nothing"} {
+	for _, s := range []string{"`gabo/setup-probe/<timestamp>`", "read it back", "delete it", "reads back nothing"} {
 		i := strings.Index(smoke[at:], s)
 		if i < 0 {
 			t.Fatalf("%s smoke test: %q missing or out of order", setupSkill, s)
 		}
 		at += i + len(s)
 	}
-	for _, s := range []string{"only under", "nothing stays in the project memory", "stays unverified"} {
+	for _, s := range []string{
+		"only under", "nothing stays in the project memory", "stays unverified",
+		"backend's own memory tool", "no delete operation", "writes nothing", "read-only `search`",
+	} {
 		if !strings.Contains(smoke, s) {
 			t.Errorf("%s smoke test: missing %q", setupSkill, s)
+		}
+	}
+}
+
+// The memory contract defines no delete, so the probe cannot be deleted
+// through a contract operation: the smoke test must name the backend's own
+// tool for it. This test fails if the contract gains a delete, so the smoke
+// step is revisited then.
+func TestMemoryProbeDeletionMatchesTheContract(t *testing.T) {
+	t.Parallel()
+	b, err := content.ReadFile("gabo-contract-memory/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if strings.HasPrefix(line, "### ") && strings.Contains(strings.ToLower(line), "delete") {
+			t.Fatalf("gabo-contract-memory now has %q: make the setup smoke test delete the probe through it", line)
+		}
+	}
+}
+
+// A catalog memory adapter is copied to a project-owned file before the
+// memory project name is written (never into the catalog copy).
+func TestSetupCopiesACatalogMemoryAdapterBeforeWriting(t *testing.T) {
+	t.Parallel()
+	sec := sharedMemory(t)
+	for _, s := range []string{"points into the catalog copy", "project-owned copy", "`gabo-adapter-writer`", "points `slots.memory.adapter` at the copy"} {
+		if !strings.Contains(sec, s) {
+			t.Errorf("%s ## Shared memory: missing %q", setupSkill, s)
 		}
 	}
 }
