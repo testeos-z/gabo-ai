@@ -72,9 +72,9 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 
 ## Wave Close
 
-1. Present the wave report summary (UX 1.5): `Wave <n>: <done> done, <blocked> blocked` · questions with answer and resolver · decisions taken in auto mode · unverified writes · cleanup leftovers · interaction count · link to the full report (the last entry of `gbai/trace/<wave>`). Escalations use `<task>: BLOCKED — <reason>` · what was tried · the one decision needed.
+1. Present the wave report summary (UX 1.5) as `gabo-wave-report` formats it, starting with `Wave <n>: <done> done, <blocked> blocked`: questions with answer and resolver, auto decisions, unverified writes, leftovers, interaction count and the link to the full report.
 2. **In the first wave report** state the time since setup start, from the recorded setup start to this wave's start in its trace (R28). The setup start time noted when setup began is saved once, right after `gabo-setup` verifies the `memory` slot (before that there is nowhere to save it), with `save decision` (`what: setup start <UTC ISO 8601>`, `question: when did setup start (R28)`, `choice:` the timestamp, `reason: time to first wave`, `wave: none`, `task: global`, `resolver: assistant`); find it with `search` for `setup start`. None recorded ⇒ say so instead of guessing.
-3. Ask the comfort question once, after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". Apply the answer for the next wave by editing `interaction_level` and `tone` in the global user file directly (validated at the next `gbai check`, D24), and say what changed.
+3. Ask the comfort question once, after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". Apply the answer for the next wave by editing `interaction_level` and `tone` in the global user file directly (validated at the next `gbai check`, D24), and say what changed. Record the answer as the report's comfort answer through `gabo-wave-report` (saved again, read back).
 
 ## Personalization (D22)
 

@@ -17,6 +17,7 @@ var want = []string{
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
 	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
+	"gabo-wave-report",
 }
 
 // contracts maps each contract skill to its TRD 9.1 operations, in order, and
@@ -140,7 +141,18 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"4 fix rounds", "Unverified writes", "test databases", "no `gbai` command",
 			"no state dir", "D15", "D17", "skips DONE", "reattach", "disagreement",
 			"never guess", "TRD 9.2", "save the wave report", "`gbai/trace/<wave>`",
-			"`gbai/ledger/<wave>`", "merged tasks still open",
+			"`gbai/ledger/<wave>`",
+			// T061: the report format lives in gabo-wave-report.
+			"`gabo-wave-report`",
+		},
+		// T061: J3 wave report (TRD 9.2) formatted once and saved through memory.
+		"gabo-wave-report/SKILL.md": {
+			"TRD 9.2", "J3", "status", "PR", "last verdict", "fix rounds", "coder handle",
+			"answer and resolver", "R5", "interaction count", "reasons", "R29",
+			"Unverified writes", "R24", "leftovers", "test databases", "merged tasks still open", "R13",
+			"plan-change proposals", "denied board moves", "resume disagreements", "comfort answer", "R17",
+			"`memory`", "save wave trace", "last entry of `gbai/trace/<wave>`", "read it back", "unverified",
+			"`Wave <n>: <done> done, <blocked> blocked`", "UX 1.5", "none",
 		},
 		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
 		"gabo-assistant/SKILL.md": {
@@ -161,6 +173,8 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"secrets", "sensitive", "setup start", "time since setup start", "first wave report",
 			// The setup start is saved only once a memory slot exists; the wave start survives a restart.
 			"after `gabo-setup` verifies the `memory` slot", "save wave trace",
+			// T061: the summary and the comfort answer follow gabo-wave-report.
+			"`gabo-wave-report`",
 		},
 		"gabo-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
 		"gabo-contract-repository-host/examples/host-github.md": {
@@ -630,5 +644,31 @@ func TestCatalogShipsTheAgentSpec(t *testing.T) {
 	}
 	if !slices.Contains(paths, "gabo-agent-templates/agents.yaml") {
 		t.Fatalf("Files() misses gabo-agent-templates/agents.yaml (has %v)", paths)
+	}
+}
+
+// T061: the wave report format lives only in gabo-wave-report; the cycle and
+// the assistant reference it instead of repeating its fields, and the cycle
+// agent loads it.
+func TestWaveReportFormatLivesInOneSkill(t *testing.T) {
+	t.Parallel()
+	files, err := Files()
+	if err != nil {
+		t.Fatal(err)
+	}
+	repeated := []string{"denied board moves", "merged tasks still open", "interaction count with reasons", "plan-change proposals"}
+	for _, f := range files {
+		switch f.Path {
+		case "gabo-cycle/SKILL.md", "gabo-assistant/SKILL.md":
+			for _, s := range repeated {
+				if strings.Contains(string(f.Data), s) {
+					t.Errorf("%s repeats the wave report field %q; reference `gabo-wave-report` instead", f.Path, s)
+				}
+			}
+		case "gabo-agent-templates/agents.yaml":
+			if !strings.Contains(string(f.Data), "skills: [gabo-cycle, gabo-wave-report]") {
+				t.Errorf("%s: the gabo-cycle agent must load gabo-wave-report", f.Path)
+			}
+		}
 	}
 }
