@@ -163,6 +163,24 @@ origin gabocheck O_CHECKS='gabo check'
 scenario gabocheck >/dev/null
 check "gabo check (the current binary name) also runs the configured binary" grep -qE '^gabo-call check ' "$work/gabocheck/calls.log"
 
+echo "# review.check_env"
+origin checkenv O_CHECK_ENV='TEST_DB_URL'
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" \
+  "$(scenario checkenv TEST_DB_URL=listed-value UNLISTED_VAR=unlisted-value)" "a listed, exported variable passes the checks"
+check "a listed variable is visible to the checks" grep -qxF 'check-vars TEST_DB_URL=listed-value UNLISTED_VAR=unset' "$work/checkenv/calls.log"
+check "an unlisted variable is not visible to the checks" bash -c "! grep '^check-vars' '$work/checkenv/calls.log' | grep -q unlisted-value"
+check "the review step does not get listed variables" grep -qxF 'cc-vars TEST_DB_URL=unset UNLISTED_VAR=unset' "$work/checkenv/calls.log"
+check "the value never reaches the comment" bash -c "! grep -q listed-value '$work/checkenv/all_posted_7.md'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario checkenv_unset)" \
+  "a listed, unset variable fails the checks"
+expect_match '^reviewer/tests failure .*TEST_DB_URL' "$(status_line checkenv_unset reviewer/tests)" \
+  "the reviewer/tests failure names the variable"
+check "no check runs when a listed variable is unset" bash -c "! grep -q '^go-argc' '$work/checkenv_unset/calls.log'"
+check "the comment names the unset variable" grep -qF 'TEST_DB_URL' "$work/checkenv_unset/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario checkenv_empty TEST_DB_URL=)" \
+  "a listed, empty variable fails the checks"
+check "no check runs when a listed variable is empty" bash -c "! grep -q '^go-argc' '$work/checkenv_empty/calls.log'"
+
 echo "# base version minimum"
 origin stamped O_STAMP=0.4.0
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario old_cli GABO_VERSION=0.3.0)" "an older binary than the base stamp ends in error"

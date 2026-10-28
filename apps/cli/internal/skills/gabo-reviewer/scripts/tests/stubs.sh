@@ -72,6 +72,7 @@ GH
 [[ -n "${STUB_LOG:-}" ]] || source "$(dirname "$0")/stub-context"
 echo "claude $* cwd=$PWD" >>"$STUB_LOG"
 echo "cc-env GH_TOKEN=${GH_TOKEN:-unset} REVIEWER_GH_TOKEN=${REVIEWER_GH_TOKEN:-unset} CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-unset} HOME=$HOME" >>"$STUB_LOG"
+echo "cc-vars TEST_DB_URL=${TEST_DB_URL:-unset} UNLISTED_VAR=${UNLISTED_VAR:-unset}" >>"$STUB_LOG"
 cat >"$FIXTURE/prompt_seen.txt"
 result() { jq -nc --arg t "$1" --arg s "${2:-success}" --argjson e "${3:-false}" '{type:"result", subtype:$s, is_error:$e, result:$t}'; }
 case "${CLAUDE_MODE:-pass}" in
@@ -91,6 +92,7 @@ CLAUDE
 args="go $*"
 printf 'go-argc=%s args=%s cwd=%s head=%s\n' "$#" "$args" "$PWD" "$(git rev-parse HEAD 2>/dev/null)" >>"$STUB_LOG"
 echo "check-env GH_TOKEN=${GH_TOKEN:-unset} REVIEWER_GH_TOKEN=${REVIEWER_GH_TOKEN:-unset} CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-unset} HOME=$HOME CI=${CI:-unset}" >>"$STUB_LOG"
+echo "check-vars TEST_DB_URL=${TEST_DB_URL:-unset} UNLISTED_VAR=${UNLISTED_VAR:-unset}" >>"$STUB_LOG"
 if [[ -n "${FAIL_CHECK:-}" ]] && grep -Eq -- "$FAIL_CHECK" <<<"$args"; then
   echo "error: $args failed at main.go:3"
   exit 1
@@ -120,7 +122,8 @@ GABO
 # write_yaml <file>: a gabo.yaml for the fixture repository. Knobs (env):
 # O_AUTO_MERGE (false), O_PLACEMENT (local), O_MARKER (gbai-reviewer-bot),
 # O_CHECKS (newline-separated; default the three go checks), O_REPO
-# (example-org/example-repo).
+# (example-org/example-repo), O_CHECK_ENV (space-separated review.check_env
+# names; none by default).
 write_yaml() {
   local checks="${O_CHECKS:-go -C apps/cli build ./...
 go -C apps/cli vet ./...
@@ -153,6 +156,10 @@ go -C apps/cli test ./...}"
     done <<<"$checks"
     echo "  auto_merge: ${O_AUTO_MERGE:-false} # owner note"
     echo "  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/]"
+    if [[ -n "${O_CHECK_ENV:-}" ]]; then
+      echo "  check_env:"
+      for c in $O_CHECK_ENV; do echo "    - $c # name only"; done
+    fi
     echo
     echo "developers:"
     echo "  \"owner@example.com\": Owner"

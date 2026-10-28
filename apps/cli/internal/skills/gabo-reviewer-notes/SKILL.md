@@ -33,7 +33,7 @@ Use when an agent needs to understand or explain a review result. Agents never r
 
 - Own clone: the scripts work in their own state dir (`~/.local/state/gabo/reviewer`) with their own clone of the repository, never the coder's worktree; never edit or build inside it.
 - They re-read the PR and skip a head that moved; they test-merge the pinned head into a fresh `dev`. A merge conflict is blocking.
-- Checks run with their own `HOME`, their own build and module cache and `CI=true`, in a clean environment (`env -i`) inside a credential-free copy of the merged tree.
+- Checks run with their own `HOME`, their own build and module cache and `CI=true`, in a clean environment (`env -i`) inside a credential-free copy of the merged tree. Only the variables named in `review.check_env` (from the base `gabo.yaml`) are added, with values from the reviewer's own environment; one unset or empty fails the checks. The agent review never gets them.
 - The agent review runs read-only in a clean environment with no `gh` or git credentials: with a model token configured it gets an empty `HOME` of its own and only that token; without one it uses the owner's model login.
 - This is trust-based, not an OS-user boundary.
 
