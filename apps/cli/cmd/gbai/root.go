@@ -14,6 +14,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/check"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/plan"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/review"
@@ -55,6 +56,7 @@ func newRootCommand(d deps) *cobra.Command {
 	root.AddCommand(version.NewCommand(version.NewUseCase(d.version)))
 	root.AddCommand(review.NewCommand(reviewFactories(d.runner, loadConfig)))
 	root.AddCommand(initcmd.NewCommand(initFactory(d.runner, d.version)))
+	root.AddCommand(check.NewCommand(checkFactory(d.runner, d.version, os.Getenv, os.Getwd)))
 	root.AddCommand(plan.NewCommand(plan.NewUseCase(osfs.FS{})))
 	return root
 }

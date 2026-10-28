@@ -1,6 +1,6 @@
 # Architecture
 
-`gbai` is one Go binary (`apps/cli`): an agent compiler only (TRD D18). It installs the embedded gbai skills (`gbai init`); the work itself runs in the agents through those skills. The work-time commands (`status`, `audit`, `sessions`, `provision`, `secrets`, `repo`, `worktree`, `mcp`, `doctor`, `config`) and the gbai MCP server were retired by T042; `review` and `plan` remain until T043 retires them. `docs/cloud-agent-flow.md` describes the retired cloud flow and is kept for history only.
+`gbai` is one Go binary (`apps/cli`): an agent compiler only (TRD D18). It installs the embedded gbai skills (`gbai init`) and validates a project read-only (`gbai check`: config, spec agents in each runtime's declared agent directory, agent version lines and the catalog version stamp; slot coverage follows in T011); the work itself runs in the agents through those skills. The work-time commands (`status`, `audit`, `sessions`, `provision`, `secrets`, `repo`, `worktree`, `mcp`, `doctor`, `config`) and the gbai MCP server were retired by T042; `review` and `plan` remain until T043 retires them. `docs/cloud-agent-flow.md` describes the retired cloud flow and is kept for history only.
 
 ## Hexagonal vertical slices
 

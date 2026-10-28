@@ -5,7 +5,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"runtime/debug"
 
@@ -24,7 +26,20 @@ func main() {
 		stderr:  os.Stderr,
 	})
 	if err := root.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "gbai:", err)
-		os.Exit(1)
+		os.Exit(exitCode(os.Stderr, err))
 	}
+}
+
+// exitCode prints err to w and returns the process exit code: the code an
+// error carries (for example check's 1 and 2), else 1. An error with an empty
+// message prints nothing; its output was already written.
+func exitCode(w io.Writer, err error) int {
+	if msg := err.Error(); msg != "" {
+		fmt.Fprintln(w, "gbai:", msg)
+	}
+	var coded interface{ ExitCode() int }
+	if errors.As(err, &coded) {
+		return coded.ExitCode()
+	}
+	return 1
 }
