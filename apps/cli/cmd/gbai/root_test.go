@@ -28,7 +28,7 @@ func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	for _, c := range root.Commands() {
 		got = append(got, c.Name())
 	}
-	if want := []string{"init", "plan", "review", "version"}; !slices.Equal(got, want) {
+	if want := []string{"check", "init", "plan", "review", "version"}; !slices.Equal(got, want) {
 		t.Fatalf("commands = %v, want %v", got, want)
 	}
 	var out bytes.Buffer
@@ -36,6 +36,9 @@ func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	root.SetArgs([]string{"--help"})
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
+	}
+	if !strings.Contains(out.String(), "  check ") {
+		t.Fatalf("help does not list check:\n%s", out.String())
 	}
 	for _, removed := range []string{"secrets", "provision", "repo", "sessions", "status", "audit", "doctor", "mcp", "worktree", "config "} {
 		if strings.Contains(out.String(), "  "+removed) {

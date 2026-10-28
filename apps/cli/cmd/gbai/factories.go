@@ -12,6 +12,7 @@ import (
 	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/osfs"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
+	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/check"
 	"github.com/testeos-z/gbai-team/apps/cli/internal/slices/initcmd"
 )
 
@@ -61,6 +62,24 @@ func initFactory(runner kernel.Runner, version string) initcmd.Factory {
 				ProjectDir: project, Version: version, SetupPrompt: setupprompt.Text,
 			}),
 		}, nil
+	}
+}
+
+// checkFactory builds the check run lazily. The project is the git top-level
+// of the working directory, or the directory itself; GABO_UPGRADE_PR=1 (set
+// by the reviewer scripts and CI on an upgrade PR) validates only the config.
+func checkFactory(runner kernel.Runner, version string, getenv func(string) string, getwd func() (string, error)) check.Factory {
+	return func(ctx context.Context) (*check.UseCase, error) {
+		wd, err := getwd()
+		if err != nil {
+			return nil, err
+		}
+		project := config.ProjectRoot(ctx, runner, wd)
+		return check.NewUseCase(os.DirFS(project), osfs.FS{}, check.Settings{
+			Version:   version,
+			Layers:    config.LayerPaths(getenv, project),
+			UpgradePR: getenv("GABO_UPGRADE_PR") == "1",
+		}), nil
 	}
 }
 
