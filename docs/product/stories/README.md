@@ -1,6 +1,6 @@
 # User stories
 
-User stories for the gbai framework. Each story lives in its own file, `US-0NN-<kebab-title>.md`, and is indexed in the [PRD](../PRD.md) section 7.
+User stories for the gabo-ai framework. Each story lives in its own file, `US-0NN-<kebab-title>.md`, and is indexed in the [PRD](../PRD.md) section 7.
 
 ## Rules
 
