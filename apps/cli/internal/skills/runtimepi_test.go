@@ -1,0 +1,69 @@
+package skills
+
+import (
+	"bytes"
+	"io/fs"
+	"strings"
+	"testing"
+
+	"gopkg.in/yaml.v3"
+)
+
+// The Pi runtime skill (T053, TRD D21, D24) declares where gabo check finds
+// its agents and carries the verified Pi and gentle-pi facts it builds from.
+func TestRuntimePiSkill(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(Catalog(), "gabo-runtime-pi/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(b)
+
+	rest, _ := bytes.CutPrefix(b, []byte("---\n"))
+	front, _, ok := bytes.Cut(rest, []byte("\n---\n"))
+	if !ok {
+		t.Fatal("gabo-runtime-pi/SKILL.md: no frontmatter")
+	}
+	var fm struct {
+		Metadata struct {
+			AgentDir string `yaml:"agent_dir"`
+		} `yaml:"metadata"`
+	}
+	if err := yaml.Unmarshal(front, &fm); err != nil {
+		t.Fatalf("gabo-runtime-pi/SKILL.md frontmatter: %v", err)
+	}
+	if fm.Metadata.AgentDir != ".pi/agents" {
+		t.Errorf("metadata.agent_dir = %q, want .pi/agents", fm.Metadata.AgentDir)
+	}
+
+	for _, s := range []string{
+		// prerequisite: a subagent package, checked read-only, never configured.
+		"`pi list`", "`npm i -g gentle-pi`", "`pi install npm:gentle-pi`", "another subagent package",
+		"Never edit", "`subagents.json`", "refuse",
+		// inputs read from the project copy.
+		"`.gabo/skills/gabo-agent-templates/agents.yaml`", "`.gabo/VERSION`", "`runtimes.*`", "`slots.<slot>.adapter`",
+		// agents: one file per spec id, version line in the frontmatter.
+		"`.pi/agents/<id>.md`", "gabo-version: <version>", "`tools`",
+		"subagent_run",
+		// skills and fixed-name links.
+		"`.pi/skills/<skill>`", "`../../.gabo/skills/<skill>`", "`.pi/skills/gabo-methodology`", "`gabo-<slot>`",
+		// reviewer stays at user level, linked into the active Pi agent home.
+		"Never place `gabo-reviewer` in the project",
+		"`GENTLE_PI_AGENT_HOME`", "`PI_CODING_AGENT_DIR`", "`~/.pi/agent`", "`~/.gentle-shell/agent`",
+		"`${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer`",
+		`${GENTLE_PI_AGENT_HOME:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}}/skills/gabo-reviewer/scripts/reviewer.sh`,
+		// probe and check.
+		"probe agent", "`gabo check`",
+		// sources and versions (former TRD 9.6 rows), and the confirmed git clone path.
+		"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md",
+		"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md",
+		"Pi 1.4.0", "gentle-pi 4.4.0", "`<agent-home>/git/<host>/<path>`", "`.pi/git/<host>/<path>`",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-runtime-pi/SKILL.md: missing %q", s)
+		}
+	}
+	if strings.Contains(doc, "unverified") {
+		t.Errorf("gabo-runtime-pi/SKILL.md: still calls a location unverified")
+	}
+}

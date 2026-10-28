@@ -2,7 +2,7 @@
  "schema_version": 2,
  "diagram_type": "workflow",
  "meta": {
-  "title": "Marco gbai: flujo del equipo y puntos configurables",
+  "title": "Marco gabo-ai: flujo del equipo y puntos configurables",
   "output": ".archify/workflow-gbai-fases-20261024-1900/gbai-fases.html",
   "quality_profile": "showcase",
   "locale": "es"
@@ -128,7 +128,7 @@
    "lane": "desarrollo",
    "col": 2,
    "type": "backend",
-   "label": "gbai-cycle",
+   "label": "gabo-cycle",
    "sublabel": "elige tareas de la ola",
    "tag": "skill"
   },
@@ -407,7 +407,7 @@
    "dot": "emerald",
    "title": "Cada ola",
    "items": [
-    "El asistente inicia gbai-cycle; el ciclo lanza coders con la metodología de gbai.yaml",
+    "El asistente inicia gabo-cycle; el ciclo lanza coders con la metodología de gabo.yaml",
     "Validación del coder (GGA, RDD) opcional; el revisor corre aislado, comenta en el PR y devuelve el veredicto",
     "El ciclo actualiza la tarea, limpia lo que creó e informa al asistente"
    ]
