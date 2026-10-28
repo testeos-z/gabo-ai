@@ -9,6 +9,10 @@ import (
 // owner's agent writes them during setup, gabo never fills them (R12).
 const NextSetup = "next: run setup"
 
+// NextReviewerClaude ends a load error for runtimes.reviewer: pi. The reviewer
+// scripts run only Claude until the Pi engine lands (T072, T073).
+const NextReviewerClaude = "next: set runtimes.reviewer to claude; a Pi reviewer is not supported yet (T073)"
+
 // Suggestion is a value setup may offer for a required key, among others.
 // gabo never applies it; the owner chooses (R12, TRD TD2).
 type Suggestion struct {
@@ -20,12 +24,11 @@ type Suggestion struct {
 // formerDefaults are the values the loader used to fill silently.
 var formerDefaults = []Suggestion{
 	{Key: "runtimes.coder", Values: []string{string(RuntimeClaude)}},
-	{Key: "runtimes.reviewer", Values: []string{string(RuntimePi)}},
+	{Key: "runtimes.reviewer", Values: []string{string(RuntimeClaude)}},
 	{Key: "runtimes.assistant", Values: []string{string(RuntimeClaude)}},
 	{Key: "repo.integration_branch", Values: []string{"dev"}},
 	{Key: "review.checks", Values: []string{"bun install --frozen-lockfile", "bun run build", "bun run check-types", "bun run lint", "bun run test"}},
 	{Key: "review.human_only_paths", Values: []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}},
-	{Key: "review.pi_credential_env", Values: []string{"ANTHROPIC_API_KEY"}},
 	{Key: "parallelism", Values: []string{"3"}},
 }
 
@@ -42,8 +45,6 @@ func Suggestions() []Suggestion {
 // missingKeys lists the required keys absent from c, in a fixed order.
 // parallelismSet tells an absent parallelism from an explicit 0. An explicit
 // empty list is set, not missing, and fails its own validation.
-// review.pi_credential_env is required only for the pi reviewer runtime,
-// the only one that reads it.
 func (c Config) missingKeys(parallelismSet bool) []string {
 	var keys []string
 	add := func(absent bool, key string) {
@@ -57,7 +58,6 @@ func (c Config) missingKeys(parallelismSet bool) []string {
 	add(c.Repo.IntegrationBranch == "", "repo.integration_branch")
 	add(c.Review.Checks == nil, "review.checks")
 	add(c.Review.HumanOnlyPaths == nil, "review.human_only_paths")
-	add(c.Runtimes.Reviewer == RuntimePi && c.Review.PiCredentialEnv == "", "review.pi_credential_env")
 	add(!parallelismSet, "parallelism")
 	return keys
 }
@@ -77,4 +77,9 @@ func withNextSetup(err error, missing []string) error {
 		return err
 	}
 	return errors.Join(err, errors.New(NextSetup))
+}
+
+// piReviewerError is the error of a layer that sets runtimes.reviewer: pi.
+func piReviewerError() error {
+	return errors.Join(fmt.Errorf("runtimes.reviewer: must be %q, got %q", RuntimeClaude, RuntimePi), errors.New(NextReviewerClaude))
 }

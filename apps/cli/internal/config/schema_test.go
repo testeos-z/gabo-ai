@@ -101,7 +101,8 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"version 0":               with("version: 0"),
 		"null optional values":    with("mode:\ncoder:\nworktree:\nslots:\nreviewer:\ndevelopers:\nplan_change:\nversion:\nalias:\nlanguage:\n"),
 		"empty optional strings":  with(`{mode: "", coder: {login: ""}, reviewer: {placement: "", signing: {marker: ""}}, plan_change: {scope: ""}, interaction_level: "", language: ""}`),
-		"pi reviewer with env":    with("runtimes: {reviewer: pi}\nreview: {pi_credential_env: ANTHROPIC_API_KEY}"),
+		"pi coder and assistant":  with("runtimes: {coder: pi, assistant: pi}"),
+		"claude reviewer env":     with("review: {pi_credential_env: ANTHROPIC_API_KEY}"),
 		"bot coder login":         with("coder: {login: 'gabo-coder[bot]'}"),
 		"state dir":               with("review: {state_dir: /data/gabo/reviewer}"),
 		"keep name and abs path":  with("worktree: {keep: [main, /srv/wt/x]}"),
@@ -118,8 +119,8 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"missing parallelism":         string(without(t, "parallelism")),
 		"missing review.checks":       string(without(t, "review.checks")),
 		"missing human_only_paths":    string(without(t, "review.human_only_paths")),
-		"pi reviewer without env":     with("runtimes: {reviewer: pi}"),
-		"pi reviewer empty env":       with(`{runtimes: {reviewer: pi}, review: {pi_credential_env: ""}}`),
+		"pi reviewer":                 with("runtimes: {reviewer: pi}"),
+		"pi reviewer with env":        with("runtimes: {reviewer: pi}\nreview: {pi_credential_env: ANTHROPIC_API_KEY}"),
 		"null parallelism":            with("parallelism: null"),
 		"null runtimes.coder":         with("runtimes: {coder: null}"),
 		"empty runtimes.coder":        with(`runtimes: {coder: ""}`),
@@ -196,7 +197,9 @@ func TestSchemaRejectsNonStringScalarGoWouldCoerce(t *testing.T) {
 	}
 }
 
-// dbSchemaProjectExample is the project example of DB_SCHEMA 4.2.
+// dbSchemaProjectExample is the project example of DB_SCHEMA 4.2, with a
+// Claude reviewer: the reviewer scripts run only Claude (T072; the DB_SCHEMA
+// wording follows in T075). pi_credential_env still parses with no effect.
 const dbSchemaProjectExample = `
 version: 1
 mode: manual
@@ -206,7 +209,7 @@ repo:
 runtimes:
   coder: claude
   assistant: claude
-  reviewer: pi
+  reviewer: claude
 slots:
   tasks:
     adapter: .gabo/adapters/tasks-gh.md
