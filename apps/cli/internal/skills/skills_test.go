@@ -16,7 +16,7 @@ var want = []string{
 	"gabo-adapter-writer", "gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-config-writer", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-runtime-claude", "gabo-runtime-pi", "gabo-setup",
+	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-runtime-builder", "gabo-runtime-claude", "gabo-runtime-pi", "gabo-setup",
 	"gabo-wave-report",
 }
 
