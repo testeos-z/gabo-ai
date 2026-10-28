@@ -177,11 +177,13 @@ func TestLoadLayersUnknownKeyNamesTheFile(t *testing.T) {
 	}
 }
 
-func TestLoadLayersValidatesOnlyTheMergedResult(t *testing.T) {
+// Required keys are checked only on the merged result; values are also
+// checked per layer (see TestLoadLayersValidatesEveryLayerAgainstItsSchema).
+func TestLoadLayersRequiresKeysOnlyOnTheMergedResult(t *testing.T) {
 	t.Parallel()
-	// Neither file is valid alone; merged they are.
+	// Neither file is complete alone; merged they are.
 	r := files{
-		"/home/o/.config/gbai/config.yaml": with("review:\n  checks: []\n"),
+		"/home/o/.config/gbai/config.yaml": string(without(t, "review.checks")),
 		"/src/p/gbai.yaml":                 "review:\n  checks: [go test ./...]\n",
 	}
 	if _, err := LoadLayers(r, twoLayers()); err != nil {

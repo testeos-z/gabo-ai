@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/testeos-z/gbai-team/main/schemas/gbai.project.schema.json",
+  "title": "gbai project config (gbai.yaml)",
+  "description": "Team keys of the project gbai.yaml (DB_SCHEMA 3.2). Personal keys belong in the global user file (gbai.user.schema.json). Secrets never appear here, only environment variable names (R21). A null or empty optional value means unset, as the Go loader reads it.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "#/$defs/projectKeys" },
+    { "$ref": "#/$defs/complete" }
+  ],
+  "$comment": "The names below close the object; their rules live in $defs/projectKeys.",
+  "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true },
+  "additionalProperties": false,
+  "$defs": {
+    "projectKeys": {
+      "description": "Every project key with its value rules and no required key: a layer may hold only some of them.",
+      "properties": {
+        "version": {
+          "description": "Schema version of this file; missing reads as 0.",
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "mode": {
+          "description": "Who resolves questions (R6).",
+          "enum": ["manual", "auto", "", null]
+        },
+        "repo": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "description": "Target GitHub repository as owner/name.",
+              "type": ["string", "null"],
+              "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+            },
+            "integration_branch": {
+              "description": "The only branch auto mode may merge into, never main (D13).",
+              "type": ["string", "null"],
+              "pattern": "^[A-Za-z0-9._/-]+$"
+            }
+          }
+        },
+        "runtimes": {
+          "description": "Agent runtime per role.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "coder": { "$ref": "#/$defs/runtime" },
+            "reviewer": { "$ref": "#/$defs/runtime" },
+            "assistant": { "$ref": "#/$defs/runtime" }
+          }
+        },
+        "coder": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "login": {
+              "description": "GitHub login the coder pushes with; it must never merge.",
+              "type": ["string", "null"],
+              "pattern": "^([A-Za-z0-9-]+(\\[bot\\])?)?$"
+            }
+          }
+        },
+        "review": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "checks": {
+              "description": "Commands run in order in a credential-free copy of the merged tree; each is split on whitespace, no shell.",
+              "type": ["array", "null"],
+              "minItems": 1,
+              "items": { "type": "string", "pattern": "\\S" }
+            },
+            "auto_merge": {
+              "description": "Whether the reviewer merges a clean head into the integration branch.",
+              "type": ["boolean", "null"]
+            },
+            "human_only_paths": {
+              "description": "Repository-relative paths only a human may change.",
+              "type": ["array", "null"],
+              "minItems": 1,
+              "items": { "$ref": "#/$defs/relativePath" }
+            },
+            "pi_credential_env": {
+              "description": "Name of the environment variable that receives the pi model credential; required when runtimes.reviewer is pi. The value never enters the config (R21).",
+              "type": ["string", "null"],
+              "pattern": "^([A-Z_][A-Z0-9_]*)?$"
+            },
+            "state_dir": {
+              "description": "Absolute path of the reviewer's clone and workspaces.",
+              "type": ["string", "null"],
+              "pattern": "^(/[A-Za-z0-9._/-]*)?$"
+            }
+          }
+        },
+        "worktree": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "keep": {
+              "description": "Worktree names or absolute paths that are never closed.",
+              "type": ["array", "null"],
+              "items": {
+                "type": "string",
+                "anyOf": [
+                  { "pattern": "^/[^\\n\\r]*$" },
+                  { "pattern": "^[^/\\n\\r]+$", "not": { "enum": [".", ".."] } }
+                ]
+              }
+            }
+          }
+        },
+        "parallelism": {
+          "description": "Most coder sessions the cycle runs at once.",
+          "type": ["integer", "null"],
+          "minimum": 1
+        },
+        "slots": {
+          "description": "Adapter Markdown file per slot contract (D2, TRD 9.1).",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "tasks": { "$ref": "#/$defs/slot" },
+            "memory": { "$ref": "#/$defs/slot" },
+            "notifications": { "$ref": "#/$defs/slot" },
+            "direct_sessions": { "$ref": "#/$defs/slot" },
+            "methodology": { "$ref": "#/$defs/slot" },
+            "repository_host": { "$ref": "#/$defs/slot" },
+            "reviewer_placement": { "$ref": "#/$defs/slot" },
+            "agent_host": { "$ref": "#/$defs/slot" }
+          }
+        },
+        "reviewer": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "placement": {
+              "description": "Where the reviewer runs; only local is available (D6). server, github-actions and gitlab-ci are planned for a later release.",
+              "enum": ["local", "", null]
+            },
+            "signing": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "properties": {
+                "marker": {
+                  "description": "Marker the reviewer writes in its verdict comment.",
+                  "type": ["string", "null"],
+                  "pattern": "^[A-Za-z0-9._-]*$"
+                }
+              }
+            }
+          }
+        },
+        "developers": {
+          "description": "Developer catalog: git email to alias (D10).",
+          "type": ["object", "null"],
+          "propertyNames": { "pattern": "^[^@\\s]+@[^@\\s]+$" },
+          "additionalProperties": { "type": "string", "pattern": "\\S" }
+        },
+        "plan_change": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "scope": {
+              "description": "Widest plan scope agents may change (R19, D7).",
+              "enum": ["task", "group", "global", "", null]
+            },
+            "global_without_owner": {
+              "description": "Whether the global plan may change without the owner (D7).",
+              "type": ["boolean", "null"]
+            }
+          }
+        }
+      }
+    },
+    "complete": {
+      "description": "Keys a complete config must set (R12): gbai fills none of them.",
+      "required": ["runtimes", "repo", "review", "parallelism"],
+      "properties": {
+        "runtimes": {
+          "type": "object",
+          "required": ["coder", "reviewer", "assistant"],
+          "properties": {
+            "coder": { "type": "string" },
+            "reviewer": { "type": "string" },
+            "assistant": { "type": "string" }
+          }
+        },
+        "repo": {
+          "type": "object",
+          "required": ["name", "integration_branch"],
+          "properties": {
+            "name": { "type": "string" },
+            "integration_branch": { "type": "string" }
+          }
+        },
+        "review": {
+          "type": "object",
+          "required": ["checks", "human_only_paths"],
+          "properties": {
+            "checks": { "type": "array" },
+            "human_only_paths": { "type": "array" }
+          }
+        },
+        "parallelism": { "type": "integer" }
+      },
+      "if": {
+        "required": ["runtimes"],
+        "properties": { "runtimes": { "required": ["reviewer"], "properties": { "reviewer": { "const": "pi" } } } }
+      },
+      "then": {
+        "properties": {
+          "review": {
+            "required": ["pi_credential_env"],
+            "properties": { "pi_credential_env": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    },
+    "layer": {
+      "description": "One config file as the loader reads it: every project and personal key, none required. The loader checks required keys on the merged result.",
+      "type": "object",
+      "allOf": [
+        { "$ref": "#/$defs/projectKeys" },
+        { "$ref": "gbai.user.schema.json#/$defs/personalKeys" }
+      ],
+      "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
+      "additionalProperties": false
+    },
+    "file": {
+      "description": "A complete config file with every key class, as given with --config.",
+      "allOf": [
+        { "$ref": "#/$defs/layer" },
+        { "$ref": "#/$defs/complete" }
+      ]
+    },
+    "runtime": {
+      "enum": ["claude", "pi", null]
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["adapter"],
+      "properties": {
+        "adapter": {
+          "description": "Repository-relative path of the adapter file; for methodology it may also be a skill name.",
+          "type": "string",
+          "allOf": [{ "pattern": "\\S" }, { "$ref": "#/$defs/relativePath" }]
+        }
+      }
+    },
+    "relativePath": {
+      "description": "A non-empty path inside the repository: no leading slash and no '..' segment.",
+      "type": "string",
+      "pattern": "^[^/]",
+      "not": { "pattern": "(^|/)\\.\\.(/|$)" }
+    }
+  }
+}

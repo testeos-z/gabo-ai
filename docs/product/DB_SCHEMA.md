@@ -228,10 +228,13 @@ No cloud keys appear here: a team that runs agents on a server adds `slots.agent
 
 ## 5. JSON Schema approach
 
-All of this section is proposed (not implemented).
+Location, strictness, embedding and validation on load are implemented (T007); the `gbai check` validation point is T047 and the editor comment in each file is written by the config writer (T051).
 
-- **Location.** `schemas/gbai.user.schema.json` and `schemas/gbai.project.schema.json` at the repository root, JSON Schema draft 2020-12. The CLI embeds the same files so validation works offline; one source, no copies by hand.
-- **Strictness.** `additionalProperties: false` at every level, matching today's strict known-fields decoding. Patterns mirror the Go validators (repo, branch, login, path, env var name).
+- **Location.** `schemas/gbai.user.schema.json` and `schemas/gbai.project.schema.json` at the repository root, JSON Schema draft 2020-12. The CLI embeds the same files so validation works offline; one source, no copies by hand: `go generate ./internal/config` (in `apps/cli`) refreshes the embedded copy and a test fails when it differs from `schemas/`.
+- **Shape.** The project schema root is a complete `gbai.yaml`: project keys only (a personal key is flagged in the editor) and the required keys of R12. The user schema accepts the personal keys plus any project key as a fallback and requires nothing. `gbai.project.schema.json#/$defs/layer` is one file as the loader reads it (every key, none required) and `#/$defs/file` is a complete file with every key class, the schema twin of the Go `Parse`.
+- **Strictness.** `additionalProperties: false` at every level, matching today's strict known-fields decoding. Patterns mirror the Go validators (repo, branch, login, path, env var name). As in Go, a null or empty optional value means unset. One deliberate difference: a YAML number or boolean in a string key (`tone: 42`) fails the schema although yaml.v3 alone would read it as text; quote it.
+- **Secrets.** No key holds a secret value; a credential is only the name of an environment variable in a key ending in `_env` (R21). A test enforces it.
+- **On load.** The loader validates every layer against its schema before the merge (the user file against the user schema, the project file without its personal keys and a `--config` file against the layer schema), so a bad value fails in the file that holds it even when a higher layer overrides it; required keys are checked on the merged result with the `✗ <key> missing` form.
 - **Versioning.** Each file carries `version`. A breaking change bumps it and ships a new schema file (`...v2.schema.json`); the loader rejects an unknown version with a message naming the migration. Additive, optional keys do not bump it.
 - **Validation points.**
   - **`gbai check`** (approved owner 2026-10-27, TRD D24, 9.4): read-only; validates each layer and the merged result against the JSON Schemas with the key classes (a personal key in `gbai.yaml` is a warning; a former cloud key is an error naming `slots.agent_host`) and reports key path, file and next step. It is the single validation point for agents, the reviewer and CI.
@@ -240,7 +243,7 @@ All of this section is proposed (not implemented).
   - **Superseded (owner 2026-10-27, TRD D24):** `gbai generate` as the validation point (it replaced the removed `gbai doctor`, TRD D18), `gbai config set` validating one key before writing, and the reviewer's generator no-diff check; all three are removed. The read-only `gbai config` stays removed (open question 11).
 - **Editor integration.** gbai writes a first-line `# yaml-language-server: $schema=<url>` comment in both files, so YAML language servers give autocomplete and inline errors without extra setup. The URL points at the published schema for the file's `version`.
 
-The Go structs stay the source of runtime truth; a unit test asserts the schema and the Go validation accept and reject the same fixtures.
+The Go structs stay the source of runtime truth; a unit test (`apps/cli/internal/config/schema_test.go`) asserts the schema and the Go validation accept and reject the same fixtures.
 
 ## 6. Migration
 
