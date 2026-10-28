@@ -26,11 +26,23 @@ parallelism: 3
 review:
   checks: [go test ./...]
   human_only_paths: [.github/]
+slots:
+  tasks:
+    adapter: .gbai/skills/gabo-contract-tasks/examples/tasks-gh.md
+  repository_host:
+    adapter: .gbai/skills/gabo-contract-repository-host/examples/host-github.md
+  memory:
+    adapter: .gbai/skills/gabo-contract-memory/examples/memory-engram.md
+  methodology:
+    adapter: .gbai/skills/gabo-contract-methodology/examples/methodology-tdd.md
+  reviewer_placement:
+    adapter: .gbai/skills/gabo-contract-reviewer-placement/examples/reviewer-local.md
 `
 
 // checkProject runs the real `gbai init` at version, then adds gbai.yaml, a
 // Claude Code runtime skill and every agent of the embedded spec built with
-// version, so `gbai check` passes on it.
+// version, so `gbai check` passes on it; the slots point at the bundled
+// example adapters in the catalog copy.
 func checkProject(t *testing.T, version string) string {
 	t.Helper()
 	project := t.TempDir()

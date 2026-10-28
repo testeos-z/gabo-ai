@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the `direct_sessions` slot (
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
 - A session opens only inside an existing task worktree; it never creates, moves or removes worktrees and never touches another task's worktree.
 - The brief names the task id, the worktree path and the branch, and repeats the coder's hard rules: never merge, never force-push, never post the reviewer marker.
 - A session is not a second coder: while the task's coder is running, messages go to the open session only when the owner asked for it.

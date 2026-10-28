@@ -12,7 +12,7 @@ Load when writing, checking or using the adapter of the `notifications` slot (`s
 
 ## Hard Rules
 
-- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: the planned coverage check in `gbai generate` (T011) compares them; today only the skills test enforces them, for the bundled example.
+- An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
 - A developer is addressed by alias, resolved through `developers` in `gbai.yaml` (git email to alias, D10); an alias that resolves to no developer is reported, never guessed (R16).
 - A notification never carries secrets (R21) and never the reviewer marker.
 - A notification is one short message with a link to where the details live (issue, PR, wave report); it is not a question channel that blocks the agent.

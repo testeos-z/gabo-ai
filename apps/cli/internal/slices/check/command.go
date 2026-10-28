@@ -44,13 +44,15 @@ type Factory func(ctx context.Context) (*UseCase, error)
 func NewCommand(factory Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check",
-		Short: "Validate the config, the agents and the catalog version, read-only",
+		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
 		Long: "Validate the project read-only and engine-neutral (PRD R33):\n" +
 			"  - the global user file and gbai.yaml, each layer and the merged result,\n" +
 			"    against the embedded JSON Schemas;\n" +
 			"  - every agent of the neutral agent spec (" + CatalogDir + "/) in the agent\n" +
 			"    directory each runtime skill declares (metadata.agent_dir);\n" +
 			"  - each agent's gabo-version line against " + StampFile + ";\n" +
+			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
+			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +
 			"With GABO_UPGRADE_PR=1 only the config is validated.\n" +
 			"It writes nothing and never updates itself.\n" +
