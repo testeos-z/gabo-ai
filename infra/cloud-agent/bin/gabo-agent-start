@@ -43,8 +43,18 @@ fi
 #    the build context; the fetch and the clone without a seed need whatever
 #    git access the operator configured at run time, and only warn without it.
 if [ ! -e "$repo_dir/.git" ]; then
+  seeded=0
   if [ -d "$repo_seed" ]; then
-    git clone --quiet --no-checkout "$repo_seed" "$repo_dir"
+    # The seed belongs to another user when the agent uid differs from the
+    # build; trust only the seed itself for this one clone.
+    upload_pack="git -c safe.directory=$(printf '%q' "$repo_seed") upload-pack"
+    if git clone --quiet --no-checkout --no-local --upload-pack "$upload_pack" "$repo_seed" "$repo_dir"; then
+      seeded=1
+    else
+      log "WARNING: could not clone the image seed ${repo_seed}; trying ${repo_url}"
+    fi
+  fi
+  if [ "$seeded" = 1 ]; then
     git -C "$repo_dir" remote set-url origin "$repo_url"
     if ! git -C "$repo_dir" fetch --quiet origin "+refs/heads/$repo_branch:refs/remotes/origin/$repo_branch"; then
       log "could not fetch ${repo_branch} from ${repo_url}; using the image seed as built"

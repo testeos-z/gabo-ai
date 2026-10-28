@@ -141,6 +141,8 @@ git -C "$upstream" symbolic-ref HEAD refs/heads/main
 checkout="$scratch/checkout"
 git clone -q "$upstream" "$checkout"
 git -C "$checkout" config gabo.test.private-setting must-not-be-copied
+gitc -C "$checkout" branch experiment
+gitc -C "$checkout" tag v0-local
 
 seed="$scratch/seed.git"
 if run gabo-make-seed "$checkout/.git" "$seed" https://github.com/testeos-z/gabo-ai.git >/dev/null 2>&1 &&
@@ -151,6 +153,12 @@ if run gabo-make-seed "$checkout/.git" "$seed" https://github.com/testeos-z/gabo
   pass "gabo-make-seed keeps dev from a default-branch clone and not the source git config"
 else
   fail "gabo-make-seed keeps dev from a default-branch clone and not the source git config"
+fi
+
+if [ "$(git -C "$seed" for-each-ref --format='%(refname)' | sort | tr '\n' ' ')" = "refs/heads/dev refs/heads/main " ]; then
+  pass "gabo-make-seed holds only dev and main, no other local branch or tag"
+else
+  fail "gabo-make-seed holds only dev and main, no other local branch or tag"
 fi
 
 # A seed without dev whose HEAD is main (the source only knew main).
@@ -213,6 +221,27 @@ if out="$(start_env GABO_REPO_SEED="$nodev_seed" GABO_REPO_URL="$scratch/missing
   pass "gabo-agent-start warns when neither the seed nor origin has dev"
 else
   fail "gabo-agent-start warns when neither the seed nor origin has dev"
+fi
+
+# A git that treats the seed as owned by another user (CVE-2024-32004 check).
+otherowner="$scratch/otherowner"
+mkdir -p "$otherowner"
+{
+  echo '#!/usr/bin/env bash'
+  echo "case \" \$* \" in *\"$seed\"*) export GIT_TEST_ASSUME_DIFFERENT_OWNER=1 ;; esac"
+  echo 'exec /usr/bin/git "$@"'
+} >"$otherowner/git"
+chmod +x "$otherowner/git"
+
+new_case
+if out="$(env HOME="$STUB_STATE/home" PATH="$otherowner:$stubs:$bin:/usr/bin:/bin" \
+     GABO_AGENT_USER="$(id -un)" GABO_REPO_SEED="$seed" GABO_REPO_URL="$scratch/missing.git" \
+     GABO_ENGRAM_SYNC_ON_START=0 gabo-agent-start echo started 2>&1)" &&
+   [ "$(tail -n1 <<<"$out")" = started ] &&
+   [ "$(git -C "$STUB_STATE/home/gabo-ai" branch --show-current)" = dev ]; then
+  pass "gabo-agent-start checks out dev from a seed owned by another user"
+else
+  fail "gabo-agent-start checks out dev from a seed owned by another user"
 fi
 
 # --- gabo-agent-check -------------------------------------------------------

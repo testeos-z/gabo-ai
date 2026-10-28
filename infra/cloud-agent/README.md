@@ -20,7 +20,7 @@ Scripts in `bin/` (installed to `/usr/local/bin`):
 
 - `gabo-agent-start`: the entrypoint. Started as root it fixes the ownership of the agent home (`/home/agent`, a fresh volume is owned by root) and continues as user `agent`. It registers the Engram MCP server again if the home does not have it, checks the repository out at `~/gabo-ai` on `dev` from the seed, first fetching `dev` from GitHub when the run-time git access allows it (or clones it when the image has no seed; without `dev` from either it logs a `WARNING` and leaves no checkout), runs one Engram Cloud sync in the background and then runs the container command (default `sleep infinity`).
 - `gabo-agent-check`: the start checks (pinned `engram version`, `engram` in `claude mcp list`, tooling on `PATH`, repository checked out on `GABO_REPO_BRANCH`). Exits non-zero when one fails.
-- `gabo-make-seed <git dir> <seed> <url> [branch]`: builds the seed at build time; local branches and the source's `origin` remote-tracking branches become seed branches, so a fresh clone of the default branch still yields `dev`.
+- `gabo-make-seed <git dir> <seed> <url> [branch]`: builds the seed at build time with only the target branch and `main`, each from the local branch or else the source's `origin` remote-tracking branch, so a fresh clone of the default branch still yields `dev` and no other local work of the builder ships in the image.
 - `gabo-engram-sync [project]`: one Engram Cloud sync (export, then import) for `gabo-ai`. It skips with exit 0 when Engram reports that Engram Cloud is not configured.
 - `fetch-verified <url> <sha256> <out>`: the checksum-verified download used by the build.
 
@@ -85,7 +85,7 @@ Download the file and compare `sha256sum` with the published value before commit
 
 ## Verify
 
-- Script tests (stubbed `claude`, `engram` and `curl`; no Docker, network or credential): `infra/cloud-agent/tests/run.sh`.
+- Script tests (stubbed `claude`, `engram` and `curl`; no Docker, network or credential): `infra/cloud-agent/tests/run.sh`. No project check runs them yet; run them by hand after changing a script.
 - Build from a clean checkout, then `docker run --rm gabo-cloud-agent gabo-agent-check`: it must show `engram 3.6.0`, `engram` in `claude mcp list`, the tooling on `PATH` and the checkout.
 - Secret scan over `infra/cloud-agent/` and the built image (for example its exported filesystem and `docker history`) with the team's scanner; it must find nothing.
 
