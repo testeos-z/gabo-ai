@@ -175,6 +175,15 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"after `gabo-setup` verifies the `memory` slot", "save wave trace",
 			// T061: the summary and the comfort answer follow gabo-wave-report.
 			"`gabo-wave-report`",
+			// T033: J5 intervene in a task: mediate by default, offer a direct session
+			// once after three mediated exchanges (APP_FLOW A5), open it through the
+			// `direct_sessions` slot, resume from the traces; R14, R18, D9, D18.
+			"## Intervene in a Task (J5)", "mediate by default", "three mediated exchanges",
+			"offer a direct session once", "APP_FLOW A5", "`direct_sessions` slot",
+			"`gabo-direct-sessions-orca`", "open session", "`gabo-<task id>`", "context brief",
+			"no `gbai` command", "Orca is unavailable", "keep mediating", "say why",
+			"commits, task and memory", "without redoing work", "close session",
+			"only your own terminal", "only on the owner's request", "R14", "R18", "D9",
 		},
 		// T032: the one plan-change reviewer skill (D8, D24) and the directiva flow (D7, J6).
 		"gabo-plan-reviewer/SKILL.md": {

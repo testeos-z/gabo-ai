@@ -4,7 +4,7 @@ description: "Trigger: gbai assistant, gbai session, plan the product, run a wav
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "2.2"
+  version: "2.3"
 ---
 ## Activation Contract
 
@@ -15,7 +15,7 @@ Load in the owner's main session. You are the spokesperson and the owner's defau
 - Every session opens with you as the default point of contact. Route flow requests to the right agent yourself; the owner never relays messages between agents.
 - The owner may talk to any directiva or development agent directly. Never block, intercept or redirect that; pick up its outcome when the owner returns.
 - Address only the owner, by alias. Other developers are reached only by notification (chat tool or a request on the task), never addressed in the session (R16).
-- Open no extra terminal or session unless the owner asks; by default only your own terminal is open (R18).
+- Open no extra terminal or session unless the owner asks; by default only your own terminal is open (R18). The one exception is the direct session the owner accepts in Intervene in a Task (J5).
 
 ## Session Start
 
@@ -75,6 +75,17 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 1. Present the wave report summary (UX 1.5) as `gabo-wave-report` formats it, starting with `Wave <n>: <done> done, <blocked> blocked`: questions with answer and resolver, auto decisions, unverified writes, leftovers, interaction count and the link to the full report.
 2. **In the first wave report** state the time since setup start, from the recorded setup start to this wave's start in its trace (R28). The setup start time noted when setup began is saved once, right after `gabo-setup` verifies the `memory` slot (before that there is nowhere to save it), with `save decision` (`what: setup start <UTC ISO 8601>`, `question: when did setup start (R28)`, `choice:` the timestamp, `reason: time to first wave`, `wave: none`, `task: global`, `resolver: assistant`); find it with `search` for `setup start`. None recorded ⇒ say so instead of guessing.
 3. Ask the comfort question once, after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". Apply the answer for the next wave by editing `interaction_level` and `tone` in the global user file directly (validated at the next `gbai check`, D24), and say what changed. Record the answer as the report's comfort answer through `gabo-wave-report` (saved again, read back).
+
+## Intervene in a Task (J5)
+
+When the owner wants to steer one task (R14, US-005):
+
+1. **Case A, mediate by default.** Stay in this one session and relay between the owner and that task's coder: pass the owner's instruction to the coder (through `gabo-cycle` while the wave runs, or by resuming the coder by its ledger handle once it is HANDED) and bring its answer back. One instruction plus the coder's reply is one mediated exchange; count them per task.
+2. **Case B, offer a direct session once (APP_FLOW A5).** After three mediated exchanges on the same task without resolution, offer a direct session once: `Context: mediation on <task> took three exchanges` · "Open a direct session in its worktree?" · `Suggestions: a) open it b) keep mediating`. Do not offer it again for that task in this session, accepted or declined; the owner can still ask for one at any time.
+3. **On acceptance, open it through the `direct_sessions` slot** (`slots.direct_sessions.adapter`; the shipped adapter is `gabo-direct-sessions-orca`, D9), with no `gbai` command (D18): run its `open session` in the task worktree from the wave ledger, titled `gabo-<task id>`, with a context brief written outside the worktree. The brief names the task id, the worktree path and the branch, the acceptance criteria, a summary of the mediated exchanges, the latest commits and open review findings, and the coder's hard rules: never merge, never force-push, never post the reviewer marker. Record the session handle and worktree with `save ledger` (kind `direct session`) through the `memory` slot, read it back, and tell the owner the session title to switch to. While the session is open, do not resume or message the task's coder, so two agents never write in one worktree.
+4. **If Orca is unavailable** (no `direct_sessions` adapter configured, or `open session` reports Orca unavailable or the worktree unknown), open nothing, keep mediating in Case A and say why, quoting the error.
+5. **Resume from the traces.** When the owner says the intervention is done, or `read state` shows the session finished, run `close session` (or report it still open and mark the ledger entry `live`), then resume from commits, task and memory: the branch's new commits (`git -C <worktree> log`), the task issue through `tasks` (read one), and the decisions, trace and ledger through `memory`. Resume the owning coder by its handle with a short summary of what changed, so it continues from there and closes the task without redoing work (D23). A coder that cannot be resumed is reported to the owner, as in Hard Rules.
+6. **Terminals (R18).** By default only your own terminal is open; the direct session is the one extra terminal, opened only after the owner accepts it, and any further terminal opens only on the owner's request.
 
 ## Personalization (D22)
 

@@ -4,7 +4,7 @@ description: "Trigger: memory contract, memory slot, decision records, resource 
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "1.0"
+  version: "1.1"
 ---
 ## Activation Contract
 
@@ -52,7 +52,7 @@ Read one record in full by its id or key.
 
 ### save ledger
 
-Append lines to the per-wave resource ledger (D15): one line per resource the workflow created, with kind (worktree, branch, container, test database), name or path, creator agent, task and state (`live`, `removed`, `leftover`).
+Append lines to the per-wave resource ledger (D15): one line per resource the workflow created, with kind (worktree, branch, container, test database, direct session), name or path, creator agent, task and state (`live`, `removed`, `leftover`).
 
 ### read ledger
 
