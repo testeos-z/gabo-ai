@@ -1,16 +1,70 @@
 # Setup prompt
 
-The setup prompt is the only entry text of gabo-ai setup (TRD 9.4, D25, PRD R36). Paste it into the coding agent you use, opened in your project: the agent installs the CLI when it is missing, runs `gabo init`, and continues with the guided setup. `gabo init` prints the same text on a fresh project, so you can also start from the terminal and paste what it prints.
+The setup prompt is the only entry text of gabo-ai setup (TRD 9.4, D25, PRD R36). Your coding agent follows it, in your project, to install the CLI when it is missing, run `gabo init`, ask you the setup questions, write the config, build the gabo agents, run `gabo check` and verify each slot.
 
-The block between the two marker comments is the prompt, byte for byte the file embedded in the CLI (`apps/cli/internal/setupprompt/setup-prompt.md`). Do not edit it here: change the embedded file and copy it over; a Go test fails when the two differ.
+The block under [Prompt](#prompt) is the prompt, byte for byte the file embedded in the CLI (`apps/cli/internal/setupprompt/setup-prompt.md`). Do not edit it here: change the embedded file and copy it over; a Go test fails when the two differ.
+
+## Two ways to start
+
+Both entries reach the same setup; pick the one that fits you.
+
+| entry | you do | your agent does |
+|---|---|---|
+| (a) Terminal | [Install the CLI](#install-the-cli), run `gabo init` in the project root, then open your agent there and ask it to configure gabo-ai (or paste what `gabo init` printed) | loads the setup skills from `.gabo/skills/` and continues with the questions |
+| (b) Pasted prompt | open your agent in the project root and paste the [prompt](#prompt) | installs the CLI if `gabo` is missing, runs `gabo init`, then continues with the questions |
+
+`gabo init` copies the skill catalog to `.gabo/skills/`, writes the version stamp `.gabo/VERSION`, installs the `gabo-reviewer` skill at user level (never in the project) and, on a fresh project, prints the prompt after its `next:` line. It never touches an existing config, so rerunning it, or the prompt, is safe.
+
+You answer every question; the agent applies no value you did not accept and asks one question at a time. Config files hold only the names of environment variables, never a secret value.
 
 ## Install the CLI
 
-The CLI needs Go. Install it with:
+The CLI needs Go (the version named in `apps/cli/go.mod`). Install the newest release:
 
 ```sh
 go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
 ```
+
+`gabo init` accepts only a release version (`x.y.z`). `@latest` resolves to the newest release tag; while the repository has no release tag, Go installs a pseudo-version and `gabo init` refuses it. In that case build from a clone and name the version yourself, using the project's `.gabo/VERSION` when it already has one:
+
+```sh
+git clone https://github.com/testeos-z/gabo-ai.git
+cd gabo-ai
+go -C apps/cli install -ldflags "-X main.buildVersion=<x.y.z>" ./cmd/gabo
+```
+
+While the repository is private, Go must fetch it with your own git credentials: set `GOPRIVATE=github.com/testeos-z/*` so Go skips the public module proxy. Check the install with `gabo version`.
+
+## Your engine
+
+The prompt names no engine; the agent loads the runtime skill of the engine it runs in from `.gabo/skills/`.
+
+| engine | runtime skill | agents built in | prerequisite |
+|---|---|---|---|
+| Claude Code | `gabo-runtime-claude` | `.claude/agents/` | none |
+| Pi | `gabo-runtime-pi` | `.pi/agents/` | a subagent package (below) |
+| another engine | written first with `gabo-runtime-builder` | the engine's own agent folder | subagents and skills; the builder refuses an engine without them and says why |
+
+**Pi needs a subagent package.** Pi core has no subagents, so `gabo-runtime-pi` builds nothing until one is present. Recommended: gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); it needs Pi >= 1.2.0 and Node >= 22.19.0. Another subagent package you already use is acceptable once the agent confirms it discovers project agents in `.pi/agents/`. The agent explains why the package is needed and installs it only after you accept; gabo-ai never edits Pi's or gentle-pi's own configuration.
+
+## Recommended stack
+
+The agent offers the gentle-ai stack as recommended, not required, and explains why: gentle-ai with ODD for the `methodology` slot, its RDD as coder-side validation inside that adapter, and Engram for the `memory` slot. It installs it only if you accept; any other methodology or memory adapter works. RDD never replaces the gabo reviewer, which stays the merge gate.
+
+## Shared memory
+
+Before it configures the memory slot, the agent explains that one memory backend and one memory project name should be shared by every agent of this project, local and cloud, for every developer, except the reviewer, which never reads or writes it; a local-only memory is fine, for example for a solo developer. It offers Engram with Engram Cloud sync first as the recommendation, because one self-hostable server shares a whole project across machines and developers through autosync. For teams that only use Claude Code, `gabo-setup` also lists:
+
+| backend | shares across machines | shares across developers |
+|---|---|---|
+| claude-mem | only with its paid Cloud Sync (per user) | not through Cloud Sync; only its paid TeamBrain plan or export and import |
+| Mem0 (hosted MCP) | yes, memories live in the Mem0 account | yes, through a shared Mem0 organization and project |
+
+Both are user-supplied adapters: gabo-ai ships none for them. Setup records only the memory adapter and the memory project name, and never sets up the backend, its credentials or its access; that stays in your own setup outside gabo. The memory smoke test writes only under a scratch topic and deletes the probe afterwards, or writes nothing when the backend cannot delete.
+
+## When setup is done
+
+`gabo check` passes and each slot is reported as verified, or unverified with the failing operation and a question for you. The agent lists the files it changed (`gabo.yaml`, `.gabo/`, adapters, agent folders) for you to commit. After a gabo upgrade, run `gabo init` again and ask your agent to rebuild the agents, then rerun `gabo check`.
 
 ## Prompt
 
