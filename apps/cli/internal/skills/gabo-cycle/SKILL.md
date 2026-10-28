@@ -33,8 +33,8 @@ Load in the `gabo-cycle` subagent. The assistant gives you a wave id and the mod
 3. Per task: re-read it (rule 1), `git worktree add <path> -b <branch> origin/dev`, record worktree and branch in the ledger, launch `gabo-coder` with task, worktree, branch and mode; record its handle.
 4. On each outcome (HANDED, DONE, BLOCKED): append its resources to the ledger; update the task (BLOCKED status, PR link; never DONE) and the trace; apply rules 2 and 3; recompute what is unblocked and launch the next task within `parallelism`.
 5. Wave close is a fallback sweep: clean the merged entries no coder closed (rules above), without writing DONE; mark every ledger entry removed, live or leftover.
-6. Report: build the TRD 9.2 wave report, save the wave report as the last entry of `gbai/trace/<wave>` through `memory` (verified), then return it to the assistant.
+6. Report: build the TRD 9.2 wave report with `gabo-wave-report`, save the wave report as the last entry of `gbai/trace/<wave>` through `memory` (verified), then return it to the assistant.
 
 ## Output Contract
 
-Wave report (TRD 9.2): wave id; per task status, PR, last verdict, fix rounds, coder handle; questions with answer and resolver (R5); interaction count with reasons (R29); Unverified writes (R24); resume disagreements; REFUSED removals and leftovers (paths, containers, test databases), including merged tasks still open because no coder could close them (R13); plan-change proposals; denied board moves.
+The wave report (TRD 9.2) in the format of `gabo-wave-report`, with its comfort answer `pending`, and the save as `verified` or `unverified`.

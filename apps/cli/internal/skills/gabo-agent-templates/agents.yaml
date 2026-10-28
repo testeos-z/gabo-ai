@@ -45,7 +45,7 @@ agents:
     template: agents/gabo-plan-reviewer.md
   - id: gabo-cycle
     role: Wave runner; claims unblocked tasks, creates worktrees, launches coders, keeps the resource ledger and reports the wave.
-    skills: [gabo-cycle]
+    skills: [gabo-cycle, gabo-wave-report]
     tools: [read, search, shell, git, tracker, repository-host, memory, skills, subagents]
     launched_by: main-session
     template: agents/gabo-cycle.md
