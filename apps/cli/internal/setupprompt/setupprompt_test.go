@@ -94,3 +94,18 @@ func TestPromptIsNeutralAndHoldsNoSecretOrLocalPath(t *testing.T) {
 		t.Fatalf("prompt contains %q", m)
 	}
 }
+
+// TestPromptRecommendsASharedMemory: the prompt says in a short paragraph what
+// gabo-setup explains before the memory slot (T070, R37, R38, R36).
+func TestPromptRecommendsASharedMemory(t *testing.T) {
+	t.Parallel()
+	for _, want := range []string{
+		"one memory backend and one memory project name", "every agent of this project",
+		"except the reviewer", "never reads or writes", "local-only memory is fine",
+		"Engram with Engram Cloud sync", "scratch topic", "deletes",
+	} {
+		if !strings.Contains(Text, want) {
+			t.Errorf("prompt lacks %q", want)
+		}
+	}
+}

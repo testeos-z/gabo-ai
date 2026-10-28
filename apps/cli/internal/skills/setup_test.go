@@ -127,3 +127,102 @@ func TestSetupHasTheRebuildStep(t *testing.T) {
 		}
 	}
 }
+
+// sharedMemory returns the ## Shared memory section of the setup skill.
+func sharedMemory(t *testing.T) string {
+	t.Helper()
+	_, sec, ok := strings.Cut(setupDoc(t), "## Shared memory")
+	if !ok {
+		t.Fatalf("%s: no ## Shared memory section", setupSkill)
+	}
+	sec, _, _ = strings.Cut(sec, "\n## ")
+	return sec
+}
+
+// Before the memory slot is configured, setup explains the shared-memory
+// recommendation (T070, R37, R38): one backend and one project name for every
+// agent except the reviewer (R9, D6), local-only accepted.
+func TestSetupExplainsSharedMemoryBeforeTheMemorySlot(t *testing.T) {
+	t.Parallel()
+	doc := setupDoc(t)
+	_, steps, _ := strings.Cut(doc, "## Steps")
+	ask, _, _ := strings.Cut(steps, "**Adapter.**")
+	if !strings.Contains(ask, "explain **Shared memory** first") {
+		t.Errorf("%s: the Ask step does not explain Shared memory before the memory slot", setupSkill)
+	}
+	sec := sharedMemory(t)
+	for _, s := range []string{
+		"R37", "R38", "one memory backend and one memory project name", "every agent of the project",
+		"local and cloud", "every developer", "except the reviewer", "never reads or writes it",
+		"R9", "D6", "no memory slot", "local-only memory is acceptable", "solo developer",
+	} {
+		if !strings.Contains(sec, s) {
+			t.Errorf("%s ## Shared memory: missing %q", setupSkill, s)
+		}
+	}
+}
+
+// Engram with Engram Cloud sync comes first with its reason; claude-mem and
+// Mem0 are listed with their sharing capability as user-supplied adapters
+// (PRD "Memory backends researched", open question 13); nothing is applied
+// without the owner's answer (R12).
+func TestSetupOffersEngramCloudFirstAndListsTheOthers(t *testing.T) {
+	t.Parallel()
+	sec := sharedMemory(t)
+	engram := strings.Index(sec, "Engram with Engram Cloud sync")
+	claudeMem := strings.Index(sec, "claude-mem")
+	mem0 := strings.Index(sec, "Mem0")
+	if engram < 0 || claudeMem < 0 || mem0 < 0 || engram > claudeMem || engram > mem0 {
+		t.Fatalf("%s ## Shared memory: Engram with Engram Cloud sync must come before claude-mem and Mem0", setupSkill)
+	}
+	for _, s := range []string{
+		"recommended", "because", "only use Claude Code", "across machines", "across developers",
+		"user-supplied adapters", "open question 13", "R12", "owner's answer",
+	} {
+		if !strings.Contains(sec, s) {
+			t.Errorf("%s ## Shared memory: missing %q", setupSkill, s)
+		}
+	}
+}
+
+// Setup records only the adapter and the memory project name, in the
+// project-owned adapter file, never in the catalog copy; a write under a
+// human-only path needs a human merge; no backend setup, no secret.
+func TestSetupRecordsOnlyTheMemoryAdapterAndProjectName(t *testing.T) {
+	t.Parallel()
+	sec := sharedMemory(t)
+	for _, s := range []string{
+		"`slots.memory.adapter`", "memory project name", "project-owned", "never in the catalog copy",
+		"`.gabo/skills/`", "`gabo init` replaces", "no new config key", "`review.human_only_paths`",
+		"human merge", "never auto-merges", "never sets up the backend", "credentials", "access", "no secret",
+	} {
+		if !strings.Contains(sec, s) {
+			t.Errorf("%s ## Shared memory: missing %q", setupSkill, s)
+		}
+	}
+}
+
+// The memory smoke test writes and reads only under a scratch topic and
+// deletes the probe afterwards, so nothing stays in the project memory.
+func TestSetupMemoryProbeUsesAScratchTopicAndDeletesIt(t *testing.T) {
+	t.Parallel()
+	doc := setupDoc(t)
+	_, smoke, ok := strings.Cut(doc, "**Smoke test.**")
+	if !ok {
+		t.Fatalf("%s: no smoke test step", setupSkill)
+	}
+	smoke, _, _ = strings.Cut(smoke, "\n7. ")
+	at := 0
+	for _, s := range []string{"`gabo/setup-probe/<timestamp>`", "read it back", "delete the probe", "reads back nothing"} {
+		i := strings.Index(smoke[at:], s)
+		if i < 0 {
+			t.Fatalf("%s smoke test: %q missing or out of order", setupSkill, s)
+		}
+		at += i + len(s)
+	}
+	for _, s := range []string{"only under", "nothing stays in the project memory", "stays unverified"} {
+		if !strings.Contains(smoke, s) {
+			t.Errorf("%s smoke test: missing %q", setupSkill, s)
+		}
+	}
+}
