@@ -102,6 +102,20 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 	}}, nil
 }
 
+// newerStamp reports the stamp and binary versions when a readable stamp is
+// newer than a release binary; any other state is left to Run.
+func (u *UseCase) newerStamp() (want, have string, ok bool) {
+	bin, ok := parseVersion(strings.TrimPrefix(u.s.Version, "v"))
+	if !ok {
+		return "", "", false
+	}
+	cur, hasStamp, err := u.readStamp()
+	if err != nil || !hasStamp || cur.compare(bin) <= 0 {
+		return "", "", false
+	}
+	return cur.String(), bin.String(), true
+}
+
 // copyCatalog replaces the catalog directory and writes the stamp last, so an
 // interrupted copy keeps the old stamp and the next run repeats it.
 func (u *UseCase) copyCatalog(v version) error {

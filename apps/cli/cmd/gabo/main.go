@@ -12,6 +12,8 @@ import (
 	"runtime/debug"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel/execrunner"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate/adapters"
 )
 
 // buildVersion is injected at build time with -ldflags "-X main.buildVersion=<v>";
@@ -22,6 +24,17 @@ func main() {
 	root := newRootCommand(deps{
 		version: resolveVersion(buildVersion, debug.ReadBuildInfo),
 		runner:  execrunner.New(),
+		update: updateDeps{
+			baseURL:     selfupdate.ReleaseBaseURL,
+			publicKey:   selfupdate.ReleasePublicKey,
+			interactive: adapters.IsTerminal(os.Stdin),
+			in:          os.Stdin,
+			out:         os.Stdout,
+			args:        os.Args,
+			binary:      adapters.OSBinary{},
+			releases:    adapters.HTTPReleases{},
+			getenv:      os.Getenv,
+		},
 	})
 	if err := root.Execute(); err != nil {
 		os.Exit(exitCode(os.Stderr, err))

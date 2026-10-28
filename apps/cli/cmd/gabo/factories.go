@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
@@ -14,6 +16,8 @@ import (
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/initcmd"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate/adapters"
 )
 
 // reviewerSkillDir is the user-level location of the gabo-reviewer skill
@@ -34,7 +38,7 @@ func reviewerSkillDir(getenv func(string) string) (string, error) {
 // initFactory builds the init run lazily, so help and usage errors never
 // touch the filesystem. The project is the git top-level of the working
 // directory, or the directory itself.
-func initFactory(runner kernel.Runner, version string) initcmd.Factory {
+func initFactory(runner kernel.Runner, version string, upd updateDeps) initcmd.Factory {
 	return func(ctx context.Context) (*initcmd.Init, error) {
 		wd, err := os.Getwd()
 		if err != nil {
@@ -54,7 +58,21 @@ func initFactory(runner kernel.Runner, version string) initcmd.Factory {
 			return nil, err
 		}
 		project := config.ProjectRoot(ctx, runner, wd)
+		var updater initcmd.Updater
+		if upd.binary != nil {
+			updater = selfupdate.NewUseCase(upd.releases, upd.binary,
+				adapters.Console{In: bufio.NewReader(upd.in), Out: upd.out},
+				selfupdate.Settings{
+					BaseURL: upd.baseURL, PublicKey: upd.publicKey,
+					GOOS: runtime.GOOS, GOARCH: runtime.GOARCH,
+					Interactive: upd.interactive,
+					CI:          upd.getenv("CI") != "",
+					OptOut:      upd.getenv(selfupdate.OptOutEnv) != "",
+					Args:        upd.args,
+				})
+		}
 		return &initcmd.Init{
+			Updater: updater,
 			Reviewer: initcmd.NewReviewer(osfs.FS{}, toFiles(reviewer, "gabo-reviewer/"), initcmd.ReviewerSettings{
 				Dir: dir, ProjectDir: project, Version: version,
 			}),

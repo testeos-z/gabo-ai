@@ -22,7 +22,10 @@ func NewCommand(factory Factory) *cobra.Command {
 			"Copy the embedded gabo skill catalog (without gabo-reviewer) into " + CatalogDir + "/\n" +
 			"and write the catalog version to " + StampFile + "; commit both.\n" +
 			"An older or missing stamp refreshes the catalog; a matching stamp changes nothing;\n" +
-			"a newer stamp changes nothing and exits 1 with the upgrade command.\n" +
+			"a newer stamp changes nothing and exits 1 with the upgrade command, unless init runs\n" +
+			"at a terminal with CI and GABO_NO_SELF_UPDATE unset and you agree to update gabo to\n" +
+			"exactly that version: the release's checksums.txt must be minisign-signed by the key\n" +
+			"pinned in gabo and match the asset's SHA-256, then gabo replaces itself and reruns init.\n" +
 			"On a fresh project (no stamp, no " + ConfigFile + ") it prints the setup prompt to paste\n" +
 			"into your agent; it writes the prompt nowhere.\n" +
 			"init never creates or edits " + ConfigFile + " or the user config.",

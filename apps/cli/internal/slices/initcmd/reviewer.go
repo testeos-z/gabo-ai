@@ -110,19 +110,33 @@ func (r *Reviewer) write(dir string, v version) error {
 	return nil
 }
 
-// Init is one `init` run: the user-level reviewer install, then the catalog.
+// Init is one `init` run: the self-update offer for a newer stamp, the
+// user-level reviewer install, then the catalog.
 type Init struct {
 	Reviewer *Reviewer
 	Catalog  *UseCase
+	// Updater is optional; without it a newer stamp only prints the upgrade
+	// command.
+	Updater Updater
 }
 
-// Run installs the reviewer on every run, whatever the repository stamp says,
+// Run first offers the self-update when the stamp is newer than the binary;
+// an updated binary re-executes init, so nothing else runs here. Otherwise it
+// installs the reviewer on every run, whatever the repository stamp says,
 // then copies or refreshes the catalog; output keeps that order.
 func (i *Init) Run(ctx context.Context) (Output, error) {
+	var pre []string
+	if want, have, ok := i.Catalog.newerStamp(); ok && i.Updater != nil {
+		lines, updated, err := i.Updater.Update(ctx, want, have)
+		if updated {
+			return Output{Lines: lines}, err
+		}
+		pre = lines
+	}
 	rev, err := i.Reviewer.Install(ctx)
 	if err != nil {
-		return rev, err
+		return Output{Lines: append(pre, rev.Lines...)}, err
 	}
 	cat, err := i.Catalog.Run(ctx)
-	return Output{Lines: append(rev.Lines, cat.Lines...)}, err
+	return Output{Lines: append(append(pre, rev.Lines...), cat.Lines...)}, err
 }
