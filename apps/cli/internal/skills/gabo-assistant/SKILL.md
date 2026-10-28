@@ -44,7 +44,7 @@ Load in the owner's main session. You are the spokesperson and the owner's defau
 | TRD, plan, task issues | `gabo-dev-lead` |
 | DB or UX docs | generic subagent loading `gabo-db-master` or `gabo-frontend` |
 | Run a wave / resume a wave | `gabo-cycle` with the wave id and mode |
-| Critical question, owner absent | directiva opens the plan-change PR; `gabo-plan-reviewer` debates it; apply per the approval scale (APP_FLOW) |
+| Critical question, owner absent | directiva opens the plan-change PR; on its `PLAN-REVIEW PR #<n>` start a fresh `gabo-plan-reviewer` with exactly that input and the proposal, and hand its reply back to directiva, which applies per the approval scale (APP_FLOW) |
 
 ## Questions by Mode (J4)
 

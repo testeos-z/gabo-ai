@@ -153,3 +153,25 @@ func TestAgentTemplatesSkillHasNoSecrets(t *testing.T) {
 		}
 	}
 }
+
+// The plan reviewer and the directiva agents that open plan changes load the
+// one plan-change reviewer skill (T032, D24).
+func TestPlanChangeAgentsLoadThePlanReviewerSkill(t *testing.T) {
+	t.Parallel()
+	spec, err := agentspec.Load(Catalog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	need := map[string]bool{"gabo-plan-reviewer": true, "gabo-pm": true, "gabo-dev-lead": true}
+	for _, a := range spec.Agents {
+		if need[a.ID] {
+			delete(need, a.ID)
+			if !slices.Contains(a.Skills, "gabo-plan-reviewer") {
+				t.Errorf("agent %s: skills %v miss gabo-plan-reviewer", a.ID, a.Skills)
+			}
+		}
+	}
+	for id := range need {
+		t.Errorf("agent %s: not in the spec", id)
+	}
+}

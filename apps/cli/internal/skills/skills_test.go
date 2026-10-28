@@ -16,7 +16,7 @@ var want = []string{
 	"gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
+	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-setup",
 	"gabo-wave-report",
 }
 
@@ -176,6 +176,18 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			// T061: the summary and the comfort answer follow gabo-wave-report.
 			"`gabo-wave-report`",
 		},
+		// T032: the one plan-change reviewer skill (D8, D24) and the directiva flow (D7, J6).
+		"gabo-plan-reviewer/SKILL.md": {
+			"## Approval Scale", "## Plan-Change Flow", "## Review",
+			"`plan_change.scope`", "`plan_change.global_without_owner`",
+			"One issue and one PR per proposal", "only `docs/product` and tasks",
+			"only when the owner is absent", "never for a proposal debated with the owner",
+			"fresh", "clean context", "index the repository", "never edit",
+			"`AGREE`", "`COUNTER-PROPOSAL`", "BLOCKED", "R19", "D7", "D8",
+			"never applies automatically", "save decision",
+		},
+		"gabo-pm/SKILL.md":                       {"`gabo-plan-reviewer`", "## Plan-Change Flow"},
+		"gabo-dev-lead/SKILL.md":                 {"`gabo-plan-reviewer`", "## Plan-Change Flow"},
 		"gabo-contract-repository-host/SKILL.md": {"without force", "merged head", "leftover"},
 		"gabo-contract-repository-host/examples/host-github.md": {
 			"baseRefName,headRefName,headRefOid", "git branch -d <branch>", "ls-remote", "leftover",
@@ -197,7 +209,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		"gabo-doc-guide/SKILL.md": {
 			"docs/product/PRD.md", "docs/product/stories/", "docs/product/TRD.md", "docs/product/IMPLEMENTATION_PLAN.md",
 			"docs/product/DB_SCHEMA.md", "docs/product/UX_UI.md", "docs/product/APP_FLOW.md", "DESIGN.md",
-			"setup prompt", ".gbai/skills/", "adds no rule",
+			"setup prompt", ".gbai/skills/", "adds no rule", "`gabo-plan-reviewer`",
 		},
 		// The former cloud keys of the core config (DB_SCHEMA 2.3).
 		"gabo-contract-agent-host/SKILL.md": {
@@ -671,4 +683,51 @@ func TestWaveReportFormatLivesInOneSkill(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The skill carries the APP_FLOW plan-change approval scale (TRD D7) row for
+// row, so directiva applies the same scale the product docs define.
+func TestPlanReviewerCarriesTheAppFlowApprovalScale(t *testing.T) {
+	t.Parallel()
+	b, err := content.ReadFile("gabo-plan-reviewer/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// APP_FLOW lives in the repository checkout, three levels above this
+	// package's module dir.
+	doc, err := os.ReadFile("../../../../docs/product/APP_FLOW.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := scaleRows(t, string(doc), "## Plan-change approval scale")
+	got := scaleRows(t, string(b), "## Approval Scale")
+	if !slices.Equal(got, want) {
+		t.Fatalf("approval scale rows\n got %q\nwant %q", got, want)
+	}
+	if len(got) != 6 {
+		t.Fatalf("approval scale has %d table lines, want header, rule and 4 scopes", len(got))
+	}
+	for i, scope := range []string{"One task", "Group of tasks", "Global plan", "Any scope beyond `plan_change.scope`"} {
+		if !strings.HasPrefix(got[i+2], "| "+scope) {
+			t.Errorf("row %d = %q, want scope %q", i+1, got[i+2], scope)
+		}
+	}
+}
+
+// scaleRows returns the first Markdown table under heading.
+func scaleRows(t *testing.T, doc, heading string) []string {
+	t.Helper()
+	_, rest, ok := strings.Cut(doc, "\n"+heading+"\n")
+	if !ok {
+		t.Fatalf("heading %q not found", heading)
+	}
+	var rows []string
+	for _, line := range strings.Split(rest, "\n") {
+		if strings.HasPrefix(line, "|") {
+			rows = append(rows, line)
+		} else if len(rows) > 0 || strings.HasPrefix(line, "## ") {
+			break
+		}
+	}
+	return rows
 }

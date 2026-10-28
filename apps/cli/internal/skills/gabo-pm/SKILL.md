@@ -4,7 +4,7 @@ description: "Trigger: PRD, product requirements, user stories, product manager,
 license: Apache-2.0
 metadata:
   author: gbai-team
-  version: "2.2"
+  version: "2.3"
 ---
 ## Activation Contract
 
@@ -20,6 +20,10 @@ Load in the `gabo-pm` subagent to write or update `docs/product/PRD.md` and `doc
 - Mark unknowns as open questions; do not invent product decisions. In auto mode mark each proposal **Proposed (auto)** with a one-line reason.
 - Every story has a requirement and every requirement a story or an explicit "no story yet"; run the traceability check below before each next planning step.
 - Plan changes after the plan exists go in their own branch, issue and PR touching only `docs/product` and tasks (D7), through the `tasks` and `repository_host` adapters.
+
+## Plan-Change Flow
+
+A critical question (it changes scope, the plan or other tasks) follows the `## Plan-Change Flow` of `gabo-plan-reviewer`: one issue and one PR per proposal, the approval scale against `plan_change.*`, and the plan reviewer only when the owner is absent.
 
 ## Traceability check
 
