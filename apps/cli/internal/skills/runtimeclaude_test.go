@@ -124,7 +124,7 @@ func TestRuntimeClaudeKeepsTheReviewerOutOfTheProject(t *testing.T) {
 	for _, s := range []string{
 		"Never place `gabo-reviewer` in the project",
 		"${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer",
-		"$HOME/.claude/skills/gabo-reviewer/scripts/reviewer.sh",
+		"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer/scripts/reviewer.sh",
 		"leave it and report it",
 		"`gabo check`",
 	} {
@@ -143,7 +143,8 @@ func TestRuntimeClaudeProbesEveryLink(t *testing.T) {
 	for _, s := range []string{
 		"Probe, on every build", "every fixed-name link made in step 3",
 		"delete the file whatever the result", "the adapter's frontmatter `name` instead of the link name",
-		"still failing, stop and report the link", "except the `✗ agent <id> missing` lines of agents you skipped",
+		"still failing, stop and report the link", "probe not run: restart Claude Code and rebuild",
+		"Only a probe that ran in such a session can fail a link", "except the `✗ agent <id> missing` lines of agents you skipped",
 	} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("%s: missing %q", runtimeClaude, s)
