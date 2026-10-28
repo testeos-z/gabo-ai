@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Downloads one file over HTTPS and keeps it only when its SHA-256 matches the
+# pinned value. Any mismatch, empty checksum or failed download exits non-zero
+# and leaves no file behind, so a Docker build step using it fails.
+# Usage: fetch-verified <https url> <sha256> <output path>
+set -euo pipefail
+
+if [ $# -ne 3 ]; then
+  echo "usage: fetch-verified <https url> <sha256> <output path>" >&2
+  exit 2
+fi
+url="$1" sha="$2" out="$3"
+
+if ! [[ "$sha" =~ ^[0-9a-f]{64}$ ]]; then
+  echo "fetch-verified: refusing ${url}: pinned SHA-256 is missing or malformed" >&2
+  exit 1
+fi
+
+tmp="${out}.partial"
+rm -f "$tmp" "$out"
+if ! curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 -o "$tmp" "$url"; then
+  rm -f "$tmp"
+  echo "fetch-verified: download failed: ${url}" >&2
+  exit 1
+fi
+
+actual="$(sha256sum "$tmp" | cut -d' ' -f1)"
+if [ "$actual" != "$sha" ]; then
+  rm -f "$tmp"
+  echo "fetch-verified: SHA-256 mismatch for ${url}: expected ${sha}, got ${actual}" >&2
+  exit 1
+fi
+mv "$tmp" "$out"

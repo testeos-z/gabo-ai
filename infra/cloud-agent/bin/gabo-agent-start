@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+# Entrypoint of the gabo-ai cloud agent image. Started as root it fixes the
+# ownership of the agent home (a fresh volume is owned by root) and re-runs
+# itself as the agent user. As the agent user it makes sure that:
+#   1. engram is registered as a user-scope Claude Code MCP server;
+#   2. the gabo-ai repository is checked out on dev (image seed updated by a
+#      fetch when git access allows it, else a clone);
+#   3. one Engram Cloud sync runs in the background (skipped when not configured);
+# and then runs the given command (default: keep the container alive).
+# It never reads, writes or prints a credential.
+set -euo pipefail
+
+agent_user="${GABO_AGENT_USER:-agent}"
+
+if [ "$(id -u)" = 0 ] && [ "$agent_user" != root ]; then
+  home="$(getent passwd "$agent_user" | cut -d: -f6)"
+  mkdir -p "$home"
+  # Repair any part of the home not owned by the agent (a fresh volume, or a
+  # file written by an earlier root `docker exec`).
+  if [ -n "$(find "$home" ! -user "$agent_user" -print -quit)" ]; then
+    chown -R "$agent_user:$agent_user" "$home"
+  fi
+  exec setpriv --reuid="$agent_user" --regid="$agent_user" --init-groups \
+    env HOME="$home" USER="$agent_user" LOGNAME="$agent_user" "$0" "$@"
+fi
+
+log() { echo "gabo-agent-start: $*" >&2; }
+
+repo_dir="${GABO_REPO_DIR:-$HOME/gabo-ai}"
+repo_url="${GABO_REPO_URL:-https://github.com/testeos-z/gabo-ai.git}"
+repo_branch="${GABO_REPO_BRANCH:-dev}"
+repo_seed="${GABO_REPO_SEED:-/opt/gabo-agent/seed.git}"
+
+# 1. Engram MCP server (user scope lives in ~/.claude.json, so a volume mounted
+#    on the home hides the build-time registration; register it again).
+if ! claude mcp get engram >/dev/null 2>&1; then
+  engram_bin="$(command -v engram)"
+  claude mcp add --transport stdio --scope user engram -- "$engram_bin" mcp --tools=agent >/dev/null
+  log "registered engram as a user-scope MCP server"
+fi
+
+# 2. Repository checkout on $repo_branch. The seed is made at build time from
+#    the build context; the fetch and the clone without a seed need whatever
+#    git access the operator configured at run time, and only warn without it.
+if [ ! -e "$repo_dir/.git" ]; then
+  seeded=0
+  if [ -d "$repo_seed" ]; then
+    # The seed belongs to another user when the agent uid differs from the
+    # build; trust only the seed itself for this one clone.
+    upload_pack="git -c safe.directory=$(printf '%q' "$repo_seed") upload-pack"
+    if git clone --quiet --no-checkout --no-local --upload-pack "$upload_pack" "$repo_seed" "$repo_dir"; then
+      seeded=1
+    else
+      log "WARNING: could not clone the image seed ${repo_seed}; trying ${repo_url}"
+    fi
+  fi
+  if [ "$seeded" = 1 ]; then
+    git -C "$repo_dir" remote set-url origin "$repo_url"
+    if ! git -C "$repo_dir" fetch --quiet origin "+refs/heads/$repo_branch:refs/remotes/origin/$repo_branch"; then
+      log "could not fetch ${repo_branch} from ${repo_url}; using the image seed as built"
+    fi
+    if git -C "$repo_dir" rev-parse --verify --quiet "refs/remotes/origin/$repo_branch" >/dev/null; then
+      git -C "$repo_dir" checkout --quiet -B "$repo_branch" "origin/$repo_branch"
+      log "checked out ${repo_branch} of ${repo_url} at ${repo_dir}"
+    else
+      log "WARNING: neither the image seed nor ${repo_url} gave branch ${repo_branch}; ${repo_dir} has no checkout"
+    fi
+  elif git clone --quiet --branch "$repo_branch" "$repo_url" "$repo_dir"; then
+    log "cloned ${repo_branch} of ${repo_url} at ${repo_dir}"
+  else
+    log "WARNING: could not clone ${repo_url}; the repository is not checked out"
+  fi
+fi
+
+# 3. One Engram Cloud sync at start (a startup reconcile, not a loop).
+if [ "${GABO_ENGRAM_SYNC_ON_START:-1}" != 0 ]; then
+  (gabo-engram-sync || log "Engram Cloud sync failed; run gabo-engram-sync to retry") &
+fi
+
+if [ $# -eq 0 ]; then
+  set -- sleep infinity
+fi
+exec "$@"

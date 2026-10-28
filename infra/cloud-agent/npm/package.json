@@ -1,0 +1,9 @@
+{
+  "name": "gabo-cloud-agent-tools",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.312",
+    "@colbymchenry/codegraph": "1.6.2"
+  }
+}
