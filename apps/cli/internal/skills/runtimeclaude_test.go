@@ -133,3 +133,20 @@ func TestRuntimeClaudeKeepsTheReviewerOutOfTheProject(t *testing.T) {
 		}
 	}
 }
+
+// The probe checks every fixed-name link on every build, has a fallback when a
+// link does not preload, always removes its file, and the verify step does not
+// loop on agents the skill skipped (review of PR #127).
+func TestRuntimeClaudeProbesEveryLink(t *testing.T) {
+	t.Parallel()
+	doc := runtimeClaudeDoc(t)
+	for _, s := range []string{
+		"Probe, on every build", "every fixed-name link made in step 3",
+		"delete the file whatever the result", "the adapter's frontmatter `name` instead of the link name",
+		"still failing, stop and report the link", "except the `✗ agent <id> missing` lines of agents you skipped",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", runtimeClaude, s)
+		}
+	}
+}

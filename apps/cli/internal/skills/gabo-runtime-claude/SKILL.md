@@ -19,7 +19,7 @@ Load when any of `runtimes.coder`, `runtimes.reviewer` or `runtimes.assistant` i
 - Read the spec, the templates and `.gabo/VERSION` from the project; never build from memory. A missing or empty `.gabo/VERSION` or catalog: stop and tell the user to run `gabo init`.
 - Fill only the template slots, as below, and invent nothing: no frontmatter key, tool, skill, model or rule the spec and template do not give.
 - Never place `gabo-reviewer` in the project: no `.claude/skills/gabo-reviewer`, no copy of its scripts, and never in an agent's `skills`. Only link the user-level copy that `gabo init` installs (D20).
-- Overwrite only the agent files named after a spec id and the links this skill makes. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
+- Overwrite only the agent files named after a spec id, the links this skill makes and the probe file it writes. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
 - Write no secret into any file (R21).
 
 ## Sources
@@ -33,6 +33,7 @@ Checked on 2026-10-28 against Claude Code 2.1.302 (`claude --version`), its `cla
 | `tools` is a comma-separated allowlist of tool names; `mcp__<server>__*` gives one MCP server's tools; `Agent` spawns subagents. | tool list | https://code.claude.com/docs/en/sub-agents |
 | `skills` preloads each listed skill's full content at startup; a missing skill is skipped with a debug-log warning. | skill list | https://code.claude.com/docs/en/sub-agents |
 | Project skills live in `.claude/skills/<name>/SKILL.md`; a `.claude/skills/<name>` entry may be a symlink to a folder, and the folder name also invokes the skill. | catalog skills, fixed-name links | https://code.claude.com/docs/en/skills |
+| A subagent's `skills` entry naming a `.claude/skills/<link>` symlink preloads the target folder's skill even when its frontmatter `name` differs. Verified by probe on Claude Code 2.1.302 (four links `gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory` to folders named `sample-*`); the probe in step 8 rechecks it on every build. | fixed-name preload | https://code.claude.com/docs/en/skills, probe |
 | Personal skills live in `~/.claude/skills/<name>/SKILL.md` and win over a project skill of the same name. | reviewer link | https://code.claude.com/docs/en/skills |
 | Edits under `.claude/agents/` load without restart, unless the folder did not exist when the session started. | rebuild | https://code.claude.com/docs/en/sub-agents |
 | `claude plugin validate <dir>` reports agent files whose frontmatter does not parse (2.1.233 or later); `--strict` turns the unknown `gabo-version` key into an error, so never pass it. | verify | https://code.claude.com/docs/en/sub-agents |
@@ -93,8 +94,8 @@ Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/S
    ```
 
    Omit `skills` when the list is empty (the reviewer agent).
-7. Verify: run `claude plugin validate .claude/agents`, then `gabo check`. Fix every failure this skill caused and rerun until `gabo check` passes; report any other failure.
-8. Probe, on the first build in a repository or after a recheck found a new version: write `.claude/agents/gabo-probe.md` in the same format (`tools: Bash`, `skills: [gabo-methodology]` or another link, body: run `git rev-parse --show-toplevel` and reply with its output and the first heading of each preloaded skill). Launch it once, check that it ran the command and saw the skill, then delete the file.
+7. Verify: run `claude plugin validate .claude/agents`, then `gabo check`. Fix every failure this skill caused and rerun until `gabo check` passes, except the `✗ agent <id> missing` lines of agents you skipped and reported in step 5; report any other failure.
+8. Probe, on every build: write `.claude/agents/gabo-probe.md` in the same format, with `tools: Bash`, `skills:` listing every fixed-name link made in step 3, and the body: run `git rev-parse --show-toplevel` once and reply with its output, then one line per preloaded skill with the name it was listed under and its first Markdown heading. Launch it once, then delete the file whatever the result. It passes when it ran the command and every link shows its adapter's heading. A link that does not preload: in `skills:` and in its slot fill, use the adapter's frontmatter `name` instead of the link name, rebuild the affected agents and probe once more; still failing, stop and report the link. A `gabo-probe.md` that this skill did not write: leave it and report it, and report the probe as not run.
 
 ## Output Contract
 
