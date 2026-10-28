@@ -6,11 +6,11 @@ import (
 )
 
 // NextSetup is the last line of a load error that names missing keys: the
-// owner's agent writes them during setup, gbai never fills them (R12).
+// owner's agent writes them during setup, gabo never fills them (R12).
 const NextSetup = "next: run setup"
 
 // Suggestion is a value setup may offer for a required key, among others.
-// gbai never applies it; the owner chooses (R12, TRD TD2).
+// gabo never applies it; the owner chooses (R12, TRD TD2).
 type Suggestion struct {
 	Key string
 	// Values holds the suggested value; a list key has one entry per item.
@@ -30,7 +30,7 @@ var formerDefaults = []Suggestion{
 }
 
 // Suggestions returns a fresh copy of the former defaults, in key order, for
-// setup to offer; changing it changes nothing in gbai.
+// setup to offer; changing it changes nothing in gabo.
 func Suggestions() []Suggestion {
 	out := make([]Suggestion, len(formerDefaults))
 	for i, s := range formerDefaults {

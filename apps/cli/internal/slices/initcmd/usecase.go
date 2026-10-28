@@ -1,5 +1,5 @@
-// Package initcmd copies the embedded gbai skill catalog into the project
-// (.gbai/skills/) and keeps its version stamp (.gbai/VERSION), TRD 9.4.
+// Package initcmd copies the embedded gabo skill catalog into the project
+// (.gabo/skills/) and keeps its version stamp (.gabo/VERSION), TRD 9.4.
 package initcmd
 
 import (
@@ -15,10 +15,10 @@ import (
 
 // Project-relative locations (TRD 9.4).
 const (
-	CatalogDir  = ".gbai/skills"
-	StampFile   = ".gbai/VERSION"
-	ConfigFile  = "gbai.yaml"
-	installPath = "github.com/testeos-z/gbai-team/apps/cli/cmd/gbai"
+	CatalogDir  = ".gabo/skills"
+	StampFile   = ".gabo/VERSION"
+	ConfigFile  = "gabo.yaml"
+	installPath = "github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo"
 )
 
 // File is one catalog file; Path is relative to the catalog directory.
@@ -59,7 +59,7 @@ func NewUseCase(store Store, files []File, s Settings) *UseCase {
 func (u *UseCase) Run(context.Context) (Output, error) {
 	bin, ok := parseVersion(strings.TrimPrefix(u.s.Version, "v"))
 	if !ok {
-		return Output{}, fmt.Errorf("binary version %q is not a release version x.y.z; build gbai with -ldflags \"-X main.buildVersion=<x.y.z>\"", u.s.Version)
+		return Output{}, fmt.Errorf("binary version %q is not a release version x.y.z; build gabo with -ldflags \"-X main.buildVersion=<x.y.z>\"", u.s.Version)
 	}
 	cur, hasStamp, err := u.readStamp()
 	if err != nil {
@@ -86,7 +86,7 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 	case hasStamp && cur.compare(bin) == 0:
 		return Output{Lines: []string{"catalog is current (" + bin.String() + "); nothing changed"}}, nil
 	case hasStamp && cur.compare(bin) > 0:
-		return Output{}, fmt.Errorf("catalog version %s is newer than gbai %s; upgrade with: go install %s@v%s",
+		return Output{}, fmt.Errorf("catalog version %s is newer than gabo %s; upgrade with: go install %s@v%s",
 			cur, bin, installPath, cur)
 	}
 	old := "none"
@@ -125,13 +125,13 @@ func (u *UseCase) copyCatalog(v version) error {
 	return nil
 }
 
-// checkOwnPaths refuses a .gbai, .gbai/skills or stamp that is a symlink or of
+// checkOwnPaths refuses a .gabo, .gabo/skills or stamp that is a symlink or of
 // the wrong kind, so removing and writing never leave the project.
 func (u *UseCase) checkOwnPaths() error {
 	for _, p := range []struct {
 		rel, kind string
 		dir       bool
-	}{{".gbai", "directory", true}, {CatalogDir, "directory", true}, {StampFile, "regular file", false}} {
+	}{{".gabo", "directory", true}, {CatalogDir, "directory", true}, {StampFile, "regular file", false}} {
 		mode, err := u.store.Lstat(u.path(p.rel))
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
@@ -139,9 +139,9 @@ func (u *UseCase) checkOwnPaths() error {
 		case err != nil:
 			return fmt.Errorf("stat %s: %w", p.rel, err)
 		case mode&fs.ModeSymlink != 0:
-			return fmt.Errorf("%s is a symlink; init writes only inside the project, so replace it with a real directory or file and rerun gbai init", p.rel)
+			return fmt.Errorf("%s is a symlink; init writes only inside the project, so replace it with a real directory or file and rerun gabo init", p.rel)
 		case mode.IsDir() != p.dir || (!p.dir && !mode.IsRegular()):
-			return fmt.Errorf("%s is not a %s; move it away and rerun gbai init", p.rel, p.kind)
+			return fmt.Errorf("%s is not a %s; move it away and rerun gabo init", p.rel, p.kind)
 		}
 	}
 	return nil
@@ -158,7 +158,7 @@ func (u *UseCase) readStamp() (version, bool, error) {
 	raw := strings.TrimSpace(string(b))
 	v, ok := parseVersion(raw)
 	if !ok {
-		return version{}, false, fmt.Errorf("%s holds %q, not a version x.y.z; restore it from git or delete it, then rerun gbai init", StampFile, raw)
+		return version{}, false, fmt.Errorf("%s holds %q, not a version x.y.z; restore it from git or delete it, then rerun gabo init", StampFile, raw)
 	}
 	return v, true, nil
 }

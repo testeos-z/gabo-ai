@@ -20,21 +20,21 @@ import (
 // package embeds a byte-identical copy so validation works offline, and a
 // test fails when the copy drifts.
 //
-//go:generate cp ../../../../schemas/gbai.user.schema.json ../../../../schemas/gbai.project.schema.json schemas/
+//go:generate cp ../../../../schemas/gabo.user.schema.json ../../../../schemas/gabo.project.schema.json schemas/
 //go:embed schemas/*.schema.json
 var schemaFS embed.FS
 
 // Schema file names, as published under schemas/.
 const (
-	UserSchemaFile    = "gbai.user.schema.json"
-	ProjectSchemaFile = "gbai.project.schema.json"
+	UserSchemaFile    = "gabo.user.schema.json"
+	ProjectSchemaFile = "gabo.project.schema.json"
 )
 
 // SchemaFileNames lists the embedded schema files.
 var SchemaFileNames = []string{UserSchemaFile, ProjectSchemaFile}
 
 // schemaBaseURL is the $id prefix both schema files declare.
-const schemaBaseURL = "https://raw.githubusercontent.com/testeos-z/gbai-team/main/schemas/"
+const schemaBaseURL = "https://raw.githubusercontent.com/testeos-z/gabo-ai/main/schemas/"
 
 // Schema selects what a document is validated as.
 type Schema string
@@ -44,7 +44,7 @@ const (
 	// SchemaUser is the global user file: personal keys plus any project
 	// key as a fallback, none required.
 	SchemaUser Schema = UserSchemaFile
-	// SchemaProject is a complete gbai.yaml as editors check it: project
+	// SchemaProject is a complete gabo.yaml as editors check it: project
 	// keys only, required keys set.
 	SchemaProject Schema = ProjectSchemaFile
 	// SchemaLayer is one file as the loader reads it: every key class, none

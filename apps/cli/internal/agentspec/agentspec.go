@@ -1,9 +1,9 @@
 // Package agentspec loads and validates the neutral agent spec (TRD 8.1,
-// D24): the engine-independent list of gbai agents that runtime skills build
+// D24): the engine-independent list of gabo agents that runtime skills build
 // into agent files and `gabo check` verifies.
 //
 // The loader reads from a catalog root: the embedded catalog
-// (skills.Catalog()) or the project's .gbai/skills/ copy.
+// (skills.Catalog()) or the project's .gabo/skills/ copy.
 package agentspec
 
 import (
@@ -27,7 +27,7 @@ const (
 	MainSession = "main-session"
 )
 
-// Agent is one gbai agent that runs from an agent file.
+// Agent is one gabo agent that runs from an agent file.
 type Agent struct {
 	ID   string `yaml:"id"`
 	Role string `yaml:"role"`

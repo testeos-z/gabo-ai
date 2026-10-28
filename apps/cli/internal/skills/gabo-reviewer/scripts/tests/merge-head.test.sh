@@ -32,16 +32,16 @@ gate() {
   echo "${G_FILES:-$files}" >"$fx/files_7"
   (
     export HOME="$fake_home" STUB_LOG="$fx/calls.log" FIXTURE="$fx" REVIEWER_GH="$work/bin/gh" \
-      GBAI_REVIEWER_STATE_DIR="$fx/state" REVIEWER_AUTO_MERGE=true REVIEWER_NOW=2026-10-20T13:00:00Z \
-      REVIEWER_REPO=testeos-z/gabo-ai REVIEWER_CHECKS='go test ./...' \
-      REVIEWER_HUMAN_ONLY_PATHS='.claude/ .github/ gbai.yaml AGENTS.md CLAUDE.md'
+      GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_AUTO_MERGE=true REVIEWER_NOW=2026-10-20T13:00:00Z \
+      REVIEWER_REPO=example-org/example-repo REVIEWER_CHECKS='go test ./...' \
+      REVIEWER_HUMAN_ONLY_PATHS='.claude/ .github/ gabo.yaml AGENTS.md CLAUDE.md'
     for kv in "$@"; do export "${kv?}"; done
     bash "$skill/merge-head.sh" 7 "$sha" 2>&1 | tail -n 1 | cut -d' ' -f2-
   )
 }
 
 expect_eq "MERGED #7 $sha" "$(gate ok)" "every rule holds: merges"
-check "merge is pinned and plain" grep -qxF "gh pr merge 7 --repo testeos-z/gabo-ai --merge --match-head-commit $sha" "$work/ok/calls.log"
+check "merge is pinned and plain" grep -qxF "gh pr merge 7 --repo example-org/example-repo --merge --match-head-commit $sha" "$work/ok/calls.log"
 expect_match '^MERGE-SKIPPED .*REVIEWER_AUTO_MERGE' "$(gate off REVIEWER_AUTO_MERGE=false)" "auto merge off: skipped"
 expect_match '^MERGE-SKIPPED .*targets main; the reviewer never merges into it' "$(G_BASE=main gate main)" "never merges into main"
 check "no merge call for main" bash -c "! grep -q '^gh pr merge' '$work/main/calls.log'"
@@ -58,11 +58,11 @@ check "needs-human comment carries no verdict marker" bash -c "! grep -q 'gbai-r
 expect_match '^MERGE-FAILED ' "$(gate refused MERGE_FAIL=1)" "a refused merge is MERGE-FAILED"
 
 echo "# built-in human-only paths"
-expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".gbai/skills/gabo-coder/SKILL.md"}]' gate catalog)" \
-  "the catalog subtree .gbai/skills/ always needs a human merge"
+expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".gabo/skills/gabo-coder/SKILL.md"}]' gate catalog)" \
+  "the catalog subtree .gabo/skills/ always needs a human merge"
 check "no merge call for the catalog" bash -c "! grep -q '^gh pr merge' '$work/catalog/calls.log'"
-expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".gbai/VERSION"}]' gate stamp REVIEWER_HUMAN_ONLY_PATHS=' ')" \
-  "the stamp .gbai/VERSION needs a human merge even with no configured human-only paths"
+expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".gabo/VERSION"}]' gate stamp REVIEWER_HUMAN_ONLY_PATHS=' ')" \
+  "the stamp .gabo/VERSION needs a human merge even with no configured human-only paths"
 check "no merge call for the stamp" bash -c "! grep -q '^gh pr merge' '$work/stamp/calls.log'"
 
 echo "# reviewer.signing marker"

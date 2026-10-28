@@ -9,7 +9,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
 )
 
 // Runner runs local processes.

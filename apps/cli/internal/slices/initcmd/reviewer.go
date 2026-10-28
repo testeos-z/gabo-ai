@@ -14,7 +14,7 @@ const ReviewerStamp = "VERSION"
 
 // ReviewerSettings locate the user-level gabo-reviewer copy (TRD 9.4, D20).
 type ReviewerSettings struct {
-	// Dir is ${XDG_DATA_HOME:-~/.local/share}/gbai/skills/gabo-reviewer.
+	// Dir is ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer.
 	Dir string
 	// ProjectDir is refused as a parent of Dir: the scripts never enter the
 	// repository they review.
@@ -40,7 +40,7 @@ func NewReviewer(store Store, files []File, s ReviewerSettings) *Reviewer {
 func (r *Reviewer) Install(context.Context) (Output, error) {
 	bin, ok := parseVersion(strings.TrimPrefix(r.s.Version, "v"))
 	if !ok {
-		return Output{}, fmt.Errorf("binary version %q is not a release version x.y.z; build gbai with -ldflags \"-X main.buildVersion=<x.y.z>\"", r.s.Version)
+		return Output{}, fmt.Errorf("binary version %q is not a release version x.y.z; build gabo with -ldflags \"-X main.buildVersion=<x.y.z>\"", r.s.Version)
 	}
 	dir := filepath.Clean(r.s.Dir)
 	if err := r.checkDir(dir); err != nil {
@@ -53,9 +53,9 @@ func (r *Reviewer) Install(context.Context) (Output, error) {
 	case err != nil:
 		return Output{}, fmt.Errorf("stat %s: %w", dir, err)
 	case mode&fs.ModeSymlink != 0:
-		return Output{}, fmt.Errorf("%s is a symlink; gbai init installs the reviewer scripts only into a real directory, so remove the link and rerun gbai init", dir)
+		return Output{}, fmt.Errorf("%s is a symlink; gabo init installs the reviewer scripts only into a real directory, so remove the link and rerun gabo init", dir)
 	case !mode.IsDir():
-		return Output{}, fmt.Errorf("%s is not a directory; move it away and rerun gbai init", dir)
+		return Output{}, fmt.Errorf("%s is not a directory; move it away and rerun gabo init", dir)
 	}
 	old := "unknown"
 	if exists {

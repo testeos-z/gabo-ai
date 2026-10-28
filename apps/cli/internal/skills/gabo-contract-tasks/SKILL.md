@@ -1,14 +1,14 @@
 ---
 name: gabo-contract-tasks
-description: "Trigger: tasks contract, tasks slot, tracker adapter, adapter coverage, write a tasks adapter. Operations every gbai tasks adapter must cover."
+description: "Trigger: tasks contract, tasks slot, tracker adapter, adapter coverage, write a tasks adapter. Operations every gabo tasks adapter must cover."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
 
-Load when writing, checking or using the adapter of the `tasks` slot (`slots.tasks.adapter`, TRD 9.1). This contract states WHAT agents must be able to do with the team's tracker; the adapter states HOW with the user's own tool (D2, D4). gbai ships no tracker code.
+Load when writing, checking or using the adapter of the `tasks` slot (`slots.tasks.adapter`, TRD 9.1). This contract states WHAT agents must be able to do with the team's tracker; the adapter states HOW with the user's own tool (D2, D4). gabo ships no tracker code.
 
 ## Hard Rules
 

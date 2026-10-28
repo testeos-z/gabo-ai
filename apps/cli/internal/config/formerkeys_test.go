@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel/kerneltest"
 )
 
 // The cloud keys removed by T042 fail as unknown keys naming the key path
@@ -16,7 +16,7 @@ func TestFormerCloudKeysFailAsUnknownKeys(t *testing.T) {
 		extra string
 		paths []string
 	}{
-		{"server", "server:\n  host: orca.example.com\n  user: gbai\n", []string{"server.host", "server.user"}},
+		{"server", "server:\n  host: orca.example.com\n  user: gabo\n", []string{"server.host", "server.user"}},
 		{"users", "users:\n  leo:\n    ssh_key: k\n", []string{"users.leo"}},
 		{"bot", "bot: true\n", []string{"bot"}},
 		{"sessions", "sessions:\n  local_orca:\n    enabled: true\n", []string{"sessions.local_orca"}},
@@ -34,10 +34,10 @@ func TestFormerCloudKeysFailAsUnknownKeys(t *testing.T) {
 				}
 			}
 			_, err = LoadLayers(files{
-				"/home/o/.config/gbai/config.yaml": minimal,
-				"/src/p/gbai.yaml":                 tt.extra,
+				"/home/o/.config/gabo/config.yaml": minimal,
+				"/src/p/gabo.yaml":                 tt.extra,
 			}, twoLayers())
-			if err == nil || !strings.Contains(err.Error(), "/src/p/gbai.yaml") || !strings.Contains(err.Error(), tt.paths[0]) ||
+			if err == nil || !strings.Contains(err.Error(), "/src/p/gabo.yaml") || !strings.Contains(err.Error(), tt.paths[0]) ||
 				!strings.Contains(err.Error(), "slots.agent_host") {
 				t.Errorf("LoadLayers() error = %v, want the project file, %s and slots.agent_host", err, tt.paths[0])
 			}
@@ -59,9 +59,9 @@ func TestGenerationIsAnUnknownKey(t *testing.T) {
 func TestLoaderIgnoresTheSystemFileAndNeverWrites(t *testing.T) {
 	t.Parallel()
 	fsys := &kerneltest.FS{Files: map[string]string{
-		"/etc/gbai/gbai.yaml":              "server:\n  host: orca\nparallelism: 9\n",
-		"/home/o/.config/gbai/config.yaml": minimal,
-		"/src/p/gbai.yaml":                 "parallelism: 4\n",
+		"/etc/gabo/gabo.yaml":              "server:\n  host: orca\nparallelism: 9\n",
+		"/home/o/.config/gabo/config.yaml": minimal,
+		"/src/p/gabo.yaml":                 "parallelism: 4\n",
 	}}
 	env := map[string]string{"HOME": "/home/o"}
 	res, err := LoadLayers(fsys, LayerPaths(func(k string) string { return env[k] }, "/src/p"))

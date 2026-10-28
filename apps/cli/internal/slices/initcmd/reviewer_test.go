@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	userDir      = "/home/u/.local/share/gbai/skills/gabo-reviewer"
+	userDir      = "/home/u/.local/share/gabo/skills/gabo-reviewer"
 	userStamp    = userDir + "/VERSION"
 	userSkill    = userDir + "/SKILL.md"
 	userScript   = userDir + "/scripts/reviewer.sh"
@@ -160,7 +160,7 @@ func TestNewerStampStillInstallsReviewer(t *testing.T) {
 	t.Parallel()
 	s := newStore(map[string]string{stamp: "2.0.0\n"})
 	out, err := runInit(t, s, "1.2.3")
-	if err == nil || !strings.Contains(err.Error(), "is newer than gbai 1.2.3") {
+	if err == nil || !strings.Contains(err.Error(), "is newer than gabo 1.2.3") {
 		t.Fatalf("err = %v", err)
 	}
 	assertReviewer(t, s, "1.2.3")
@@ -180,7 +180,7 @@ func TestReviewerRefusesUnsafeLocations(t *testing.T) {
 		want               string
 	}{
 		{"dev binary", userDir, "dev", nil, `binary version "dev"`},
-		{"relative dir", "share/gbai/skills/gabo-reviewer", "1.2.3", nil, "not an absolute path"},
+		{"relative dir", "share/gabo/skills/gabo-reviewer", "1.2.3", nil, "not an absolute path"},
 		{"inside the project", root + "/.local/gabo-reviewer", "1.2.3", nil, "inside the project"},
 		{"project itself", root, "1.2.3", nil, "inside the project"},
 		{"symlink", userDir, "1.2.3", map[string]fs.FileMode{userDir: fs.ModeSymlink}, "symlink"},

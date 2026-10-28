@@ -3,7 +3,7 @@ name: gabo-plan-reviewer
 description: "Trigger: plan change, plan-change proposal, critical question, approval scale, plan reviewer, owner absent. Plan-change flow for directiva and the clean-context plan reviewer."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
@@ -13,7 +13,7 @@ The one plan-change skill (TRD D7, D8, D24; J6; R7, R19, R27). Directiva (`gabo-
 ## Hard Rules
 
 - One issue and one PR per proposal (D7), touching only `docs/product` and tasks; never inside a code PR, never two proposals in one PR.
-- Apply the approval scale below against `plan_change.scope` (`task`, `group` or `global`) and `plan_change.global_without_owner` in `gbai.yaml`. A missing key is the narrowest setting: scope `task`, global `false`.
+- Apply the approval scale below against `plan_change.scope` (`task`, `group` or `global`) and `plan_change.global_without_owner` in `gabo.yaml`. A missing key is the narrowest setting: scope `task`, global `false`.
 - The reviewer is started only when the owner is absent, and never for a proposal debated with the owner.
 - The reviewer never edits code or documents, never pushes, comments, labels or merges; its reply is advice that directiva applies per the scale.
 - While a proposal is debated or waits, only the affected task is BLOCKED (operating rule 2).
@@ -48,7 +48,7 @@ Run by `gabo-plan-reviewer` in a fresh session with a clean context: nothing fro
 
 Input: `PLAN-REVIEW PR #<n>` and the proposal.
 
-1. Index the repository yourself: `docs/product/` (PRD, TRD, IMPLEMENTATION_PLAN, APP_FLOW, stories), `gbai.yaml` (`plan_change.*`), and the PR diff and description.
+1. Index the repository yourself: `docs/product/` (PRD, TRD, IMPLEMENTATION_PLAN, APP_FLOW, stories), `gabo.yaml` (`plan_change.*`), and the PR diff and description.
 2. Check: the PR touches only `docs/product` and tasks; its scope is within `plan_change.scope`; the traceability chain story → requirement → decision → task → test still holds; no dependency cycle, dangling id or `depends_on` / `unblocks` mismatch; the rationale answers the trigger question.
 3. Decide. Agree only if every check passes and the change is the smallest one that answers the question.
 

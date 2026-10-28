@@ -1,6 +1,6 @@
-# methodology-tdd: example adapter for the gbai methodology contract
+# methodology-tdd: example adapter for the gabo methodology contract
 
-Fills the `methodology` slot with plain test-driven development and no coder-side review tool. Copy it to `.gbai/adapters/methodology-tdd.md` and point `slots.methodology.adapter` at it; coders load it as `gabo-methodology`.
+Fills the `methodology` slot with plain test-driven development and no coder-side review tool. Copy it to `.gabo/adapters/methodology-tdd.md` and point `slots.methodology.adapter` at it; coders load it as `gabo-methodology`.
 
 ## Operations
 
@@ -10,11 +10,11 @@ Fills the `methodology` slot with plain test-driven development and no coder-sid
 2. Per behavior: write a failing test and run it (RED), write the least code that passes (GREEN), then refactor with the tests green.
 3. No runnable deterministic test applies (pure documentation, configuration without a test seam): state the exception and run a proportional check instead.
 4. Commit each behavior with its tests as one Conventional Commit.
-5. Before every push run every command in `review.checks` of `gbai.yaml`; fix failures before pushing.
+5. Before every push run every command in `review.checks` of `gabo.yaml`; fix failures before pushing.
 
 ### coder-side review
 
-`none`. The gbai reviewer is the only review; the coder requests it after each push.
+`none`. The gabo reviewer is the only review; the coder requests it after each push.
 
 ### report per task
 

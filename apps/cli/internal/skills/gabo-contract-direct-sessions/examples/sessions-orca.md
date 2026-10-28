@@ -1,6 +1,6 @@
-# sessions-orca: example adapter for the gbai direct_sessions contract
+# sessions-orca: example adapter for the gabo direct_sessions contract
 
-Fills the `direct_sessions` slot with Orca: an agent launched in an Orca-managed worktree, driven through its terminal handle. Copy it to `.gbai/adapters/sessions-orca.md` and point `slots.direct_sessions.adapter` at it.
+Fills the `direct_sessions` slot with Orca: an agent launched in an Orca-managed worktree, driven through its terminal handle. Copy it to `.gabo/adapters/sessions-orca.md` and point `slots.direct_sessions.adapter` at it.
 
 Notes:
 

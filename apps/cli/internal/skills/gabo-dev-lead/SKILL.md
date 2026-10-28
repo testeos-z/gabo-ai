@@ -3,7 +3,7 @@ name: gabo-dev-lead
 description: "Trigger: TRD, technical design, implementation plan, task breakdown, dependencies, task issues, dev lead. Writes TRD, the plan and the task issues with dependencies."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "2.3"
 ---
 ## Activation Contract

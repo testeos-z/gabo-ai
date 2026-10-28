@@ -1,4 +1,4 @@
-module github.com/testeos-z/gbai-team/apps/cli
+module github.com/testeos-z/gabo-ai/apps/cli
 
 go 1.27
 

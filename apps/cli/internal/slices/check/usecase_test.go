@@ -9,12 +9,12 @@ import (
 	"testing"
 	"testing/fstest"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 )
 
 const (
-	userFile    = "/home/o/.config/gbai/config.yaml"
-	projectFile = "/src/p/gbai.yaml"
+	userFile    = "/home/o/.config/gabo/config.yaml"
+	projectFile = "/src/p/gabo.yaml"
 )
 
 // validConfig sets every required key; both runtimes are claude.
@@ -68,11 +68,11 @@ func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 // Claude Code runtime skill and both agents built with 1.2.3.
 func project() fstest.MapFS {
 	return fstest.MapFS{
-		".gbai/VERSION": file("1.2.3\n"),
-		".gbai/skills/gabo-agent-templates/agents.yaml":     file(spec),
-		".gbai/skills/gabo-agent-templates/agents/alpha.md": file("gabo-version: {{gabo_version}}\n"),
-		".gbai/skills/gabo-agent-templates/agents/beta.md":  file("gabo-version: {{gabo_version}}\n"),
-		".gbai/skills/gabo-runtime-claude/SKILL.md":         file(claudeSkill),
+		".gabo/VERSION": file("1.2.3\n"),
+		".gabo/skills/gabo-agent-templates/agents.yaml":     file(spec),
+		".gabo/skills/gabo-agent-templates/agents/alpha.md": file("gabo-version: {{gabo_version}}\n"),
+		".gabo/skills/gabo-agent-templates/agents/beta.md":  file("gabo-version: {{gabo_version}}\n"),
+		".gabo/skills/gabo-runtime-claude/SKILL.md":         file(claudeSkill),
 		".claude/agents/alpha.md":                           file("---\nname: alpha\ngabo-version: 1.2.3\n---\nbody\n"),
 		".claude/agents/beta.md":                            file("---\nname: beta\ngabo-version: 1.2.3\n---\nbody\n"),
 	}
@@ -143,7 +143,38 @@ func TestPassingProject(t *testing.T) {
 func TestMissingProjectConfig(t *testing.T) {
 	t.Parallel()
 	r := run(t, project(), configFiles{userFile: validConfig}, Settings{})
-	wantFailed(t, r, "✗ no gbai.yaml found", "next: run gabo init, then ask your agent to configure gabo-ai")
+	wantFailed(t, r, "✗ no gabo.yaml found", "next: run gabo init, then ask your agent to configure gabo-ai")
+}
+
+// A config still under its name from before the gabo-ai rename (TRD D26)
+// fails with the rename to make; it is never read.
+func TestFormerConfigNamesFailWithTheRename(t *testing.T) {
+	t.Parallel()
+	former := []config.FormerName{
+		{Probe: "/home/o/.config/gbai/config.yaml", From: "/home/o/.config/gbai", To: "/home/o/.config/gabo"},
+		{Probe: "/src/p/gbai.yaml", From: "/src/p/gbai.yaml", To: "/src/p/gabo.yaml"},
+	}
+	for _, upgrade := range []bool{false, true} {
+		r := run(t, project(), configFiles{
+			projectFile:                        validConfig,
+			"/src/p/gbai.yaml":                 "parallelism: 0\n",
+			"/home/o/.config/gbai/config.yaml": "interaction_level: loud\n",
+		}, Settings{Former: former, UpgradePR: upgrade})
+		wantFailed(t, r,
+			"✗ /home/o/.config/gbai/config.yaml uses a name from before the gabo-ai rename and is not read",
+			"next: rename /home/o/.config/gbai to /home/o/.config/gabo, then rerun gabo check",
+			"✗ /src/p/gbai.yaml uses a name from before the gabo-ai rename and is not read",
+			"next: rename /src/p/gbai.yaml to /src/p/gabo.yaml, then rerun gabo check")
+		if strings.Contains(joined(r), "parallelism") || strings.Contains(joined(r), "interaction_level") {
+			t.Fatalf("a former file was read:\n%s", joined(r))
+		}
+	}
+	r := run(t, project(), configFiles{projectFile: validConfig}, Settings{Former: former})
+	wantPassed(t, r, PassedLine)
+	_, err := NewUseCase(project(), failingReader{}, Settings{Version: "1.2.3", Layers: layers(), Former: former}).Run()
+	if err == nil || !strings.Contains(err.Error(), "permission denied") {
+		t.Fatalf("error = %v, want the read error", err)
+	}
 }
 
 func TestConfigFailureNamesKeyFileAndNext(t *testing.T) {
@@ -218,7 +249,7 @@ func TestSameNamedFileOutsideTheAgentDirDoesNotCount(t *testing.T) {
 		"testdata/beta.toml":            "# gabo-version: 1.2.3\n",
 		".claude/agents/nested/beta.md": "gabo-version: 1.2.3\n",
 		".claude/beta.md":               "gabo-version: 1.2.3\n",
-		".gbai/skills/x/agents/beta.md": "gabo-version: 1.2.3\n",
+		".gabo/skills/x/agents/beta.md": "gabo-version: 1.2.3\n",
 	})
 	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
 	wantFailed(t, r, "✗ agent beta missing")
@@ -226,24 +257,24 @@ func TestSameNamedFileOutsideTheAgentDirDoesNotCount(t *testing.T) {
 
 func TestRuntimeWithoutSkillNamesTheBuilder(t *testing.T) {
 	t.Parallel()
-	proj := with(project(), map[string]string{".gbai/skills/gabo-runtime-claude/SKILL.md": ""})
+	proj := with(project(), map[string]string{".gabo/skills/gabo-runtime-claude/SKILL.md": ""})
 	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
 	wantFailed(t, r, "✗ runtime claude has no runtime skill gabo-runtime-claude", NextRuntimeBuilder)
 }
 
 func TestRuntimeSkillWithoutAgentDirNamesTheBuilder(t *testing.T) {
 	t.Parallel()
-	proj := with(project(), map[string]string{".gbai/skills/gabo-runtime-claude/SKILL.md": "---\nname: gabo-runtime-claude\n---\n"})
+	proj := with(project(), map[string]string{".gabo/skills/gabo-runtime-claude/SKILL.md": "---\nname: gabo-runtime-claude\n---\n"})
 	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
 	wantFailed(t, r, "✗ runtime claude: gabo-runtime-claude declares no metadata.agent_dir", NextRuntimeBuilder)
 }
 
-// A runtime skill written by the runtime builder lives in .gbai/runtimes/.
+// A runtime skill written by the runtime builder lives in .gabo/runtimes/.
 func TestBuilderWrittenRuntimeSkill(t *testing.T) {
 	t.Parallel()
 	pi := strings.ReplaceAll(validConfig, "reviewer: claude", "reviewer: pi") + "  pi_credential_env: ANTHROPIC_API_KEY\n"
 	proj := with(project(), map[string]string{
-		".gbai/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n---\n",
+		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n---\n",
 		".pi/agents/alpha.md":                     "---\ngabo-version: 1.2.3\n---\n",
 	})
 	r := run(t, proj, configFiles{projectFile: pi}, Settings{})
@@ -259,7 +290,7 @@ func TestAgentDirMustStayInsideTheRepository(t *testing.T) {
 		t.Run(dir, func(t *testing.T) {
 			t.Parallel()
 			proj := with(project(), map[string]string{
-				".gbai/skills/gabo-runtime-claude/SKILL.md": "---\nmetadata:\n  agent_dir: " + dir + "\n---\n",
+				".gabo/skills/gabo-runtime-claude/SKILL.md": "---\nmetadata:\n  agent_dir: " + dir + "\n---\n",
 			})
 			r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
 			wantFailed(t, r, "✗ runtime claude: agent_dir must stay inside the repository")
@@ -292,7 +323,7 @@ func TestAgentVersionLine(t *testing.T) {
 
 func TestCatalogVersionStamp(t *testing.T) {
 	t.Parallel()
-	older := with(project(), map[string]string{".gbai/VERSION": "1.0.0\n"})
+	older := with(project(), map[string]string{".gabo/VERSION": "1.0.0\n"})
 	for _, p := range []string{".claude/agents/alpha.md", ".claude/agents/beta.md"} {
 		older[p] = file("gabo-version: 1.0.0\n")
 	}
@@ -303,13 +334,13 @@ func TestCatalogVersionStamp(t *testing.T) {
 		lines  []string
 	}{
 		{"older warns", older, false, []string{"! this project uses gabo 1.0.0; run gabo init to upgrade it"}},
-		{"missing fails", with(project(), map[string]string{".gbai/VERSION": ""}), true, []string{"✗ no stamp: run gabo init"}},
-		{"newer fails", with(project(), map[string]string{".gbai/VERSION": "2.0.0\n"}), true, []string{
+		{"missing fails", with(project(), map[string]string{".gabo/VERSION": ""}), true, []string{"✗ no stamp: run gabo init"}},
+		{"newer fails", with(project(), map[string]string{".gabo/VERSION": "2.0.0\n"}), true, []string{
 			"✗ catalog version 2.0.0 is newer than gabo 1.2.3",
-			"next: run go install github.com/testeos-z/gbai-team/apps/cli/cmd/gbai@v2.0.0",
+			"next: run go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@v2.0.0",
 		}},
-		{"not a version fails", with(project(), map[string]string{".gbai/VERSION": "latest\n"}), true, []string{
-			`✗ .gbai/VERSION holds "latest", not a version x.y.z`,
+		{"not a version fails", with(project(), map[string]string{".gabo/VERSION": "latest\n"}), true, []string{
+			`✗ .gabo/VERSION holds "latest", not a version x.y.z`,
 		}},
 	}
 	for _, tt := range tests {
@@ -346,7 +377,7 @@ func TestNewerCLIUsesTheProjectSpec(t *testing.T) {
 
 func TestMissingSpecFails(t *testing.T) {
 	t.Parallel()
-	proj := with(project(), map[string]string{".gbai/skills/gabo-agent-templates/agents.yaml": ""})
+	proj := with(project(), map[string]string{".gabo/skills/gabo-agent-templates/agents.yaml": ""})
 	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
 	if !r.Failed || !strings.Contains(joined(r), "✗ agent spec: ") {
 		t.Fatalf("output:\n%s", joined(r))
@@ -355,7 +386,7 @@ func TestMissingSpecFails(t *testing.T) {
 
 func TestUpgradePRValidatesOnlyTheConfig(t *testing.T) {
 	t.Parallel()
-	broken := fstest.MapFS{".gbai/VERSION": file("9.9.9\n")}
+	broken := fstest.MapFS{".gabo/VERSION": file("9.9.9\n")}
 	r := run(t, broken, configFiles{projectFile: validConfig}, Settings{UpgradePR: true})
 	wantPassed(t, r, UpgradePRLine)
 	if len(r.Lines) != 1 {
@@ -380,8 +411,8 @@ const methodologyContract = "---\nname: gabo-contract-methodology\n---\n## Opera
 // covering each.
 func slotProject() fstest.MapFS {
 	return with(project(), map[string]string{
-		".gbai/skills/gabo-contract-tasks/SKILL.md":       tasksContract,
-		".gbai/skills/gabo-contract-methodology/SKILL.md": methodologyContract,
+		".gabo/skills/gabo-contract-tasks/SKILL.md":       tasksContract,
+		".gabo/skills/gabo-contract-methodology/SKILL.md": methodologyContract,
 		"docs/adapters/tasks.md":                          "## Operations\n\n### create\n\n### read one\n\n### claim\n",
 		"docs/adapters/methodology.md":                    "## Operations\n\n### coder instructions\n\n### report per task\n",
 	})
@@ -417,7 +448,7 @@ func TestSlotWithMissingAdapterNamesTheSlot(t *testing.T) {
 
 func TestSlotWithoutContractInTheCatalog(t *testing.T) {
 	t.Parallel()
-	proj := with(slotProject(), map[string]string{".gbai/skills/gabo-contract-tasks/SKILL.md": ""})
+	proj := with(slotProject(), map[string]string{".gabo/skills/gabo-contract-tasks/SKILL.md": ""})
 	r := run(t, proj, configFiles{projectFile: slotConfig}, Settings{})
 	wantFailed(t, r,
 		"✗ slot tasks: contract gabo-contract-tasks missing from "+CatalogDir,
@@ -429,7 +460,7 @@ func TestSlotWithoutContractInTheCatalog(t *testing.T) {
 func TestSlotUsesTheProjectContract(t *testing.T) {
 	t.Parallel()
 	proj := with(slotProject(), map[string]string{
-		".gbai/skills/gabo-contract-tasks/SKILL.md": "## Operations\n\n### create\n",
+		".gabo/skills/gabo-contract-tasks/SKILL.md": "## Operations\n\n### create\n",
 		"docs/adapters/tasks.md":                    "## Operations\n\n### create\n",
 	})
 	r := run(t, proj, configFiles{projectFile: slotConfig}, Settings{})
@@ -448,7 +479,7 @@ func TestMethodologyAdapterAsSkillName(t *testing.T) {
 	t.Parallel()
 	cfg := strings.Replace(slotConfig, "adapter: docs/adapters/methodology.md", "adapter: gabo-methodology-tdd", 1)
 	proj := with(slotProject(), map[string]string{
-		".gbai/skills/gabo-methodology-tdd/SKILL.md": "## Operations\n\n### coder instructions\n",
+		".gabo/skills/gabo-methodology-tdd/SKILL.md": "## Operations\n\n### coder instructions\n",
 	})
 	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
 	wantFailed(t, r, "✗ adapter "+CatalogDir+"/gabo-methodology-tdd/SKILL.md does not cover: report per task")

@@ -46,8 +46,11 @@ func NewCommand(factory Factory) *cobra.Command {
 		Use:   "check",
 		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
 		Long: "Validate the project read-only and engine-neutral (PRD R33):\n" +
-			"  - the global user file and gbai.yaml, each layer and the merged result,\n" +
+			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
 			"    against the embedded JSON Schemas;\n" +
+			"  - no config left under its name from before the gabo-ai rename (a project\n" +
+			"    gbai.yaml or a global gbai config dir): it fails with the rename to make\n" +
+			"    and is never read;\n" +
 			"  - every agent of the neutral agent spec (" + CatalogDir + "/) in the agent\n" +
 			"    directory each runtime skill declares (metadata.agent_dir);\n" +
 			"  - each agent's gabo-version line against " + StampFile + ";\n" +

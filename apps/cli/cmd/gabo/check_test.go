@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/agentspec"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/skills"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 )
 
 const checkConfig = `repo:
@@ -28,20 +28,20 @@ review:
   human_only_paths: [.github/]
 slots:
   tasks:
-    adapter: .gbai/skills/gabo-contract-tasks/examples/tasks-gh.md
+    adapter: .gabo/skills/gabo-contract-tasks/examples/tasks-gh.md
   repository_host:
-    adapter: .gbai/skills/gabo-contract-repository-host/examples/host-github.md
+    adapter: .gabo/skills/gabo-contract-repository-host/examples/host-github.md
   memory:
-    adapter: .gbai/skills/gabo-contract-memory/examples/memory-engram.md
+    adapter: .gabo/skills/gabo-contract-memory/examples/memory-engram.md
   methodology:
-    adapter: .gbai/skills/gabo-contract-methodology/examples/methodology-tdd.md
+    adapter: .gabo/skills/gabo-contract-methodology/examples/methodology-tdd.md
   reviewer_placement:
-    adapter: .gbai/skills/gabo-contract-reviewer-placement/examples/reviewer-local.md
+    adapter: .gabo/skills/gabo-contract-reviewer-placement/examples/reviewer-local.md
 `
 
-// checkProject runs the real `gbai init` at version, then adds gbai.yaml, a
+// checkProject runs the real `gabo init` at version, then adds gabo.yaml, a
 // Claude Code runtime skill and every agent of the embedded spec built with
-// version, so `gbai check` passes on it; the slots point at the bundled
+// version, so `gabo check` passes on it; the slots point at the bundled
 // example adapters in the catalog copy.
 func checkProject(t *testing.T, version string) string {
 	t.Helper()
@@ -59,8 +59,8 @@ func checkProject(t *testing.T, version string) string {
 			t.Fatal(err)
 		}
 	}
-	write("gbai.yaml", checkConfig)
-	write(".gbai/runtimes/gabo-runtime-claude/SKILL.md", "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\n")
+	write("gabo.yaml", checkConfig)
+	write(".gabo/runtimes/gabo-runtime-claude/SKILL.md", "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\n")
 	spec, err := agentspec.Load(skills.Catalog())
 	if err != nil {
 		t.Fatal(err)
@@ -71,7 +71,7 @@ func checkProject(t *testing.T, version string) string {
 	return project
 }
 
-// runCheck runs `gbai check` in project with a temporary user config dir.
+// runCheck runs `gabo check` in project with a temporary user config dir.
 func runCheck(t *testing.T, project, version string, args ...string) (string, error) {
 	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
@@ -142,8 +142,43 @@ func TestCheckFailureExitsOne(t *testing.T) {
 
 func TestCheckMissingConfigExitsOne(t *testing.T) {
 	out, err := runCheck(t, t.TempDir(), "1.2.3")
-	if exitOf(err) != 1 || !strings.Contains(out, "✗ no gbai.yaml found\nnext: run gabo init, then ask your agent to configure gabo-ai") {
+	if exitOf(err) != 1 || !strings.Contains(out, "✗ no gabo.yaml found\nnext: run gabo init, then ask your agent to configure gabo-ai") {
 		t.Fatalf("exit %d: %v\n%s", exitOf(err), err, out)
+	}
+}
+
+// A project config or global dir still named gabo fails with the rename
+// instead of being read silently (TRD D26).
+func TestCheckFormerNamesFail(t *testing.T) {
+	project := checkProject(t, "1.2.3")
+	if err := os.WriteFile(filepath.Join(project, "gbai.yaml"), []byte(checkConfig), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	xdg := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(xdg, "gbai"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(xdg, "gbai", "config.yaml"), []byte("tone: dry\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GABO_UPGRADE_PR", "")
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	t.Chdir(project)
+	var out bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs([]string{"check"})
+	err := root.Execute()
+	for _, want := range []string{
+		"✗ " + filepath.Join(project, "gbai.yaml") + " uses a name from before the gabo-ai rename and is not read\n" +
+			"next: rename " + filepath.Join(project, "gbai.yaml") + " to " + filepath.Join(project, "gabo.yaml") + ", then rerun gabo check",
+		"✗ " + filepath.Join(xdg, "gbai", "config.yaml") + " uses a name from before the gabo-ai rename and is not read\n" +
+			"next: rename " + filepath.Join(xdg, "gbai") + " to " + filepath.Join(xdg, "gabo") + ", then rerun gabo check",
+	} {
+		if exitOf(err) != 1 || !strings.Contains(out.String(), want) {
+			t.Fatalf("exit %d: %v, want %q in:\n%s", exitOf(err), err, want, out.String())
+		}
 	}
 }
 
@@ -181,7 +216,7 @@ func TestCheckUpgradePRValidatesOnlyTheConfig(t *testing.T) {
 
 func TestCheckUsageErrorsExitTwo(t *testing.T) {
 	project := checkProject(t, "1.2.3")
-	for _, args := range [][]string{{"extra"}, {"--bogus"}, {"--config", "gbai.yaml"}} {
+	for _, args := range [][]string{{"extra"}, {"--bogus"}, {"--config", "gabo.yaml"}} {
 		_, err := runCheck(t, project, "1.2.3", args...)
 		if exitOf(err) != 2 {
 			t.Fatalf("check %v: exit %d (%v), want 2", args, exitOf(err), err)
@@ -194,7 +229,7 @@ func TestCheckReadErrorExitsTwo(t *testing.T) {
 		t.Skip("root reads unreadable files")
 	}
 	project := checkProject(t, "1.2.3")
-	cfg := filepath.Join(project, "gbai.yaml")
+	cfg := filepath.Join(project, "gabo.yaml")
 	if err := os.Chmod(cfg, 0); err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +243,7 @@ func TestCheckReadErrorExitsTwo(t *testing.T) {
 func TestExitCode(t *testing.T) {
 	t.Parallel()
 	var w bytes.Buffer
-	if got := exitCode(&w, errors.New("boom")); got != 1 || w.String() != "gbai: boom\n" {
+	if got := exitCode(&w, errors.New("boom")); got != 1 || w.String() != "gabo: boom\n" {
 		t.Fatalf("plain error: %d %q", got, w.String())
 	}
 }
@@ -217,7 +252,7 @@ func TestExitCode(t *testing.T) {
 // passes on an older project whose spec lacks an agent the embedded spec has.
 func TestCheckNewerCLIReadsTheProjectSpec(t *testing.T) {
 	project := checkProject(t, "1.2.3")
-	specPath := filepath.Join(project, ".gbai", "skills", filepath.FromSlash(agentspec.File))
+	specPath := filepath.Join(project, ".gabo", "skills", filepath.FromSlash(agentspec.File))
 	b, err := os.ReadFile(specPath)
 	if err != nil {
 		t.Fatal(err)

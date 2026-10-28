@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
 )
 
 // FS is the local filesystem.

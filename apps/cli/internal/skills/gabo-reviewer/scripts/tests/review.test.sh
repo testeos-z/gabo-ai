@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end tests of one review: reviewer.sh head -> review-head.sh ->
-# merge-head.sh, offline with fake gh, claude, go and gbai, and a local bare
+# merge-head.sh, offline with fake gh, claude, go and gabo, and a local bare
 # repository standing in for GitHub.
 # Run: bash tests/review.test.sh
 set -uo pipefail
@@ -43,8 +43,8 @@ scenario() {
   (
     cd "$CALLER" || exit 1
     export HOME="$fake_home" PATH="$work/bin:$PATH" STUB_LOG="$fx/calls.log" FIXTURE="$fx" \
-      REVIEWER_GH="$work/bin/gh" REVIEWER_CLAUDE="$work/bin/claude" REVIEWER_GABO_BIN="$work/bin/gbai" \
-      GBAI_REVIEWER_STATE_DIR="$fx/state" REVIEWER_REMOTE_URL="$ORIGIN" \
+      REVIEWER_GH="$work/bin/gh" REVIEWER_CLAUDE="$work/bin/claude" REVIEWER_GABO_BIN="$work/bin/gabo" \
+      GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_REMOTE_URL="$ORIGIN" \
       REVIEWER_GH_TOKEN=secret-gh CLAUDE_CODE_OAUTH_TOKEN=secret-claude \
       REVIEWER_NOW=2026-10-20T12:00:00Z REVIEWER_MERGE_DELAY=0 REVIEWER_MERGE_TRIES=2
     for kv in "$@"; do export "${kv?}"; done
@@ -68,13 +68,13 @@ expect_match '^reviewer/tests success' "$(status_line clean reviewer/tests)" "te
 expect_match '^reviewer/review success' "$(status_line clean reviewer/review)" "review status ends success"
 expect_eq "No blocking issues found." "$(first_line clean)" "comment opens with the clean verdict"
 expect_eq "<!-- gbai-reviewer-bot sha=$HEAD_SHA -->|🤖 gabo reviewer" "$(footer clean)" "comment ends with the reviewer.signing marker signing the head and the footer"
-check "merge is pinned to the reviewed head" grep -qE "^gh pr merge 7 --repo testeos-z/gabo-ai --merge --match-head-commit $HEAD_SHA$" "$work/clean/calls.log"
+check "merge is pinned to the reviewed head" grep -qE "^gh pr merge 7 --repo example-org/example-repo --merge --match-head-commit $HEAD_SHA$" "$work/clean/calls.log"
 expect_eq 3 "$(grep -c '^go-argc=' "$work/clean/calls.log")" "runs the three checks of review.checks"
 check "checks are argv: go -C apps/cli build ./..." grep -qF "go-argc=4 args=go -C apps/cli build ./..." "$work/clean/calls.log"
 check "checks run on the merge result" grep -qE "^go-argc=.* head=$MERGE_SHA$" "$work/clean/calls.log"
 check "checks get no credential" bash -c "! grep '^check-env' '$work/clean/calls.log' | grep -q secret"
 check "checks get the reviewer's own HOME" grep -qF "HOME=$work/clean/state/check-home CI=true" "$work/clean/calls.log"
-check "gabo check is not run when review.checks does not list it" bash -c "! grep -q '^gbai-call check' '$work/clean/calls.log'"
+check "gabo check is not run when review.checks does not list it" bash -c "! grep -q '^gabo-call check' '$work/clean/calls.log'"
 check "review runs in the head checkout" grep -qE "^claude -p .* cwd=$work/clean/state/worktrees/pr-7$" "$work/clean/calls.log"
 check "review gets only the Claude token" grep -qE "^cc-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=secret-claude HOME=$work/clean/state/review-home$" "$work/clean/calls.log"
 check "review is read-only" grep -qE '^claude -p .*--permission-mode dontAsk --tools Read,Grep,Glob,Bash' "$work/clean/calls.log"
@@ -85,7 +85,7 @@ expect_eq 1 "$(grep -c 'gbai-reviewer-bot sha=' "$work/clean/all_posted_7.md")" 
 echo "# already reviewed"
 fx="$work/clean"
 out="$(cd "$CALLER" && HOME="$fake_home" PATH="$work/bin:$PATH" STUB_LOG="$fx/calls.log" FIXTURE="$fx" REVIEWER_GH="$work/bin/gh" \
-  REVIEWER_GABO_BIN="$work/bin/gbai" REVIEWER_REMOTE_URL="$ORIGIN" GBAI_REVIEWER_STATE_DIR="$fx/state" \
+  REVIEWER_GABO_BIN="$work/bin/gabo" REVIEWER_REMOTE_URL="$ORIGIN" GABO_REVIEWER_STATE_DIR="$fx/state" \
   bash "$skill/reviewer.sh" head 7 "$HEAD_SHA" 2>&1 | tail -n 1)"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=skipped merge=none" "$out" "a head with a final status is reviewed once"
 c="$(jq -nc --arg b $'Blocking issues found.\n\n<!-- gbai-reviewer-bot sha='"$HEAD_SHA"$' -->\n🤖 gabo reviewer' \
@@ -144,9 +144,9 @@ check "no merge call for human-only paths" no_merge human
 echo "# catalog subtree is always human-only"
 origin skills O_AUTO_MERGE=true O_PR=skills
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=needs-human-merge" "$(scenario skills_only)" \
-  "a PR that only edits .gbai/skills/ is not merged even with review.auto_merge: true"
+  "a PR that only edits .gabo/skills/ is not merged even with review.auto_merge: true"
 check "no merge call for a catalog edit" no_merge skills_only
-check "the needs-human comment names the catalog file" grep -qF '.gbai/skills/gabo-coder/SKILL.md' "$work/skills_only/posted_7.md"
+check "the needs-human comment names the catalog file" grep -qF '.gabo/skills/gabo-coder/SKILL.md' "$work/skills_only/posted_7.md"
 
 echo "# configured reviewer.signing marker"
 origin marker O_MARKER=team-bot
@@ -157,35 +157,35 @@ echo "# gabo check listed in review.checks"
 origin gabocheck O_CHECKS='go -C apps/cli test ./...
 gabo check'
 scenario gabocheck >/dev/null
-check "gabo check runs with the configured binary" grep -qE '^gbai-call check GABO_UPGRADE_PR=unset GH_TOKEN=unset' "$work/gabocheck/calls.log"
+check "gabo check runs with the configured binary" grep -qE '^gabo-call check GABO_UPGRADE_PR=unset GH_TOKEN=unset' "$work/gabocheck/calls.log"
 check "the comment lists the check as configured" grep -qF '| `gabo check` | passed' "$work/gabocheck/posted_7.md"
-origin gbaicheck O_CHECKS='gbai check'
-scenario gbaicheck >/dev/null
-check "gbai check (the current binary name) also runs the configured binary" grep -qE '^gbai-call check ' "$work/gbaicheck/calls.log"
+origin gabocheck O_CHECKS='gabo check'
+scenario gabocheck >/dev/null
+check "gabo check (the current binary name) also runs the configured binary" grep -qE '^gabo-call check ' "$work/gabocheck/calls.log"
 
 echo "# base version minimum"
 origin stamped O_STAMP=0.4.0
-expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario old_cli GBAI_VERSION=0.3.0)" "an older binary than the base stamp ends in error"
-check "the refusal names the upgrade command" grep -qF 'go install github.com/testeos-z/gbai-team/apps/cli/cmd/gbai@v0.4.0' "$work/old_cli/out.log"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario old_cli GABO_VERSION=0.3.0)" "an older binary than the base stamp ends in error"
+check "the refusal names the upgrade command" grep -qF 'go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@v0.4.0' "$work/old_cli/out.log"
 check "nothing runs with an older binary" bash -c "! grep -qE '^(claude|go-argc)' '$work/old_cli/calls.log'"
-expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario new_cli GBAI_VERSION=0.5.0)" "a newer binary reviews"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario new_cli GABO_VERSION=0.5.0)" "a newer binary reviews"
 
 echo "# upgrade PR"
 origin upgrade O_STAMP=0.4.0 O_PR=upgrade O_HEAD_STAMP=9.9.9 O_AUTO_MERGE=true O_CHECKS='go -C apps/cli test ./...
 gabo check'
-v="$(scenario upgrade GBAI_VERSION=0.4.1)"
+v="$(scenario upgrade GABO_VERSION=0.4.1)"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=needs-human-merge" "$v" \
   "an upgrade PR is reviewed with the CLI it has (the head stamp is never the minimum) and never merged"
 check "no merge call for an upgrade PR" no_merge upgrade
-check "the CLI runs with GABO_UPGRADE_PR=1" grep -qE '^gbai-call check GABO_UPGRADE_PR=1 ' "$work/upgrade/calls.log"
+check "the CLI runs with GABO_UPGRADE_PR=1" grep -qE '^gabo-call check GABO_UPGRADE_PR=1 ' "$work/upgrade/calls.log"
 check "the comment reports the upgrade PR" grep -qxF 'upgrade PR: only config validated, human merge required' "$work/upgrade/all_posted_7.md"
 check "the output reports the upgrade PR" grep -qF 'upgrade PR: only config validated, human merge required' "$work/upgrade/out.log"
 up="$(sed -n '/^### Upgrade PR/,/^### Review/p' "$work/upgrade/all_posted_7.md")"
 expect_match '`apps/cli/main.go`' "$up" "the report lists changed paths outside the catalog and agent directories"
-expect_match '`.gbai/VERSION`' "$up" "the report lists the stamp"
-check "the report leaves out the catalog subtree" bash -c "! grep -q '^- \`.gbai/skills/' <<<\"\$1\"" _ "$up"
+expect_match '`.gabo/VERSION`' "$up" "the report lists the stamp"
+check "the report leaves out the catalog subtree" bash -c "! grep -q '^- \`.gabo/skills/' <<<\"\$1\"" _ "$up"
 check "the report leaves out the declared agent directory" bash -c "! grep -q '^- \`.claude/agents/' <<<\"\$1\"" _ "$up"
-expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario upgrade_old GBAI_VERSION=0.3.0)" \
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario upgrade_old GABO_VERSION=0.3.0)" \
   "an upgrade PR still needs the base minimum"
 
 finish

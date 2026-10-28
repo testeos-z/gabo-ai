@@ -1,9 +1,9 @@
 ---
 name: gabo-contract-reviewer-placement
-description: "Trigger: reviewer placement contract, reviewer_placement slot, where the reviewer runs, VERDICT line, adapter coverage. Operations every gbai reviewer placement adapter must cover."
+description: "Trigger: reviewer placement contract, reviewer_placement slot, where the reviewer runs, VERDICT line, adapter coverage. Operations every gabo reviewer placement adapter must cover."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract

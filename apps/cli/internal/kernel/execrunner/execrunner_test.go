@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
 )
 
 func TestRunCapturesOutputStdinAndExitCode(t *testing.T) {
@@ -33,7 +33,7 @@ func TestRunCapturesOutputStdinAndExitCode(t *testing.T) {
 
 func TestRunMissingBinaryIsAnError(t *testing.T) {
 	t.Parallel()
-	_, err := New().Run(context.Background(), kernel.Command{Name: "gbai-definitely-missing-binary"})
+	_, err := New().Run(context.Background(), kernel.Command{Name: "gabo-definitely-missing-binary"})
 	if err == nil {
 		t.Fatal("Run() error = nil, want error for missing binary")
 	}
@@ -52,7 +52,7 @@ func TestRunUsesWorkingDirectory(t *testing.T) {
 }
 
 func TestRunCleanEnvPassesOnlyGivenVariables(t *testing.T) {
-	t.Setenv("GBAI_LEAK_CHECK", "leaked")
+	t.Setenv("GABO_LEAK_CHECK", "leaked")
 	res, err := New().Run(context.Background(), kernel.Command{
 		Name: "/usr/bin/env", Env: []string{"ONLY=1"}, CleanEnv: true,
 	})

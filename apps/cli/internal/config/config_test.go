@@ -96,7 +96,7 @@ func TestParseValidationErrors(t *testing.T) {
 
 func TestLoadExampleFile(t *testing.T) {
 	t.Parallel()
-	cfg, err := Load(filepath.Join("..", "..", "gbai.example.yaml"))
+	cfg, err := Load(filepath.Join("..", "..", "gabo.example.yaml"))
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}

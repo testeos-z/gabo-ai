@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/testeos-z/gbai-team/main/schemas/gbai.project.schema.json",
-  "title": "gbai project config (gbai.yaml)",
-  "description": "Team keys of the project gbai.yaml (DB_SCHEMA 3.2). Personal keys belong in the global user file (gbai.user.schema.json). Secrets never appear here, only environment variable names (R21). A null or empty optional value means unset, as the Go loader reads it.",
+  "$id": "https://raw.githubusercontent.com/testeos-z/gabo-ai/main/schemas/gabo.project.schema.json",
+  "title": "gabo project config (gabo.yaml)",
+  "description": "Team keys of the project gabo.yaml (DB_SCHEMA 3.2). Personal keys belong in the global user file (gabo.user.schema.json). Secrets never appear here, only environment variable names (R21). A null or empty optional value means unset, as the Go loader reads it.",
   "type": "object",
   "allOf": [
     { "$ref": "#/$defs/projectKeys" },
@@ -175,7 +175,7 @@
       }
     },
     "complete": {
-      "description": "Keys a complete config must set (R12): gbai fills none of them.",
+      "description": "Keys a complete config must set (R12): gabo fills none of them.",
       "required": ["runtimes", "repo", "review", "parallelism"],
       "properties": {
         "runtimes": {
@@ -223,7 +223,7 @@
       "type": "object",
       "allOf": [
         { "$ref": "#/$defs/projectKeys" },
-        { "$ref": "gbai.user.schema.json#/$defs/personalKeys" }
+        { "$ref": "gabo.user.schema.json#/$defs/personalKeys" }
       ],
       "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
       "additionalProperties": false

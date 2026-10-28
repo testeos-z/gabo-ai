@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel/kerneltest"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel/kerneltest"
 )
 
 func TestMerge(t *testing.T) {
@@ -89,16 +89,16 @@ func (f files) ReadFile(name string) ([]byte, error) {
 
 func twoLayers() []Layer {
 	return []Layer{
-		{Name: LayerUser, Path: "/home/o/.config/gbai/config.yaml"},
-		{Name: LayerProject, Path: "/src/p/gbai.yaml"},
+		{Name: LayerUser, Path: "/home/o/.config/gabo/config.yaml"},
+		{Name: LayerProject, Path: "/src/p/gabo.yaml"},
 	}
 }
 
 func TestLoadLayersHigherLayersWin(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gbai/config.yaml": with("parallelism: 4\ncoder:\n  login: helper\nreview:\n  checks: [make test]\n  auto_merge: true\n"),
-		"/src/p/gbai.yaml":                 "parallelism: 6\nreview:\n  checks: [go test, go vet]\n",
+		"/home/o/.config/gabo/config.yaml": with("parallelism: 4\ncoder:\n  login: helper\nreview:\n  checks: [make test]\n  auto_merge: true\n"),
+		"/src/p/gabo.yaml":                 "parallelism: 6\nreview:\n  checks: [go test, go vet]\n",
 	}
 	res, err := LoadLayers(r, twoLayers())
 	if err != nil {
@@ -129,7 +129,7 @@ func TestLoadLayersHigherLayersWin(t *testing.T) {
 
 func TestLoadLayersSkipsMissingFiles(t *testing.T) {
 	t.Parallel()
-	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal}, twoLayers())
+	res, err := LoadLayers(files{"/src/p/gabo.yaml": minimal}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
@@ -146,14 +146,14 @@ func TestLoadLayersEmptyPathAndEmptyFile(t *testing.T) {
 	t.Parallel()
 	layers := twoLayers()
 	layers[0].Path = ""
-	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal}, layers)
+	res, err := LoadLayers(files{"/src/p/gabo.yaml": minimal}, layers)
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
 	if res.Layers[0].Found || !res.Layers[1].Found {
 		t.Fatalf("layers = %+v", res.Layers)
 	}
-	res, err = LoadLayers(files{"/home/o/.config/gbai/config.yaml": minimal, "/src/p/gbai.yaml": "# nothing yet\n"}, twoLayers())
+	res, err = LoadLayers(files{"/home/o/.config/gabo/config.yaml": minimal, "/src/p/gabo.yaml": "# nothing yet\n"}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() with an empty project file error = %v", err)
 	}
@@ -165,11 +165,11 @@ func TestLoadLayersEmptyPathAndEmptyFile(t *testing.T) {
 func TestLoadLayersUnknownKeyNamesTheFile(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gbai/config.yaml": minimal,
-		"/src/p/gbai.yaml":                 "parallelizm: 4\n",
+		"/home/o/.config/gabo/config.yaml": minimal,
+		"/src/p/gabo.yaml":                 "parallelizm: 4\n",
 	}
 	res, err := LoadLayers(r, twoLayers())
-	if err == nil || !strings.Contains(err.Error(), "/src/p/gbai.yaml") || !strings.Contains(err.Error(), "parallelizm") {
+	if err == nil || !strings.Contains(err.Error(), "/src/p/gabo.yaml") || !strings.Contains(err.Error(), "parallelizm") {
 		t.Fatalf("error = %v, want unknown key naming the project file", err)
 	}
 	if len(res.Layers) != 2 {
@@ -183,13 +183,13 @@ func TestLoadLayersRequiresKeysOnlyOnTheMergedResult(t *testing.T) {
 	t.Parallel()
 	// Neither file is complete alone; merged they are.
 	r := files{
-		"/home/o/.config/gbai/config.yaml": string(without(t, "review.checks")),
-		"/src/p/gbai.yaml":                 "review:\n  checks: [go test ./...]\n",
+		"/home/o/.config/gabo/config.yaml": string(without(t, "review.checks")),
+		"/src/p/gabo.yaml":                 "review:\n  checks: [go test ./...]\n",
 	}
 	if _, err := LoadLayers(r, twoLayers()); err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
-	if _, err := LoadLayers(files{"/src/p/gbai.yaml": "review:\n  checks: [go test ./...]\n"}, twoLayers()); err == nil ||
+	if _, err := LoadLayers(files{"/src/p/gabo.yaml": "review:\n  checks: [go test ./...]\n"}, twoLayers()); err == nil ||
 		!strings.Contains(err.Error(), "repo.name") {
 		t.Fatalf("merged validation error = %v", err)
 	}
@@ -206,7 +206,7 @@ func TestLoadLayersNoFileFound(t *testing.T) {
 func TestLoadLayersReadErrorIsNotSkipped(t *testing.T) {
 	t.Parallel()
 	_, err := LoadLayers(failingReader{}, twoLayers())
-	if err == nil || !strings.Contains(err.Error(), "/home/o/.config/gbai/config.yaml") {
+	if err == nil || !strings.Contains(err.Error(), "/home/o/.config/gabo/config.yaml") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -234,11 +234,35 @@ func TestLayerPathsOrder(t *testing.T) {
 	env := map[string]string{"HOME": "/home/o"}
 	got := LayerPaths(func(k string) string { return env[k] }, "/src/p")
 	want := []Layer{
-		{Name: LayerUser, Path: "/home/o/.config/gbai/config.yaml"},
-		{Name: LayerProject, Path: "/src/p/gbai.yaml"},
+		{Name: LayerUser, Path: "/home/o/.config/gabo/config.yaml"},
+		{Name: LayerProject, Path: "/src/p/gabo.yaml"},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("LayerPaths() = %+v, want %+v", got, want)
+	}
+}
+
+// The locations before the gabo-ai rename (TRD D26) are listed so gabo check
+// can report them instead of reading them silently.
+func TestFormerNames(t *testing.T) {
+	t.Parallel()
+	env := map[string]string{"HOME": "/home/o"}
+	got := FormerNames(func(k string) string { return env[k] }, "/src/p")
+	want := []FormerName{
+		{Probe: "/home/o/.config/gbai/config.yaml", From: "/home/o/.config/gbai", To: "/home/o/.config/gabo"},
+		{Probe: "/src/p/gbai.yaml", From: "/src/p/gbai.yaml", To: "/src/p/gabo.yaml"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("FormerNames() = %+v, want %+v", got, want)
+	}
+	env = map[string]string{"XDG_CONFIG_HOME": "/x"}
+	got = FormerNames(func(k string) string { return env[k] }, "")
+	want = []FormerName{{Probe: "/x/gbai/config.yaml", From: "/x/gbai", To: "/x/gabo"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("FormerNames() without HOME or project = %+v, want %+v", got, want)
+	}
+	if got := FormerNames(func(string) string { return "" }, ""); len(got) != 0 {
+		t.Fatalf("FormerNames() with nothing resolved = %+v, want none", got)
 	}
 }
 
@@ -249,9 +273,9 @@ func TestUserPath(t *testing.T) {
 		env  map[string]string
 		want string
 	}{
-		{"xdg wins", map[string]string{"XDG_CONFIG_HOME": "/x", "HOME": "/home/o"}, "/x/gbai/config.yaml"},
-		{"relative xdg is ignored", map[string]string{"XDG_CONFIG_HOME": "rel", "HOME": "/home/o"}, "/home/o/.config/gbai/config.yaml"},
-		{"home fallback", map[string]string{"HOME": "/home/o"}, "/home/o/.config/gbai/config.yaml"},
+		{"xdg wins", map[string]string{"XDG_CONFIG_HOME": "/x", "HOME": "/home/o"}, "/x/gabo/config.yaml"},
+		{"relative xdg is ignored", map[string]string{"XDG_CONFIG_HOME": "rel", "HOME": "/home/o"}, "/home/o/.config/gabo/config.yaml"},
+		{"home fallback", map[string]string{"HOME": "/home/o"}, "/home/o/.config/gabo/config.yaml"},
 		{"nothing", map[string]string{}, ""},
 	}
 	for _, tt := range tests {
@@ -296,11 +320,11 @@ func TestProjectRoot(t *testing.T) {
 func TestLoadLayersRejectsUnsupportedVersionInAnyLayer(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gbai/config.yaml": "version: 99\n",
-		"/src/p/gbai.yaml":                 "version: 1\n",
+		"/home/o/.config/gabo/config.yaml": "version: 99\n",
+		"/src/p/gabo.yaml":                 "version: 1\n",
 	}
 	_, err := LoadLayers(r, twoLayers())
-	if err == nil || !strings.Contains(err.Error(), "/home/o/.config/gbai/config.yaml") || !strings.Contains(err.Error(), "version") {
+	if err == nil || !strings.Contains(err.Error(), "/home/o/.config/gabo/config.yaml") || !strings.Contains(err.Error(), "version") {
 		t.Fatalf("error = %v, want unsupported version naming the user file", err)
 	}
 }
@@ -308,8 +332,8 @@ func TestLoadLayersRejectsUnsupportedVersionInAnyLayer(t *testing.T) {
 func TestLoadLayersKeepsVersionOutOfTheMergedConfig(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gbai/config.yaml": minimal + "version: 1\n",
-		"/src/p/gbai.yaml":                 "parallelism: 4\n",
+		"/home/o/.config/gabo/config.yaml": minimal + "version: 1\n",
+		"/src/p/gabo.yaml":                 "parallelism: 4\n",
 	}
 	res, err := LoadLayers(r, twoLayers())
 	if err != nil {

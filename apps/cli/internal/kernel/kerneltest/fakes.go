@@ -6,7 +6,7 @@ import (
 	"io"
 	"io/fs"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
 )
 
 // RunnerCall records one Runner invocation with its stdin fully read.

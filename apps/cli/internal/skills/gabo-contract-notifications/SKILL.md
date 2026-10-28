@@ -1,19 +1,19 @@
 ---
 name: gabo-contract-notifications
-description: "Trigger: notifications contract, notifications slot, notify owner, notify developer, alias, adapter coverage. Operations every gbai notifications adapter must cover."
+description: "Trigger: notifications contract, notifications slot, notify owner, notify developer, alias, adapter coverage. Operations every gabo notifications adapter must cover."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.0"
 ---
 ## Activation Contract
 
-Load when writing, checking or using the adapter of the `notifications` slot (`slots.notifications.adapter`, TRD 9.1). This contract states WHO agents must be able to reach; the adapter states HOW with the team's own channel (D2, D4). gbai ships no messaging code.
+Load when writing, checking or using the adapter of the `notifications` slot (`slots.notifications.adapter`, TRD 9.1). This contract states WHO agents must be able to reach; the adapter states HOW with the team's own channel (D2, D4). gabo ships no messaging code.
 
 ## Hard Rules
 
 - An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
-- A developer is addressed by alias, resolved through `developers` in `gbai.yaml` (git email to alias, D10); an alias that resolves to no developer is reported, never guessed (R16).
+- A developer is addressed by alias, resolved through `developers` in `gabo.yaml` (git email to alias, D10); an alias that resolves to no developer is reported, never guessed (R16).
 - A notification never carries secrets (R21) and never the reviewer marker.
 - A notification is one short message with a link to where the details live (issue, PR, wave report); it is not a question channel that blocks the agent.
 - Every sent notification is read back where the channel allows it; otherwise it is reported as unverified.

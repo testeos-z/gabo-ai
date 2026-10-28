@@ -5,9 +5,9 @@
 #   reviewer.sh due <pr> <sha>       exit 0 when that head is due, else 1
 #   reviewer.sh list-due             prints "<pr> <sha>" for each due head
 #   reviewer.sh once                 reviews every due head, one at a time
-# Run it from a checkout of the repository (its gbai.yaml names the
+# Run it from a checkout of the repository (its gabo.yaml names the
 # repository and the integration branch) or set REVIEWER_REPO. Every other
-# repository setting comes from gbai.yaml in the reviewer's own clean checkout
+# repository setting comes from gabo.yaml in the reviewer's own clean checkout
 # of the integration branch.
 # A head is due unless its newest reviewer/review status from the bot login is
 # final (success or failure, or error after REVIEWER_MAX_ATTEMPTS attempts)

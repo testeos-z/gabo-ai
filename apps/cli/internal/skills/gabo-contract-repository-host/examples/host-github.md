@@ -1,6 +1,6 @@
-# host-github: example adapter for the gbai repository_host contract
+# host-github: example adapter for the gabo repository_host contract
 
-Fills the `repository_host` slot with GitHub through `gh` and `git`. Copy it to `.gbai/adapters/host-github.md` and point `slots.repository_host.adapter` at it. Repository `R=<owner>/<repo>`, integration branch `B=<repo.integration_branch>` (for example `dev`).
+Fills the `repository_host` slot with GitHub through `gh` and `git`. Copy it to `.gabo/adapters/host-github.md` and point `slots.repository_host.adapter` at it. Repository `R=<owner>/<repo>`, integration branch `B=<repo.integration_branch>` (for example `dev`).
 
 Branches are created in the task worktree with `git switch -c <type>/<issue>-<slug> origin/$B` and pushed with `git push -u origin HEAD`.
 

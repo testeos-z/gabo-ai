@@ -1,6 +1,6 @@
-# tasks-gh: example adapter for the gbai tasks contract
+# tasks-gh: example adapter for the gabo tasks contract
 
-Fills the `tasks` slot with GitHub Issues through the `gh` CLI. Copy it to `.gbai/adapters/tasks-gh.md` and point `slots.tasks.adapter` at it. Repository `R=<owner>/<repo>` (`repo.name` in `gbai.yaml`).
+Fills the `tasks` slot with GitHub Issues through the `gh` CLI. Copy it to `.gabo/adapters/tasks-gh.md` and point `slots.tasks.adapter` at it. Repository `R=<owner>/<repo>` (`repo.name` in `gabo.yaml`).
 
 Notes:
 
@@ -44,7 +44,7 @@ gh issue comment <n> -R $R --body "claimed by <agent> (wave <w>)"
 ### log progress
 
 ```bash
-gh issue comment <n> -R $R --body "<!-- gbai-progress --> <one line>"
+gh issue comment <n> -R $R --body "<!-- gabo-progress --> <one line>"
 ```
 
 ### change status

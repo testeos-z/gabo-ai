@@ -1,19 +1,19 @@
 ---
 name: gabo-agent-templates
-description: "Trigger: build gbai agents, agent spec, agents.yaml, agent templates, rebuild agents, runtime skill input. Neutral agent spec and engine-neutral body templates of every gbai agent."
+description: "Trigger: build gabo agents, agent spec, agents.yaml, agent templates, rebuild agents, runtime skill input. Neutral agent spec and engine-neutral body templates of every gabo agent."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "0.2"
 ---
 ## Activation Contract
 
-Load when a runtime skill (for example `gabo-runtime-claude`) builds or rebuilds the gbai agents of a project, or when `gabo check` reports a missing or outdated agent (TRD 8.1, D24).
+Load when a runtime skill (for example `gabo-runtime-claude`) builds or rebuilds the gabo agents of a project, or when `gabo check` reports a missing or outdated agent (TRD 8.1, D24).
 
 ## Hard Rules
 
 - `agents.yaml` is the single source of which agents exist. Build exactly one agent file per entry, named after its spec `id`; never add, drop or rename an agent.
-- Read the spec and templates from the project copy (`.gbai/skills/gabo-agent-templates/`), never from memory.
+- Read the spec and templates from the project copy (`.gabo/skills/gabo-agent-templates/`), never from memory.
 - `tools` are engine-neutral capabilities; the runtime skill maps them to the engine's tool names.
 - `skills` lists catalog skills only; slot adapters are linked by the runtime skill under their fixed slot names.
 - `launched_by` names the spec agent that launches the agent, or `main-session` for the assistant's main session.
@@ -28,14 +28,14 @@ Each template is a Markdown body. A slot is written `{{name}}`; these are the on
 |---|---|
 | `{{id}}` | the agent's spec `id` (identity) |
 | `{{role}}` | the agent's spec `role` (identity) |
-| `{{gabo_version}}` | the single line of `.gbai/VERSION`, the bare version (for example `0.4.0`) |
+| `{{gabo_version}}` | the single line of `.gabo/VERSION`, the bare version (for example `0.4.0`) |
 | `{{methodology}}` | the fixed-name link of the methodology slot adapter (`gabo-methodology`) |
 | `{{adapter:tasks}}` | the fixed-name link of the tasks slot adapter |
 | `{{adapter:repository_host}}` | the fixed-name link of the repository host slot adapter |
 | `{{adapter:memory}}` | the fixed-name link of the memory slot adapter |
 | `{{reviewer_script}}` | the path of `scripts/reviewer.sh` in the user-level reviewer skill the runtime skill links (D20); never a copy inside the project |
 
-Every template starts with the version line `gabo-version: {{gabo_version}}` (TRD 9.4, no hashes). The runtime skill writes it with the filled version where the engine keeps agent metadata (for example the frontmatter), and `gabo check` compares it with `.gbai/VERSION`. A runtime skill that links an adapter also makes the agent load it, so the slot name in the body names a skill the agent has.
+Every template starts with the version line `gabo-version: {{gabo_version}}` (TRD 9.4, no hashes). The runtime skill writes it with the filled version where the engine keeps agent metadata (for example the frontmatter), and `gabo check` compares it with `.gabo/VERSION`. A runtime skill that links an adapter also makes the agent load it, so the slot name in the body names a skill the agent has.
 
 ## Spec Fields
 

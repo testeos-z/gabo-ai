@@ -3,10 +3,10 @@
 # run it. Follows the vulcam pr-reviewer pattern in single-user mode (TRD D20).
 # External binaries are injectable so tests run offline with stubs:
 #   REVIEWER_GH (default gh), REVIEWER_CLAUDE (default claude),
-#   REVIEWER_GABO_BIN (default gbai until T062).
+#   REVIEWER_GABO_BIN (default gabo).
 #
 # Settings, highest first: the environment, the private env file, the
-# skill's config.env, gbai.yaml on the integration branch (read from the
+# skill's config.env, gabo.yaml on the integration branch (read from the
 # reviewer's own clean checkout of it, never from a PR head), built-in
 # defaults. reviewer.sh exports the resolved values to its child scripts.
 
@@ -30,7 +30,7 @@ load_kv_file() {
 }
 
 # yaml_get <file> <dotted.key>: prints a scalar, or one line per list item
-# (block "- x" or flow "[x, y]"), from the small YAML subset gbai.yaml uses.
+# (block "- x" or flow "[x, y]"), from the small YAML subset gabo.yaml uses.
 # Comments and surrounding quotes are dropped; a missing key prints nothing.
 read -r -d '' _yaml_awk <<'AWK'
 function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
@@ -87,18 +87,18 @@ frontmatter_get() {
   yaml_get <(awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1 { print }' "$1") "$2"
 }
 
-# caller_yaml <key>: a key of gbai.yaml at the top of the caller's checkout.
+# caller_yaml <key>: a key of gabo.yaml at the top of the caller's checkout.
 # Used only to find the repository and its integration branch; every other
 # repository setting comes from the reviewer's own checkout of that branch.
 caller_yaml() {
   local top
   top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 0
-  yaml_get "$top/gbai.yaml" "$1"
+  yaml_get "$top/gabo.yaml" "$1"
 }
 
 # Secrets (CLAUDE_CODE_OAUTH_TOKEN, REVIEWER_GH_TOKEN) live only in a private
 # env file outside the skill; refused unless it is mode 600 and ours.
-REVIEWER_ENV_FILE="${REVIEWER_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/gbai/reviewer.env}"
+REVIEWER_ENV_FILE="${REVIEWER_ENV_FILE:-${XDG_CONFIG_HOME:-$HOME/.config}/gabo/reviewer.env}"
 if [[ -f "$REVIEWER_ENV_FILE" ]]; then
   if [[ "$(stat -c '%a %u' "$REVIEWER_ENV_FILE")" != "600 $(id -u)" ]]; then
     echo "PREFLIGHT-FAILED $REVIEWER_ENV_FILE must be mode 600 and owned by $(id -un)" >&2
@@ -111,15 +111,15 @@ fi
 
 GH="${REVIEWER_GH:-gh}"
 CLAUDE="${REVIEWER_CLAUDE:-claude}"
-GABO_BIN="${REVIEWER_GABO_BIN:-gbai}"
-GABO_INSTALL="${REVIEWER_GABO_INSTALL:-github.com/testeos-z/gbai-team/apps/cli/cmd/gbai}"
+GABO_BIN="${REVIEWER_GABO_BIN:-gabo}"
+GABO_INSTALL="${REVIEWER_GABO_INSTALL:-github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo}"
 REPO="${REVIEWER_REPO:-$(caller_yaml repo.name | head -n 1)}"
 BASE_BRANCH="${REVIEWER_BASE_BRANCH:-$(caller_yaml repo.integration_branch | head -n 1)}"
 BASE_BRANCH="${BASE_BRANCH:-dev}"
 MODE="${REVIEWER_MODE:-single-user}"
 ENGINE="${REVIEWER_ENGINE:-claude}"
 BOT_LOGIN="${REVIEWER_BOT_LOGIN:-}"
-WORKDIR="${GBAI_REVIEWER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/gbai/reviewer}"
+WORKDIR="${GABO_REVIEWER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer}"
 STATE="$WORKDIR/state"
 BASE_DIR="$WORKDIR/base"
 MAX_ATTEMPTS="${REVIEWER_MAX_ATTEMPTS:-2}"
@@ -134,12 +134,12 @@ MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
 REMOTE_URL="${REVIEWER_REMOTE_URL:-https://github.com/$REPO.git}"
 # The trusted install locations: the engine-neutral user-level copy (TRD 9.4)
 # and the runtime's skills dir, which links or holds it.
-TRUSTED_DIRS=("${XDG_DATA_HOME:-$HOME/.local/share}/gbai/skills/gabo-reviewer/scripts"
+TRUSTED_DIRS=("${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts"
   "$HOME/.claude/skills/gabo-reviewer/scripts")
 # Paths a human always merges, whatever review.human_only_paths says: the
 # catalog version stamp and the catalog copy (TRD 9.4, issue #79).
-BUILTIN_STAMP=".gbai/VERSION"
-BUILTIN_CATALOG=".gbai/skills/"
+BUILTIN_STAMP=".gabo/VERSION"
+BUILTIN_CATALOG=".gabo/skills/"
 # The reviewer's own source (any skills/gabo-reviewer/ dir, like the embedded
 # copy in gabo-ai) is human-only too: a PR may not weaken its own gate.
 BUILTIN_REVIEWER="skills/gabo-reviewer/"
@@ -163,7 +163,7 @@ UPGRADE_REPORT="upgrade PR: only config validated, human merge required"
 apply_repo_settings() {
   CHECKS_SPEC="${REVIEWER_CHECKS:-}"
   AUTO_MERGE="${REVIEWER_AUTO_MERGE:-false}"
-  HUMAN_ONLY_PATHS="${REVIEWER_HUMAN_ONLY_PATHS-.claude/ .github/ gbai.yaml AGENTS.md CLAUDE.md}"
+  HUMAN_ONLY_PATHS="${REVIEWER_HUMAN_ONLY_PATHS-.claude/ .github/ gabo.yaml AGENTS.md CLAUDE.md}"
   PLACEMENT="${REVIEWER_PLACEMENT:-local}"
   AGENT_DIRS="${REVIEWER_AGENT_DIRS:-}"
   MINIMUM="${REVIEWER_MINIMUM:-none}"
@@ -231,9 +231,9 @@ parse_checks() {
   done
 }
 
-# is_gabo_check <argv0> <argv1>: true for a "gabo check" or "gbai check"
-# entry of review.checks, which runs with GABO_BIN.
-is_gabo_check() { [[ ("$1" == gabo || "$1" == gbai) && "$2" == check ]]; }
+# is_gabo_check <argv0> <argv1>: true for a "gabo check" entry of
+# review.checks, which runs with GABO_BIN.
+is_gabo_check() { [[ "$1" == gabo && "$2" == check ]]; }
 
 # is_human_only <path>: true when a human must merge a change to <path>.
 is_human_only() {
@@ -272,7 +272,7 @@ repo_copy_problem() {
   local top caller_top
   top="$(git -C "$reviewer_dir" rev-parse --show-toplevel 2>/dev/null)" || return 0
   caller_top="$(git rev-parse --show-toplevel 2>/dev/null)"
-  if [[ -f "$top/gbai.yaml" || "$top" == "$caller_top" ]] ||
+  if [[ -f "$top/gabo.yaml" || "$top" == "$caller_top" ]] ||
     git -C "$top" remote -v 2>/dev/null | grep -qiF "/$REPO"; then
     echo "the reviewer scripts at $reviewer_dir are inside the repository under review ($top); run the user-level copy"
   fi
@@ -301,7 +301,7 @@ trust_problem() {
 validate_static() {
   local n
   [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] ||
-    { echo "no repository: set REVIEWER_REPO or run from a checkout whose gbai.yaml sets repo.name (got '${REPO}')"; return; }
+    { echo "no repository: set REVIEWER_REPO or run from a checkout whose gabo.yaml sets repo.name (got '${REPO}')"; return; }
   [[ "$BASE_BRANCH" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "REVIEWER_BASE_BRANCH has unexpected characters"; return; }
   [[ "$BASE_BRANCH" != main && "$BASE_BRANCH" != master ]] ||
     { echo "REVIEWER_BASE_BRANCH must be the integration branch, never $BASE_BRANCH"; return; }
@@ -374,20 +374,20 @@ sync_base() {
 # runtimes.{coder, reviewer, assistant} declare (metadata.agent_dir), from
 # the catalog copy on the integration branch, one per line with a final "/".
 declared_agent_dirs() {
-  local y="$BASE_DIR/gbai.yaml" rt f d
+  local y="$BASE_DIR/gabo.yaml" rt f d
   for rt in $({ yaml_get "$y" runtimes.coder; yaml_get "$y" runtimes.reviewer; yaml_get "$y" runtimes.assistant; } | sort -u); do
-    for f in "$BASE_DIR"/.gbai/{skills,runtimes}/{gabo,gbai}-runtime-"$rt"/SKILL.md; do
+    for f in "$BASE_DIR"/.gabo/{skills,runtimes}/gabo-runtime-"$rt"/SKILL.md; do
       d="$(frontmatter_get "$f" metadata.agent_dir | head -n 1)"
       [[ -n "$d" ]] && printf '%s/\n' "${d%/}"
     done
   done | sort -u
 }
 
-# load_base_config: the repository settings from gbai.yaml in the reviewer's
+# load_base_config: the repository settings from gabo.yaml in the reviewer's
 # checkout of the integration branch, for every REVIEWER_* key the
 # environment does not set; exported so the child scripts see the same.
 load_base_config() {
-  local y="$BASE_DIR/gbai.yaml" stamp
+  local y="$BASE_DIR/gabo.yaml" stamp
   if [[ -z "${REVIEWER_CHECKS+set}" ]]; then
     REVIEWER_CHECKS="$(yaml_get "$y" review.checks | paste -sd';' -)"
   fi
@@ -412,7 +412,7 @@ load_base_config() {
   apply_repo_settings
 }
 
-# gabo_version: the version the gabo binary reports ("gbai 1.2.3" -> 1.2.3).
+# gabo_version: the version the gabo binary reports ("gabo 1.2.3" -> 1.2.3).
 gabo_version() { timeout 60 "$GABO_BIN" version 2>/dev/null | awk 'NR == 1 { print $NF }'; }
 
 # minimum_problem: prints why the gabo binary does not meet the integration

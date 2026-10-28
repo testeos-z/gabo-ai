@@ -15,8 +15,8 @@ func TestFileWithoutVersionReadsAsVersionZero(t *testing.T) {
 		t.Fatalf("version = %d, want 0", cfg.Version)
 	}
 	res, err := LoadLayers(files{
-		"/home/o/.config/gbai/config.yaml": minimal + "version: 1\nalias: Leo\n",
-		"/src/p/gbai.yaml":                 "parallelism: 3\n",
+		"/home/o/.config/gabo/config.yaml": minimal + "version: 1\nalias: Leo\n",
+		"/src/p/gabo.yaml":                 "parallelism: 3\n",
 	}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
@@ -41,8 +41,8 @@ func TestVersionMustBeSupported(t *testing.T) {
 func TestPersonalKeysResolveGlobalFirst(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gbai/config.yaml": minimal + "alias: Leo\ninteraction_level: balanced\ntone: direct, brief\nlanguage: es\n",
-		"/src/p/gbai.yaml":                 "alias: Other\ninteraction_level: high\ntone: chatty\nlanguage: en\nparallelism: 5\n",
+		"/home/o/.config/gabo/config.yaml": minimal + "alias: Leo\ninteraction_level: balanced\ntone: direct, brief\nlanguage: es\n",
+		"/src/p/gabo.yaml":                 "alias: Other\ninteraction_level: high\ntone: chatty\nlanguage: en\nparallelism: 5\n",
 	}
 	res, err := LoadLayers(r, twoLayers())
 	if err != nil {
@@ -59,7 +59,7 @@ func TestPersonalKeysResolveGlobalFirst(t *testing.T) {
 		t.Fatalf("warnings = %q, want one per ignored personal key", res.Warnings)
 	}
 	for i, key := range PersonalKeys {
-		if w := res.Warnings[i]; !strings.Contains(w, key) || !strings.Contains(w, "/src/p/gbai.yaml") {
+		if w := res.Warnings[i]; !strings.Contains(w, key) || !strings.Contains(w, "/src/p/gabo.yaml") {
 			t.Errorf("warning %d = %q, want it to name %s and the project file", i, w, key)
 		}
 	}
@@ -67,7 +67,7 @@ func TestPersonalKeysResolveGlobalFirst(t *testing.T) {
 
 func TestProjectPersonalKeyIsIgnoredEvenWithoutAGlobalValue(t *testing.T) {
 	t.Parallel()
-	res, err := LoadLayers(files{"/src/p/gbai.yaml": minimal + "alias: Other\n"}, twoLayers())
+	res, err := LoadLayers(files{"/src/p/gabo.yaml": minimal + "alias: Other\n"}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)
 	}
@@ -82,7 +82,7 @@ func TestProjectPersonalKeyIsIgnoredEvenWithoutAGlobalValue(t *testing.T) {
 func TestNoWarningsWithoutProjectPersonalKeys(t *testing.T) {
 	t.Parallel()
 	res, err := LoadLayers(files{
-		"/home/o/.config/gbai/config.yaml": minimal + "alias: Leo\n",
+		"/home/o/.config/gabo/config.yaml": minimal + "alias: Leo\n",
 	}, twoLayers())
 	if err != nil {
 		t.Fatalf("LoadLayers() error = %v", err)

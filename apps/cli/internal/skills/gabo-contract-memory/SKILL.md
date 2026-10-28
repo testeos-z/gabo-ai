@@ -1,9 +1,9 @@
 ---
 name: gabo-contract-memory
-description: "Trigger: memory contract, memory slot, decision records, resource ledger, wave trace, preferences, adapter coverage. Operations every gbai memory adapter must cover."
+description: "Trigger: memory contract, memory slot, decision records, resource ledger, wave trace, preferences, adapter coverage. Operations every gabo memory adapter must cover."
 license: Apache-2.0
 metadata:
-  author: gbai-team
+  author: gabo-ai
   version: "1.1"
 ---
 ## Activation Contract
