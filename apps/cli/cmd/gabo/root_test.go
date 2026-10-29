@@ -16,7 +16,8 @@ import (
 )
 
 // The work-time (T042) and the review and plan commands (T043) were retired
-// (D18, D24): the CLI is an agent compiler with init, check and version.
+// (D18, D24): the CLI is an agent compiler with init, check, version and
+// prompt (R31, R39).
 func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	t.Parallel()
 	root := newRootCommand(deps{version: "1.2.3"})
@@ -24,7 +25,7 @@ func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	for _, c := range root.Commands() {
 		got = append(got, c.Name())
 	}
-	if want := []string{"check", "init", "version"}; !slices.Equal(got, want) {
+	if want := []string{"check", "init", "prompt", "version"}; !slices.Equal(got, want) {
 		t.Fatalf("commands = %v, want %v", got, want)
 	}
 	var out bytes.Buffer
@@ -33,8 +34,10 @@ func TestRootListsOnlyTheCompilerCommands(t *testing.T) {
 	if err := root.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if !strings.Contains(out.String(), "  check ") {
-		t.Fatalf("help does not list check:\n%s", out.String())
+	for _, name := range []string{"init", "check", "version", "prompt"} {
+		if !strings.Contains(out.String(), "  "+name+" ") {
+			t.Fatalf("help does not list %s:\n%s", name, out.String())
+		}
 	}
 	for _, removed := range []string{"secrets", "provision", "repo", "sessions", "status", "audit", "doctor", "mcp", "worktree", "config ", "review", "plan"} {
 		if strings.Contains(out.String(), "  "+removed) {
@@ -54,6 +57,87 @@ func TestRootVersionSubcommand(t *testing.T) {
 	}
 	if got := out.String(); got != "gabo 1.2.3\n" {
 		t.Fatalf("output = %q", got)
+	}
+}
+
+// runPrompt runs `gabo prompt` through the CLI entry with separate stdout
+// and stderr buffers.
+func runPrompt(t *testing.T) (stdout, stderr string, err error) {
+	t.Helper()
+	var out, errOut bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3"})
+	root.SetOut(&out)
+	root.SetErr(&errOut)
+	root.SetArgs([]string{"prompt"})
+	err = root.Execute()
+	return out.String(), errOut.String(), err
+}
+
+// `gabo prompt` prints the embedded setup prompt byte for byte and nothing
+// else, and creates nothing without a project (R39, D25).
+func TestPromptPrintsTheEmbeddedPromptAndCreatesNothing(t *testing.T) {
+	scratch := t.TempDir()
+	dirs := map[string]string{}
+	for _, name := range []string{"cwd", "HOME", "XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"} {
+		dirs[name] = filepath.Join(scratch, name)
+		if err := os.Mkdir(dirs[name], 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if name != "cwd" {
+			t.Setenv(name, dirs[name])
+		}
+	}
+	t.Chdir(dirs["cwd"])
+	stdout, stderr, err := runPrompt(t)
+	if err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+	if stdout != setupprompt.Text {
+		t.Fatalf("stdout differs from the embedded prompt:\n%q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %q", stderr)
+	}
+	for name, dir := range dirs {
+		if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
+			t.Fatalf("%s holds %v (%v), want empty", name, entries, err)
+		}
+	}
+}
+
+// Inside a project `gabo prompt` changes nothing: no catalog, stamp, config
+// or user-level reviewer write, no self-update.
+func TestPromptLeavesAProjectUntouched(t *testing.T) {
+	project := t.TempDir()
+	if _, err := runInit(t, project, "1.2.3"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(project, "gabo.yaml"), []byte("repo:\n  name: o/r\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	home, data := os.Getenv("HOME"), os.Getenv("XDG_DATA_HOME")
+	before := []map[string]string{snapshot(t, project), snapshot(t, home), snapshot(t, data)}
+	stdout, stderr, err := runPrompt(t)
+	if err != nil || stdout != setupprompt.Text || stderr != "" {
+		t.Fatalf("prompt: %v, stderr %q, stdout:\n%s", err, stderr, stdout)
+	}
+	after := []map[string]string{snapshot(t, project), snapshot(t, home), snapshot(t, data)}
+	for i := range before {
+		if !maps.Equal(before[i], after[i]) {
+			t.Fatalf("prompt changed %v", []string{project, home, data}[i])
+		}
+	}
+}
+
+func TestPromptRefusesArguments(t *testing.T) {
+	t.Parallel()
+	root := newRootCommand(deps{version: "1.2.3"})
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs([]string{"prompt", "extra"})
+	if err := root.Execute(); err == nil || strings.Contains(out.String(), setupprompt.Text) {
+		t.Fatalf("prompt with an argument: %v\n%s", err, out.String())
 	}
 }
 

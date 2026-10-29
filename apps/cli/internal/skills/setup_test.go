@@ -84,7 +84,7 @@ func TestSetupAppliesOnlyOwnerAnswers(t *testing.T) {
 	requireAll(t, setupDoc(t), []string{"R12", "owner's answer", "R21", "env var name"})
 }
 
-// The CLI has three commands (D24); setup uses no other and no gabo MCP tool.
+// The CLI has four commands (D24, R31); setup uses no other and no gabo MCP tool.
 func TestSetupUsesNoRemovedCommand(t *testing.T) {
 	t.Parallel()
 	doc := setupDoc(t)
