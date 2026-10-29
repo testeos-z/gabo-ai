@@ -88,11 +88,15 @@ func TestSetupAppliesOnlyOwnerAnswers(t *testing.T) {
 func TestSetupUsesNoRemovedCommand(t *testing.T) {
 	t.Parallel()
 	doc := setupDoc(t)
-	requireAll(t, doc, []string{"no gabo MCP tool", "`gabo version`"})
+	requireAll(t, doc, []string{"no gabo MCP tool", "`gabo version`", "`gabo prompt`", "Four commands"})
 	for _, s := range []string{"generate", "config set", "mcp__gabo", "gbai"} {
 		if strings.Contains(doc, s) {
 			t.Errorf("%s: names removed command or tool %q", setupSkill, s)
 		}
+	}
+	// Built from parts so a repository grep for the stale rule stays empty.
+	if stale := "Three" + " commands"; strings.Contains(doc, stale) {
+		t.Errorf("%s: still says %q", setupSkill, stale)
 	}
 }
 
