@@ -208,6 +208,8 @@ func (c Config) validate(parallelismSet bool) error {
 			check(false, "review.check_env", fmt.Sprintf("entry %q must be an environment variable name", name))
 		case reservedCheckEnv(name):
 			check(false, "review.check_env", fmt.Sprintf("entry %q is reserved for the reviewer", name))
+		case name == c.Review.PiCredentialEnv:
+			check(false, "review.check_env", fmt.Sprintf("entry %q is review.pi_credential_env, the review engine's credential", name))
 		}
 	}
 	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")

@@ -177,6 +177,7 @@ func TestParseReviewValidation(t *testing.T) {
 		"bad env":         {"review:\n  pi_credential_env: \"A=B\"\n", "review.pi_credential_env"},
 		"check env value": {"review:\n  check_env: [\"A=B\"]\n", "review.check_env: entry \"A=B\" must be an environment variable name"},
 		"reserved env":    {"review:\n  check_env: [GH_TOKEN]\n", "review.check_env: entry \"GH_TOKEN\" is reserved"},
+		"pi credential":   {"review:\n  pi_credential_env: PI_KEY\n  check_env: [DB_URL, PI_KEY]\n", "review.check_env: entry \"PI_KEY\" is review.pi_credential_env"},
 	} {
 		if _, err := Parse([]byte(with(tt.yaml))); err == nil || !strings.Contains(err.Error(), tt.want) {
 			t.Errorf("%s: error = %v, want %q", name, err, tt.want)

@@ -93,6 +93,9 @@ for reserved in PATH HOME CI GOCACHE GOMODCACHE GOPATH GABO_UPGRADE_PR GH_TOKEN 
     "$(pre REVIEWER_CHECK_ENV="DB_URL $reserved" bash "$skill/reviewer.sh" preflight)" "check_env refuses the reserved name $reserved"
 done
 expect_match '^PREFLIGHT-OK ' "$(pre REVIEWER_CHECK_ENV='DB_URL _X1' bash "$skill/reviewer.sh" preflight)" "valid check_env names pass"
+expect_match '^PREFLIGHT-FAILED review.check_env entry PI_KEY is review.pi_credential_env' \
+  "$(pre REVIEWER_PI_CREDENTIAL_ENV=PI_KEY REVIEWER_CHECK_ENV='DB_URL PI_KEY' bash "$skill/reviewer.sh" preflight)" \
+  "check_env refuses the Pi credential name"
 expect_match '^PREFLIGHT-FAILED gh cannot authenticate' \
   "$(pre REVIEWER_GH=/bin/false bash "$skill/reviewer.sh" preflight)" "no gh login is refused"
 out="$(pre REVIEWER_BASE_BRANCH=main bash "$skill/reviewer.sh" head 7 "$sha")"

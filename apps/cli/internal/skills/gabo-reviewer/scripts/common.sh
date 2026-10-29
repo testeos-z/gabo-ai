@@ -357,6 +357,8 @@ validate_config() {
     [[ "$entry" =~ ^[A-Z_][A-Z0-9_]*$ ]] ||
       { echo "review.check_env entry $entry must be an environment variable name"; return; }
     ! check_env_reserved "$entry" || { echo "review.check_env entry $entry is reserved for the reviewer"; return; }
+    [[ "$entry" != "$PI_CREDENTIAL_ENV" ]] ||
+      { echo "review.check_env entry $entry is review.pi_credential_env, the review engine's credential"; return; }
   done
   for entry in $AGENT_DIRS; do
     [[ "$entry" =~ ^[A-Za-z0-9._-][A-Za-z0-9._/-]*/$ && ! "$entry" =~ (^|/)\.\.(/|$) ]] ||
