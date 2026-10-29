@@ -71,7 +71,7 @@ Check the install with `gabo version`.
 
 1. In your project root, run `gabo init`. It copies the skill catalog to `.gabo/skills/`, writes the version stamp `.gabo/VERSION`, installs the `gabo-reviewer` skill at user level, and prints the setup prompt.
 2. Open your coding agent in the project root.
-3. Paste the prompt that `gabo init` printed. You can also ask the agent to configure gabo-ai.
+3. Paste the prompt that `gabo init` printed (`gabo prompt` prints it again at any time). You can also ask the agent to configure gabo-ai.
 4. Answer the setup questions. The agent asks one at a time and applies no value you did not accept. It writes the config, builds the agents for your engine and checks each slot.
 5. Run `gabo check` to confirm everything passes.
 6. Commit the changed files (`gabo.yaml`, `.gabo/`, adapters, agent folders).
@@ -80,13 +80,14 @@ You can also skip step 1: paste the [setup prompt](docs/setup-prompt.md#prompt) 
 
 ## Commands
 
-The CLI has only three commands. Everything else is done by your agent through the skills.
+The CLI has only four commands. Everything else is done by your agent through the skills.
 
 | command | what it does |
 |---|---|
 | `gabo init` | Copies the skill catalog to `.gabo/skills/`, writes `.gabo/VERSION` and installs the reviewer skill at user level. It never touches an existing config. |
 | `gabo check` | Validates, read-only, the config files, the agents, slot coverage (each adapter explains every operation of its contract) and the catalog version. Exits non-zero on any failure. |
 | `gabo version` | Prints the gabo version. |
+| `gabo prompt` | Prints the setup prompt, and nothing else, to paste into your agent. It reads no config and writes nothing, with or without a project. |
 
 ## Configuration
 

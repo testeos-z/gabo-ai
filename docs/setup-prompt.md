@@ -15,6 +15,8 @@ Both entries reach the same setup; pick the one that fits you.
 
 `gabo init` copies the skill catalog to `.gabo/skills/`, writes the version stamp `.gabo/VERSION`, installs the `gabo-reviewer` skill at user level (never in the project) and, on a fresh project, prints the prompt after its `next:` line. It never touches an existing config, so rerunning it, or the prompt, is safe.
 
+`gabo prompt` prints the same prompt, byte for byte and nothing else, at any time, with or without a project; it reads no config and writes nothing.
+
 You answer every question; the agent applies no value you did not accept and asks one question at a time. Config files hold only the names of environment variables, never a secret value.
 
 ## Install the CLI

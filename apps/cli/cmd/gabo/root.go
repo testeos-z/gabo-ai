@@ -7,8 +7,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/initcmd"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/prompt"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/version"
 )
@@ -44,5 +46,6 @@ func newRootCommand(d deps) *cobra.Command {
 	root.AddCommand(version.NewCommand(version.NewUseCase(d.version)))
 	root.AddCommand(initcmd.NewCommand(initFactory(d.runner, d.version, d.update)))
 	root.AddCommand(check.NewCommand(checkFactory(d.runner, d.version, os.Getenv, os.Getwd)))
+	root.AddCommand(prompt.NewCommand(setupprompt.Text))
 	return root
 }
