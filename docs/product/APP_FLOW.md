@@ -4,8 +4,8 @@
 |---|---|
 | status | Draft |
 | owner | gabo-frontend |
-| version | 0.6 |
-| date | 2026-10-27 |
+| version | 0.7 |
+| date | 2026-10-29 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [DB_SCHEMA](DB_SCHEMA.md), [UX_UI](UX_UI.md), [stories](stories/README.md) |
 | diagrams | [team-flow.html](diagrams/team-flow.html), [configuration-flow.html](diagrams/configuration-flow.html) |
 
@@ -26,7 +26,7 @@ Written by gabo-frontend in auto mode (R6, R19). Every item is marked **Proposed
 | A7 | US-011 | A resumed wave first re-reads every wave task from the tracker and reconciles it with the memory ledger and traces before launching any coder; the cycle does this through its skill, with no gabo command (TRD D17, owner 2026-10-26). | R3 and R25 require resuming from tracker state and traces; reading first prevents relaunching DONE tasks. |
 | A9 | CLI, J2, J7, J8, J10, Flow | Approved (owner 2026-10-26): the CLI is used only for the initial configuration (`gabo init`, `gbai config set`, `gbai generate`); planning templates and the traceability check live in the directiva skills; the reviewer agent invokes the installed reviewer scripts; worktrees are removed with git. | TRD D18, D19, D20. |
 | A10 | Surfaces, J1, J4, J7, Flow | Approved (owner 2026-10-26): setup starts from a prompt pasted into Claude Code or Pi (no TUI); agents write config by editing the YAML directly and `gbai generate` validates it; there is no read-only `gbai config`; the reviewer scripts live in the user-level `gabo-reviewer` skill; preferences have a stable layer (global file) and a learning layer (memory, `user/preferences`). | TRD D18, D20, D21, D22; UX_UI 1.8. |
-| A11 | Surfaces, J1, J4, J7, Flow | Approved (owner 2026-10-27, issue #51): the CLI has three commands (`gabo init`, `gabo check`, `gabo version`); setup starts with `gabo init`, then the user asks their own agent to configure gabo-ai; the agent builds the config and the agents from skills (setup, config-writer, runtime skill or runtime builder) and runs `gabo check`. Supersedes the `gbai generate` and `gbai config set` parts of A9 and A10. | PRD R31–R35; UX_UI 1.8, 2. |
+| A11 | Surfaces, J1, J4, J7, Flow | Approved (owner 2026-10-27, issue #51), amended Proposed (auto) (owner request 2026-10-29, plan change #158, issue #154, PRD R31, R39): the CLI has four commands (`gabo init`, `gabo check`, `gabo version`, `gabo prompt`; three until 2026-10-29, superseded); `gabo prompt` reprints the embedded setup prompt and changes nothing; setup starts with `gabo init`, then the user asks their own agent to configure gabo-ai; the agent builds the config and the agents from skills (setup, config-writer, runtime skill or runtime builder) and runs `gabo check`. Supersedes the `gbai generate` and `gbai config set` parts of A9 and A10. | PRD R31–R35, R39; UX_UI 1.8, 2. |
 | A8 | Flow | One Mermaid flowchart covers the planning → wave → adjust loop; the two Archify diagrams stay the detailed references. | Avoids duplicating the existing diagrams while giving a text-diffable overview. |
 
 ## Surfaces
@@ -37,7 +37,7 @@ Proposed (auto) A1.
 |---|---|---|---|
 | Assistant conversation (the single Orca terminal opened by default, R18) | New session (R1); first time: after `gabo init`, the owner asks their agent to configure gabo-ai (UX_UI 1.8, owner 2026-10-27; earlier the pasted setup prompt) | Talk to the owner, start waves, route questions | No config: the assistant starts setup (US-001). Missing alias: asks once (R16). |
 | Direct session (Orca terminal in a task worktree) | Owner accepts the assistant's offer (R14) | Owner talks to the working agent directly | Orca unavailable: the assistant keeps mediating and says why (Orca only in the first release). |
-| CLI (`gabo init`, `gabo check`, `gabo version`; owner 2026-10-27, PRD R31) | Terminal, assistant, reviewer, CI | `gabo init` copies or refreshes the skill catalog, writes the version stamp, installs the user-level `gabo-reviewer` skill and prints the embedded setup prompt; `gabo check` validates read-only (updated issue #74; superseded: the neutral entry file) | Errors print what failed and the next step (see [UX_UI](UX_UI.md#4-messages-and-errors)). Superseded (owner 2026-10-27): compile agents and install per-runtime artifacts with `gbai generate`; `gbai config set`. |
+| CLI (`gabo init`, `gabo check`, `gabo version`, `gabo prompt`; owner 2026-10-27, PRD R31; `gabo prompt` Proposed (auto) (owner request 2026-10-29, plan change #158, issue #154, PRD R31, R39)) | Terminal, assistant, reviewer, CI | `gabo init` copies or refreshes the skill catalog, writes the version stamp, installs the user-level `gabo-reviewer` skill and prints the embedded setup prompt; `gabo prompt` prints the same setup prompt again, read-only, with or without a project; `gabo check` validates read-only (updated issue #74; superseded: the neutral entry file) | Errors print what failed and the next step (see [UX_UI](UX_UI.md#4-messages-and-errors)). Superseded (owner 2026-10-27): compile agents and install per-runtime artifacts with `gbai generate`; `gbai config set`. |
 | Tracker and PR (team's tools via adapters) | Links in wave reports | Read task status, PR verdicts, plan-change PRs | Unverified writes are listed in the wave report (R24). |
 
 ## Plan-change approval scale
