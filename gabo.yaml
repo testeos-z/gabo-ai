@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/testeos-z/gabo-ai/main/schemas/gabo.project.schema.json
+# gabo project config (v0, hand-written before the compiler exists).
+# Keys follow docs/product/DB_SCHEMA.md 3.2 and TRD 9.3. Agents may edit this
+# file directly during the work; `gabo generate` validates it later (TRD D18).
+# Personal keys (alias, interaction_level, tone, language) do not belong here:
+# they live in ~/.config/gabo/config.yaml (TRD D11, D22).
+version: 1
+mode: auto
+
+repo:
+  name: testeos-z/gabo-ai
+  integration_branch: dev
+
+runtimes:
+  coder: claude
+  reviewer: claude
+  assistant: claude
+
+# Adapters are the Claude Code skills that fill each slot contract (TRD 9.1).
+slots:
+  tasks:
+    adapter: .claude/skills/gabo-tasks-github/SKILL.md
+  repository_host:
+    adapter: .claude/skills/gabo-repository-host-github/SKILL.md
+  memory:
+    adapter: .claude/skills/gabo-memory-engram/SKILL.md
+  methodology:
+    adapter: .claude/skills/gabo-methodology-gentle-ai/SKILL.md
+  # Owner choice 2026-10-28: the catalog local placement adapter covers the
+  # reviewer_placement contract; the gabo-reviewer agent stays template-built.
+  reviewer_placement:
+    adapter: .gabo/skills/gabo-reviewer-placement-local/SKILL.md
+  # Owner choice 2026-10-28: agents run on the owner's machine (catalog adapter).
+  agent_host:
+    adapter: .gabo/skills/gabo-agent-host-local/SKILL.md
+
+reviewer:
+  # local in single-user mode: the scripts run as the owner with the owner's gh login.
+  placement: local
+  signing:
+    marker: gbai-reviewer-bot
+
+review:
+  # Split on whitespace and run as argv in a credential-free copy of the merged tree (no shell).
+  checks:
+    - go -C apps/cli build ./...
+    - go -C apps/cli vet ./...
+    - go -C apps/cli test ./...
+  # 2026-10-27 owner decision (plan change #83, T069): the reviewer merges clean
+  # heads into dev, never into main (TRD D13). The hand-installed reviewer scripts
+  # also need REVIEWER_AUTO_MERGE=true in the user-level skill config.env.
+  auto_merge: true
+  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/]
+
+# Git email -> alias (TRD D10). OWNER: change "Leo" if you prefer another alias.
+# The local git user.email is dimasmerida15@gmail.com; both emails map to the owner.
+developers:
+  "d.merida@gobern.ai": Leo
+  "dimasmerida15@gmail.com": Leo
+
+plan_change:
+  scope: group
+  global_without_owner: false
+
+parallelism: 3
+
+worktree:
+  keep: []

@@ -1,10 +1,11 @@
 {
-  "name": "@gbai-team/cli",
+  "name": "@gabo-ai/cli",
   "private": true,
   "scripts": {
-    "build": "go build -o dist/gbai ./cmd/gbai",
+    "build": "go build -o dist/gabo ./cmd/gabo",
     "test": "go test ./...",
     "lint": "go vet ./... && test -z \"$(gofmt -l .)\"",
-    "check-types": "go build ./..."
+    "check-types": "go build ./...",
+    "test:e2e": "go test -tags e2e ./e2e/"
   }
 }

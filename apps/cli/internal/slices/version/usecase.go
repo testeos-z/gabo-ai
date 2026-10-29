@@ -1,4 +1,4 @@
-// Package version reports the build version of the gbai binary.
+// Package version reports the build version of the gabo binary.
 package version
 
 // DefaultVersion is reported when no version was injected at build time.

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/testeos-z/gabo-ai/main/schemas/gabo.user.schema.json",
+  "title": "gabo global user config (~/.config/gabo/config.yaml)",
+  "description": "Personal keys of one person for all repositories (DB_SCHEMA 3.1, D11). Project keys are accepted as a fallback the project file overrides; none is required here. Secrets never appear here, only environment variable names (R21). A null or empty optional value means unset, as the Go loader reads it.",
+  "$ref": "gabo.project.schema.json#/$defs/layer",
+  "$defs": {
+    "personalKeys": {
+      "description": "Keys that resolve from this file only; in the project file they are ignored with a warning.",
+      "properties": {
+        "alias": {
+          "description": "How the assistant addresses this person (R16).",
+          "type": ["string", "null"]
+        },
+        "interaction_level": {
+          "description": "Preferred number of interactions (R17).",
+          "enum": ["low", "balanced", "high", "", null]
+        },
+        "tone": {
+          "description": "Tone and speaking style, free text (R17).",
+          "type": ["string", "null"]
+        },
+        "language": {
+          "description": "Conversation language as a BCP 47 tag; generated artifacts stay English.",
+          "type": ["string", "null"],
+          "pattern": "^([A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*)?$"
+        }
+      }
+    }
+  }
+}

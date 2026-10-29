@@ -1,4 +1,4 @@
-// Package config loads and validates gbai.yaml.
+// Package config loads and validates gabo.yaml.
 package config
 
 import (
@@ -23,78 +23,42 @@ const (
 	RuntimePi     Runtime = "pi"
 )
 
-// Config is the validated content of gbai.yaml.
+// Config is the validated content of gabo.yaml.
 type Config struct {
-	Server   Server   `yaml:"server"`
-	Users    Users    `yaml:"users"`
 	Runtimes Runtimes `yaml:"runtimes"`
 	Repo     Repo     `yaml:"repo"`
-	Bot      Bot      `yaml:"bot"`
 	Review   Review   `yaml:"review"`
 	Coder    Coder    `yaml:"coder"`
-	Sessions Sessions `yaml:"sessions"`
 	Worktree Worktree `yaml:"worktree"`
 	// Parallelism is the most coder sessions the cycle runs at once; it
-	// already leaves room for the reviewer's checks. 0 means the default, 3.
+	// already leaves room for the reviewer's checks. Required, no default.
 	Parallelism int `yaml:"parallelism"`
+
+	// Version is the schema version of the file; a file without it is
+	// version 0, the current shape (see keyclass.go).
+	Version int `yaml:"version"`
+	// Project keys of DB_SCHEMA migration step 3 (see projectkeys.go).
+	Mode       Mode              `yaml:"mode,omitempty"`
+	Slots      map[string]Slot   `yaml:"slots,omitempty"`
+	Reviewer   Reviewer          `yaml:"reviewer,omitempty"`
+	Developers map[string]string `yaml:"developers,omitempty"`
+	PlanChange PlanChange        `yaml:"plan_change,omitempty"`
+	// Personal keys (see PersonalKeys): read from the global layers only.
+	Alias            string `yaml:"alias,omitempty"`
+	InteractionLevel string `yaml:"interaction_level,omitempty"`
+	Tone             string `yaml:"tone,omitempty"`
+	Language         string `yaml:"language,omitempty"`
 }
 
-// Worktree configures `gbai worktree close`.
+// Worktree configures the cycle's wave cleanup.
 type Worktree struct {
 	// Keep lists worktree names (or absolute paths) that are never closed.
 	Keep []string `yaml:"keep,omitempty"`
 }
 
 // Coder is the GitHub identity the coder pushes with; it must never merge.
-// An empty Login skips the coder-merge audit rule.
 type Coder struct {
 	Login string `yaml:"login"`
-}
-
-// Sessions configures the long-lived Orca agent sessions.
-type Sessions struct {
-	// LocalOrca is the Orca CLI used in local mode (orca-ide on Linux
-	// desktops where orca is the screen reader).
-	LocalOrca string  `yaml:"local_orca"`
-	Coder     Session `yaml:"coder"`
-	Reviewer  Session `yaml:"reviewer"`
-	Assistant Session `yaml:"assistant"`
-}
-
-// Session configures one role's session.
-type Session struct {
-	// PromptFile, when set, is read on the session host and passed as the
-	// startup prompt.
-	PromptFile string `yaml:"prompt_file"`
-}
-
-// Server locates the cloud server.
-type Server struct {
-	Railway Railway `yaml:"railway"`
-}
-
-// Railway holds the explicit ids passed to `railway ssh`.
-type Railway struct {
-	ProjectID     string `yaml:"project_id"`
-	EnvironmentID string `yaml:"environment_id"`
-	ServiceID     string `yaml:"service_id"`
-}
-
-// Users lists the OS users on the server. Single-user mode: the reviewer
-// runs as the orca user, the same OS user as the agent sessions.
-type Users struct {
-	Orca User `yaml:"orca"`
-}
-
-// All returns the users in a stable order.
-func (u Users) All() []User { return []User{u.Orca} }
-
-// User is one OS user on the server. UID 0 means the uid is not managed.
-type User struct {
-	Name      string   `yaml:"name"`
-	Home      string   `yaml:"home"`
-	UID       int      `yaml:"uid"`
-	ExtraPath []string `yaml:"extra_path"`
 }
 
 // Runtimes selects the runtime per role.
@@ -116,14 +80,8 @@ func (r Repo) Owner() string { o, _, _ := strings.Cut(r.Name, "/"); return o }
 // Repo returns the repository part of Name.
 func (r Repo) Repo() string { _, n, _ := strings.Cut(r.Name, "/"); return n }
 
-// Bot is the owner's GitHub login: in single-user mode the reviewer posts,
-// sets statuses and merges with the owner's own gh login. Empty means the
-// login gh is authenticated as; when set it must equal that login.
-type Bot struct {
-	Login string `yaml:"login"`
-}
-
-// Review configures `gbai review run` and its checks side.
+// Review configures the user-level reviewer scripts (gabo-reviewer skill,
+// D20), which read these keys from the project config.
 type Review struct {
 	// Checks are run in order inside a copy of the merged tree, without
 	// GitHub credentials. Each is split on whitespace into argv; no shell is
@@ -131,47 +89,41 @@ type Review struct {
 	Checks         []string `yaml:"checks"`
 	AutoMerge      bool     `yaml:"auto_merge"`
 	HumanOnlyPaths []string `yaml:"human_only_paths"`
-	// PiCredentialEnv names the env var that receives the pi model credential.
+	// PiCredentialEnv optionally names the env var whose value the pi
+	// reviewer gets instead of reusing the owner's Pi login (T073).
 	PiCredentialEnv string `yaml:"pi_credential_env"`
+	// CheckEnv names environment variables the reviewer passes from its own
+	// environment into the checks (never into the agent review). Names only,
+	// never values (R21); a listed variable unset at review time fails the
+	// checks.
+	CheckEnv []string `yaml:"check_env,omitempty"`
 	// StateDir holds the reviewer's own clone, worktrees and check
-	// workspaces. Empty means $XDG_STATE_HOME/gbai/reviewer, else
-	// ~/.local/state/gbai/reviewer, resolved on the host that runs the review.
+	// workspaces. Empty means the reviewer scripts' default state dir.
 	StateDir string `yaml:"state_dir,omitempty"`
-}
-
-// StateDirFrom resolves the reviewer state dir with getenv (os.Getenv).
-func (r Review) StateDirFrom(getenv func(string) string) (string, error) {
-	if r.StateDir != "" {
-		return r.StateDir, nil
-	}
-	if xdg := getenv("XDG_STATE_HOME"); path.IsAbs(xdg) {
-		return path.Join(xdg, "gbai", "reviewer"), nil
-	}
-	if home := getenv("HOME"); path.IsAbs(home) {
-		return path.Join(home, ".local", "state", "gbai", "reviewer"), nil
-	}
-	return "", errors.New("reviewer state dir: set review.state_dir, XDG_STATE_HOME or HOME")
-}
-
-// CheckArgv returns each check split into argv.
-func (r Review) CheckArgv() [][]string {
-	out := make([][]string, 0, len(r.Checks))
-	for _, c := range r.Checks {
-		out = append(out, strings.Fields(c))
-	}
-	return out
 }
 
 var (
 	envPattern    = regexp.MustCompile(`^[A-Z_][A-Z0-9_]*$`)
-	idPattern     = regexp.MustCompile(`^[A-Za-z0-9-]+$`)
-	userPattern   = regexp.MustCompile(`^[a-z_][a-z0-9_-]{0,31}$`)
 	pathPattern   = regexp.MustCompile(`^/[A-Za-z0-9._/-]*$`)
 	repoPattern   = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
 	branchPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 	loginPattern  = regexp.MustCompile(`^[A-Za-z0-9-]+(\[bot\])?$`)
-	filePattern   = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 )
+
+// reservedCheckEnv reports the names the reviewer sets for the checks itself
+// or keeps from them (credentials): review.check_env may not list them.
+func reservedCheckEnv(name string) bool {
+	switch name {
+	case "PATH", "HOME", "CI", "GOCACHE", "GOMODCACHE", "GOPATH", "GABO_UPGRADE_PR":
+		return true
+	}
+	for _, prefix := range []string{"GH_", "GITHUB_", "CLAUDE_", "REVIEWER_"} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
 
 // Load reads and validates the config file at path.
 func Load(path string) (Config, error) {
@@ -186,22 +138,33 @@ func Load(path string) (Config, error) {
 	return cfg, nil
 }
 
-// Parse decodes, defaults and validates a config document.
+// Parse decodes and validates a config document. It fills no value: a
+// missing required key fails with "✗ <key> missing" and NextSetup (R12);
+// the former defaults are only offered through Suggestions.
 func Parse(b []byte) (Config, error) {
+	if err := formerCloudKeyErrors(b); err != nil {
+		return Config{}, err
+	}
 	var cfg Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)
 	if err := dec.Decode(&cfg); err != nil {
 		return Config{}, fmt.Errorf("decode yaml: %w", err)
 	}
-	cfg.applyDefaults()
-	if err := cfg.validate(); err != nil {
+	// An int cannot tell an absent parallelism from an explicit 0.
+	var set struct {
+		Parallelism *int `yaml:"parallelism"`
+	}
+	if err := yaml.Unmarshal(b, &set); err != nil {
+		return Config{}, fmt.Errorf("decode yaml: %w", err)
+	}
+	if err := cfg.validate(set.Parallelism != nil); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
 }
 
-// Marshal encodes the validated config, defaults included, as YAML.
+// Marshal encodes the validated config as YAML.
 func (c Config) Marshal() ([]byte, error) {
 	b, err := yaml.Marshal(c)
 	if err != nil {
@@ -210,68 +173,24 @@ func (c Config) Marshal() ([]byte, error) {
 	return b, nil
 }
 
-func (c *Config) applyDefaults() {
-	defaultUser(&c.Users.Orca, User{Name: "orca", Home: "/data/home", ExtraPath: []string{"/data/home/.local/bin"}})
-	defaultString(&c.Runtimes.Coder, RuntimeClaude)
-	defaultString(&c.Runtimes.Reviewer, RuntimePi)
-	defaultString(&c.Runtimes.Assistant, RuntimeClaude)
-	defaultString(&c.Repo.IntegrationBranch, "dev")
-	if c.Review.Checks == nil {
-		c.Review.Checks = []string{"bun install --frozen-lockfile", "bun run build", "bun run check-types", "bun run lint", "bun run test"}
-	}
-	if c.Review.HumanOnlyPaths == nil {
-		c.Review.HumanOnlyPaths = []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}
-	}
-	defaultString(&c.Review.PiCredentialEnv, "ANTHROPIC_API_KEY")
-	defaultString(&c.Sessions.LocalOrca, "orca")
-	if c.Parallelism == 0 {
-		c.Parallelism = 3
-	}
-}
-
-func defaultUser(u *User, d User) {
-	defaultString(&u.Name, d.Name)
-	defaultString(&u.Home, d.Home)
-	if u.UID == 0 {
-		u.UID = d.UID
-	}
-	if u.ExtraPath == nil {
-		u.ExtraPath = d.ExtraPath
-	}
-}
-
-func defaultString[T ~string](v *T, d T) {
-	if *v == "" {
-		*v = d
-	}
-}
-
-func (c Config) validate() error {
-	var errs []error
+// validate reports every missing required key first, then every invalid
+// value of a key that is set, and ends with NextSetup when a key was missing.
+func (c Config) validate(parallelismSet bool) error {
+	missing := c.missingKeys(parallelismSet)
+	errs := missingErrors(missing)
 	check := func(ok bool, field, msg string) {
-		if !ok {
+		if !ok && !slices.Contains(missing, field) {
 			errs = append(errs, fmt.Errorf("%s: %s", field, msg))
 		}
 	}
-	r := c.Server.Railway
-	check(idPattern.MatchString(r.ProjectID), "server.railway.project_id", "required id")
-	check(idPattern.MatchString(r.EnvironmentID), "server.railway.environment_id", "required id")
-	check(idPattern.MatchString(r.ServiceID), "server.railway.service_id", "required id")
-
-	u := c.Users.Orca
-	check(userPattern.MatchString(u.Name), "users.orca.name", "must be a lowercase POSIX user name")
-	check(pathPattern.MatchString(u.Home), "users.orca.home", "must be an absolute path of safe characters")
-	check(u.UID >= 0, "users.orca.uid", "must not be negative")
-	for _, p := range u.ExtraPath {
-		check(pathPattern.MatchString(p), "users.orca.extra_path", "entries must be absolute paths of safe characters")
-	}
-
-	for field, rt := range map[string]Runtime{"runtimes.coder": c.Runtimes.Coder, "runtimes.reviewer": c.Runtimes.Reviewer, "runtimes.assistant": c.Runtimes.Assistant} {
-		check(rt == RuntimeClaude || rt == RuntimePi, field, fmt.Sprintf("must be %q or %q, got %q", RuntimeClaude, RuntimePi, rt))
+	for _, rt := range []struct {
+		field string
+		value Runtime
+	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.reviewer", c.Runtimes.Reviewer}, {"runtimes.assistant", c.Runtimes.Assistant}} {
+		check(rt.value == RuntimeClaude || rt.value == RuntimePi, rt.field, fmt.Sprintf("must be %q or %q, got %q", RuntimeClaude, RuntimePi, rt.value))
 	}
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")
-	check(c.Bot.Login == "" || loginPattern.MatchString(c.Bot.Login), "bot.login", "must be the owner's GitHub login")
 
 	check(len(c.Review.Checks) > 0, "review.checks", "at least one check is required")
 	for _, ch := range c.Review.Checks {
@@ -282,19 +201,25 @@ func (c Config) validate() error {
 		ok := p != "" && !strings.HasPrefix(p, "/") && !slices.Contains(strings.Split(strings.TrimSuffix(p, "/"), "/"), "..")
 		check(ok, "review.human_only_paths", fmt.Sprintf("entry %q must be a relative repository path", p))
 	}
-	check(envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
-	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")
-	check(c.Coder.Login == "" || !strings.EqualFold(c.Coder.Login, c.Bot.Login), "coder.login",
-		"must differ from bot.login: the audit flags every merge by the coder login")
-	check(c.Review.StateDir == "" || pathPattern.MatchString(c.Review.StateDir), "review.state_dir", "must be an absolute path of safe characters")
-	check(filePattern.MatchString(c.Sessions.LocalOrca), "sessions.local_orca", "must be a command name or path")
-	for key, s := range map[string]Session{"coder": c.Sessions.Coder, "reviewer": c.Sessions.Reviewer, "assistant": c.Sessions.Assistant} {
-		check(s.PromptFile == "" || filePattern.MatchString(s.PromptFile), "sessions."+key+".prompt_file", "must be a path of safe characters")
+	check(c.Review.PiCredentialEnv == "" || envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
+	for _, name := range c.Review.CheckEnv {
+		switch {
+		case !envPattern.MatchString(name):
+			check(false, "review.check_env", fmt.Sprintf("entry %q must be an environment variable name", name))
+		case reservedCheckEnv(name):
+			check(false, "review.check_env", fmt.Sprintf("entry %q is reserved for the reviewer", name))
+		case name == c.Review.PiCredentialEnv:
+			check(false, "review.check_env", fmt.Sprintf("entry %q is review.pi_credential_env, the review engine's credential", name))
+		}
 	}
+	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")
+	check(c.Review.StateDir == "" || pathPattern.MatchString(c.Review.StateDir), "review.state_dir", "must be an absolute path of safe characters")
 	check(c.Parallelism > 0, "parallelism", "must be a positive number of coder sessions")
 	for _, k := range c.Worktree.Keep {
 		ok := k != "" && !strings.ContainsAny(k, "\n\r") && (path.IsAbs(k) || !strings.Contains(k, "/")) && k != ".." && k != "."
 		check(ok, "worktree.keep", fmt.Sprintf("entry %q must be a worktree name or an absolute path", k))
 	}
-	return errors.Join(errs...)
+	errs = append(errs, c.validateKeyClasses()...)
+	errs = append(errs, c.validateProjectKeys()...)
+	return withNextSetup(errors.Join(errs...), missing)
 }

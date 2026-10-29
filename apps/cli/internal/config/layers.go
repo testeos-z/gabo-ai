@@ -12,20 +12,55 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"github.com/testeos-z/gbai-team/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
 )
 
 // Layer names, lowest to highest precedence. LayerFlag is the single file
-// given with --config, which replaces the layered lookup.
+// given with --config, which replaces the layered lookup. There is no system
+// layer: no file under /etc is ever read (T006).
 const (
-	LayerSystem  = "system"
 	LayerUser    = "user"
 	LayerProject = "project"
 	LayerFlag    = "flag"
 )
 
 // ProjectFile is the project layer's file name at the project root.
-const ProjectFile = "gbai.yaml"
+const ProjectFile = "gabo.yaml"
+
+// Names from before the gabo-ai rename (TRD D26): never read, only reported.
+const (
+	formerProjectFile = "gbai.yaml"
+	formerDir         = "gbai"
+	userDir           = "gabo"
+)
+
+// FormerName is a config location from before the gabo-ai rename: Probe is
+// the file whose presence shows the former name is still in use, From is
+// what to rename and To its new name.
+type FormerName struct {
+	Probe string
+	From  string
+	To    string
+}
+
+// FormerNames returns the former user dir and project file locations that
+// resolve, in the order of LayerPaths. The former user dir is probed through
+// each file gabo keeps there: the user config and the reviewer's secrets
+// file (reviewer.env).
+func FormerNames(getenv func(string) string, projectRoot string) []FormerName {
+	var out []FormerName
+	if base := userBase(getenv); base != "" {
+		from := path.Join(base, formerDir)
+		for _, f := range []string{"config.yaml", "reviewer.env"} {
+			out = append(out, FormerName{Probe: path.Join(from, f), From: from, To: path.Join(base, userDir)})
+		}
+	}
+	if projectRoot != "" {
+		from := path.Join(projectRoot, formerProjectFile)
+		out = append(out, FormerName{Probe: from, From: from, To: path.Join(projectRoot, ProjectFile)})
+	}
+	return out
+}
 
 // Layer is one config file in the resolution order. An empty Path means the
 // location could not be resolved (for example no HOME) and is skipped.
@@ -33,14 +68,32 @@ type Layer struct {
 	Name  string
 	Path  string
 	Found bool
+	// Version is the file's schema version; 0 when the file has none.
+	Version int
 }
 
-// Resolution is the merged, defaulted and validated config together with the
+// Resolution is the merged and validated config together with the
 // layers it was looked up in.
 type Resolution struct {
 	Layers []Layer
 	Config Config
+	// Warnings are non-fatal problems, such as a personal key set in the
+	// project file and ignored.
+	Warnings []string
 }
+
+// FileError is a config problem in one file: File is its path, or "merged
+// from <paths>" for the merged result. Err holds one "<key path>: <reason>"
+// line per problem (or the R12 "✗ <key> missing" lines). Read errors are
+// never a FileError.
+type FileError struct {
+	File string
+	Err  error
+}
+
+func (e *FileError) Error() string { return "config " + e.File + ": " + e.Err.Error() }
+
+func (e *FileError) Unwrap() error { return e.Err }
 
 // Reader reads a file; a missing file is reported with an error matching
 // fs.ErrNotExist (kernel.FileSystem satisfies it).
@@ -48,27 +101,34 @@ type Reader interface {
 	ReadFile(name string) ([]byte, error)
 }
 
-// LayerPaths returns the system, user and project layers in precedence order.
+// LayerPaths returns the user and project layers in precedence order.
 func LayerPaths(getenv func(string) string, projectRoot string) []Layer {
 	project := ""
 	if projectRoot != "" {
 		project = path.Join(projectRoot, ProjectFile)
 	}
 	return []Layer{
-		{Name: LayerSystem, Path: kernel.ServerConfigPath},
 		{Name: LayerUser, Path: UserPath(getenv)},
 		{Name: LayerProject, Path: project},
 	}
 }
 
-// UserPath is $XDG_CONFIG_HOME/gbai/config.yaml, else ~/.config/gbai/config.yaml;
+// UserPath is $XDG_CONFIG_HOME/gabo/config.yaml, else ~/.config/gabo/config.yaml;
 // relative values are ignored, as the XDG spec requires. Empty when neither resolves.
 func UserPath(getenv func(string) string) string {
+	if base := userBase(getenv); base != "" {
+		return path.Join(base, userDir, "config.yaml")
+	}
+	return ""
+}
+
+// userBase is $XDG_CONFIG_HOME, else ~/.config; empty when neither is absolute.
+func userBase(getenv func(string) string) string {
 	if xdg := getenv("XDG_CONFIG_HOME"); path.IsAbs(xdg) {
-		return path.Join(xdg, "gbai", "config.yaml")
+		return xdg
 	}
 	if home := getenv("HOME"); path.IsAbs(home) {
-		return path.Join(home, ".config", "gbai", "config.yaml")
+		return path.Join(home, ".config")
 	}
 	return ""
 }
@@ -99,17 +159,24 @@ func LoadFile(r Reader, name string) (Resolution, error) {
 	}
 	res.Layers[0].Found = true
 	cfg, err := Parse(b)
+	if err == nil {
+		// The Go errors come first: they carry the R12 "✗ <key> missing" form.
+		err = ValidateSchema(SchemaLayer, b)
+	}
 	if err != nil {
 		return res, fmt.Errorf("config %s: %w", name, err)
 	}
+	res.Layers[0].Version = cfg.Version
 	res.Config = cfg
 	return res, nil
 }
 
 // LoadLayers reads every existing layer in order and merges them: a higher
 // layer overrides a lower one field by field (see Merge). Missing files are
-// skipped; unknown keys fail per file. Defaults and validation run once on
-// the merged result. Layers are returned with Found set, even on error.
+// skipped; unknown keys and an unsupported version fail per file, and
+// version is kept out of the merged document. Validation runs once on the
+// merged result; no layer value is filled in. Every layer is also validated
+// against its JSON Schema before the merge. Layers are returned with Found set, even on error.
 func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 	res := Resolution{Layers: append([]Layer(nil), layers...)}
 	var merged map[string]any
@@ -126,10 +193,25 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 			return res, fmt.Errorf("read config %s: %w", l.Path, err)
 		}
 		res.Layers[i].Found = true
-		doc, err := decodeLayer(b)
+		doc, version, err := decodeLayer(b)
 		if err != nil {
-			return res, fmt.Errorf("config %s: %w", l.Path, err)
+			return res, &FileError{File: l.Path, Err: err}
 		}
+		res.Layers[i].Version = version
+		if version < 0 || version > MaxVersion {
+			return res, &FileError{File: l.Path, Err: fmt.Errorf("version: must be between 0 and %d, got %d", MaxVersion, version)}
+		}
+		if l.Name == LayerProject {
+			res.Warnings = append(res.Warnings, dropPersonalKeys(doc, l.Path)...)
+		}
+		// Each layer is checked against its schema on its own, so a bad
+		// value fails in the file that holds it even when a higher layer
+		// overrides it. Personal keys are already gone from the project layer.
+		if err := validateLayer(l.Name, doc); err != nil {
+			return res, &FileError{File: l.Path, Err: err}
+		}
+		// version describes one file, not the merged document.
+		delete(doc, "version")
 		merged = Merge(merged, doc)
 		used = append(used, l.Path)
 	}
@@ -147,30 +229,52 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 		return res, fmt.Errorf("encode merged config: %w", err)
 	}
 	cfg, err := Parse(b)
+	if err == nil {
+		// The Go errors come first, as in LoadFile; by the parity test the
+		// schema agrees, and this keeps the merged result schema-checked too.
+		err = validateValue(SchemaFile, merged)
+	}
 	if err != nil {
-		return res, fmt.Errorf("config merged from %s: %w", strings.Join(used, ", "), err)
+		return res, &FileError{File: "merged from " + strings.Join(used, ", "), Err: err}
 	}
 	res.Config = cfg
 	return res, nil
 }
 
+// validateLayer validates one decoded layer: the user file against the user
+// schema, any other layer against the layer schema. Required keys are left to
+// the merged result.
+func validateLayer(name string, doc map[string]any) error {
+	if doc == nil {
+		return nil
+	}
+	if name == LayerUser {
+		return validateValue(SchemaUser, doc)
+	}
+	return validateValue(SchemaLayer, doc)
+}
+
 // decodeLayer checks a layer's keys against Config (unknown keys fail) and
-// returns it as a generic mapping. An empty document is an empty layer.
-func decodeLayer(b []byte) (map[string]any, error) {
+// returns it as a generic mapping with its schema version. An empty document
+// is an empty layer of version 0.
+func decodeLayer(b []byte) (map[string]any, int, error) {
+	if err := formerCloudKeyErrors(b); err != nil {
+		return nil, 0, err
+	}
 	var probe Config
 	dec := yaml.NewDecoder(bytes.NewReader(b))
 	dec.KnownFields(true)
 	if err := dec.Decode(&probe); err != nil {
 		if errors.Is(err, io.EOF) {
-			return nil, nil
+			return nil, 0, nil
 		}
-		return nil, fmt.Errorf("decode yaml: %w", err)
+		return nil, 0, fmt.Errorf("decode yaml: %w", err)
 	}
 	var doc map[string]any
 	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return nil, fmt.Errorf("decode yaml: %w", err)
+		return nil, 0, fmt.Errorf("decode yaml: %w", err)
 	}
-	return doc, nil
+	return doc, probe.Version, nil
 }
 
 // Merge returns lower overridden by higher: mappings present in both merge

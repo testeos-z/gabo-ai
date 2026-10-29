@@ -1,0 +1,70 @@
+# gabo configuration example. Secrets never go here, in any layer: only the
+# names of the environment variables that carry them.
+#
+# gabo merges up to two layers, lowest to highest precedence
+# (there is no system layer: /etc/gabo/gabo.yaml is never read):
+#   1. user:    $XDG_CONFIG_HOME/gabo/config.yaml, else ~/.config/gabo/config.yaml
+#   2. project: gabo.yaml at the git top-level of the current directory
+#               (the current directory itself outside a git repository)
+# A higher layer overrides only the keys it sets: mappings merge key by key,
+# scalars and lists replace the lower value, `key: null` unsets it.
+# Missing files are skipped; an unknown key fails and names its file. The
+# former cloud keys (server, users, bot, sessions) fail naming their key path
+# and slots.agent_host; gabo never rewrites a config file.
+# Validation runs once on the merged result. gabo fills no key: a missing
+# required key fails with `✗ <key> missing` and `next: run setup`.
+
+runtimes:
+  coder: claude
+  # claude or pi; a pi reviewer reuses the owner's Pi login unless
+  # review.pi_credential_env is set.
+  reviewer: claude
+  assistant: claude
+
+repo:
+  name: cappy-lab/vulcam
+  integration_branch: dev
+
+# Read by the user-level reviewer scripts (gabo-reviewer skill, D20).
+review:
+  # Run in order inside a copy of the merged tree, with GitHub credentials
+  # stripped from the environment; split on whitespace, no shell.
+  checks:
+    - bun install --frozen-lockfile
+    - bun run build
+    - bun run check-types
+    - bun run lint
+    - bun run test
+  # Merge clean PRs into the integration branch, pinned to the reviewed head.
+  auto_merge: true
+  # Never merged automatically. Entries ending in "/" are root directories;
+  # others are file names matched at any depth.
+  human_only_paths:
+    - .claude/
+    - .github/
+    - .opencode/
+    - AGENTS.md
+    - CLAUDE.md
+    - docs/policies/
+    - tools/hook-tests/
+    - agents/
+  # Optional, read only by a pi reviewer: the env var whose value the review
+  # step gets instead of the owner's Pi login (the value never goes here).
+  # pi_credential_env: ANTHROPIC_API_KEY
+  # Reviewer state (its own clone/, worktrees/ and ci/ workspaces), 0700.
+  # Default: $XDG_STATE_HOME/gabo/reviewer, else ~/.local/state/gabo/reviewer.
+  # state_dir: /home/owner/.local/state/gabo/reviewer
+
+# GitHub login the coder pushes with, only when it differs from the owner's.
+# In single-user mode it is usually unset.
+# coder:
+#   login: vulcam-coder
+
+# Most coder sessions the cycle runs at once (required). 3 leaves room for
+# the reviewer's checks on the same machine; lower it on a smaller one.
+parallelism: 3
+
+# Read by the cycle at wave cleanup.
+worktree:
+  # Worktree names (or absolute paths) that are never closed.
+  keep: []

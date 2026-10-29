@@ -14,7 +14,7 @@ func TestCommandPrintsVersion(t *testing.T) {
 	if err := cmd.Execute(); err != nil {
 		t.Fatalf("Execute() error = %v", err)
 	}
-	if got, want := out.String(), "gbai 1.2.3\n"; got != want {
+	if got, want := out.String(), "gabo 1.2.3\n"; got != want {
 		t.Fatalf("output = %q, want %q", got, want)
 	}
 }

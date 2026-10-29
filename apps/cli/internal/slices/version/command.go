@@ -10,10 +10,10 @@ import (
 func NewCommand(uc *UseCase) *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Print the gbai version",
+		Short: "Print the gabo version",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			_, err := fmt.Fprintf(cmd.OutOrStdout(), "gbai %s\n", uc.Show().Version)
+			_, err := fmt.Fprintf(cmd.OutOrStdout(), "gabo %s\n", uc.Show().Version)
 			return err
 		},
 	}

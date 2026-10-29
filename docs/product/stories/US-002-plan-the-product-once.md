@@ -15,7 +15,7 @@ As a solo developer, I want directiva to produce the global plan once from my go
 ## Acceptance criteria
 
 - Given I state a goal, When directiva plans, Then it produces `docs/product` and creates the tracker tasks with blocked-by / unblocks dependencies, and no task is created outside the dependency map.
-- Given a planning document is being created, When directiva fills it, Then it uses the template from its skill (gbai's own) and asks the template's fixed questions one at a time.
+- Given a planning document is being created, When directiva fills it, Then it uses the template from its skill (gabo-ai's own) and asks the template's fixed questions one at a time.
 - Given a story has no requirement, a requirement has no decision, task or verification, a task has no story, or the dependency graph has a cycle, When the next planning step is attempted, Then the traceability check that directiva runs from its skill instruction blocks it.
 - Given a task was modified after a wave, When the next wave starts, Then the cycle reads the task again with its changes.
 
