@@ -28,14 +28,47 @@ Use whenever a gabo agent records or reads decisions, the per-wave resource ledg
 
 ## Operations
 
-| contract op | how |
-|---|---|
-| save decision | `mem_save` with the decision topic, type `decision` |
-| list decisions | `mem_search` with `gabo/decision/<wave>` (or `/<task>`) and a mode word; open hits with `mem_get_observation` |
-| search / read one | `mem_search`, then `mem_get_observation` for the full text |
-| append to ledger | read `gabo/ledger/<wave>`, add the lines, `mem_update` (create with `mem_save` the first time) |
-| save / read trace | same pattern on `gabo/trace/<wave>` |
-| preferences | read `user/preferences` at session start; increment the count of a repeated observation |
+Tool calls come from this adapter's former operation table and Records, and the `memory` contract with its Engram example adapter; parameter names (`title`, `content`, `type`, `topic_key`, `scope`; `mem_update` needs `id` and `expected_project`; `mem_search` takes `query`, optional `scope`, `type`) confirmed from the Engram MCP tool schemas on 2026-10-28. Every save is read back with `mem_get_observation` on the returned id; a record that does not show up after one retry is `unverified`.
+
+### save decision
+
+`mem_save` with `type: decision`, `topic_key: gabo/decision/<wave>/<task or "global">/<slug>`, `scope: project`, `title: <what>`, `content` lines `what:`, `question:`, `choice:`, `why:`, `who:`, `mode:`, `wave:`, `task:`. Return the observation id. Read back: `mem_get_observation` with that id.
+
+### list decisions
+
+`mem_search` with `query: gabo/decision/<wave>` (add `/<task>` to narrow) and `type: decision`, plus the mode word (`manual` or `auto`) when filtering by mode; open each hit with `mem_get_observation` and drop records whose fields do not match the filter.
+
+### search
+
+`mem_search` with the query; return the hit ids and titles.
+
+### read one
+
+`mem_search` for the topic key when only the key is known, then `mem_get_observation` with the id for the full text.
+
+### save ledger
+
+`mem_search` for `gabo/ledger/<wave>`; if found, `mem_get_observation`, add the lines and `mem_update` (`id`, `expected_project`, `content`); otherwise `mem_save` with `topic_key: gabo/ledger/<wave>`, `scope: project`. One line per resource: kind, name or path, creator agent, task, state (`live`, `removed`, `leftover`). Read back: `mem_get_observation` with the id.
+
+### read ledger
+
+`mem_search` for `gabo/ledger/<wave>`, then `mem_get_observation`.
+
+### save wave trace
+
+Same pattern as `save ledger` on `gabo/trace/<wave>`: wave tasks with status, PR, verdict, open questions.
+
+### read wave trace
+
+`mem_search` for `gabo/trace/<wave>` (or `gabo/trace/` for the latest), then `mem_get_observation`.
+
+### save preference
+
+`mem_search` for `user/preferences` in the chosen scope (`scope: personal` for global, `scope: project` otherwise); increment the count of a repeated observation with `mem_update`, or add it with `mem_save` (`topic_key: user/preferences`, same scope). Content: observation, evidence, count.
+
+### read preferences
+
+Read `user/preferences` at session start: `mem_search` for `user/preferences` with `scope: personal` and with `scope: project`; open both with `mem_get_observation`; project overrides global.
 
 ## Output Contract
 

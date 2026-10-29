@@ -24,6 +24,37 @@ Load in every coder as the `methodology` slot (`gabo-methodology`, TRD 9.1). gen
 3. If RDD is on: `gentle-ai review assess --cwd <worktree> --json` on the commit and follow `review_due` / `next_transition`.
 4. Run the repository checks the reviewer will run (`review.checks` in `gabo.yaml`) before pushing.
 
+## Operations
+
+Derived from the Hard Rules and Coder Steps above and the `methodology` contract; `gentle-ai` commands as named in this adapter.
+
+### coder instructions
+
+1. Read the task issue, its acceptance criteria and the code it touches (ODD: explore first).
+2. When a relevant deterministic test exists: write it and observe RED, implement GREEN, refactor while green. Otherwise state the exception and run proportional checks.
+3. Commit each work unit with a Conventional Commit message, tests and docs with the behavior, no AI attribution lines (`git commit -m "<type>(<scope>): <summary>"`).
+4. Before pushing, run every command of `review.checks` in `gabo.yaml` (split on whitespace, as the reviewer runs them) and fix failures.
+
+### coder-side review
+
+RDD, only when it is on. Check, read-only:
+
+```bash
+gentle-ai review mode status
+```
+
+When it reports on, after each work-unit commit run
+
+```bash
+gentle-ai review assess --cwd <worktree> --json
+```
+
+and follow `review_due` / `next_transition` verbatim (execute the returned command unchanged); a declined candidate continues under ordinary policy. When off, coder-side review is `none` for this task. Never run `gentle-ai review mode enable|disable`. RDD never replaces the gabo reviewer, the mandatory merge gate, which still runs after the push.
+
+### report per task
+
+Add to the coder outcome: RED/GREEN evidence or the stated exception, commits (SHA and message), each `review.checks` command with its result, and the RDD outcome (`granted`, `declined`, `passive`, `off`, `unavailable`).
+
 ## Keeping gentle-ai current
 
 Only at session start or between waves, never mid-wave (a version change mid-wave would split one wave across two toolchains):
