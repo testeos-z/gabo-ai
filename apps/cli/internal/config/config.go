@@ -92,6 +92,11 @@ type Review struct {
 	// PiCredentialEnv optionally names the env var whose value the pi
 	// reviewer gets instead of reusing the owner's Pi login (T073).
 	PiCredentialEnv string `yaml:"pi_credential_env"`
+	// CheckEnv names environment variables the reviewer passes from its own
+	// environment into the checks (never into the agent review). Names only,
+	// never values (R21); a listed variable unset at review time fails the
+	// checks.
+	CheckEnv []string `yaml:"check_env,omitempty"`
 	// StateDir holds the reviewer's own clone, worktrees and check
 	// workspaces. Empty means the reviewer scripts' default state dir.
 	StateDir string `yaml:"state_dir,omitempty"`
@@ -104,6 +109,21 @@ var (
 	branchPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
 	loginPattern  = regexp.MustCompile(`^[A-Za-z0-9-]+(\[bot\])?$`)
 )
+
+// reservedCheckEnv reports the names the reviewer sets for the checks itself
+// or keeps from them (credentials): review.check_env may not list them.
+func reservedCheckEnv(name string) bool {
+	switch name {
+	case "PATH", "HOME", "CI", "GOCACHE", "GOMODCACHE", "GOPATH", "GABO_UPGRADE_PR":
+		return true
+	}
+	for _, prefix := range []string{"GH_", "GITHUB_", "CLAUDE_", "REVIEWER_"} {
+		if strings.HasPrefix(name, prefix) {
+			return true
+		}
+	}
+	return false
+}
 
 // Load reads and validates the config file at path.
 func Load(path string) (Config, error) {
@@ -182,6 +202,16 @@ func (c Config) validate(parallelismSet bool) error {
 		check(ok, "review.human_only_paths", fmt.Sprintf("entry %q must be a relative repository path", p))
 	}
 	check(c.Review.PiCredentialEnv == "" || envPattern.MatchString(c.Review.PiCredentialEnv), "review.pi_credential_env", "must be an environment variable name")
+	for _, name := range c.Review.CheckEnv {
+		switch {
+		case !envPattern.MatchString(name):
+			check(false, "review.check_env", fmt.Sprintf("entry %q must be an environment variable name", name))
+		case reservedCheckEnv(name):
+			check(false, "review.check_env", fmt.Sprintf("entry %q is reserved for the reviewer", name))
+		case name == c.Review.PiCredentialEnv:
+			check(false, "review.check_env", fmt.Sprintf("entry %q is review.pi_credential_env, the review engine's credential", name))
+		}
+	}
 	check(c.Coder.Login == "" || loginPattern.MatchString(c.Coder.Login), "coder.login", "must be a GitHub login")
 	check(c.Review.StateDir == "" || pathPattern.MatchString(c.Review.StateDir), "review.state_dir", "must be an absolute path of safe characters")
 	check(c.Parallelism > 0, "parallelism", "must be a positive number of coder sessions")

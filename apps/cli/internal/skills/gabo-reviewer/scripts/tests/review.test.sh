@@ -167,6 +167,30 @@ origin gabocheck O_CHECKS='gabo check'
 scenario gabocheck >/dev/null
 check "gabo check (the current binary name) also runs the configured binary" grep -qE '^gabo-call check ' "$work/gabocheck/calls.log"
 
+echo "# review.check_env"
+origin checkenv O_CHECK_ENV='TEST_DB_URL'
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" \
+  "$(scenario checkenv TEST_DB_URL=listed-value UNLISTED_VAR=unlisted-value)" "a listed, exported variable passes the checks"
+check "a listed variable is visible to the checks" grep -qxF 'check-vars TEST_DB_URL=listed-value UNLISTED_VAR=unset' "$work/checkenv/calls.log"
+check "an unlisted variable is not visible to the checks" bash -c "! grep '^check-vars' '$work/checkenv/calls.log' | grep -q unlisted-value"
+check "the review step does not get listed variables" grep -qxF 'cc-vars TEST_DB_URL=unset UNLISTED_VAR=unset' "$work/checkenv/calls.log"
+check "the value never reaches the comment" bash -c "! grep -q listed-value '$work/checkenv/all_posted_7.md'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario checkenv_unset)" \
+  "a listed, unset variable fails the checks"
+expect_match '^reviewer/tests failure .*TEST_DB_URL' "$(status_line checkenv_unset reviewer/tests)" \
+  "the reviewer/tests failure names the variable"
+check "no check runs when a listed variable is unset" bash -c "! grep -q '^go-argc' '$work/checkenv_unset/calls.log'"
+check "the comment names the unset variable" grep -qF 'TEST_DB_URL' "$work/checkenv_unset/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario checkenv_empty TEST_DB_URL=)" \
+  "a listed, empty variable fails the checks"
+check "no check runs when a listed variable is empty" bash -c "! grep -q '^go-argc' '$work/checkenv_empty/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" \
+  "$(scenario checkenv_failing TEST_DB_URL=listed-value FAIL_CHECK=vet)" "a failing check with a listed variable is blocking"
+check "the failure output is posted" grep -qF 'connection refused' "$work/checkenv_failing/posted_7.md"
+check "a listed value printed by a failing check never reaches the comment" \
+  bash -c "! grep -q listed-value '$work/checkenv_failing/all_posted_7.md'"
+check "the failure output names the redacted variable" grep -qF 'open [review.check_env:TEST_DB_URL]: connection refused' "$work/checkenv_failing/posted_7.md"
+
 echo "# pi reviewer reusing the owner's Pi login (runtimes.reviewer: pi)"
 origin pi O_REVIEWER=pi O_AUTO_MERGE=true O_PR=pi
 v="$(scenario pi_clean)"

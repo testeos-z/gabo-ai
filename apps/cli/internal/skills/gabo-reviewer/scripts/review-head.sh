@@ -11,8 +11,10 @@
 #    entry runs REVIEWER_GABO_BIN. A PR that changes .gabo/VERSION is an
 #    upgrade PR: its checks get GABO_UPGRADE_PR=1 and the comment reports
 #    "upgrade PR: only config validated, human merge required" with the
-#    changed paths outside the catalog and the agent directories. The
-#    worktree is removed when the run ends.
+#    changed paths outside the catalog and the agent directories. Each
+#    variable named in review.check_env (base gabo.yaml) is passed from the
+#    reviewer's own environment; one unset or empty fails the checks before
+#    any runs. The worktree is removed when the run ends.
 # 4. Reviews the PR diff with the runtimes.reviewer engine (Claude Code or
 #    Pi), read-only, in the head checkout.
 # 5. Posts one comment (first line: the verdict; last lines: the marker that
@@ -223,8 +225,31 @@ check_env=(env -i "PATH=$PATH" "HOME=$check_home" CI=true
 [[ "$upgrade" != true ]] || check_env+=(GABO_UPGRADE_PR=1)
 results=()
 failed=()
+# review.check_env: names from the base gabo.yaml, values from the reviewer's
+# own environment, for the checks only (the review step's env -i never gets
+# them). Only names are ever reported, never values (R21): a value a check
+# prints is redacted from the failure output before it is posted.
+missing_env=()
+passed_env=()
+for name in $CHECK_ENV; do
+  if [[ -n "${!name:-}" ]]; then
+    check_env+=("$name=${!name}")
+    passed_env+=("$name")
+  else
+    missing_env+=("$name")
+  fi
+done
+if ((${#missing_env[@]})); then
+  {
+    echo "review.check_env lists ${missing_env[*]}, unset or empty in the reviewer's environment."
+    echo "Export it where the reviewer runs; no check ran."
+  } >"$logs/check-env.log"
+  results+=("review.check_env|failed|0|unset or empty: ${missing_env[*]}")
+  failed+=(check-env)
+fi
 i=0
-while IFS= read -r check; do
+# A missing variable runs no check at all: no silent skip, no false green.
+((${#missing_env[@]} == 0)) && while IFS= read -r check; do
   i=$((i + 1))
   read -ra argv <<<"$check"
   # "gabo check" runs only when review.checks lists it, with the configured
@@ -246,7 +271,10 @@ while IFS= read -r check; do
 done < <(parse_checks)
 cleanup_merge_wt
 passed_n="$(printf '%s\n' "${results[@]}" | grep -c '|passed|')"
-if ((${#failed[@]})); then
+if ((${#missing_env[@]})); then
+  tests_state=failure
+  tests_desc="review.check_env unset or empty: ${missing_env[*]}"
+elif ((${#failed[@]})); then
   tests_state=failure
   tests_desc="${#failed[@]} failed, $passed_n passed"
 else
@@ -498,6 +526,18 @@ body="$logs/comment.md"
     echo "_Note: the review prompt's diff was truncated to $diff_truncated of $diff_bytes bytes._"
   fi
 } >"$body"
+# redact_check_env <log>: the last MiB of <log> with every value passed through
+# review.check_env replaced, literally, by [review.check_env:<name>].
+redact_check_env() {
+  local text name val
+  text="$(tail -c 1048576 "$1" 2>/dev/null; printf x)"
+  text="${text%x}"
+  for name in "${passed_env[@]}"; do
+    val="${!name}"
+    text="${text//"$val"/"[review.check_env:$name]"}"
+  done
+  printf '%s' "$text"
+}
 budget=$((60000 - $(wc -c <"$body")))
 tails=("${failed[@]}")
 [[ "$review_state" == error ]] && tails+=(review)
@@ -510,7 +550,8 @@ if ((${#tails[@]})); then
       echo "<details><summary>Failure output: $name (last lines)</summary>"
       echo
       echo '```text'
-      tail_chars "$per" "$logs/$name.log" | grep -vF "$MARKER_PREFIX"
+      redact_check_env "$logs/$name.log" >"$logs/$name.redacted.log"
+      tail_chars "$per" "$logs/$name.redacted.log" | grep -vF "$MARKER_PREFIX"
       echo '```'
       echo
       echo "</details>"

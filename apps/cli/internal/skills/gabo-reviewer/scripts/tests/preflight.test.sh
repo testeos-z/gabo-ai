@@ -86,6 +86,16 @@ expect_match '^PREFLIGHT-FAILED REVIEWER_MODE=isolated belongs to the reviewer_p
   "$(pre REVIEWER_MODE=isolated bash "$skill/reviewer.sh" preflight)" "isolated mode is left to the placement adapter"
 expect_match '^PREFLIGHT-FAILED review.checks is empty' \
   "$(pre REVIEWER_CHECKS=' ; ' bash "$skill/reviewer.sh" preflight)" "checks are required"
+expect_match '^PREFLIGHT-FAILED review.check_env entry A=B must be an environment variable name' \
+  "$(pre REVIEWER_CHECK_ENV='A=B' bash "$skill/reviewer.sh" preflight)" "a check_env value is refused"
+for reserved in PATH HOME CI GOCACHE GOMODCACHE GOPATH GABO_UPGRADE_PR GH_TOKEN GITHUB_TOKEN CLAUDE_CODE_OAUTH_TOKEN REVIEWER_GH_TOKEN; do
+  expect_match "^PREFLIGHT-FAILED review.check_env entry $reserved is reserved" \
+    "$(pre REVIEWER_CHECK_ENV="DB_URL $reserved" bash "$skill/reviewer.sh" preflight)" "check_env refuses the reserved name $reserved"
+done
+expect_match '^PREFLIGHT-OK ' "$(pre REVIEWER_CHECK_ENV='DB_URL _X1' bash "$skill/reviewer.sh" preflight)" "valid check_env names pass"
+expect_match '^PREFLIGHT-FAILED review.check_env entry PI_KEY is review.pi_credential_env' \
+  "$(pre REVIEWER_PI_CREDENTIAL_ENV=PI_KEY REVIEWER_CHECK_ENV='DB_URL PI_KEY' bash "$skill/reviewer.sh" preflight)" \
+  "check_env refuses the Pi credential name"
 expect_match '^PREFLIGHT-FAILED gh cannot authenticate' \
   "$(pre REVIEWER_GH=/bin/false bash "$skill/reviewer.sh" preflight)" "no gh login is refused"
 out="$(pre REVIEWER_BASE_BRANCH=main bash "$skill/reviewer.sh" head 7 "$sha")"

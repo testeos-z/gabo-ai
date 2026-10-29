@@ -168,6 +168,9 @@ apply_repo_settings() {
   HUMAN_ONLY_PATHS="${REVIEWER_HUMAN_ONLY_PATHS-.claude/ .github/ gabo.yaml AGENTS.md CLAUDE.md}"
   PLACEMENT="${REVIEWER_PLACEMENT:-local}"
   AGENT_DIRS="${REVIEWER_AGENT_DIRS:-}"
+  # Names (never values) of the variables passed from the reviewer's own
+  # environment into the checks (review.check_env).
+  CHECK_ENV="${REVIEWER_CHECK_ENV:-}"
   MINIMUM="${REVIEWER_MINIMUM:-none}"
   # The reviewer posts with the owner's own login, which the owner and the
   # coders also use, so a verdict comment counts only with this marker on a
@@ -331,6 +334,15 @@ validate_static() {
   [[ "$PI_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || echo "REVIEWER_PI_MODEL has unexpected characters"
 }
 
+# check_env_reserved <name>: true for a name review.check_env may not list:
+# the variables the reviewer sets for the checks itself and its credentials.
+check_env_reserved() {
+  case "$1" in
+    PATH | HOME | CI | GOCACHE | GOMODCACHE | GOPATH | GABO_UPGRADE_PR | GH_* | GITHUB_* | CLAUDE_* | REVIEWER_*) return 0 ;;
+  esac
+  return 1
+}
+
 # validate_config: prints the first problem, or nothing.
 validate_config() {
   local problem entry
@@ -341,6 +353,13 @@ validate_config() {
   [[ "$MARKER" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || { echo "reviewer.signing.marker must be one word (got '$MARKER')"; return; }
   [[ "$AUTO_MERGE" =~ ^(true|false)$ ]] || { echo "review.auto_merge must be true or false"; return; }
   [[ -n "$(parse_checks)" ]] || { echo "review.checks is empty"; return; }
+  for entry in $CHECK_ENV; do
+    [[ "$entry" =~ ^[A-Z_][A-Z0-9_]*$ ]] ||
+      { echo "review.check_env entry $entry must be an environment variable name"; return; }
+    ! check_env_reserved "$entry" || { echo "review.check_env entry $entry is reserved for the reviewer"; return; }
+    [[ "$entry" != "$PI_CREDENTIAL_ENV" ]] ||
+      { echo "review.check_env entry $entry is review.pi_credential_env, the review engine's credential"; return; }
+  done
   for entry in $AGENT_DIRS; do
     [[ "$entry" =~ ^[A-Za-z0-9._-][A-Za-z0-9._/-]*/$ && ! "$entry" =~ (^|/)\.\.(/|$) ]] ||
       { echo "agent directory $entry must stay inside the repository"; return; }
@@ -410,6 +429,7 @@ load_base_config() {
   [[ -n "${REVIEWER_MARKER+set}" ]] || REVIEWER_MARKER="$(yaml_get "$y" reviewer.signing.marker | head -n 1)"
   [[ -n "${REVIEWER_PLACEMENT+set}" ]] || REVIEWER_PLACEMENT="$(yaml_get "$y" reviewer.placement | head -n 1)"
   [[ -n "${REVIEWER_AGENT_DIRS+set}" ]] || REVIEWER_AGENT_DIRS="$(declared_agent_dirs | paste -sd' ' -)"
+  [[ -n "${REVIEWER_CHECK_ENV+set}" ]] || REVIEWER_CHECK_ENV="$(yaml_get "$y" review.check_env | paste -sd' ' -)"
   [[ -n "${REVIEWER_ENGINE+set}" ]] || REVIEWER_ENGINE="$(yaml_get "$y" runtimes.reviewer | head -n 1)"
   [[ -n "${REVIEWER_PI_CREDENTIAL_ENV+set}" ]] || REVIEWER_PI_CREDENTIAL_ENV="$(yaml_get "$y" review.pi_credential_env | head -n 1)"
   export REVIEWER_ENGINE REVIEWER_PI_CREDENTIAL_ENV
@@ -419,7 +439,8 @@ load_base_config() {
     stamp="$(cat "$BASE_DIR/$BUILTIN_STAMP")"
     REVIEWER_MINIMUM="${stamp:-invalid}"
   fi
-  export REVIEWER_CHECKS REVIEWER_AUTO_MERGE REVIEWER_MARKER REVIEWER_PLACEMENT REVIEWER_AGENT_DIRS REVIEWER_MINIMUM
+  export REVIEWER_CHECKS REVIEWER_AUTO_MERGE REVIEWER_MARKER REVIEWER_PLACEMENT REVIEWER_AGENT_DIRS REVIEWER_MINIMUM \
+    REVIEWER_CHECK_ENV
   [[ -z "${REVIEWER_HUMAN_ONLY_PATHS+set}" ]] || export REVIEWER_HUMAN_ONLY_PATHS
   [[ -n "$REVIEWER_AUTO_MERGE" ]] || unset REVIEWER_AUTO_MERGE
   [[ -n "$REVIEWER_MARKER" ]] || unset REVIEWER_MARKER
