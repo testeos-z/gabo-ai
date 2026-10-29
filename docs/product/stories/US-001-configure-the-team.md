@@ -5,7 +5,7 @@
 | status | Approved (auto proposal, owner 2026-10-26) |
 | user | solo developer |
 | priority | must |
-| requirements | R12, R16, R8, R31, R32, R33, R34, R36 |
+| requirements | R12, R16, R8, R31, R32, R33, R34, R36, R39 |
 | depends on | — |
 
 ## Story
@@ -34,7 +34,10 @@ As a solo developer, I want the assistant to guide me through configuring my age
 - Given a second developer clones a configured repository without the user-level `gabo-reviewer` skill, or with one that differs from the embedded skill, When they run `gabo init`, Then it installs that skill whatever the stamp says, and leaves the config untouched (Approved (owner 2026-10-27), R32, issue #74).
 - Given I upgraded and ran `gabo init` but my agent has not rebuilt the agents yet, When `gabo check` runs, Then it fails for each agent whose version line differs from the catalog stamp with "agent <id> built with <v>, catalog is <w>: ask your agent to rebuild" (Approved (owner 2026-10-27), R33, PRD O11).
 - Given a configured project, When I, an agent, the reviewer or CI runs `gabo check`, Then it validates the config files against their JSON Schemas, confirms every agent of the neutral agent spec is present, checks slot coverage and checks that the catalog version stamp matches the CLI version, warning locally without failing on an older stamp with "this project uses gabo <stamp>; run gabo init to upgrade it", on a missing stamp with "no stamp: run gabo init" and on a newer stamp with the exact upgrade command, and checks that every agent's version line exists and matches the catalog stamp (failing with "agent <id> built with <v>, catalog is <w>: ask your agent to rebuild"), writes nothing and exits non-zero on any failure (Approved (owner 2026-10-27), R33).
-- Given I list the gabo CLI commands, When I read the help, Then only `gabo init`, `gabo check` and `gabo version` exist (Approved (owner 2026-10-27), R31).
+- Superseded (Proposed (auto), issue #148): Given I list the gabo CLI commands, When I read the help, Then only `gabo init`, `gabo check` and `gabo version` exist (Approved (owner 2026-10-27), R31).
+- Given I list the gabo CLI commands, When I read the help, Then only `gabo init`, `gabo check`, `gabo version` and `gabo prompt` exist (Proposed (auto), owner request 2026-10-29, issue #148, R31).
+- Given I need the setup prompt again (for example in a new agent session), When I run `gabo prompt` in any directory, Then it prints exactly the setup prompt embedded in the CLI, the same text `gabo init` prints and the documentation publishes, prints nothing else and exits 0 (Proposed (auto), issue #148, R39, R36).
+- Given a project with or without a catalog, stamp or config, When I run `gabo prompt`, Then no file, config, catalog, stamp or reviewer skill is created or changed (Proposed (auto), issue #148, R39).
 - Superseded (owner 2026-10-27): Given I paste the setup prompt from the gbai documentation into Claude Code or Pi, When the agent runs it, Then it installs gbai, asks the setup questions, writes the config files and runs `gbai generate`, which installs the agents and per-runtime artifacts for each runtime in `generation.targets` (Approved (owner 2026-10-26)). Since 2026-10-27 the pasted prompt is the second entry, with the text embedded in the CLI (R36).
 - Given I run setup for the first time, When the assistant configures a slot, Then it asks me before configuring it and only suggests options, applying no silent default.
 - Given I am configuring the team, When the assistant asks where each agent runs and which tracker is used, Then it explains whether and how the chosen agents can communicate.

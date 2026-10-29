@@ -9,10 +9,6 @@ import (
 // owner's agent writes them during setup, gabo never fills them (R12).
 const NextSetup = "next: run setup"
 
-// NextReviewerClaude ends a load error for runtimes.reviewer: pi. The reviewer
-// scripts run only Claude until the Pi engine lands (T072, T073).
-const NextReviewerClaude = "next: set runtimes.reviewer to claude; a Pi reviewer is not supported yet (T073)"
-
 // Suggestion is a value setup may offer for a required key, among others.
 // gabo never applies it; the owner chooses (R12, TRD TD2).
 type Suggestion struct {
@@ -77,9 +73,4 @@ func withNextSetup(err error, missing []string) error {
 		return err
 	}
 	return errors.Join(err, errors.New(NextSetup))
-}
-
-// piReviewerError is the error of a layer that sets runtimes.reviewer: pi.
-func piReviewerError() error {
-	return errors.Join(fmt.Errorf("runtimes.reviewer: must be %q, got %q", RuntimeClaude, RuntimePi), errors.New(NextReviewerClaude))
 }

@@ -353,6 +353,31 @@ func TestReviewerLinkOnlyForTheReviewerRuntime(t *testing.T) {
 	wantPassed(t, rep, PassedLine)
 }
 
+// A pi reviewer runtime decides the reviewer link from its own skill: one
+// that declares none needs no link and the project passes gabo check (T073),
+// with or without review.pi_credential_env.
+func TestPiReviewerRuntimePassesCheck(t *testing.T) {
+	t.Parallel()
+	p := linkedProject()
+	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n---\n")
+	cfg := strings.Replace(linkedConfig, "  reviewer: claude", "  reviewer: pi", 1)
+	u := goodUser().clone()
+	delete(u.links, userLink)
+	for name, c := range map[string]string{
+		"without env": cfg,
+		"with env":    strings.Replace(cfg, "  human_only_paths: [.github/]\n", "  human_only_paths: [.github/]\n  pi_credential_env: PI_TOKEN\n", 1),
+	} {
+		rep, err := NewUseCase(p, configFiles{projectFile: c}, u, Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if rep.Failed {
+			t.Errorf("%s: gabo check failed: %v", name, rep.Lines)
+		}
+		wantPassed(t, rep, PassedLine)
+	}
+}
+
 func TestExpand(t *testing.T) {
 	t.Parallel()
 	get := env("HOME", "/h", "CFG", "/c")

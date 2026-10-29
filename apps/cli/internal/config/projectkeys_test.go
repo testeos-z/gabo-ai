@@ -6,8 +6,7 @@ import (
 )
 
 // dbSchemaExample is the project gabo.yaml example of DB_SCHEMA 4.2, with a
-// Claude reviewer: the reviewer scripts run only Claude (T072; the DB_SCHEMA
-// wording follows in T075). pi_credential_env still parses with no effect.
+// Claude reviewer (the DB_SCHEMA wording follows in T075).
 const dbSchemaExample = `# yaml-language-server: $schema=https://raw.githubusercontent.com/testeos-z/gabo-ai/main/schemas/gabo.project.schema.json
 version: 1
 mode: manual

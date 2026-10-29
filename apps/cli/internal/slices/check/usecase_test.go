@@ -205,15 +205,23 @@ func TestConfigFailureNamesKeyFileAndNext(t *testing.T) {
 	wantLines(t, r, NextFixConfig)
 }
 
-// The reviewer scripts run only Claude (T072): a pi reviewer fails with the
-// file, the key path and its own next step, in any layer.
-func TestPiReviewerFailsWithItsNext(t *testing.T) {
+// The reviewer scripts run Claude or Pi (T073): a pi reviewer passes the
+// config checks with or without review.pi_credential_env, in any layer.
+func TestPiReviewerConfigPasses(t *testing.T) {
 	t.Parallel()
 	pi := strings.Replace(validConfig, "reviewer: claude", "reviewer: pi", 1)
-	r := run(t, project(), configFiles{projectFile: pi}, Settings{})
-	wantFailed(t, r, "✗ "+projectFile+`: runtimes.reviewer: must be "claude", got "pi"`, config.NextReviewerClaude)
-	r = run(t, project(), configFiles{userFile: "runtimes:\n  reviewer: pi\n", projectFile: validConfig}, Settings{})
-	wantFailed(t, r, "✗ "+userFile+`: runtimes.reviewer: must be "claude", got "pi"`, config.NextReviewerClaude)
+	for name, files := range map[string]configFiles{
+		"without env": {projectFile: pi},
+		"with env":    {projectFile: pi + "  pi_credential_env: OPENAI_API_KEY\n"},
+		"user layer":  {userFile: "runtimes:\n  reviewer: pi\n", projectFile: validConfig},
+	} {
+		r := run(t, project(), files, Settings{})
+		for _, l := range r.Lines {
+			if strings.Contains(l, "runtimes.reviewer") || strings.Contains(l, "pi_credential_env") {
+				t.Errorf("%s: line %q, want no reviewer runtime failure", name, l)
+			}
+		}
+	}
 }
 
 func TestFormerCloudKeyFailsNamingAgentHost(t *testing.T) {

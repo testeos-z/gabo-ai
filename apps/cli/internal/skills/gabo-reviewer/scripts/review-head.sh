@@ -15,7 +15,8 @@
 #    variable named in review.check_env (base gabo.yaml) is passed from the
 #    reviewer's own environment; one unset or empty fails the checks before
 #    any runs. The worktree is removed when the run ends.
-# 4. Reviews the PR diff with Claude Code, read-only, in the head checkout.
+# 4. Reviews the PR diff with the runtimes.reviewer engine (Claude Code or
+#    Pi), read-only, in the head checkout.
 # 5. Posts one comment (first line: the verdict; last lines: the marker that
 #    signs the head and the footer), sets reviewer/tests and reviewer/review,
 #    and on a clean head runs merge-head.sh.
@@ -35,6 +36,13 @@ if [[ -n "$problem" ]]; then
   exit 2
 fi
 [[ -n "$BOT_LOGIN" ]] || resolve_bot_login || { echo "PREFLIGHT-FAILED gh cannot authenticate" >&2; exit 2; }
+# The Pi credential named by review.pi_credential_env, like the Claude token,
+# is kept in a shell variable, out of the environment of the checks.
+PI_KEY=""
+if [[ "$ENGINE" == pi && -n "$PI_CREDENTIAL_ENV" ]]; then
+  PI_KEY="${!PI_CREDENTIAL_ENV:-}"
+  unset "$PI_CREDENTIAL_ENV"
+fi
 
 pr_fields=number,headRefOid,baseRefName,isDraft,isCrossRepository,mergeable
 info="$("$GH" pr view "$pr" --repo "$REPO" --json "$pr_fields" 2>/dev/null)" || {
@@ -357,35 +365,78 @@ find_verdict() {
 review_log="$logs/review.log"
 prompt_file="$logs/prompt.md"
 agent_prompt >"$prompt_file"
-# Read-only by construction: only Read, Grep, Glob, and Bash exist; Bash is
-# pre-approved for git diff/log/show/status only; dontAsk denies anything else.
-# --setting-sources user and --strict-mcp-config keep the PR's project
-# settings, hooks, and MCP servers out; --disable-slash-commands keeps its
-# skills out. disableAllHooks keeps the owner's user hooks from writing into
-# the checkout. The prompt comes on stdin.
-args=(-p --output-format json --permission-mode dontAsk
-  --tools Read,Grep,Glob,Bash
-  --allowedTools "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)"
-  --disallowedTools Edit Write NotebookEdit WebFetch WebSearch "mcp__*"
-  --setting-sources user --settings '{"disableAllHooks":true}' --strict-mcp-config --disable-slash-commands --no-session-persistence
-  --max-turns "$CLAUDE_MAX_TURNS")
-[[ -z "$CLAUDE_MODEL" ]] || args+=(--model "$CLAUDE_MODEL")
-# With a token, the review runs with an empty HOME of its own; without one it
-# uses the owner's Claude Code login (HOME), still without any GitHub token.
 review_env=(env -i "PATH=$PATH" NO_COLOR=1 TERM=dumb)
-if [[ -n "$CLAUDE_TOKEN" ]]; then
-  review_home="$WORKDIR/review-home"
-  mkdir -p "$review_home"
-  review_env+=("HOME=$review_home" "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOKEN")
+if [[ "$ENGINE" == pi ]]; then
+  # Read-only by construction: only the read, grep, find and ls tools exist
+  # (no bash, edit or write). --no-approve ignores the PR's project files
+  # (.pi/settings.json, .pi/mcp.json, .pi/extensions, ...); --no-extensions,
+  # --no-skills, --no-prompt-templates and --no-themes also keep the owner's
+  # user-level extensions and packages out, --no-mcp every MCP server, and
+  # --no-context-files the PR's AGENTS.md and CLAUDE.md as instructions (the
+  # agent still reads them as data). --no-session saves nothing. The prompt
+  # comes on stdin, prepended to the short message below.
+  engine_name="Pi"
+  engine_model="$PI_MODEL"
+  engine_cmd=("$PI" --mode json --no-session
+    --no-approve --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp
+    --tools read,grep,find,ls --exclude-tools 'bash,edit,write,mcp__*')
+  [[ -z "$PI_MODEL" ]] || engine_cmd+=(--model "$PI_MODEL")
+  engine_cmd+=(-- "Follow the gabo-reviewer instructions above and answer with the review comment only.")
+  # With review.pi_credential_env, the review gets only that variable and an
+  # empty HOME of its own. Without it, it reuses the owner's Pi login and
+  # model configuration: the owner's HOME, so Pi reads auth.json (the login,
+  # refreshed in place), settings.json (default provider and model) and
+  # models.json from its agent dir, still without any GitHub token.
+  if [[ -n "$PI_CREDENTIAL_ENV" ]]; then
+    review_home="$WORKDIR/review-home"
+    mkdir -p "$review_home"
+    review_env+=("HOME=$review_home" "$PI_CREDENTIAL_ENV=$PI_KEY")
+  else
+    review_env+=("HOME=$HOME")
+    [[ -z "${PI_CODING_AGENT_DIR:-}" ]] || review_env+=("PI_CODING_AGENT_DIR=$PI_CODING_AGENT_DIR")
+  fi
 else
-  review_env+=("HOME=$HOME")
+  # Read-only by construction: only Read, Grep, Glob, and Bash exist; Bash is
+  # pre-approved for git diff/log/show/status only; dontAsk denies anything
+  # else. --setting-sources user and --strict-mcp-config keep the PR's
+  # project settings, hooks, and MCP servers out; --disable-slash-commands
+  # keeps its skills out. disableAllHooks keeps the owner's user hooks from
+  # writing into the checkout. The prompt comes on stdin.
+  engine_name="Claude Code"
+  engine_model="$CLAUDE_MODEL"
+  engine_cmd=("$CLAUDE" -p --output-format json --permission-mode dontAsk
+    --tools Read,Grep,Glob,Bash
+    --allowedTools "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(git status *)"
+    --disallowedTools Edit Write NotebookEdit WebFetch WebSearch "mcp__*"
+    --setting-sources user --settings '{"disableAllHooks":true}' --strict-mcp-config --disable-slash-commands --no-session-persistence
+    --max-turns "$CLAUDE_MAX_TURNS")
+  [[ -z "$CLAUDE_MODEL" ]] || engine_cmd+=(--model "$CLAUDE_MODEL")
+  # With a token, the review runs with an empty HOME of its own; without one
+  # it uses the owner's Claude Code login (HOME), still without any GitHub
+  # token.
+  if [[ -n "$CLAUDE_TOKEN" ]]; then
+    review_home="$WORKDIR/review-home"
+    mkdir -p "$review_home"
+    review_env+=("HOME=$review_home" "CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_TOKEN")
+  else
+    review_env+=("HOME=$HOME")
+  fi
 fi
 before="$(git -C "$wt" status --porcelain 2>/dev/null)"
 code=0
 (cd "$wt" && RUN_STDIN="$prompt_file" run_bounded $((REVIEW_TIMEOUT + 5)) "$review_log" \
-  "${review_env[@]}" "$CLAUDE" "${args[@]}") || code=$?
+  "${review_env[@]}" "${engine_cmd[@]}") || code=$?
 after="$(git -C "$wt" status --porcelain 2>/dev/null)"
-result="$(jq -Rc 'fromjson? | select(type == "object" and .type == "result")' "$review_log" 2>/dev/null | tail -n 1)"
+# One result object for both engines: Claude's final "result" record, or a
+# result built from Pi's last assistant message (stopReason "stop" is success).
+if [[ "$ENGINE" == pi ]]; then
+  result="$(jq -Rc 'fromjson? | select(type == "object" and .type == "message_end" and .message.role? == "assistant") | .message' \
+    "$review_log" 2>/dev/null | tail -n 1 |
+    jq -c '{type: "result", is_error: (.stopReason != "stop"), subtype: (if .stopReason == "stop" then "success" else (.stopReason // "unknown") end),
+      result: ([.content[]? | select(.type == "text") | .text] | join(""))}' 2>/dev/null)"
+else
+  result="$(jq -Rc 'fromjson? | select(type == "object" and .type == "result")' "$review_log" 2>/dev/null | tail -n 1)"
+fi
 text="$(jq -r '.result // empty' <<<"$result" 2>/dev/null)"
 read -r verdict at <<<"$(find_verdict "$text")"
 findings=""
@@ -411,11 +462,11 @@ fi
 findings="${findings:0:20000}"
 
 if [[ "$review_state" == error ]]; then
-  why="claude exit $code"
-  ((code == 2)) && why="no verdict line in the claude output"
+  why="$ENGINE exit $code"
+  ((code == 2)) && why="no verdict line in the $ENGINE output"
   ((code == 3)) && why="the review agent modified the checkout"
-  ((code == 5)) && why="the claude run reported an error"
-  ((code == 6)) && why="both verdict lines in the claude output"
+  ((code == 5)) && why="the $ENGINE run reported an error"
+  ((code == 6)) && why="both verdict lines in the $ENGINE output"
   ((code == 124)) && why="timed out after ${REVIEW_TIMEOUT}s"
   if ((attempt < MAX_ATTEMPTS)); then
     post_status "$sha" "$REVIEW_CONTEXT" error "Review could not complete ($why); attempt $attempt/$MAX_ATTEMPTS" || true
@@ -424,9 +475,9 @@ if [[ "$review_state" == error ]]; then
   fi
   review_desc="Review could not complete ($why) after $attempt attempts"
 elif [[ "$review_state" == success ]]; then
-  review_desc="claude: no blocking issues found"
+  review_desc="$ENGINE: no blocking issues found"
 else
-  review_desc="claude: blocking findings, see the PR comment"
+  review_desc="$ENGINE: blocking findings, see the PR comment"
 fi
 
 # --- comment ------------------------------------------------------------------------
@@ -438,7 +489,7 @@ body="$logs/comment.md"
     echo "$VERDICT_BLOCKING"
   fi
   echo
-  echo "Independent review of head \`$sha\` by gabo-reviewer: checks on the merge result \`$merge_sha\` (\`$BASE_BRANCH\` at \`$base_sha\`), then a Claude Code review${CLAUDE_MODEL:+ (\`$CLAUDE_MODEL\`)}."
+  echo "Independent review of head \`$sha\` by gabo-reviewer: checks on the merge result \`$merge_sha\` (\`$BASE_BRANCH\` at \`$base_sha\`), then a $engine_name review${engine_model:+ (\`$engine_model\`)}."
   echo
   echo "### Checks ($TESTS_CONTEXT: $tests_state)"
   echo

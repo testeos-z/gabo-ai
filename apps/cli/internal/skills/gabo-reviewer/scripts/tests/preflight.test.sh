@@ -100,6 +100,24 @@ expect_match "^VERDICT PR #7 head $sha verdict=error merge=none$" "$out" "a refu
 expect_eq 2 "$(pre bash "$skill/reviewer.sh" head 7 abc123 >/dev/null 2>&1; echo $?)" "head needs a 40-hex sha"
 expect_eq 2 "$(pre bash "$skill/reviewer.sh" head 'x;y' "$sha" >/dev/null 2>&1; echo $?)" "head needs a PR number"
 
+echo "# reviewer engine"
+O_REVIEWER=pi make_origin "$work/origin-pi.git"
+pi_pre() { PRE_ORIGIN="$work/origin-pi.git" PRE_STATE="$work/state-pi" pre "$@"; }
+expect_match '^PREFLIGHT-OK .* engine=pi ' "$(pi_pre REVIEWER_PI="$work/bin/pi" bash "$skill/reviewer.sh" preflight)" \
+  "runtimes.reviewer: pi on the integration branch selects the Pi engine"
+expect_match '^PREFLIGHT-OK .* engine=claude ' "$(pi_pre REVIEWER_ENGINE=claude bash "$skill/reviewer.sh" preflight)" \
+  "REVIEWER_ENGINE in the environment overrides runtimes.reviewer"
+expect_match '^PREFLIGHT-FAILED no pi binary \(REVIEWER_PI=/missing/pi\) for runtimes.reviewer pi$' \
+  "$(pi_pre REVIEWER_PI=/missing/pi bash "$skill/reviewer.sh" preflight)" "a missing pi binary is refused"
+expect_match '^PREFLIGHT-FAILED no claude binary \(REVIEWER_CLAUDE=/missing/claude\) for runtimes.reviewer claude$' \
+  "$(pre REVIEWER_CLAUDE=/missing/claude bash "$skill/reviewer.sh" preflight)" "a missing claude binary is refused"
+expect_match "^PREFLIGHT-FAILED REVIEWER_ENGINE must be claude or pi \(runtimes.reviewer\), got 'gpt'$" \
+  "$(pre REVIEWER_ENGINE=gpt bash "$skill/reviewer.sh" preflight)" "an unknown engine is refused"
+expect_match '^PREFLIGHT-FAILED review.pi_credential_env must be an environment variable name' \
+  "$(pi_pre REVIEWER_PI="$work/bin/pi" REVIEWER_PI_CREDENTIAL_ENV='a-b' bash "$skill/reviewer.sh" preflight)" "a bad credential env var name is refused"
+expect_match '^PREFLIGHT-FAILED review.pi_credential_env may not name PATH' \
+  "$(pi_pre REVIEWER_PI="$work/bin/pi" REVIEWER_PI_CREDENTIAL_ENV=PATH bash "$skill/reviewer.sh" preflight)" "a credential env var may not replace the review's own environment"
+
 echo "# placement"
 O_PLACEMENT=github-actions make_origin "$work/origin-gha.git"
 expect_match '^PREFLIGHT-FAILED reviewer.placement github-actions is planned for a later release; only local runs here' \

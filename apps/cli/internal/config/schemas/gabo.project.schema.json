@@ -47,10 +47,7 @@
           "additionalProperties": false,
           "properties": {
             "coder": { "$ref": "#/$defs/runtime" },
-            "reviewer": {
-              "description": "Reviewer runtime. Only claude: the reviewer scripts run only Claude; a Pi reviewer is not supported yet (T073).",
-              "enum": ["claude", null]
-            },
+            "reviewer": { "$ref": "#/$defs/runtime" },
             "assistant": { "$ref": "#/$defs/runtime" }
           }
         },
@@ -86,7 +83,7 @@
               "items": { "$ref": "#/$defs/relativePath" }
             },
             "pi_credential_env": {
-              "description": "Name of an environment variable for a future pi reviewer (T073). Optional and without effect: the reviewer scripts run only Claude. The value never enters the config (R21).",
+              "description": "Optional, read only by a pi reviewer: name of the environment variable whose value the review step gets instead of reusing the owner's Pi login. The value never enters the config (R21).",
               "type": ["string", "null"],
               "pattern": "^([A-Z_][A-Z0-9_]*)?$"
             },

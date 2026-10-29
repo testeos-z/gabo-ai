@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end tests of one review: reviewer.sh head -> review-head.sh ->
-# merge-head.sh, offline with fake gh, claude, go and gabo, and a local bare
+# merge-head.sh, offline with fake gh, claude, pi, go and gabo, and a local bare
 # repository standing in for GitHub.
 # Run: bash tests/review.test.sh
 set -uo pipefail
@@ -11,6 +11,10 @@ work="$(new_tmp)"
 fake_home="$work/home"
 skill="$(install_skill "$fake_home")"
 make_stubs "$work/bin"
+# The owner's Pi login and model config, which a Pi review reuses.
+mkdir -p "$fake_home/.pi/agent"
+echo '{"openai": {"type": "oauth"}}' >"$fake_home/.pi/agent/auth.json"
+echo '{"defaultProvider": "openai", "defaultModel": "gpt-5.5"}' >"$fake_home/.pi/agent/settings.json"
 
 # origin <name> [O_*=value...]: builds the fixture repository <name> and a
 # caller checkout of its integration branch; sets ORIGIN, CALLER and the
@@ -43,7 +47,7 @@ scenario() {
   (
     cd "$CALLER" || exit 1
     export HOME="$fake_home" PATH="$work/bin:$PATH" STUB_LOG="$fx/calls.log" FIXTURE="$fx" \
-      REVIEWER_GH="$work/bin/gh" REVIEWER_CLAUDE="$work/bin/claude" REVIEWER_GABO_BIN="$work/bin/gabo" \
+      REVIEWER_GH="$work/bin/gh" REVIEWER_CLAUDE="$work/bin/claude" REVIEWER_PI="$work/bin/pi" REVIEWER_GABO_BIN="$work/bin/gabo" \
       GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_REMOTE_URL="$ORIGIN" \
       REVIEWER_GH_TOKEN=secret-gh CLAUDE_CODE_OAUTH_TOKEN=secret-claude \
       REVIEWER_NOW=2026-10-20T12:00:00Z REVIEWER_MERGE_DELAY=0 REVIEWER_MERGE_TRIES=2
@@ -186,6 +190,52 @@ check "the failure output is posted" grep -qF 'connection refused' "$work/checke
 check "a listed value printed by a failing check never reaches the comment" \
   bash -c "! grep -q listed-value '$work/checkenv_failing/all_posted_7.md'"
 check "the failure output names the redacted variable" grep -qF 'open [review.check_env:TEST_DB_URL]: connection refused' "$work/checkenv_failing/posted_7.md"
+
+echo "# pi reviewer reusing the owner's Pi login (runtimes.reviewer: pi)"
+origin pi O_REVIEWER=pi O_AUTO_MERGE=true O_PR=pi
+v="$(scenario pi_clean)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" "a clean Pi review ends with the same VERDICT line and merges"
+expect_eq "No blocking issues found." "$(first_line pi_clean)" "the Pi comment opens with the clean verdict"
+expect_eq "<!-- gbai-reviewer-bot sha=$HEAD_SHA -->|🤖 gabo reviewer" "$(footer pi_clean)" "the Pi comment ends with the marker and the footer"
+check "the Pi comment carries the findings" grep -qF 'All files comply.' "$work/pi_clean/posted_7.md"
+check "the Pi comment names the engine" grep -qF 'then a Pi review' "$work/pi_clean/posted_7.md"
+expect_match '^reviewer/review success pi: no blocking issues found' "$(status_line pi_clean reviewer/review)" "the review status names the engine"
+check "claude never runs for a Pi reviewer" bash -c "! grep -q '^claude ' '$work/pi_clean/calls.log'"
+check "the Pi review runs in the head checkout" grep -qE "^pi .* cwd=$work/pi_clean/state/worktrees/pr-7$" "$work/pi_clean/calls.log"
+check "the Pi review is one-shot JSON without a saved session" grep -qE '^pi --mode json --no-session ' "$work/pi_clean/calls.log"
+check "the Pi review is read-only: only read, grep, find and ls" grep -qE '^pi .* --tools read,grep,find,ls --exclude-tools bash,edit,write,mcp__\* ' "$work/pi_clean/calls.log"
+check "the Pi review skips project files, extensions, skills, prompt templates, themes, context files and MCP" \
+  grep -qE '^pi .*--no-approve --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp ' "$work/pi_clean/calls.log"
+expect_eq "pi-project=ignored" "$(grep '^pi-project=' "$work/pi_clean/calls.log")" "the PR head's .pi settings, MCP servers and extension never load"
+check "the Pi review reuses the owner's HOME and no token" grep -qxF \
+  "pi-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset PI_TEST_KEY=unset HOME=$fake_home PI_CODING_AGENT_DIR=unset" "$work/pi_clean/calls.log"
+expect_eq "pi-files auth=yes settings=yes" "$(grep '^pi-files ' "$work/pi_clean/calls.log")" "the Pi review sees the owner's auth.json and settings.json"
+check "the Pi prompt carries the PR diff" grep -q 'func main' "$work/pi_clean/prompt_seen.txt"
+expect_eq 1 "$(grep -c 'gbai-reviewer-bot sha=' "$work/pi_clean/all_posted_7.md")" "one Pi verdict comment per head"
+scenario pi_agent_dir PI_CODING_AGENT_DIR="$fake_home/.pi/agent" >/dev/null
+check "a custom PI_CODING_AGENT_DIR of the owner reaches the review" \
+  grep -qE "^pi-env .* HOME=$fake_home PI_CODING_AGENT_DIR=$fake_home/.pi/agent$" "$work/pi_agent_dir/calls.log"
+check "without REVIEWER_PI_MODEL the owner's default Pi model is used" bash -c "! grep -qE '^pi .*--model' '$work/pi_clean/calls.log'"
+scenario pi_model REVIEWER_PI_MODEL=openai-codex/gpt-5.3-codex >/dev/null
+check "REVIEWER_PI_MODEL picks the Pi model" grep -qE '^pi .* --model openai-codex/gpt-5.3-codex -- ' "$work/pi_model/calls.log"
+check "the comment names the Pi model" grep -qF 'then a Pi review (`openai-codex/gpt-5.3-codex`).' "$work/pi_model/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario pi_fail PI_MODE=fail)" "blocking Pi findings are blocking"
+check "the Pi findings are posted" grep -qF 'nil dereference' "$work/pi_fail/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario pi_error PI_MODE=error)" "a Pi run that ends in error is an error"
+expect_match 'pi exit 1' "$(status_line pi_error reviewer/review)" "the error status names the engine"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario pi_modify PI_MODE=modify REVIEWER_MAX_ATTEMPTS=1)" \
+  "a Pi agent that edits the checkout is an error"
+
+echo "# pi reviewer with review.pi_credential_env"
+origin pikey O_REVIEWER=pi O_PI_ENV=PI_TEST_KEY
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario pi_key PI_TEST_KEY=secret-pi)" "a Pi review with a credential env var passes"
+check "only the review gets the named credential, with an empty HOME of its own" grep -qxF \
+  "pi-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset PI_TEST_KEY=secret-pi HOME=$work/pi_key/state/review-home PI_CODING_AGENT_DIR=unset" "$work/pi_key/calls.log"
+expect_eq "pi-files auth=no settings=no" "$(grep '^pi-files ' "$work/pi_key/calls.log")" "with a credential the owner's Pi files are not used"
+check "checks never get the Pi credential" bash -c "! grep '^check-env' '$work/pi_key/calls.log' | grep -q secret-pi"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario pi_key_unset)" "a named credential env var that is empty is refused"
+check "the refusal names the env var" grep -qF 'review.pi_credential_env names PI_TEST_KEY, which is empty' "$work/pi_key_unset/out.log"
+check "nothing runs without the named credential" bash -c "! grep -qE '^(pi|go-argc)' '$work/pi_key_unset/calls.log'"
 
 echo "# base version minimum"
 origin stamped O_STAMP=0.4.0

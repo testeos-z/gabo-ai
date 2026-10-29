@@ -20,14 +20,68 @@ Use whenever a gabo agent works with branches or pull requests. Fills the `repos
 
 ## Operations
 
-| contract op | command |
-|---|---|
-| branch | `git switch -c <type>/<issue>-<slug> origin/dev` in the task worktree; `git push -u origin HEAD` |
-| open PR | `gh pr create -R $R --base dev --head <branch> --title "<conventional title>" --body-file <tmp>` (body: summary, `Refs #<issue>`, verification) |
-| comment | `gh pr comment <pr> -R $R --body-file <tmp>` |
-| read status and checks | `gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup,comments` |
-| merge into dev | Check `baseRefName == "dev"` first, then `gh pr merge <pr> -R $R --squash --match-head-commit <sha>`; refuse on any other base |
-| delete branch | after merge only: `gh pr view <pr> -R $R --json state,baseRefName,headRefName,headRefOid` must show `MERGED`, base `dev` and head `<branch>`; the worktree is already removed. In this order: (1) local `git branch -d <branch>` while the local `origin/<branch>` tracking ref still exists (a refusal is a leftover; never `-D`); (2) remote `git push origin --delete <branch>` only if `git ls-remote --heads origin <branch>` shows exactly `<headRefOid>`; absent ⇒ nothing to do; other SHA ⇒ refuse |
+Commands come from this adapter's former operation table and the `repository_host` contract; `gh` flags and `--json` fields confirmed with `gh pr view --help` and `gh pr create --help` on gh 2.101.0. `R=testeos-z/gabo-ai` (`repo.name`), integration branch `dev` (`repo.integration_branch`).
+
+### branch
+
+Not a contract operation; kept for the coder. In the task worktree:
+
+```bash
+git switch -c <type>/<issue>-<slug> origin/dev
+git push -u origin HEAD
+```
+
+### open PR
+
+Body: summary, `Refs #<issue>`, verification run.
+
+```bash
+gh pr create -R $R --base dev --head <branch> --title "<conventional title>" --body-file <tmp>
+```
+
+Read back: `gh pr view <branch> -R $R --json number,state,baseRefName,headRefName,headRefOid` must show `OPEN`, base `dev`, head `<branch>`; return `number`.
+
+### comment on PR
+
+```bash
+gh pr comment <pr> -R $R --body-file <tmp>
+```
+
+Read back: `gh pr view <pr> -R $R --json comments --jq '.comments[-1].body'` must match the posted body.
+
+### read PR status and checks
+
+```bash
+gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateStatus,statusCheckRollup,comments
+```
+
+### merge into integration branch
+
+Check `baseRefName == "dev"` first (`gh pr view <pr> -R $R --json baseRefName --jq .baseRefName`); refuse on any other base. Then:
+
+```bash
+gh pr merge <pr> -R $R --squash --match-head-commit <sha>
+```
+
+Read back: `gh pr view <pr> -R $R --json state,mergeCommit --jq '[.state,.mergeCommit.oid]'` must show `MERGED`; return the merged SHA.
+
+### delete branch
+
+After merge only: `gh pr view <pr> -R $R --json state,baseRefName,headRefName,headRefOid` must show `MERGED`, base `dev` and head `<branch>`; the worktree is already removed. In this order:
+
+1. Local, while the local `origin/<branch>` tracking ref still exists (a refusal is a leftover; never `-D`):
+
+   ```bash
+   git branch -d <branch>
+   ```
+
+2. Remote, only if `git ls-remote --heads origin <branch>` shows exactly `<headRefOid>`; absent means nothing to do; another SHA means refuse:
+
+   ```bash
+   git push origin --delete <branch>
+   ```
+
+Read back: `git branch --list <branch>` and `git ls-remote --heads origin <branch>` are empty.
 
 ## Output Contract
 
