@@ -1,6 +1,6 @@
 # gabo-reviewer
 
-Embedded skill with the deterministic reviewer scripts of gabo (TRD D20, plan task T040). Follows the vulcam `agents/pr-reviewer` pattern in single-user local mode: no sudo, no reviewer OS users, Claude Code as the only engine. It is embedded apart from the catalog (`skills.ReviewerFiles`), so the catalog install never writes it; `gabo init` installs it at user level (T041). It never belongs in a repository.
+Embedded skill with the deterministic reviewer scripts of gabo (TRD D20, plan task T040). Follows the vulcam `agents/pr-reviewer` pattern in single-user local mode: no sudo, no reviewer OS users, Claude Code or Pi as the review engine (`runtimes.reviewer`). It is embedded apart from the catalog (`skills.ReviewerFiles`), so the catalog install never writes it; `gabo init` installs it at user level (T041). It never belongs in a repository.
 
 ## Why user level
 
@@ -29,13 +29,22 @@ A conflict is `blocking`; a retryable failure or a refused preflight is `error`;
 
 ## What one review does
 
-1. Preflight: no `sudo`; the trusted location; `jq`, `flock`, `git`, `setsid`; fetches the integration branch into its own mirror and moves its own checkout (`<state>/base`) to the tip, refusing when that checkout is not clean; reads the repository settings from `gabo.yaml` there; `reviewer.placement` must be `local`; the base minimum (below); the `gh` login.
+1. Preflight: no `sudo`; the trusted location; `jq`, `flock`, `git`, `setsid`; the review engine binary; fetches the integration branch into its own mirror and moves its own checkout (`<state>/base`) to the tip, refusing when that checkout is not clean; reads the repository settings from `gabo.yaml` there; `reviewer.placement` must be `local`; the base minimum (below); the `gh` login.
 2. Skips a head that moved, a draft, a fork, a PR to another base, and a head that already has a final `reviewer/review` status or a verdict comment by the bot login.
 3. Fetches GitHub's merge result `refs/pull/<n>/merge` and trusts it only when it is the integration-branch tip merged with the head; a conflict gets a blocking comment.
 4. Runs `review.checks` as argv (no shell) in a fresh worktree of the merge result with `env -i`, its own `HOME`, Go caches under the state dir, `CI=true` and no credential. A `gabo check` entry runs `REVIEWER_GABO_BIN`; `gabo check` never runs unless listed.
-5. Reviews the diff with Claude Code, read-only, in the head checkout, with no GitHub token.
+5. Reviews the diff with the review engine (Claude Code or Pi, below), read-only, in the head checkout, with no GitHub token.
 6. Posts one comment (first line the verdict, last lines the marker `<!-- <reviewer.signing.marker> sha=<head> -->` and the footer `🤖 gabo reviewer`), sets `reviewer/tests` and `reviewer/review`, and on a clean head runs the merge gate.
 7. Merge gate (`merge-head.sh`): only with `review.auto_merge: true`, PR open, base the integration branch (never `main` or `master`), same repository, head still the reviewed SHA, both statuses `success` by the bot login, the newest marker comment clean and signing that SHA, and no human-only path; then `gh pr merge <pr> --merge --match-head-commit <sha>`. Human-only paths get a "needs human merge" comment instead.
+
+## Review engines
+
+`runtimes.reviewer` on the integration branch picks the engine (`REVIEWER_ENGINE` overrides it); anything other than `claude` or `pi`, or a missing binary, fails the preflight. Both get the same prompt on stdin and must answer with the same verdict line, so the comment, the statuses and the once-per-head rule do not depend on the engine.
+
+- **Claude Code** (`REVIEWER_CLAUDE`, default `claude`): tools `Read`, `Grep`, `Glob` and `Bash` limited to `git diff/log/show/status`; only user settings, all hooks off, no MCP servers, no slash commands, no saved session. With `CLAUDE_CODE_OAUTH_TOKEN` it runs with an empty `HOME`; without it, with the owner's `HOME`, so the owner's Claude Code login is used.
+- **Pi** (`REVIEWER_PI`, default `pi`): `pi --mode json --no-session --no-approve --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp --tools read,grep,find,ls --exclude-tools 'bash,edit,write,mcp__*'` (plus `--model` from `REVIEWER_PI_MODEL`). No write or shell tool exists; `--no-approve` ignores the PR's `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/` and the rest of its project files; the other flags keep the owner's user-level extensions, packages, skills and MCP servers out too, and `AGENTS.md`/`CLAUDE.md` are read only as data. The verdict is the text of Pi's last assistant message; any `stopReason` other than `stop` is an error (Pi exits 0 on a provider error).
+  - **Reused Pi files.** Without `review.pi_credential_env` the review keeps the owner's `HOME` (and `PI_CODING_AGENT_DIR` when set), like the Claude path without a token, so no extra API key is needed: Pi reads `auth.json` (the owner's login, for example OpenAI browser OAuth), `settings.json` (`defaultProvider`, `defaultModel`) and `models.json` from its agent dir (default `~/.pi/agent`). The files are used in place rather than copied because Pi refreshes an OAuth login by rewriting `auth.json`; a refresh in a copy can rotate the refresh token and leave the owner's own login stale.
+  - **Separate credential.** With `review.pi_credential_env: <NAME>`, the value of `<NAME>` in the reviewer's environment is passed to the review step only (never to the checks), with an empty `HOME` under the state dir, so none of the owner's Pi files are read; an empty `<NAME>` fails the preflight.
 
 ## Built-in rules
 
@@ -56,18 +65,20 @@ Repository settings come from `gabo.yaml` on the integration branch; an environm
 | `review.human_only_paths` | `REVIEWER_HUMAN_ONLY_PATHS` (space-separated) | `.claude/ .github/ gabo.yaml AGENTS.md CLAUDE.md`; entries ending in `/` are prefixes, others file names in any directory |
 | `reviewer.signing.marker` | `REVIEWER_MARKER` | `gbai-reviewer-bot` |
 | `reviewer.placement` | `REVIEWER_PLACEMENT` | `local` (the only one implemented) |
+| `runtimes.reviewer` | `REVIEWER_ENGINE` | `claude`; `claude` or `pi` |
+| `review.pi_credential_env` | `REVIEWER_PI_CREDENTIAL_ENV` | empty: a Pi review reuses the owner's Pi login |
 
 Script defaults: `scripts/config.env` (plain `KEY=value`, read as data, never executed; the environment wins):
 
 | key | default | meaning |
 |---|---|---|
 | `REVIEWER_MODE` | `single-user` | Only mode here; `isolated` belongs to the placement adapter |
-| `REVIEWER_ENGINE` | `claude` | Only engine here |
 | `REVIEWER_BOT_LOGIN` | empty = `gh api user` login | Must equal the active gh login |
 | `REVIEWER_GABO_BIN` | `gabo` | The gabo binary |
 | `REVIEWER_GABO_INSTALL` | `github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo` | Package of the upgrade command |
 | `REVIEWER_MAX_ATTEMPTS`, `REVIEWER_CHECK_TIMEOUT`, `REVIEWER_REVIEW_TIMEOUT`, `REVIEWER_HEAD_TIMEOUT` | `2`, `1800`, `900`, `7200` | Attempts and seconds |
 | `REVIEWER_CLAUDE_MODEL`, `REVIEWER_CLAUDE_MAX_TURNS`, `REVIEWER_DIFF_MAX_BYTES` | Claude default, `40`, `200000` | Review engine |
+| `REVIEWER_CLAUDE`, `REVIEWER_PI`, `REVIEWER_PI_MODEL` | `claude`, `pi`, the owner's default Pi model | Engine binaries and the Pi model |
 | `REVIEWER_MERGE_TRIES`, `REVIEWER_MERGE_DELAY` | `5`, `3` | Asks for GitHub's merge result |
 | `GABO_REVIEWER_STATE_DIR` | `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer` | Own mirror, base checkout, worktrees, caches, logs |
 
@@ -84,7 +95,7 @@ The gabo-ai rename (TRD D26) changed every name these scripts read; nothing fall
 
 ## Tests
 
-Offline, with fake `gh`, `claude`, `go` and `gabo`, real `git` and a local bare repository standing in for GitHub:
+Offline, with fake `gh`, `claude`, `pi`, `go` and `gabo`, real `git` and a local bare repository standing in for GitHub:
 
 ```bash
 for t in scripts/tests/*.test.sh; do bash "$t"; done

@@ -51,6 +51,8 @@ problem="$(validate_config)"
 [[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
 problem="$(minimum_problem)"
 [[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
+problem="$(engine_problem)"
+[[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
 resolve_bot_login || preflight_failed "gh cannot authenticate (gh auth login, or REVIEWER_GH_TOKEN)" "${2:-}" "${3:-}"
 [[ "$GH_LOGIN" == "$BOT_LOGIN" ]] ||
   preflight_failed "the gh login is '$GH_LOGIN', not REVIEWER_BOT_LOGIN '$BOT_LOGIN'" "${2:-}" "${3:-}"

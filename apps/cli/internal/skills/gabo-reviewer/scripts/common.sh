@@ -3,7 +3,7 @@
 # run it. Follows the vulcam pr-reviewer pattern in single-user mode (TRD D20).
 # External binaries are injectable so tests run offline with stubs:
 #   REVIEWER_GH (default gh), REVIEWER_CLAUDE (default claude),
-#   REVIEWER_GABO_BIN (default gabo).
+#   REVIEWER_PI (default pi), REVIEWER_GABO_BIN (default gabo).
 #
 # Settings, highest first: the environment, the private env file, the
 # skill's config.env, gabo.yaml on the integration branch (read from the
@@ -111,13 +111,13 @@ fi
 
 GH="${REVIEWER_GH:-gh}"
 CLAUDE="${REVIEWER_CLAUDE:-claude}"
+PI="${REVIEWER_PI:-pi}"
 GABO_BIN="${REVIEWER_GABO_BIN:-gabo}"
 GABO_INSTALL="${REVIEWER_GABO_INSTALL:-github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo}"
 REPO="${REVIEWER_REPO:-$(caller_yaml repo.name | head -n 1)}"
 BASE_BRANCH="${REVIEWER_BASE_BRANCH:-$(caller_yaml repo.integration_branch | head -n 1)}"
 BASE_BRANCH="${BASE_BRANCH:-dev}"
 MODE="${REVIEWER_MODE:-single-user}"
-ENGINE="${REVIEWER_ENGINE:-claude}"
 BOT_LOGIN="${REVIEWER_BOT_LOGIN:-}"
 WORKDIR="${GABO_REVIEWER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer}"
 STATE="$WORKDIR/state"
@@ -128,6 +128,8 @@ REVIEW_TIMEOUT="${REVIEWER_REVIEW_TIMEOUT:-900}"
 HEAD_TIMEOUT="${REVIEWER_HEAD_TIMEOUT:-7200}"
 CLAUDE_MODEL="${REVIEWER_CLAUDE_MODEL:-}"
 CLAUDE_MAX_TURNS="${REVIEWER_CLAUDE_MAX_TURNS:-40}"
+# Empty: the owner's default Pi model (settings.json in the Pi agent dir).
+PI_MODEL="${REVIEWER_PI_MODEL:-}"
 DIFF_MAX_BYTES="${REVIEWER_DIFF_MAX_BYTES:-200000}"
 MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
 MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
@@ -173,6 +175,10 @@ apply_repo_settings() {
   MARKER="${REVIEWER_MARKER:-gbai-reviewer-bot}"
   MARKER_PREFIX="<!-- $MARKER"
   NEEDS_HUMAN_MARKER="<!-- $MARKER:needs-human-merge -->"
+  # The review engine (runtimes.reviewer) and, for pi only, the name of the
+  # env var whose value reaches the review step instead of the owner's login.
+  ENGINE="${REVIEWER_ENGINE:-claude}"
+  PI_CREDENTIAL_ENV="${REVIEWER_PI_CREDENTIAL_ENV:-}"
 }
 apply_repo_settings
 
@@ -308,7 +314,12 @@ validate_static() {
   [[ "$MODE" != isolated ]] ||
     { echo "REVIEWER_MODE=isolated belongs to the reviewer_placement adapter; these scripts run single-user mode only"; return; }
   [[ "$MODE" == single-user ]] || { echo "REVIEWER_MODE must be single-user"; return; }
-  [[ "$ENGINE" == claude ]] || { echo "REVIEWER_ENGINE must be claude"; return; }
+  [[ "$ENGINE" == claude || "$ENGINE" == pi ]] ||
+    { echo "REVIEWER_ENGINE must be claude or pi (runtimes.reviewer), got '$ENGINE'"; return; }
+  [[ "$PI_CREDENTIAL_ENV" =~ ^([A-Z_][A-Z0-9_]*)?$ ]] ||
+    { echo "review.pi_credential_env must be an environment variable name (got '$PI_CREDENTIAL_ENV')"; return; }
+  [[ ! "$PI_CREDENTIAL_ENV" =~ ^(PATH|HOME|TERM|NO_COLOR|PI_CODING_AGENT_DIR)$ ]] ||
+    { echo "review.pi_credential_env may not name $PI_CREDENTIAL_ENV, which the review step sets itself"; return; }
   [[ -z "$BOT_LOGIN" || "$BOT_LOGIN" =~ ^[A-Za-z0-9-]+(\[bot\])?$ ]] || { echo "REVIEWER_BOT_LOGIN must be a GitHub login"; return; }
   [[ "$GABO_BIN" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "REVIEWER_GABO_BIN has unexpected characters"; return; }
   [[ "$GABO_INSTALL" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "REVIEWER_GABO_INSTALL has unexpected characters"; return; }
@@ -316,7 +327,8 @@ validate_static() {
     is_number "${!n}" || { echo "REVIEWER_$n must be a positive integer (got '${!n}')"; return; }
   done
   [[ "$MERGE_DELAY" =~ ^[0-9]+$ ]] || { echo "REVIEWER_MERGE_DELAY must be a whole number of seconds"; return; }
-  [[ "$CLAUDE_MODEL" =~ ^[][A-Za-z0-9._:@-]*$ ]] || echo "REVIEWER_CLAUDE_MODEL has unexpected characters"
+  [[ "$CLAUDE_MODEL" =~ ^[][A-Za-z0-9._:@-]*$ ]] || { echo "REVIEWER_CLAUDE_MODEL has unexpected characters"; return; }
+  [[ "$PI_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || echo "REVIEWER_PI_MODEL has unexpected characters"
 }
 
 # validate_config: prints the first problem, or nothing.
@@ -398,6 +410,9 @@ load_base_config() {
   [[ -n "${REVIEWER_MARKER+set}" ]] || REVIEWER_MARKER="$(yaml_get "$y" reviewer.signing.marker | head -n 1)"
   [[ -n "${REVIEWER_PLACEMENT+set}" ]] || REVIEWER_PLACEMENT="$(yaml_get "$y" reviewer.placement | head -n 1)"
   [[ -n "${REVIEWER_AGENT_DIRS+set}" ]] || REVIEWER_AGENT_DIRS="$(declared_agent_dirs | paste -sd' ' -)"
+  [[ -n "${REVIEWER_ENGINE+set}" ]] || REVIEWER_ENGINE="$(yaml_get "$y" runtimes.reviewer | head -n 1)"
+  [[ -n "${REVIEWER_PI_CREDENTIAL_ENV+set}" ]] || REVIEWER_PI_CREDENTIAL_ENV="$(yaml_get "$y" review.pi_credential_env | head -n 1)"
+  export REVIEWER_ENGINE REVIEWER_PI_CREDENTIAL_ENV
   # The base stamp is a minimum; the PR head's stamp never counts.
   REVIEWER_MINIMUM=none
   if [[ -f "$BASE_DIR/$BUILTIN_STAMP" ]]; then
@@ -431,6 +446,17 @@ minimum_problem() {
   have="$(gabo_version)"
   version_at_least "$have" "$MINIMUM" ||
     echo "$name ${have:-unknown} is older than the minimum $MINIMUM in $BASE_BRANCH:$BUILTIN_STAMP; upgrade it with: go install $GABO_INSTALL@v$MINIMUM"
+}
+
+# engine_problem: prints why the review engine cannot run, or nothing: its
+# binary is missing, or review.pi_credential_env names an empty env var.
+engine_problem() {
+  local bin="$CLAUDE" var="REVIEWER_CLAUDE"
+  [[ "$ENGINE" != pi ]] || { bin="$PI"; var="REVIEWER_PI"; }
+  command -v "$bin" >/dev/null 2>&1 ||
+    { echo "no $ENGINE binary ($var=$bin) for runtimes.reviewer $ENGINE"; return; }
+  [[ "$ENGINE" != pi || -z "$PI_CREDENTIAL_ENV" || -n "${!PI_CREDENTIAL_ENV:-}" ]] ||
+    echo "review.pi_credential_env names $PI_CREDENTIAL_ENV, which is empty: set it for the reviewer, or remove the key to reuse the owner's Pi login"
 }
 
 # resolve_bot_login: sets BOT_LOGIN to the active gh login when it is empty.
