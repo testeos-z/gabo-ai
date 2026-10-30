@@ -134,6 +134,33 @@ var templates = map[string]struct {
 			"## Open questions",
 		},
 	},
+	// Design norms: one rule table per area, exceptions and a changelog.
+	"gabo-frontend/templates/DESIGN.md": {
+		columns: []string{
+			"| field | value |",
+			"| id | rule | level | rationale | verification | examples | source |",
+			"| rule id | exception | reason | owner | date |",
+			"| date | rule ids | change | decision |",
+		},
+		headings: []string{
+			"# Design norms",
+			"## 1. Principles and sources",
+			"## 2. Tokens",
+			"## 3. Color and themes",
+			"## 4. Typography",
+			"## 5. Layout and responsive behavior",
+			"## 6. Shape and density",
+			"## 7. Motion and state",
+			"## 8. Icons",
+			"## 9. Accessibility",
+			"## 10. Content and writing",
+			"## 11. Forms",
+			"## 12. Components",
+			"## 13. Exceptions",
+			"## 14. Changelog",
+			"## 15. Open questions",
+		},
+	},
 	"gabo-frontend/templates/UX_UI.md": {
 		columns: []string{
 			"| field | value |",
@@ -238,7 +265,7 @@ func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
 			"templates/DB_SCHEMA.md", "## Fixed questions", "config-only", "Persistence inventory",
 		},
 		"gabo-frontend/SKILL.md": {
-			"templates/APP_FLOW.md", "templates/UX_UI.md", "## Fixed questions",
+			"templates/APP_FLOW.md", "templates/UX_UI.md", "templates/DESIGN.md", "## Fixed questions",
 		},
 	} {
 		doc, ok := byPath[skill]

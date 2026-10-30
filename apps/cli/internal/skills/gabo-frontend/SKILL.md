@@ -4,11 +4,11 @@ description: "Trigger: UX, UI, Storybook, components, design tokens, CSS, DESIGN
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.2"
+  version: "1.3"
 ---
 ## Activation Contract
 
-Use to write `docs/product/UX_UI.md` (from `templates/UX_UI.md`), `docs/product/APP_FLOW.md` (from `templates/APP_FLOW.md`) and the repository `DESIGN.md`, and to plan Storybook components.
+Use to write `docs/product/UX_UI.md` (from `templates/UX_UI.md`), `docs/product/APP_FLOW.md` (from `templates/APP_FLOW.md`) and the repository `DESIGN.md` (from `templates/DESIGN.md`), and to plan Storybook components.
 
 ## Hard Rules
 
@@ -33,9 +33,10 @@ Any gap blocks the next planning step: fix it in your own documents or return it
 ## Execution Steps
 
 1. Read PRD requirements and personas.
-2. Answer the UX_UI fixed questions, then write UX_UI (principles, tokens, component inventory, accessibility, messages) and DESIGN.md (the token source of truth).
-3. Answer the APP_FLOW fixed questions, then write APP_FLOW as a surface list, the journeys and a flow diagram (Mermaid).
-4. Run the traceability check before the next planning step.
+2. Answer the UX_UI fixed questions, then write UX_UI (principles, tokens, component inventory, accessibility, messages).
+3. Answer the DESIGN fixed questions, then write DESIGN.md: the design norms, one rules table per area, each rule with an RFC 2119 keyword, rationale, verification, examples and source; exceptions and a changelog.
+4. Answer the APP_FLOW fixed questions, then write APP_FLOW as a surface list, the journeys and a flow diagram (Mermaid).
+5. Run the traceability check before the next planning step.
 
 ## Output Contract
 
