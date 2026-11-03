@@ -24,7 +24,7 @@ var formerDefaults = []Suggestion{
 	{Key: "runtimes.assistant", Values: []string{string(RuntimeClaude)}},
 	{Key: "repo.integration_branch", Values: []string{"dev"}},
 	{Key: "review.checks", Values: []string{"bun install --frozen-lockfile", "bun run build", "bun run check-types", "bun run lint", "bun run test"}},
-	{Key: "review.human_only_paths", Values: []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}},
+	{Key: "review.human_only_paths", Values: []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/", ".codex/", ".agents/", "plugins/"}},
 	{Key: "parallelism", Values: []string{"3"}},
 }
 

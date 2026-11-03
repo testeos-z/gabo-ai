@@ -2,6 +2,7 @@ package config
 
 import (
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -87,9 +88,30 @@ func TestParseAcceptsPiReviewer(t *testing.T) {
 	if err != nil || cfg.Runtimes.Coder != RuntimePi || cfg.Runtimes.Assistant != RuntimePi {
 		t.Fatalf("pi coder and assistant = %+v, %v; want accepted", cfg.Runtimes, err)
 	}
-	_, err = Parse([]byte(strings.Replace(minimal, "reviewer: claude", "reviewer: codex", 1)))
-	if err == nil || !strings.Contains(err.Error(), `runtimes.reviewer: must be "claude" or "pi", got "codex"`) {
-		t.Fatalf("codex reviewer: error = %v, want the runtime enum", err)
+}
+
+// Every role accepts the four runtimes claude, codex, pi and opencode
+// (intent 0002 S6, intent 0004 S1).
+func TestParseAcceptsEveryRuntimeInEveryRole(t *testing.T) {
+	t.Parallel()
+	for _, role := range []string{"coder", "reviewer", "assistant"} {
+		for _, rt := range []Runtime{RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode} {
+			cfg, err := Parse([]byte(strings.Replace(minimal, role+": claude", role+": "+string(rt), 1)))
+			got := map[string]Runtime{"coder": cfg.Runtimes.Coder, "reviewer": cfg.Runtimes.Reviewer, "assistant": cfg.Runtimes.Assistant}[role]
+			if err != nil || got != rt {
+				t.Errorf("runtimes.%s: %s: Parse() = %q, %v; want accepted", role, rt, got, err)
+			}
+		}
+	}
+}
+
+// An unknown runtime fails with one line naming the key and the four values.
+func TestParseRejectsUnknownRuntime(t *testing.T) {
+	t.Parallel()
+	_, err := Parse([]byte(strings.Replace(minimal, "reviewer: claude", "reviewer: foo", 1)))
+	want := `runtimes.reviewer: must be one of "claude", "codex", "pi", "opencode", got "foo"`
+	if err == nil || !slices.Contains(strings.Split(err.Error(), "\n"), want) {
+		t.Fatalf("foo reviewer: error = %v, want the line %q", err, want)
 	}
 }
 
@@ -152,7 +174,7 @@ func TestSuggestionsListFormerDefaults(t *testing.T) {
 		{Key: "runtimes.assistant", Values: []string{"claude"}},
 		{Key: "repo.integration_branch", Values: []string{"dev"}},
 		{Key: "review.checks", Values: []string{"bun install --frozen-lockfile", "bun run build", "bun run check-types", "bun run lint", "bun run test"}},
-		{Key: "review.human_only_paths", Values: []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/"}},
+		{Key: "review.human_only_paths", Values: []string{".claude/", ".github/", ".opencode/", "AGENTS.md", "CLAUDE.md", "docs/policies/", "tools/hook-tests/", "agents/", ".codex/", ".agents/", "plugins/"}},
 		{Key: "parallelism", Values: []string{"3"}},
 	}
 	if got := Suggestions(); !reflect.DeepEqual(got, want) {
