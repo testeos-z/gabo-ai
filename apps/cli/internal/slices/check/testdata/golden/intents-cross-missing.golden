@@ -1,0 +1,7 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/intents/0001-alpha/plan.md: T1 depends_on 0009/T1, but no intent 0009 exists
+✗ docs/product/intents/0001-alpha/plan.md: T1 depends_on 0002/T7, but docs/product/intents/0002-beta/plan.md has no task T7
+✗ docs/product/intents/0001-alpha/plan.md: T2 depends_on 0003/T1, but docs/product/intents/0003-gamma/plan.md has no task T1
+next: fix the intent folders above, then rerun gabo check

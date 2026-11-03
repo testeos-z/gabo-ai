@@ -1,0 +1,3 @@
+exit 2
+error: "unknown flag: --bogus\nusage: gabo check"
+--- stdout

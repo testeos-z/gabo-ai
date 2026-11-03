@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/intents/0001-alpha/plan.md: spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan
+next: fix the intent folders above, then rerun gabo check

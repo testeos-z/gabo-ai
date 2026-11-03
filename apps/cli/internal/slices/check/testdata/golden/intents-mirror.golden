@@ -1,0 +1,8 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/intents/0001-alpha/plan.md: T1 unblocks T2, but T2 does not list T1 in depends_on
+✗ docs/product/intents/0001-alpha/plan.md: T3 depends_on T1, but T1 does not list T3 in unblocks
+✗ docs/product/intents/0001-alpha/plan.md: T3 depends_on T9, which is not a task of this plan
+✗ docs/product/intents/0001-alpha/plan.md: T4 depends_on "foo", not T<n> or <NNNN>/T<n>
+next: fix the intent folders above, then rerun gabo check
