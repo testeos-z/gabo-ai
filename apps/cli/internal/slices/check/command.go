@@ -95,11 +95,15 @@ func NewCommand(factory Factory) *cobra.Command {
 			"\"tool_call\", \"engine\": \"pi\", \"tools\": [<registered tool names>],\n" +
 			"\"package_version\": \"x.y.z\", \"target_paths\": [<paths>, tool_call only]}.\n" +
 			"While no tool is subagent_run, session_start warns with the subagent refusal\n" +
-			"and a tool_call writing under .pi/agents/ is blocked with it. It prints one\n" +
-			"JSON object, {\"notify\": [{\"level\": \"warning\" or \"info\", \"text\": ...}],\n" +
-			"\"block\": null or {\"reason\": ...}}, and exits 0 without a block, 1 with\n" +
-			"one, 2 with one usage line on a bad object (malformed, unknown schema\n" +
-			"version, engine or event, or a tool_call without target_paths).",
+			"and a tool_call writing under .pi/agents/ is blocked with it. session_start\n" +
+			"also adds one info notification when package_version differs from the\n" +
+			"project's " + StampFile + " (none when it is missing), and a tool_call is\n" +
+			"blocked by the stage gate above with its \"✗\" lines, after the refusal,\n" +
+			"one reason per line. It prints one JSON object, {\"notify\": [{\"level\":\n" +
+			"\"warning\" or \"info\", \"text\": ...}], \"block\": null or {\"reason\": ...}},\n" +
+			"and exits 0 without a block, 1 with one, 2 with one usage line on a bad\n" +
+			"object (malformed, unknown schema version, engine or event, or a tool_call\n" +
+			"without target_paths).",
 		// The command parses its own flags, so a flag error knows the mode
 		// wherever --pre-write stands among the arguments.
 		DisableFlagParsing: true,
@@ -235,7 +239,7 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 // FactsResult JSON object and exits 0 without a block, 1 with one and 2 on
 // a bad facts object. A project that cannot be loaded blocks a tool_call
 // (fail closed), after the subagent refusal when it applies; session_start
-// needs no project.
+// then gets the subagent rule alone, with no version notification.
 func judgeFacts(cmd *cobra.Command, factory Factory, data []byte) error {
 	f, err := ParseFacts(data)
 	if err != nil {

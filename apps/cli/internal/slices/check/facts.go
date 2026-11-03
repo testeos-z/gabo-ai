@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"slices"
 	"strings"
 )
@@ -124,31 +125,94 @@ func ParseFacts(data []byte) (Facts, error) {
 	return f, nil
 }
 
-// JudgeFacts applies the subagent rule (intent 0003 S4, S5) to the facts.
-// While no tool in Facts.Tools is in SubagentTools, session_start returns
-// one warning with SubagentRefusal, and a tool_call any of whose targets
-// lies under .pi/agents/ of the project (as written or with its symlinks
-// resolved, as PreWrite resolves paths) is blocked with SubagentRefusal as
-// the reason. A target whose symlinks cannot be resolved counts as under
-// .pi/agents/ (fail closed). It reads nothing else and writes nothing.
+// JudgeFacts applies the rules of intent 0003 to the facts and writes
+// nothing.
+//
+// The subagent rule (S4, S5): while no tool in Facts.Tools is in
+// SubagentTools, session_start returns one warning with SubagentRefusal,
+// and a tool_call any of whose targets lies under .pi/agents/ of the
+// project (as written or with its symlinks resolved, as PreWrite resolves
+// paths) is blocked with SubagentRefusal as the reason. A target whose
+// symlinks cannot be resolved counts as under .pi/agents/ (fail closed).
+//
+// The version rule (S7): session_start then adds one info notification when
+// the package version differs from the project's .gabo/VERSION (versionNote).
+//
+// The stage gate (S6): a tool_call's targets are judged by PreWrite, the
+// path-argument hook mode of intent 0001 S11, and each of its "✗" lines is
+// a block reason after the refusal; a PreWrite error blocks too (fail
+// closed). Several reasons are joined with newlines.
 func (u *UseCase) JudgeFacts(f Facts) FactsResult {
 	r := FactsResult{Notify: []Notification{}}
-	if hasSubagentTool(f.Tools) {
-		return r
-	}
+	subagents := hasSubagentTool(f.Tools)
 	switch f.Event {
 	case EventSessionStart:
-		r.Notify = append(r.Notify, Notification{Level: LevelWarning, Text: SubagentRefusal})
+		if !subagents {
+			r.Notify = append(r.Notify, Notification{Level: LevelWarning, Text: SubagentRefusal})
+		}
+		if note, ok := u.versionNote(f.PackageVersion); ok {
+			r.Notify = append(r.Notify, Notification{Level: LevelInfo, Text: note})
+		}
 	case EventToolCall:
-		for _, p := range f.TargetPaths {
-			targets, err := u.targetsOf(p)
-			if err != nil || slices.ContainsFunc(targets, u.isPiAgent) {
-				r.Block = &Block{Reason: SubagentRefusal}
-				break
-			}
+		var reasons []string
+		if !subagents && u.writesPiAgent(f.TargetPaths) {
+			reasons = append(reasons, SubagentRefusal)
+		}
+		rep, err := u.PreWrite(f.TargetPaths)
+		if err != nil {
+			reasons = append(reasons, err.Error())
+		}
+		reasons = append(reasons, rep.Lines...)
+		if len(reasons) > 0 {
+			r.Block = &Block{Reason: strings.Join(reasons, "\n")}
 		}
 	}
 	return r
+}
+
+// writesPiAgent reports whether a write to any of paths lands under
+// .pi/agents/, or has symlinks that cannot be resolved.
+func (u *UseCase) writesPiAgent(paths []string) bool {
+	for _, p := range paths {
+		targets, err := u.targetsOf(p)
+		if err != nil || slices.ContainsFunc(targets, u.isPiAgent) {
+			return true
+		}
+	}
+	return false
+}
+
+// versionNote compares the package version fact with the project's
+// .gabo/VERSION (a leading v ignored) and, when they differ, returns the
+// text naming both and the next step: gabo init when the package is newer,
+// a package update when the stamp is newer, either when one is no version
+// x.y.z. No package version, no project, or a .gabo/VERSION that is
+// missing or cannot be read gives none: the version rule only informs.
+func (u *UseCase) versionNote(pkg string) (string, bool) {
+	pkg = strings.TrimPrefix(strings.TrimSpace(pkg), "v")
+	if pkg == "" || u.project == nil {
+		return "", false
+	}
+	b, err := fs.ReadFile(u.project, StampFile)
+	if err != nil {
+		return "", false
+	}
+	stamp := strings.TrimPrefix(strings.TrimSpace(string(b)), "v")
+	if stamp == pkg {
+		return "", false
+	}
+	next := "run gabo init or update the gabo Pi package so both match"
+	pv, okP := parseVersion(pkg)
+	sv, okS := parseVersion(stamp)
+	switch {
+	case okP && okS && pv.compare(sv) > 0:
+		next = "run gabo init with the gabo CLI " + pkg + " to update the project's catalog"
+	case okP && okS && pv.compare(sv) < 0:
+		next = "update the gabo Pi package to " + stamp
+	case okP && okS:
+		return "", false
+	}
+	return fmt.Sprintf("The gabo Pi package is %s but this project's %s is %s; next: %s.", pkg, StampFile, stamp, next), true
 }
 
 // hasSubagentTool reports whether a registered tool is a subagent tool.

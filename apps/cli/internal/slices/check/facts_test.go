@@ -153,20 +153,22 @@ func TestJudgeFactsThroughASymlink(t *testing.T) {
 }
 
 // A target whose symlinks cannot be resolved counts as under .pi/agents/
-// (fail closed); with subagent_run nothing is judged.
+// (fail closed); the stage gate fails closed on it too, after the refusal.
+// With subagent_run only the stage gate's line remains.
 func TestJudgeFactsUnresolvableTargetFailsClosed(t *testing.T) {
 	t.Parallel()
 	u := NewUseCase(intentWith(""), failingReader{}, goodUser(), Settings{
 		Root:    preRoot,
 		Resolve: func(p string) (string, error) { return "", fs.ErrPermission },
 	})
+	gate := "✗ README.md: its symlinks cannot be resolved (permission denied); it counts as not accepted"
 	got := u.JudgeFacts(Facts{Event: EventToolCall, Engine: "pi", TargetPaths: []string{"README.md"}})
-	if got.Block == nil || got.Block.Reason != SubagentRefusal {
-		t.Fatalf("JudgeFacts = %s, want the refusal block", mustJSON(t, got))
+	if got.Block == nil || got.Block.Reason != SubagentRefusal+"\n"+gate {
+		t.Fatalf("JudgeFacts = %s, want the refusal, then the stage gate line", mustJSON(t, got))
 	}
 	got = u.JudgeFacts(Facts{Event: EventToolCall, Engine: "pi", Tools: SubagentTools, TargetPaths: []string{"README.md"}})
-	if got.Block != nil {
-		t.Fatalf("with subagent_run: JudgeFacts = %s, want no block", mustJSON(t, got))
+	if got.Block == nil || got.Block.Reason != gate {
+		t.Fatalf("with subagent_run: JudgeFacts = %s, want only the stage gate line", mustJSON(t, got))
 	}
 }
 

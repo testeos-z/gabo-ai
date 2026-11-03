@@ -2,7 +2,9 @@ package main
 
 import (
 	"bytes"
+	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -73,5 +75,80 @@ func TestCheckPreWriteBadFactsExitTwo(t *testing.T) {
 		if line := msg.String(); !strings.HasPrefix(line, "gabo: usage: gabo check --pre-write") || strings.Count(line, "\n") != 1 {
 			t.Fatalf("%s: stderr %q, want one usage line", stdin, line)
 		}
+	}
+}
+
+// A tool_call on an intent plan.md is judged with the stage gate: with an
+// unaccepted or unreadable spec block.reason equals the "✗" line the
+// path-argument mode prints for that path, with an accepted spec nothing
+// blocks (the unreadable spec is tested in the check slice); a call blocked by both rules gets one reason, refusal first.
+func TestCheckPreWriteFactsStageGate(t *testing.T) {
+	plan := "docs/product/intents/0009-x/plan.md"
+	gentle := []string{"write", "subagent_run"}
+	for _, tt := range []struct {
+		name, spec string
+		tools      []string
+		blocked    bool
+	}{
+		{name: "unaccepted spec", spec: unfilledMD, tools: gentle, blocked: true},
+		{name: "accepted spec", spec: acceptedMD, tools: gentle},
+		{name: "both rules", spec: unfilledMD, tools: []string{"write"}, blocked: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			project := preWriteProject(t, tt.spec)
+			argOut, argErr := runCheckStdin(t, project, "1.2.3", "", "--pre-write", plan)
+			targets := []string{plan}
+			if !slices.Contains(tt.tools, "subagent_run") {
+				targets = []string{".pi/agents/gabo-coder.md", plan}
+			}
+			out, code := runPreWriteStdinIn(t, project, piFacts(t, "tool_call", tt.tools, targets...))
+			want := `{"notify":[],"block":null}` + "\n"
+			wantCode := 0
+			if tt.blocked {
+				reasons := []string{}
+				if !slices.Contains(tt.tools, "subagent_run") {
+					reasons = append(reasons, check.SubagentRefusal)
+				}
+				if exitOf(argErr) == 1 {
+					reasons = append(reasons, strings.TrimSuffix(argOut, "\n"))
+				}
+				want = `{"notify":[],"block":{"reason":` + hookJSON(t, strings.Join(reasons, "\n")) + `}}` + "\n"
+				wantCode = 1
+			}
+			if code != wantCode || out != want {
+				t.Fatalf("exit %d, output %q; want exit %d, output %q", code, out, wantCode, want)
+			}
+		})
+	}
+}
+
+// On session_start the package version fact is compared with the
+// project's .gabo/VERSION: one info notification when they differ, none
+// when equal or when .gabo/VERSION is missing.
+func TestCheckPreWriteFactsVersionRule(t *testing.T) {
+	gentle := []string{"read", "subagent_run"}
+	for _, tt := range []struct {
+		name, stamp, out string
+	}{
+		{name: "different", stamp: "0.4.0\n", out: `{"notify":[{"level":"info","text":"The gabo Pi package is 0.5.0 but this project's .gabo/VERSION is 0.4.0; next: run gabo init with the gabo CLI 0.5.0 to update the project's catalog."}],"block":null}` + "\n"},
+		{name: "equal", stamp: "0.5.0\n", out: `{"notify":[],"block":null}` + "\n"},
+		{name: "missing", out: `{"notify":[],"block":null}` + "\n"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			project := preWriteProject(t, acceptedMD)
+			if tt.stamp != "" {
+				if err := os.MkdirAll(filepath.Join(project, ".gabo"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(filepath.Join(project, ".gabo", "VERSION"), []byte(tt.stamp), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			stdin := hookJSON(t, map[string]any{"gabo_facts": 1, "event": "session_start", "engine": "pi", "tools": gentle, "package_version": "0.5.0"})
+			out, code := runPreWriteStdinIn(t, project, stdin)
+			if code != 0 || out != tt.out {
+				t.Fatalf("exit %d, output %q; want exit 0, output %q", code, out, tt.out)
+			}
+		})
 	}
 }
