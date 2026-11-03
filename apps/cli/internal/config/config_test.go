@@ -76,7 +76,7 @@ func TestParseValidationErrors(t *testing.T) {
 		want string
 	}{
 		{"bad repo", strings.Replace(minimal, "cappy-lab/vulcam", "vulcam", 1), "repo.name"},
-		{"bad runtime", with("runtimes:\n  coder: opencode\n"), "runtimes.coder"},
+		{"bad runtime", with("runtimes:\n  coder: foo\n"), "runtimes.coder"},
 		{"relative state dir", with("review:\n  state_dir: state\n"), "review.state_dir"},
 		{"unknown field", minimal + "extra: 1\n", "extra"},
 	}

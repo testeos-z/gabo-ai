@@ -249,7 +249,7 @@
       ]
     },
     "runtime": {
-      "enum": ["claude", "pi", null]
+      "enum": ["claude", "codex", "pi", "opencode", null]
     },
     "slot": {
       "type": "object",

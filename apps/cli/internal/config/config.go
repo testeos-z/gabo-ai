@@ -19,9 +19,14 @@ type Runtime string
 
 // Supported runtimes.
 const (
-	RuntimeClaude Runtime = "claude"
-	RuntimePi     Runtime = "pi"
+	RuntimeClaude   Runtime = "claude"
+	RuntimeCodex    Runtime = "codex"
+	RuntimePi       Runtime = "pi"
+	RuntimeOpencode Runtime = "opencode"
 )
+
+// runtimes lists every supported runtime; each role accepts all of them.
+var runtimes = []Runtime{RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode}
 
 // Config is the validated content of gabo.yaml.
 type Config struct {
@@ -189,7 +194,7 @@ func (c Config) validate(parallelismSet bool) error {
 		field string
 		value Runtime
 	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.reviewer", c.Runtimes.Reviewer}, {"runtimes.assistant", c.Runtimes.Assistant}} {
-		check(rt.value == RuntimeClaude || rt.value == RuntimePi, rt.field, fmt.Sprintf("must be %q or %q, got %q", RuntimeClaude, RuntimePi, rt.value))
+		check(slices.Contains(runtimes, rt.value), rt.field, fmt.Sprintf("must be one of %q, %q, %q, %q, got %q", RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode, rt.value))
 	}
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")

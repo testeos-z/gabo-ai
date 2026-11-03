@@ -104,6 +104,8 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"pi coder and assistant":  with("runtimes: {coder: pi, assistant: pi}"),
 		"pi reviewer":             with("runtimes: {reviewer: pi}"),
 		"pi reviewer with env":    with("runtimes: {reviewer: pi}\nreview: {pi_credential_env: ANTHROPIC_API_KEY}"),
+		"codex in every role":     with("runtimes: {coder: codex, reviewer: codex, assistant: codex}"),
+		"opencode in every role":  with("runtimes: {coder: opencode, reviewer: opencode, assistant: opencode}"),
 		"claude reviewer env":     with("review: {pi_credential_env: ANTHROPIC_API_KEY}"),
 		"bot coder login":         with("coder: {login: 'gabo-coder[bot]'}"),
 		"state dir":               with("review: {state_dir: /data/gabo/reviewer}"),
@@ -127,11 +129,11 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"missing parallelism":         string(without(t, "parallelism")),
 		"missing review.checks":       string(without(t, "review.checks")),
 		"missing human_only_paths":    string(without(t, "review.human_only_paths")),
-		"unknown reviewer runtime":    with("runtimes: {reviewer: codex}"),
+		"unknown reviewer runtime":    with("runtimes: {reviewer: foo}"),
 		"null parallelism":            with("parallelism: null"),
 		"null runtimes.coder":         with("runtimes: {coder: null}"),
 		"empty runtimes.coder":        with(`runtimes: {coder: ""}`),
-		"unknown runtime":             with("runtimes: {assistant: codex}"),
+		"unknown runtime":             with("runtimes: {assistant: foo}"),
 		"unknown top-level key":       with("colour: blue"),
 		"unknown nested key":          with("repo: {url: x}"),
 		"former cloud key":            with("server: {railway: {project_id: x}}"),
@@ -313,7 +315,7 @@ func TestUserSchema(t *testing.T) {
 	for doc, key := range map[string]string{
 		"nickname: Leo\n":            "nickname",
 		"interaction_level: max\n":   "interaction_level",
-		"runtimes: {coder: codex}\n": "runtimes.coder",
+		"runtimes: {coder: foo}\n": "runtimes.coder",
 		"users: {orca: {uid: 1}}\n":  "users",
 	} {
 		err := ValidateSchema(SchemaUser, []byte(doc))
@@ -386,7 +388,7 @@ func walkSchema(s map[string]any, path string, fn func(string, map[string]any)) 
 func TestLoadLayersValidatesEveryLayerAgainstItsSchema(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gabo/config.yaml": "runtimes: {coder: codex}\n",
+		"/home/o/.config/gabo/config.yaml": "runtimes: {coder: foo}\n",
 		"/src/p/gabo.yaml":                 minimal,
 	}
 	_, err := LoadLayers(r, twoLayers())
