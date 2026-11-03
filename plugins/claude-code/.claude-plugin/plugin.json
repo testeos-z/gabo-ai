@@ -6,5 +6,13 @@
     "name": "testeos-z"
   },
   "repository": "https://github.com/testeos-z/gabo-ai",
-  "license": "MIT"
+  "license": "MIT",
+  "userConfig": {
+    "checks": {
+      "type": "boolean",
+      "title": "gabo checks",
+      "description": "Run gabo check after Claude writes or edits a gabo file in a gabo project. Off: the hooks do nothing.",
+      "default": true
+    }
+  }
 }

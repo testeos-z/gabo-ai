@@ -1,0 +1,16 @@
+{
+  "description": "gabo post-write check: runs gabo check after Claude writes or edits a gabo file (off with the checks option).",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/gabo-check.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}
