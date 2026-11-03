@@ -1,5 +1,5 @@
-// Manifest, tarball and bootstrap-skill rules of the gabo Pi package
-// (intent 0003: S1, S3, D1, D5, D6; plan task T4).
+// Manifest, tarball and skill rules of the gabo Pi package
+// (intent 0003: S1, S3, S10, D1, D5, D6; plan tasks T4 and T5).
 import { afterAll, describe, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,6 +16,8 @@ const listDir = (dir: string) => (existsSync(dir) ? readdirSync(dir).sort() : []
 const shippedSkillDirs = listDir(join(pkgDir, "skills")).filter((d) =>
   existsSync(join(pkgDir, "skills", d, "SKILL.md")),
 );
+const catalogDir = join(repoRoot, "apps", "cli", "internal", "skills");
+const reviewerConfig = "gabo-reviewer-config";
 const shippedExtensions = listDir(join(pkgDir, "extensions")).filter((f) => f.endsWith(".ts"));
 
 function frontmatterName(skillFile: string): string | undefined {
@@ -31,6 +33,17 @@ function filesUnder(dir: string, rel: string): string[] {
   });
 }
 
+// A shipped skill directory that equals its catalog folder file by file and
+// byte for byte (S10). Only such a copy may carry a catalog skill name.
+function isCatalogCopy(dir: string): boolean {
+  const shipped = join(pkgDir, "skills", dir);
+  const source = join(catalogDir, dir);
+  if (!existsSync(join(source, "SKILL.md"))) return false;
+  const files = filesUnder(shipped, ".").sort();
+  if (JSON.stringify(files) !== JSON.stringify(filesUnder(source, ".").sort())) return false;
+  return files.every((f) => readFileSync(join(shipped, f)).equals(readFileSync(join(source, f))));
+}
+
 // A content line holds at least one letter or digit; blank lines, fences and
 // rules are shared by every Markdown file and prove nothing about copying.
 const contentLines = (text: string) =>
@@ -38,6 +51,22 @@ const contentLines = (text: string) =>
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => /[\p{L}\p{N}]/u.test(line));
+
+const cache = mkdtempSync(join(tmpdir(), "gabo-pi-npm-cache-"));
+afterAll(() => rmSync(cache, { recursive: true, force: true }));
+
+const packed = (): string[] => {
+  const run = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], {
+    cwd: pkgDir,
+    env: { ...process.env, npm_config_cache: cache, npm_config_update_notifier: "false" },
+  });
+  expect({ exitCode: run.exitCode, stderr: run.exitCode === 0 ? "" : run.stderr.toString() }).toEqual({
+    exitCode: 0,
+    stderr: "",
+  });
+  const [result] = JSON.parse(run.stdout.toString());
+  return result.files.map((f: { path: string }) => f.path).sort();
+};
 
 describe("package.json manifest (S1, D5, D6)", () => {
   test("is published as @testeos-z/gabo-pi", () => {
@@ -84,22 +113,6 @@ describe("package.json manifest (S1, D5, D6)", () => {
 });
 
 describe("npm pack --dry-run (S1, D1)", () => {
-  const cache = mkdtempSync(join(tmpdir(), "gabo-pi-npm-cache-"));
-  afterAll(() => rmSync(cache, { recursive: true, force: true }));
-
-  const packed = (): string[] => {
-    const run = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], {
-      cwd: pkgDir,
-      env: { ...process.env, npm_config_cache: cache, npm_config_update_notifier: "false" },
-    });
-    expect({ exitCode: run.exitCode, stderr: run.exitCode === 0 ? "" : run.stderr.toString() }).toEqual({
-      exitCode: 0,
-      stderr: "",
-    });
-    const [result] = JSON.parse(run.stdout.toString());
-    return result.files.map((f: { path: string }) => f.path).sort();
-  };
-
   test("holds package.json, the listed skills and extensions, and nothing else", () => {
     const files = packed();
     const listed = [
@@ -123,7 +136,6 @@ describe("gabo-pi bootstrap skill (S3)", () => {
   });
 
   test("shares no name with a catalog skill, an agents.yaml skill or a gabo-<slot> link", () => {
-    const catalogDir = join(repoRoot, "apps", "cli", "internal", "skills");
     const catalog = listDir(catalogDir).filter((d) => existsSync(join(catalogDir, d, "SKILL.md")));
     const catalogNames = catalog.flatMap((d) => [d, frontmatterName(join(catalogDir, d, "SKILL.md")) ?? d]);
 
@@ -140,10 +152,12 @@ describe("gabo-pi bootstrap skill (S3)", () => {
     expect(specNames.length).toBeGreaterThan(0);
     expect(slotLinks).toContain("gabo-methodology");
 
-    const taken = new Set([...catalogNames, ...specNames, ...slotLinks]);
+    const fixed = new Set([...specNames, ...slotLinks]);
+    const catalogTaken = new Set(catalogNames);
     for (const dir of shippedSkillDirs) {
       const names = [dir, frontmatterName(join(pkgDir, "skills", dir, "SKILL.md")) ?? dir];
-      expect(names.filter((n) => taken.has(n))).toEqual([]);
+      const taken = (n: string) => fixed.has(n) || (catalogTaken.has(n) && !isCatalogCopy(dir));
+      expect({ dir, shared: names.filter(taken) }).toEqual({ dir, shared: [] });
     }
   });
 
@@ -168,5 +182,41 @@ describe("extensions/gabo.ts stub", () => {
     const pi = new Proxy({}, { get: (_t, key) => (touched.push(key), () => undefined) });
     expect(await mod.default(pi)).toBeUndefined();
     expect(touched).toEqual([]);
+  });
+});
+
+describe("gabo-reviewer-config skill (S10, S1, S3)", () => {
+  const shipped = join(pkgDir, "skills", reviewerConfig);
+  const source = join(catalogDir, reviewerConfig);
+
+  test("is byte-identical, file by file, to its catalog folder", () => {
+    expect(existsSync(shipped)).toBe(true);
+    const sourceFiles = filesUnder(source, ".").sort();
+    expect(sourceFiles).toContain("./scripts/isolation-test.sh");
+    expect(filesUnder(shipped, ".").sort()).toEqual(sourceFiles);
+    for (const file of sourceFiles) {
+      const same = readFileSync(join(shipped, file)).equals(readFileSync(join(source, file)));
+      const sameMode = statSync(join(shipped, file)).mode === statSync(join(source, file)).mode;
+      expect({ file, same, sameMode }).toEqual({ file, same: true, sameMode: true });
+    }
+  });
+
+  test("is listed in pi.skills", () => {
+    expect(pkg.pi?.skills ?? []).toContain(`./skills/${reviewerConfig}`);
+  });
+
+  test("npm pack holds every file of its catalog folder", () => {
+    const files = packed();
+    for (const file of filesUnder(source, `skills/${reviewerConfig}`)) expect(files).toContain(file);
+    expect(files.filter((f) => f.split("/").includes("gabo-reviewer"))).toEqual([]);
+  });
+
+  test("no shipped skill invokes the reviewer scripts", () => {
+    for (const dir of shippedSkillDirs) {
+      for (const file of filesUnder(join(pkgDir, "skills", dir), dir)) {
+        const text = readFileSync(join(pkgDir, "skills", file), "utf8");
+        expect({ file, invokesReviewer: /reviewer\.sh/.test(text) }).toEqual({ file, invokesReviewer: false });
+      }
+    }
   });
 });
