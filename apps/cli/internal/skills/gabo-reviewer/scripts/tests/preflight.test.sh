@@ -114,12 +114,56 @@ expect_match '^PREFLIGHT-FAILED no pi binary \(REVIEWER_PI=/missing/pi\) for run
   "$(pi_pre REVIEWER_PI=/missing/pi bash "$skill/reviewer.sh" preflight)" "a missing pi binary is refused"
 expect_match '^PREFLIGHT-FAILED no claude binary \(REVIEWER_CLAUDE=/missing/claude\) for runtimes.reviewer claude$' \
   "$(pre REVIEWER_CLAUDE=/missing/claude bash "$skill/reviewer.sh" preflight)" "a missing claude binary is refused"
-expect_match "^PREFLIGHT-FAILED REVIEWER_ENGINE must be claude or pi \(runtimes.reviewer\), got 'gpt'$" \
+expect_match "^PREFLIGHT-FAILED REVIEWER_ENGINE must be claude, codex, pi or opencode \(runtimes.reviewer\), got 'gpt'$" \
   "$(pre REVIEWER_ENGINE=gpt bash "$skill/reviewer.sh" preflight)" "an unknown engine is refused"
 expect_match '^PREFLIGHT-FAILED review.pi_credential_env must be an environment variable name' \
   "$(pi_pre REVIEWER_PI="$work/bin/pi" REVIEWER_PI_CREDENTIAL_ENV='a-b' bash "$skill/reviewer.sh" preflight)" "a bad credential env var name is refused"
 expect_match '^PREFLIGHT-FAILED review.pi_credential_env may not name PATH' \
   "$(pi_pre REVIEWER_PI="$work/bin/pi" REVIEWER_PI_CREDENTIAL_ENV=PATH bash "$skill/reviewer.sh" preflight)" "a credential env var may not replace the review's own environment"
+
+echo "# isolation pass marker (codex, opencode)"
+marks="$fake_home/.config/gabo/reviewer-isolation"
+rm -rf "$fake_home/.config/gabo"
+expect_match '^PREFLIGHT-OK .* engine=claude ' "$(pre bash "$skill/reviewer.sh" preflight)" "claude needs no isolation pass marker"
+expect_match '^PREFLIGHT-OK .* engine=pi ' "$(pi_pre REVIEWER_PI="$work/bin/pi" bash "$skill/reviewer.sh" preflight)" \
+  "pi needs no isolation pass marker"
+O_REVIEWER=codex make_origin "$work/origin-codex.git"
+codex_pre() { PRE_ORIGIN="$work/origin-codex.git" PRE_STATE="$work/state-codex" pre REVIEWER_CODEX="$work/bin/codex" "$@"; }
+out="$(codex_pre bash "$skill/reviewer.sh" preflight)"
+expect_match "^PREFLIGHT-FAILED runtimes.reviewer codex has no isolation test pass for codex-cli 0.163.0: no marker $marks/codex; run the gabo-reviewer-config isolation test \(isolation-test.sh codex\)$" \
+  "$out" "codex without a pass marker is refused, naming the missing isolation test"
+mkdir -p "$marks"
+echo "codex-cli 0.162.0" >"$marks/codex"
+expect_match "^PREFLIGHT-FAILED runtimes.reviewer codex has no isolation test pass for codex-cli 0.163.0: $marks/codex records codex-cli 0.162.0; run the gabo-reviewer-config isolation test \(isolation-test.sh codex\)$" \
+  "$(codex_pre bash "$skill/reviewer.sh" preflight)" "a marker for another codex version is refused"
+echo "codex-cli 0.163.0" >"$marks/codex"
+expect_match '^PREFLIGHT-OK .* engine=codex ' "$(codex_pre bash "$skill/reviewer.sh" preflight)" \
+  "runtimes.reviewer: codex with a marker matching codex --version passes"
+expect_match '^PREFLIGHT-FAILED .*isolation test' "$(codex_pre XDG_CONFIG_HOME="$work/xdg" bash "$skill/reviewer.sh" preflight)" \
+  "the marker is read under XDG_CONFIG_HOME when it is set"
+mkdir -p "$work/xdg/gabo/reviewer-isolation" && echo "codex-cli 0.163.0" >"$work/xdg/gabo/reviewer-isolation/codex"
+expect_match '^PREFLIGHT-OK .* engine=codex ' "$(codex_pre XDG_CONFIG_HOME="$work/xdg" bash "$skill/reviewer.sh" preflight)" \
+  "a matching marker under XDG_CONFIG_HOME passes"
+expect_match '^PREFLIGHT-FAILED no codex binary \(REVIEWER_CODEX=gabo-test-no-codex\) for runtimes.reviewer codex$' \
+  "$(codex_pre REVIEWER_CODEX=gabo-test-no-codex bash "$skill/reviewer.sh" preflight)" "codex missing from PATH is refused naming REVIEWER_CODEX"
+# The version runs in a scrubbed environment: the stub reads it from its context file.
+STUB_LOG="$fx/calls.log" CODEX_VERSION=0.170.0 write_stub_context "$work/bin"
+expect_match '^PREFLIGHT-FAILED .*pass for codex-cli 0.170.0: .*isolation test \(isolation-test.sh codex\)$' \
+  "$(pre REVIEWER_ENGINE=codex REVIEWER_CODEX="$work/bin/codex" bash "$skill/reviewer.sh" preflight)" \
+  "REVIEWER_ENGINE=codex is accepted and an upgraded codex needs a new isolation test"
+rm -f "$work/bin/stub-context"
+oc_pre() { pre REVIEWER_ENGINE=opencode REVIEWER_OPENCODE="$work/bin/opencode" "$@"; }
+expect_match "^PREFLIGHT-FAILED runtimes.reviewer opencode has no isolation test pass for 1.0.0: no marker $marks/opencode; run the gabo-reviewer-config isolation test \(isolation-test.sh opencode\)$" \
+  "$(oc_pre bash "$skill/reviewer.sh" preflight)" "opencode without a pass marker is refused, naming the missing isolation test"
+echo "0.9.0" >"$marks/opencode"
+expect_match '^PREFLIGHT-FAILED .*opencode records 0.9.0; ' "$(oc_pre bash "$skill/reviewer.sh" preflight)" \
+  "a marker for another opencode version is refused"
+echo "1.0.0" >"$marks/opencode"
+expect_match '^PREFLIGHT-OK .* engine=opencode ' "$(oc_pre bash "$skill/reviewer.sh" preflight)" \
+  "opencode with a marker matching opencode --version passes"
+expect_match '^PREFLIGHT-FAILED no opencode binary \(REVIEWER_OPENCODE=gabo-test-no-opencode\) for runtimes.reviewer opencode$' \
+  "$(oc_pre REVIEWER_OPENCODE=gabo-test-no-opencode bash "$skill/reviewer.sh" preflight)" "opencode missing from PATH is refused naming REVIEWER_OPENCODE"
+rm -rf "$fake_home/.config/gabo"
 
 echo "# placement"
 O_PLACEMENT=github-actions make_origin "$work/origin-gha.git"

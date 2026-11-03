@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end tests of one review: reviewer.sh head -> review-head.sh ->
-# merge-head.sh, offline with fake gh, claude, pi, go and gabo, and a local bare
+# merge-head.sh, offline with fake gh, claude, pi, codex, go and gabo, and a local bare
 # repository standing in for GitHub.
 # Run: bash tests/review.test.sh
 set -uo pipefail
@@ -15,6 +15,10 @@ make_stubs "$work/bin"
 mkdir -p "$fake_home/.pi/agent"
 echo '{"openai": {"type": "oauth"}}' >"$fake_home/.pi/agent/auth.json"
 echo '{"defaultProvider": "openai", "defaultModel": "gpt-5.5"}' >"$fake_home/.pi/agent/settings.json"
+# The owner's Codex login and the isolation pass marker of the stub codex.
+mkdir -p "$fake_home/.codex" "$fake_home/.config/gabo/reviewer-isolation"
+echo '{"auth_mode": "chatgpt"}' >"$fake_home/.codex/auth.json"
+echo "codex-cli 0.163.0" >"$fake_home/.config/gabo/reviewer-isolation/codex"
 
 # origin <name> [O_*=value...]: builds the fixture repository <name> and a
 # caller checkout of its integration branch; sets ORIGIN, CALLER and the
@@ -47,8 +51,8 @@ scenario() {
   (
     cd "$CALLER" || exit 1
     export HOME="$fake_home" PATH="$work/bin:$PATH" STUB_LOG="$fx/calls.log" FIXTURE="$fx" \
-      REVIEWER_GH="$work/bin/gh" REVIEWER_CLAUDE="$work/bin/claude" REVIEWER_PI="$work/bin/pi" REVIEWER_GABO_BIN="$work/bin/gabo" \
-      GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_REMOTE_URL="$ORIGIN" \
+      REVIEWER_GH="$work/bin/gh" REVIEWER_CLAUDE="$work/bin/claude" REVIEWER_PI="$work/bin/pi" REVIEWER_CODEX="$work/bin/codex" \
+      REVIEWER_GABO_BIN="$work/bin/gabo" GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_REMOTE_URL="$ORIGIN" \
       REVIEWER_GH_TOKEN=secret-gh CLAUDE_CODE_OAUTH_TOKEN=secret-claude \
       REVIEWER_NOW=2026-10-20T12:00:00Z REVIEWER_MERGE_DELAY=0 REVIEWER_MERGE_TRIES=2
     for kv in "$@"; do export "${kv?}"; done
@@ -236,6 +240,68 @@ check "checks never get the Pi credential" bash -c "! grep '^check-env' '$work/p
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario pi_key_unset)" "a named credential env var that is empty is refused"
 check "the refusal names the env var" grep -qF 'review.pi_credential_env names PI_TEST_KEY, which is empty' "$work/pi_key_unset/out.log"
 check "nothing runs without the named credential" bash -c "! grep -qE '^(pi|go-argc)' '$work/pi_key_unset/calls.log'"
+
+echo "# codex reviewer (runtimes.reviewer: codex)"
+origin codex O_REVIEWER=codex O_AUTO_MERGE=true
+v="$(scenario codex_clean)"
+cx="$work/codex_clean"
+cwt="$cx/state/worktrees/pr-7"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" "a clean Codex review ends with the same VERDICT line and merges"
+expect_eq "No blocking issues found." "$(first_line codex_clean)" "the Codex comment opens with the clean verdict"
+expect_eq "<!-- gbai-reviewer-bot sha=$HEAD_SHA -->|🤖 gabo reviewer" "$(footer codex_clean)" "the Codex comment ends with the marker and the footer"
+check "the final message is the review text" grep -qF 'All files comply.' "$cx/posted_7.md"
+check "codex progress output is not the review text" bash -c "! grep -qF 'codex: reading the diff' '$cx/posted_7.md'"
+check "the Codex comment names the engine" grep -qF 'then a Codex review' "$cx/posted_7.md"
+expect_match '^reviewer/review success codex: no blocking issues found' "$(status_line codex_clean reviewer/review)" "the review status names the codex engine"
+check "claude never runs for a Codex reviewer" bash -c "! grep -q '^claude ' '$cx/calls.log'"
+check "the agent review runs codex exec in the head checkout" grep -qE "^codex exec .* cwd=$cwt$" "$cx/calls.log"
+for flag in --ignore-user-config --ignore-rules '-s read-only' --ephemeral "-C $cwt"; do
+  check "codex exec gets $flag" grep -qE "^codex exec (.* )?$flag( .*)? cwd=" "$cx/calls.log"
+done
+check "the prompt goes on stdin (codex exec ... -)" grep -qE "^codex exec .* - cwd=$cwt$" "$cx/calls.log"
+check "the Codex prompt carries the PR diff" grep -q 'func main' "$cx/prompt_seen.txt"
+check "the Codex review gets no GitHub or Claude token, a reviewer-owned HOME and CODEX_HOME" grep -qxF \
+  "codex-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset HOME=$cx/state/review-home CODEX_HOME=$cx/state/codex-home" "$cx/calls.log"
+expect_eq "codex-vars CODEX_HOME,HOME,NO_COLOR,PATH,TERM" "$(grep '^codex-vars ' "$cx/calls.log")" "the Codex review runs in an env -i environment"
+expect_eq "codex-files auth=yes" "$(grep '^codex-files ' "$cx/calls.log")" "the reviewer-owned CODEX_HOME holds the owner's Codex login"
+check "the login is linked, never copied" test -L "$cx/state/codex-home/auth.json"
+expect_eq "" "$(git -C "$cwt" status --porcelain)" "git status of the checkout is unchanged"
+gates="$(grep -nE '^go-argc=' "$cx/calls.log" | tail -n 1 | cut -d: -f1)"
+review="$(grep -nE '^codex exec ' "$cx/calls.log" | head -n 1 | cut -d: -f1)"
+check "the deterministic gates run before the agent review" test "${gates:-999999}" -lt "${review:-0}"
+expect_eq 3 "$(grep -c '^go-argc=' "$cx/calls.log")" "the Codex review still runs the three checks"
+expect_eq 1 "$(grep -c 'gbai-reviewer-bot sha=' "$cx/all_posted_7.md")" "one Codex verdict comment per head"
+check "without REVIEWER_CODEX_MODEL the owner's default Codex model is used" bash -c "! grep -qE '^codex exec .* -m ' '$cx/calls.log'"
+scenario codex_model REVIEWER_CODEX_MODEL=gpt-5.3-codex >/dev/null
+check "REVIEWER_CODEX_MODEL picks the Codex model" grep -qE '^codex exec .* -m gpt-5.3-codex - cwd=' "$work/codex_model/calls.log"
+check "the comment names the Codex model" grep -qF 'then a Codex review (`gpt-5.3-codex`).' "$work/codex_model/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario codex_fail CODEX_MODE=fail)" "blocking Codex findings are blocking"
+check "the Codex findings are posted" grep -qF 'nil dereference' "$work/codex_fail/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario codex_error CODEX_MODE=error)" "a Codex run that fails is an error"
+expect_match 'codex exit 1' "$(status_line codex_error reviewer/review)" "the error status names the codex engine"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario codex_silent CODEX_MODE=silent)" \
+  "a Codex run without a final message is an error"
+expect_match 'no verdict line in the codex output' "$(status_line codex_silent reviewer/review)" "the missing final message is reported"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario codex_modify CODEX_MODE=modify REVIEWER_MAX_ATTEMPTS=1)" \
+  "a Codex agent that edits the checkout is an error"
+check "the edited checkout is reported" grep -qF 'the review agent modified the checkout' "$work/codex_modify/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario codex_missing REVIEWER_CODEX=gabo-test-no-codex)" \
+  "codex missing from PATH is an error"
+check "the refusal names REVIEWER_CODEX" grep -qF 'no codex binary (REVIEWER_CODEX=gabo-test-no-codex)' "$work/codex_missing/out.log"
+check "nothing runs without codex" bash -c "! grep -qE '^(codex|go-argc)' '$work/codex_missing/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario codex_unmarked XDG_CONFIG_HOME="$work/no-marker")" \
+  "a Codex reviewer without an isolation pass marker never reviews"
+check "the refusal names the missing isolation test" grep -qF 'isolation-test.sh codex' "$work/codex_unmarked/out.log"
+check "nothing runs without the isolation pass" bash -c "! grep -qE '^(codex|go-argc)' '$work/codex_unmarked/calls.log'"
+
+echo "# opencode reviewer has no review step yet"
+origin opencode O_REVIEWER=opencode
+echo "1.0.0" >"$fake_home/.config/gabo/reviewer-isolation/opencode"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario opencode REVIEWER_OPENCODE="$work/bin/opencode")" \
+  "an opencode reviewer is refused before any review"
+check "the refusal says opencode has no review step" grep -qF 'runtimes.reviewer opencode has no review step' "$work/opencode/out.log"
+check "neither checks nor an engine run for opencode" bash -c "! grep -qE '^(claude|codex|opencode|go-argc)' '$work/opencode/calls.log'"
+rm -f "$fake_home/.config/gabo/reviewer-isolation/opencode"
 
 echo "# base version minimum"
 origin stamped O_STAMP=0.4.0
