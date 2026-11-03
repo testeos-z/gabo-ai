@@ -1,0 +1,16 @@
+{
+  "name": "gabo-ai",
+  "owner": {
+    "name": "testeos-z"
+  },
+  "metadata": {
+    "description": "gabo: an agent-driven SDLC for Claude Code (PRD, TRD, intents, waves and a reviewer gate)."
+  },
+  "plugins": [
+    {
+      "name": "gabo",
+      "source": "./plugins/claude-code",
+      "description": "gabo catalog skills for Claude Code: plan, build and review work with the gabo SDLC."
+    }
+  ]
+}
