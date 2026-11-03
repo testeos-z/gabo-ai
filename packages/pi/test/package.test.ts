@@ -174,14 +174,15 @@ describe("gabo-pi bootstrap skill (S3)", () => {
   });
 });
 
-describe("extensions/gabo.ts stub", () => {
-  test("is a no-op: it touches nothing on the extension API", async () => {
+describe("extensions/gabo.ts at load", () => {
+  test("only registers event handlers through pi.on", async () => {
     const mod = await import(join(pkgDir, "extensions", "gabo.ts"));
     expect(typeof mod.default).toBe("function");
     const touched: PropertyKey[] = [];
     const pi = new Proxy({}, { get: (_t, key) => (touched.push(key), () => undefined) });
     expect(await mod.default(pi)).toBeUndefined();
-    expect(touched).toEqual([]);
+    expect(touched.length).toBeGreaterThan(0);
+    expect(touched.filter((key) => key !== "on")).toEqual([]);
   });
 });
 
