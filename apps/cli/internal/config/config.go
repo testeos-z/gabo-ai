@@ -30,8 +30,9 @@ type Config struct {
 	Review   Review   `yaml:"review"`
 	Coder    Coder    `yaml:"coder"`
 	Worktree Worktree `yaml:"worktree"`
-	// Parallelism is the most coder sessions the cycle runs at once; it
-	// already leaves room for the reviewer's checks. Required, no default.
+	// Parallelism is the most coder sessions the cycle runs at once within
+	// one wave (one intent's tasks); it already leaves room for the
+	// reviewer's checks. Required, no default.
 	Parallelism int `yaml:"parallelism"`
 
 	// Version is the schema version of the file; a file without it is
@@ -43,6 +44,7 @@ type Config struct {
 	Reviewer   Reviewer          `yaml:"reviewer,omitempty"`
 	Developers map[string]string `yaml:"developers,omitempty"`
 	PlanChange PlanChange        `yaml:"plan_change,omitempty"`
+	Wave       Wave              `yaml:"wave,omitempty"`
 	// Personal keys (see PersonalKeys): read from the global layers only.
 	Alias            string `yaml:"alias,omitempty"`
 	InteractionLevel string `yaml:"interaction_level,omitempty"`

@@ -262,3 +262,50 @@ func TestSetupCopiesACatalogMemoryAdapterBeforeWriting(t *testing.T) {
 		}
 	}
 }
+
+// productModel returns the **Product model.** step of the setup skill.
+func productModel(t *testing.T) string {
+	t.Helper()
+	_, steps, ok := strings.Cut(setupDoc(t), "## Steps")
+	if !ok {
+		t.Fatalf("%s: no ## Steps section", setupSkill)
+	}
+	steps, _, _ = strings.Cut(steps, "\n## ")
+	_, step, ok := strings.Cut(steps, "**Product model.**")
+	if !ok {
+		t.Fatalf("%s: no **Product model.** step", setupSkill)
+	}
+	step, _, _ = strings.Cut(step, "\n9. ")
+	return step
+}
+
+// Setup guides the project into the per-change model (S13): the owner
+// chooses the stack and the assistant only proposes and helps configure it
+// (S6), recorded in the TRD through gabo-dev-lead; the global context is
+// short and scaffolded by its owning agents, with no upfront schema, plan or
+// stories; the owner picks wave.after (default wait) and accepts each spec
+// one at a time (S10, S11, S14); the first intent goes through gabo-pm.
+func TestSetupGuidesThePerChangeModel(t *testing.T) {
+	t.Parallel()
+	doc := setupDoc(t)
+	_, steps, _ := strings.Cut(doc, "## Steps")
+	smoke := strings.Index(steps, "**Smoke test.**")
+	model := strings.Index(steps, "**Product model.**")
+	if smoke < 0 || model < smoke {
+		t.Fatalf("%s: the **Product model.** step must come after the smoke test", setupSkill)
+	}
+	step := productModel(t)
+	for _, s := range []string{
+		"The owner chooses", "language, framework, database and hosting", "only propose options",
+		"helps configure", "stack and tooling", "`docs/product/TRD.md`", "`gabo-dev-lead`",
+		"conceptual PRD", "`gabo-pm`", "conventions only", "`DESIGN.md`", "only if the app has a UI",
+		"`gabo-frontend`", "`MIGRATIONS.md`", "only if the app has a database", "`gabo-db-master`",
+		"empty `docs/product/intents/`", "no upfront schema, plan or stories",
+		"`wave.after`", "`next`", "next accepted intent", "`wait`", "default is `wait`",
+		"one at a time", "the owner accepts each spec", "first intent", "`gabo-config-writer`",
+	} {
+		if !strings.Contains(step, s) {
+			t.Errorf("%s **Product model.**: missing %q", setupSkill, s)
+		}
+	}
+}

@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/intents/0001-alpha/plan.md: no spec.md; a plan starts only after a human accepts the spec
+next: fix the intent folders above, then rerun gabo check

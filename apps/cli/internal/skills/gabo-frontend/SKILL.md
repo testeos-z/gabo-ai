@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use to write `docs/product/UX_UI.md` (from `templates/UX_UI.md`), `docs/product/APP_FLOW.md` (from `templates/APP_FLOW.md`) and the repository `DESIGN.md`, and to plan Storybook components.
+Use to keep the optional global `DESIGN.md` (from `templates/DESIGN.md`, global styles only, when the product warrants UX/UI work), to contribute section `## 3. UX and app flow (optional)` of each intent's `spec.md`, and to plan Storybook components. UX and app flow are per intent; there is no global UX or app-flow document.
 
 ## Hard Rules
 
@@ -17,26 +17,30 @@ Use to write `docs/product/UX_UI.md` (from `templates/UX_UI.md`), `docs/product/
 - Tokens first: color, spacing, typography, radius and motion as CSS custom properties; components use tokens only.
 - Atomic design: atoms → molecules → organisms → templates → pages; each component gets a Storybook story with its states (default, hover, focus, disabled, loading, error, empty).
 - Accessibility: keyboard paths, focus order, contrast, labels.
-- App flow: every screen or surface, its entry points, the transitions and the error and empty states; one journey per story with trigger, actors, steps, decision points, outcome, failure and escalation. A product without a GUI lists surfaces (conversation, CLI, tracker) instead of screens.
+- App flow: every screen or surface, its entry points, the transitions and the error and empty states; one journey per changed path of the intent with trigger, actors, steps, decision points, outcome, failure and escalation, written in the spec's section 3. A product without a GUI lists surfaces (conversation, CLI, tracker) instead of screens.
 
 ## Traceability check
 
-Run it before each next planning step: before moving to the next document, before creating or updating tasks, and before returning (D19). Read the stable template tables: PRD stories and requirements, TRD decisions and requirement coverage, plan tasks and coverage. Rows marked removed (a title starting `(removed <date>)`, or a status withdrawn or superseded) are ignored on both sides of every link. A gap is:
+Run it before each next planning step: before moving to the next document, before creating or updating tasks, and before returning (D19). Read the intent folders `docs/product/intents/<NNNN-slug>/` (`intent.md`, the spec requirements and its acceptance record, the plan task table) and the tracker tasks through the `tasks` contract. Rows marked removed (a title starting `(removed <date>)`, or a status withdrawn or superseded) are ignored on both sides of every link. A gap is:
 
-- a story without requirement;
-- a requirement without decision, task or verification;
-- a task without story;
-- a dependency cycle, a dangling id (a story, requirement, decision or task id no live row defines), or a `depends_on` / `unblocks` mismatch.
+- an intent without spec;
+- an accepted spec without plan;
+- a plan task without a tracker task, or the reverse;
+- a task whose parent is not exactly one intent;
+- a requirement in the spec not covered by any plan task;
+- a dependency cycle;
+- a dangling id, including a cross-intent `<NNNN>/T<n>` reference;
+- a `depends_on`/`unblocks` mismatch.
 
 Any gap blocks the next planning step: fix it in your own documents or return it as an open question naming the ids; never skip it. A document not written yet is reported as not checked, not as passing.
 
 ## Execution Steps
 
-1. Read PRD requirements and personas.
-2. Answer the UX_UI fixed questions, then write UX_UI (principles, tokens, component inventory, accessibility, messages) and DESIGN.md (the token source of truth).
-3. Answer the APP_FLOW fixed questions, then write APP_FLOW as a surface list, the journeys and a flow diagram (Mermaid).
+1. Read the PRD users and journeys, `DESIGN.md` if present, and the intent's `intent.md` and `spec.md`.
+2. Only when the product warrants it: answer the DESIGN fixed questions, then write or update `DESIGN.md` (principles, tokens, component inventory, accessibility, messages; the token source of truth).
+3. Per intent: answer the spec's UX and app flow question, then write that spec section as a surface list, the journeys and a flow diagram (Mermaid), or "not applicable" with the reason.
 4. Run the traceability check before the next planning step.
 
 ## Output Contract
 
-Return the component inventory, the screens, the components each implementation task needs, and traceability gaps (or none).
+Return the component inventory, the surfaces the intent changes, the components each implementation task needs, and traceability gaps (or none).

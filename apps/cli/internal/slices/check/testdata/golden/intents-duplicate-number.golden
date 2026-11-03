@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ intent number 0001 used twice: docs/product/intents/0001-alpha and docs/product/intents/0001-beta
+next: fix the intent folders above, then rerun gabo check

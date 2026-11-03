@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,7 +17,7 @@ var want = []string{
 	"gabo-adapter-writer", "gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-config-writer", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-runtime-builder", "gabo-runtime-claude", "gabo-runtime-pi", "gabo-setup",
+	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-config", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-runtime-builder", "gabo-runtime-claude", "gabo-runtime-pi", "gabo-setup",
 	"gabo-wave-report",
 }
 
@@ -162,6 +163,11 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"`gabo/ledger/<wave>`",
 			// T061: the report format lives in gabo-wave-report.
 			"`gabo-wave-report`",
+			// S11: one wave is one accepted intent, read through the tasks filter.
+			"exactly one accepted intent", "the wave id is the intent id (`I####`)",
+			"`read unblocked` with the `intent` filter", "stays blocked",
+			"reported, never pulled in", "every task of that intent is DONE or BLOCKED",
+			"coders in parallel within this intent",
 		},
 		// T061: J3 wave report (TRD 9.2) formatted once and saved through memory.
 		"gabo-wave-report/SKILL.md": {
@@ -193,6 +199,11 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"after `gabo-setup` verifies the `memory` slot", "save wave trace",
 			// T061: the summary and the comfort answer follow gabo-wave-report.
 			"`gabo-wave-report`",
+			// S11, S14: one wave per intent, chained only by `wave.after`.
+			"## Wave Start", "next eligible intent", "`spec.md` the owner accepted",
+			"never accept a spec", "has unblocked tasks", "`wave.after`",
+			"`next`: start the next eligible intent", "`wait`: stop and report",
+			"no eligible intent", "wait in either case", "unset means `wait`",
 			// T033: J5 intervene in a task: mediate by default, offer a direct session
 			// once after three mediated exchanges (APP_FLOW A5), open it through the
 			// `direct_sessions` slot, resume from the traces; R14, R18, D9, D18.
@@ -212,6 +223,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"fresh", "clean context", "index the repository", "never edit",
 			"`AGREE`", "`COUNTER-PROPOSAL`", "BLOCKED", "R19", "D7", "D8",
 			"never applies automatically", "save decision",
+			"intent → spec → plan → task → test", "one intent's `plan.md`",
 		},
 		"gabo-pm/SKILL.md":                       {"`gabo-plan-reviewer`", "## Plan-Change Flow"},
 		"gabo-dev-lead/SKILL.md":                 {"`gabo-plan-reviewer`", "## Plan-Change Flow"},
@@ -234,8 +246,8 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		"gabo-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gabo-methodology"},
 		// T055: the doc guide maps every product doc, the setup prompt and the catalog.
 		"gabo-doc-guide/SKILL.md": {
-			"docs/product/PRD.md", "docs/product/stories/", "docs/product/TRD.md", "docs/product/IMPLEMENTATION_PLAN.md",
-			"docs/product/DB_SCHEMA.md", "docs/product/UX_UI.md", "docs/product/APP_FLOW.md", "DESIGN.md",
+			"docs/product/PRD.md", "docs/product/TRD.md", "docs/product/DESIGN.md", "docs/product/MIGRATIONS.md",
+			"docs/product/intents/<NNNN-slug>/", "review findings",
 			"setup prompt", ".gabo/skills/", "adds no rule", "`gabo-plan-reviewer`",
 		},
 		// The former cloud keys of the core config (DB_SCHEMA 2.3).
@@ -734,7 +746,7 @@ func TestPlanReviewerCarriesTheAppFlowApprovalScale(t *testing.T) {
 	if len(got) != 6 {
 		t.Fatalf("approval scale has %d table lines, want header, rule and 4 scopes", len(got))
 	}
-	for i, scope := range []string{"One task", "Group of tasks", "Global plan", "Any scope beyond `plan_change.scope`"} {
+	for i, scope := range []string{"One task", "One intent", "Several intents or the PRD/TRD conventions", "Any scope beyond `plan_change.scope`"} {
 		if !strings.HasPrefix(got[i+2], "| "+scope) {
 			t.Errorf("row %d = %q, want scope %q", i+1, got[i+2], scope)
 		}
@@ -757,4 +769,24 @@ func scaleRows(t *testing.T, doc, heading string) []string {
 		}
 	}
 	return rows
+}
+
+// S11: a wave no longer takes every unblocked task of the tracker, and the
+// assistant no longer picks a free-form wave id.
+func TestWaveIsOneIntent(t *testing.T) {
+	t.Parallel()
+	for file, gone := range map[string][]string{
+		"gabo-cycle/SKILL.md":     {"take the unblocked ones (every blocker closed) up to `parallelism`"},
+		"gabo-assistant/SKILL.md": {"Pick the wave id and the mode (`manual` or `auto`)."},
+	} {
+		b, err := fs.ReadFile(Catalog(), file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range gone {
+			if strings.Contains(string(b), g) {
+				t.Errorf("%s still says %q", file, g)
+			}
+		}
+	}
 }

@@ -9,7 +9,7 @@
     { "$ref": "#/$defs/complete" }
   ],
   "$comment": "The names below close the object; their rules live in $defs/projectKeys.",
-  "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true },
+  "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true },
   "additionalProperties": false,
   "$defs": {
     "projectKeys": {
@@ -126,7 +126,7 @@
           }
         },
         "parallelism": {
-          "description": "Most coder sessions the cycle runs at once.",
+          "description": "Most coder sessions the cycle runs at once within one wave, that is within one intent's tasks.",
           "type": ["integer", "null"],
           "minimum": 1
         },
@@ -177,12 +177,23 @@
           "additionalProperties": false,
           "properties": {
             "scope": {
-              "description": "Widest plan scope agents may change (R19, D7).",
+              "description": "Widest plan scope agents may change (R19, D7): task is one task in one intent's plan.md; group is one whole intent, its spec.md and plan.md; global is several intents or the PRD/TRD conventions.",
               "enum": ["task", "group", "global", "", null]
             },
             "global_without_owner": {
-              "description": "Whether the global plan may change without the owner (D7).",
+              "description": "Whether a global-scope change (several intents or the PRD/TRD conventions) may apply without the owner (D7).",
               "type": ["boolean", "null"]
+            }
+          }
+        },
+        "wave": {
+          "description": "How waves chain. A wave is one intent; chaining is optional.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "after": {
+              "description": "What the assistant does when a wave closes: next starts the next intent whose spec is accepted and that has unblocked tasks; wait stops and reports. Unset means wait. With no eligible intent it waits either way.",
+              "enum": ["next", "wait", "", null]
             }
           }
         }
@@ -227,7 +238,7 @@
         { "$ref": "#/$defs/projectKeys" },
         { "$ref": "gabo.user.schema.json#/$defs/personalKeys" }
       ],
-      "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
+      "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
       "additionalProperties": false
     },
     "file": {

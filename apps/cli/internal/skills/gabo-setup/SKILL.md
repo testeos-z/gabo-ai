@@ -1,6 +1,6 @@
 ---
 name: gabo-setup
-description: "Trigger: gabo setup, first setup, configure gabo, setup prompt, change slot adapter or runtime, rebuild agents after gabo upgrade. Guides setup: ask, adapters, config, build agents, gabo check, slot smoke test."
+description: "Trigger: gabo setup, first setup, configure gabo, setup prompt, change slot adapter or runtime, rebuild agents after gabo upgrade. Guides setup: ask, adapters, config, build agents, gabo check, slot smoke test, per-change product model."
 license: Apache-2.0
 metadata:
   author: gabo-ai
@@ -37,7 +37,12 @@ Load in the owner's agent (Claude Code, Pi or another engine) after the setup pr
 6. **Smoke test.** For each configured slot, launch one subagent of the working kind (for example `gabo-coder`) that runs one harmless operation through the slot's adapter and reads the result back: `tasks` read one issue, `repository_host` read one PR status, `memory` see the memory probe below, `methodology` report its coder instructions, `reviewer_placement` report the placement, `agent_host` report where agents run. A slot whose operation fails stays unverified (APP_FLOW A3): the report names the failing operation, and you ask the owner how to fix the adapter; after the fix rerun `gabo check` and that slot's smoke test, nothing else.
    - **Memory probe.** The memory contract has no delete operation and no save under an arbitrary topic, so the probe uses the backend's own memory tool that the adapter names, and the report says so. With a backend that can delete, write a note only under a dedicated scratch topic `gabo/setup-probe/<timestamp>` (UTC), read it back, then delete it and check that the topic reads back nothing, so nothing stays in the project memory; a probe still there after one retry stays unverified and is reported with its key for the owner to remove. With a backend that has no delete operation, the probe writes nothing: it runs one read-only `search` through the adapter, and the R28 save in step 7, read back, is the write check.
 7. **Record the start (R28).** Right after the `memory` slot is verified, `save decision` through it: `what: setup start <UTC ISO 8601>`, `question: when did setup start (R28)`, `choice:` the timestamp, `reason: time to first wave`, `wave: none`, `task: global`. Read it back. An unverified `memory` slot means nothing is saved: report it.
-8. Tell the owner which files changed (`gabo.yaml`, `.gabo/`, adapters, agent folders) so they can commit them; commit only if the owner asks.
+8. **Product model.** Guide the project into the per-change model: a short global context, then one intent at a time, each with its own `spec.md` and `plan.md` under `docs/product/intents/<NNNN-slug>/`. Skip what `docs/product/` already holds; ask one question at a time.
+   - **Stack.** Ask which technologies to use: language, framework, database and hosting. The owner chooses; you only propose options, each with its reason, and helps configure the one chosen, never imposing one. Record the choice in the stack and tooling table of `docs/product/TRD.md` through `gabo-dev-lead`.
+   - **Global context.** Scaffold it short, each document through the agent that owns it: a conceptual PRD (what the product offers and what the user gets) through `gabo-pm`; a TRD with conventions only through `gabo-dev-lead`; a `DESIGN.md` only if the app has a UI, through `gabo-frontend`; a `MIGRATIONS.md` only if the app has a database, through `gabo-db-master`; and an empty `docs/product/intents/`. There is no upfront schema, plan or stories: schema changes, UX, flow and tasks come per intent.
+   - **Waves.** Ask about `wave.after` and write the answer through `gabo-config-writer`, with its `gabo check`: `next` chains to the next accepted intent when a wave ends, `wait` stops after the wave. Explain that the default is `wait`, that each wave runs one intent, and that there is no batch of accepted intents: the owner accepts each spec one at a time, and the production gate stays the owner's too.
+   - **First intent.** Point the owner to creating the first intent through `gabo-pm`; setup writes no intent itself.
+9. Tell the owner which files changed (`gabo.yaml`, `.gabo/`, adapters, agent folders, `docs/product/`) so they can commit them; commit only if the owner asks.
 
 ## Shared memory
 
@@ -72,4 +77,4 @@ Run after a gabo upgrade (TRD 9.4), or when `gabo check` prints one of these lin
 
 ## Output Contract
 
-A checklist per step: done, skipped (reason) or failed (failing operation and next step). Then each slot as `verified` or `unverified: <failing operation>`, the last `gabo check` result, the setup start record (saved or why not), the open questions for the owner, and any unverified write.
+A checklist per step: done, skipped (reason) or failed (failing operation and next step). Then each slot as `verified` or `unverified: <failing operation>`, the last `gabo check` result, the setup start record (saved or why not), the product model (stack recorded, global docs scaffolded, `wave.after`), the open questions for the owner, and any unverified write.

@@ -1,0 +1,6 @@
+exit 1
+error: ""
+--- stdout
+✗ dependency cycle: 0001/T1 -> 0001/T2 -> 0001/T1
+✗ dependency cycle: 0001/T3 -> 0002/T1 -> 0001/T3
+next: fix the intent folders above, then rerun gabo check

@@ -81,6 +81,26 @@ type PlanChange struct {
 	GlobalWithoutOwner bool   `yaml:"global_without_owner,omitempty"`
 }
 
+// What the assistant does when a wave closes (S11). A wave is one intent.
+const (
+	AfterNext = "next" // start the next intent whose spec is accepted
+	AfterWait = "wait" // stop and report; the default
+)
+
+// Wave configures how waves chain. Chaining is optional: unset means wait.
+type Wave struct {
+	After string `yaml:"after,omitempty"`
+}
+
+// AfterWave is wave.after with its default: an unset key reads as
+// AfterWait, so waves never chain unless the project asks for it.
+func (c Config) AfterWave() string {
+	if c.Wave.After == "" {
+		return AfterWait
+	}
+	return c.Wave.After
+}
+
 var (
 	markerPattern = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
 	emailPattern  = regexp.MustCompile(`^[^@\s]+@[^@\s]+$`)
@@ -132,6 +152,12 @@ func (c Config) validateProjectKeys() []error {
 	case "", ScopeTask, ScopeGroup, ScopeGlobal:
 	default:
 		fail("plan_change.scope", "must be %q, %q or %q, got %q", ScopeTask, ScopeGroup, ScopeGlobal, c.PlanChange.Scope)
+	}
+
+	switch c.Wave.After {
+	case "", AfterNext, AfterWait:
+	default:
+		fail("wave.after", "must be %q or %q, got %q", AfterNext, AfterWait, c.Wave.After)
 	}
 	return errs
 }

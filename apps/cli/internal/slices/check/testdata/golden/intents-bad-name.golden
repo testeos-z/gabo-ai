@@ -1,0 +1,6 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/intents/0002-Bad_Slug: folder name must be NNNN-slug (4 digits, then lowercase words joined by hyphens)
+✗ docs/product/intents/1-Login: folder name must be NNNN-slug (4 digits, then lowercase words joined by hyphens)
+next: fix the intent folders above, then rerun gabo check

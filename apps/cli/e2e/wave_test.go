@@ -15,7 +15,7 @@ import (
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 )
 
-// TestMiniWaveInterruptedAndResumed runs wave 1 of a sample repository with
+// TestMiniWaveInterruptedAndResumed runs wave I0001 (one intent) of a sample repository with
 // two dependent tasks, interrupts it once the second coder is about to start,
 // and resumes it with a fresh cycle that sees only the tracker and memory.
 func TestMiniWaveInterruptedAndResumed(t *testing.T) {
@@ -43,7 +43,7 @@ func TestMiniWaveInterruptedAndResumed(t *testing.T) {
 
 	// First run: one claim write is lost once, the re-read catches it (R24).
 	w.tasks.drop["claim 1"] = true
-	first := newCycle(w, "wave-1", runs)
+	first := newCycle(w, "I0001", runs)
 	recordReviews(first)
 	first.interrupt = func(task string) bool { return task == "T002" }
 	if _, err := first.run(); !errors.Is(err, errInterrupted) {
@@ -60,7 +60,7 @@ func TestMiniWaveInterruptedAndResumed(t *testing.T) {
 	stray := filepath.Join(w.wts, "stray")
 	w.run(w.main, nil, "git", "worktree", "add", "-q", stray, "-b", "stray", "origin/dev")
 
-	second := newCycle(w, "wave-1", runs)
+	second := newCycle(w, "I0001", runs)
 	recordReviews(second)
 	report, err := second.run()
 	if err != nil {
@@ -107,7 +107,7 @@ func TestMiniWaveInterruptedAndResumed(t *testing.T) {
 				t.Fatal(err)
 			}
 			if i.State != "closed" || !slices.Contains(i.Comments, "DONE via PR #"+itoa(pr)) ||
-				!slices.Contains(i.Comments, "claimed by gabo-cycle (wave wave-1)") || !slices.Contains(i.Comments, "PR #"+itoa(pr)) {
+				!slices.Contains(i.Comments, "claimed by gabo-cycle (wave I0001)") || !slices.Contains(i.Comments, "PR #"+itoa(pr)) {
 				t.Errorf("issue #%d: %+v", n, i)
 			}
 		}
@@ -184,7 +184,7 @@ func TestMiniWaveInterruptedAndResumed(t *testing.T) {
 				t.Errorf("report misses %q:\n%s", want, report)
 			}
 		}
-		trace, err := w.mem.read("gabo/trace/wave-1")
+		trace, err := w.mem.read("gabo/trace/I0001")
 		if err != nil || trace[len(trace)-1] != "report\n"+report {
 			t.Errorf("report is not the last trace entry")
 		}
@@ -195,7 +195,7 @@ func TestMiniWaveInterruptedAndResumed(t *testing.T) {
 			t.Errorf("prompts: %d", first.prompts+second.prompts)
 		}
 		for _, id := range []string{"T001", "T002"} {
-			d, err := w.mem.read("gabo/decision/wave-1/" + id + "/file-name")
+			d, err := w.mem.read("gabo/decision/I0001/" + id + "/file-name")
 			if err != nil || len(d) != 1 {
 				t.Fatalf("%s decisions: %v %v", id, d, err)
 			}
@@ -227,6 +227,8 @@ func TestSkillsCarryTheRulesTheWaveFollows(t *testing.T) {
 			"the cycle never writes DONE",
 			"`gabo/ledger/<wave>`",
 			"`gabo/trace/<wave>`",
+			"the wave id is the intent id (`I####`)",
+			"`read unblocked` with the `intent` filter",
 		},
 		"gabo-coder": {
 			"`git worktree remove <wt>` succeeds, never `--force`",

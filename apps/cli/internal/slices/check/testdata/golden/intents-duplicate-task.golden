@@ -1,0 +1,6 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/intents/0001-alpha/plan.md: task T1 listed twice
+✗ docs/product/intents/0001-alpha/plan.md: task id "X2" is not T<n>
+next: fix the intent folders above, then rerun gabo check
