@@ -72,7 +72,7 @@ Not applicable: the change alters no stored data and no config shape.
 | TRD 2 Stack ("The gabo CLI is Go") and TRD 11 testing strategy (Go-centric) | The package adds TypeScript code and `bun test` to the shipped product. | Plan change proposed (`global` scope): the CLI stays Go; runtime packages may be TypeScript in `packages/*`, tested with `bun test`. |
 | TRD 2 Go CLI (D24: `gabo init` is the only catalog copier; agents built by runtime skills) | A package that ships skills is a second catalog distribution path. | D1: the package ships one bootstrap skill only and never replaces `.gabo/skills/`, `.pi/agents/` or `.pi/skills/` (S8). |
 | D25 (the setup prompt has one source, embedded in the CLI) | The bootstrap skill could copy the prompt. | S3: the skill runs `gabo prompt` and holds no copy. |
-| D20 (`gabo-reviewer` never in the project) and TRD 9.4 user-level reviewer | A package could carry a second reviewer copy. | S1: no `gabo-reviewer` in the package; `gabo init` keeps installing the user-level reviewer. |
+| D20 (`gabo-reviewer` never in the project) and TRD 9.4 user-level reviewer | A package could carry a second reviewer copy. | S1: no `gabo-reviewer` in the package; `gabo init` keeps installing the user-level reviewer. Owner decision A (2026-11-03), made for intents 0001 and 0002: a distributed plugin or package may ship a reviewer-configuration skill (one that installs or integrates the review tool, such as a Pi reviewer, and places the deterministic scripts at user level) but never a skill that runs reviews, which stays user level only. D1 (B) already ships no review-running skill; whether this package also ships a reviewer-configuration skill is open question 7. |
 
 ## 6. Open questions
 
@@ -84,6 +84,7 @@ Not applicable: the change alters no stored data and no config shape.
 | 4 | Intent Q3, detection: which tool names count as a subagent package? Options: A gentle-pi's `subagent_run` only; B a fixed list including other verified packages (for example `pi-subagents-j0k3r`); C a list the user extends through a key in `gabo.yaml`. | answered: A as the default list (D2). Recommendation A now, B when another package is verified the way `gabo-runtime-pi` Prerequisite step 3 asks; C needs a config change (TRD 9.3). Carried to owner. |
 | 5 | npm package name and owner account. Options: A unscoped `gabo-pi`; B scoped `@testeos-z/gabo-pi`; C `gabo-ai-pi`. | carried to owner. Recommendation B: the scope matches the GitHub organisation and the release assets, and avoids a squatted unscoped name. |
 | 6 | Does the TS/bun addition need its own plan change before planning starts (section 5, row 1)? Options: A yes, a `global` plan change first; B record it in this spec's acceptance and amend the TRD with the plan. | carried to owner. Recommendation A, per D7. |
+| 7 | Owner decision A (2026-11-03) allows plugins to ship a reviewer-configuration skill (for example one that sets up a Pi reviewer) and forbids a skill that runs reviews. Should this package ship that configuration skill next to `gabo-pi`? Options: A no, keep D1 (B) as is; B yes, once the catalog has one (intent 0001 open question 6), subject to the same name-collision rule as S3. The catalog has no such skill today. | carried to owner. Recommendation A for the first release; it keeps D1 unchanged. |
 
 ## 7. Acceptance
 
