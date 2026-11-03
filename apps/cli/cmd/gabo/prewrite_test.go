@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"maps"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel/kerneltest"
 )
 
 const (
@@ -146,5 +150,41 @@ func TestCheckPreWriteThroughASymlink(t *testing.T) {
 	out, code := runPreWriteIn(t, project, filepath.Join(alias, filepath.FromSlash(prePlan)))
 	if code != 1 || out != want {
 		t.Fatalf("exit %d, output %q; want exit 1, output %q", code, out, want)
+	}
+}
+
+// A dangling symlink is judged at the target a write through it would
+// create: here an unaccepted intent's plan.md.
+func TestCheckPreWriteThroughADanglingSymlink(t *testing.T) {
+	project := preWriteProject(t, acceptedMD)
+	other := "docs/product/intents/0010-y/plan.md"
+	if err := os.Symlink(filepath.FromSlash(other), filepath.Join(project, "notes.md")); err != nil {
+		t.Fatal(err)
+	}
+	want := "✗ " + other + ": no spec.md; a plan starts only after a human accepts the spec\n"
+	out, code := runPreWriteIn(t, project, "notes.md")
+	if code != 1 || out != want {
+		t.Fatalf("exit %d, output %q; want exit 1, output %q", code, out, want)
+	}
+}
+
+// A relative path is taken from the working directory, here a
+// subdirectory of the project (git's top level).
+func TestCheckPreWriteRelativeToTheWorkingDirectory(t *testing.T) {
+	project := preWriteProject(t, unfilledMD)
+	sub := filepath.Join(project, "docs", "product")
+	runner := &kerneltest.Runner{Result: kernel.Result{Stdout: []byte(project + "\n")}}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("GABO_UPGRADE_PR", "")
+	t.Chdir(sub)
+	var out bytes.Buffer
+	root := newRootCommand(deps{version: "1.2.3", runner: runner})
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs([]string{"check", "--pre-write", "intents/0009-x/plan.md"})
+	err := root.Execute()
+	want := "✗ " + prePlan + ": spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan\n"
+	if exitOf(err) != 1 || out.String() != want {
+		t.Fatalf("exit %d, output %q; want exit 1, output %q", exitOf(err), out.String(), want)
 	}
 }

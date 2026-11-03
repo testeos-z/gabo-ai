@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -105,9 +106,21 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 			ReviewerDir: reviewerDir,
 			Root:        project,
 			Resolve:     filepath.EvalSymlinks,
+			Readlink:    readlink,
+			WorkDir:     wd,
 			CI:          getenv("CI") != "",
 		}), nil
 	}
+}
+
+// readlink reports whether p is a symlink and its target as stored.
+func readlink(p string) (string, bool, error) {
+	info, err := os.Lstat(p)
+	if err != nil || info.Mode()&fs.ModeSymlink == 0 {
+		return "", false, err
+	}
+	target, err := os.Readlink(p)
+	return target, err == nil, err
 }
 
 // toFiles converts embedded files, trimming prefix from each path.

@@ -247,3 +247,105 @@ func TestPreWriteRootComparedWithoutCase(t *testing.T) {
 		t.Fatalf("lines = %q, want %q", rep.Lines, []string{notAccepted})
 	}
 }
+
+// fakeReadlink reports the links of a fake tree like os.Lstat plus
+// os.Readlink: a link gives its target as stored, an existing entry that is
+// no link gives false, anything else a missing entry.
+func fakeReadlink(links map[string]string, exists ...string) func(string) (string, bool, error) {
+	return func(p string) (string, bool, error) {
+		if target, ok := links[p]; ok {
+			return target, true, nil
+		}
+		if slices.Contains(exists, p) {
+			return "", false, nil
+		}
+		return "", false, &fs.PathError{Op: "lstat", Path: p, Err: fs.ErrNotExist}
+	}
+}
+
+// A dangling symlink (its target does not exist yet) is judged at its
+// target too: a write through it creates that target.
+func TestPreWriteJudgesADanglingLinkAtItsTarget(t *testing.T) {
+	t.Parallel()
+	other := "docs/product/intents/0010-y/plan.md"
+	blocked := []string{"✗ " + other + ": no spec.md; a plan starts only after a human accepts the spec"}
+	exists := []string{"/proj", "/proj/docs", "/proj/docs/product", "/proj/docs/product/intents", "/proj/docs/product/intents/0009-x", "/proj/" + preSpec}
+	tests := []struct {
+		name, path string
+		links      map[string]string
+		want       []string
+	}{
+		{name: "absolute target", path: "notes.md", links: map[string]string{"/proj/notes.md": "/proj/" + other}, want: blocked},
+		{name: "relative target", path: "notes.md", links: map[string]string{"/proj/notes.md": other}, want: blocked},
+		{name: "accepted plan linked to an unaccepted one", path: prePlan, links: map[string]string{"/proj/" + prePlan: "../0010-y/plan.md"}, want: blocked},
+		{name: "dangling directory link", path: "drafts/plan.md", links: map[string]string{"/proj/drafts": "docs/product/intents/0010-y"}, want: blocked},
+		{name: "chain of dangling links", path: "notes.md", links: map[string]string{"/proj/notes.md": "next.md", "/proj/next.md": other}, want: blocked},
+		{name: "dangling link outside the gate passes", path: "notes.md", links: map[string]string{"/proj/notes.md": "drafts/todo.md"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := Settings{Root: preRoot, Resolve: fakeResolve(tt.links, exists...), Readlink: fakeReadlink(tt.links, exists...)}
+			rep, err := NewUseCase(intentWith(acceptedMD), nil, nil, s).PreWrite([]string{tt.path})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(rep.Lines, tt.want) || rep.Failed != (tt.want != nil) {
+				t.Fatalf("lines = %q, want %q", rep.Lines, tt.want)
+			}
+		})
+	}
+}
+
+// A dangling link whose target cannot be read, or a loop of links, fails
+// closed.
+func TestPreWriteUnreadableDanglingLinkFailsClosed(t *testing.T) {
+	t.Parallel()
+	exists := []string{"/proj"}
+	denied := func(p string) (string, bool, error) {
+		if p == "/proj/notes.md" {
+			return "", false, &fs.PathError{Op: "readlink", Path: p, Err: fs.ErrPermission}
+		}
+		return fakeReadlink(nil, exists...)(p)
+	}
+	loop := map[string]string{"/proj/notes.md": "next.md", "/proj/next.md": "notes.md"}
+	for name, readlink := range map[string]func(string) (string, bool, error){"unreadable": denied, "loop": fakeReadlink(loop, exists...)} {
+		s := Settings{Root: preRoot, Resolve: fakeResolve(nil, exists...), Readlink: readlink}
+		rep, err := NewUseCase(intentWith(acceptedMD), nil, nil, s).PreWrite([]string{"notes.md"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Lines) != 1 || !rep.Failed || !strings.HasPrefix(rep.Lines[0], "✗ notes.md: its symlinks cannot be resolved (") {
+			t.Fatalf("%s: lines = %q", name, rep.Lines)
+		}
+	}
+}
+
+// A relative path is taken from the working directory (S11), which may be
+// below the project root.
+func TestPreWriteRelativeToTheWorkingDirectory(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, workDir, path string
+		want                []string
+	}{
+		{name: "from a subdirectory", workDir: "/proj/docs/product", path: "intents/0009-x/plan.md", want: []string{notAccepted}},
+		{name: "root-relative spelling from a subdirectory passes", workDir: "/proj/docs", path: prePlan},
+		{name: "from the root", workDir: preRoot, path: prePlan, want: []string{notAccepted}},
+		{name: "no working directory falls back to the root", path: prePlan, want: []string{notAccepted}},
+		{name: "up and out of the root passes", workDir: "/proj/docs", path: "../../elsewhere/" + prePlan},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := Settings{Root: preRoot, WorkDir: tt.workDir}
+			rep, err := NewUseCase(intentWith(unfilledMD), nil, nil, s).PreWrite([]string{tt.path})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(rep.Lines, tt.want) {
+				t.Fatalf("lines = %q, want %q", rep.Lines, tt.want)
+			}
+		})
+	}
+}

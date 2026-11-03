@@ -69,6 +69,13 @@ type Settings struct {
 	// Resolve returns a path with every symlink resolved
 	// (filepath.EvalSymlinks); nil compares paths as written.
 	Resolve func(string) (string, error)
+	// Readlink reports whether a path is a symlink and its target as
+	// stored (os.Lstat plus os.Readlink), so the pre-write hook mode can
+	// follow a dangling link; nil follows none.
+	Readlink func(string) (target string, isLink bool, err error)
+	// WorkDir is the absolute working directory; the pre-write hook mode
+	// takes relative paths from it. Empty means Root.
+	WorkDir string
 	// CI (CI set) skips the user-level reviewer link: the reviewer scripts
 	// and CI run with their own HOME.
 	CI bool

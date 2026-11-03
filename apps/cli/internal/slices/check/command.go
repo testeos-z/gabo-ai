@@ -75,8 +75,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"\n" +
 			"Hook mode, gabo check --pre-write <path>..., judges pending writes before\n" +
 			"they happen, for the engines' pre-write hooks. Every argument after\n" +
-			"--pre-write is a path, relative to the project root (the git top level) or\n" +
-			"absolute inside it. Writing " + IntentsDir + "/<NNNN-slug>/plan.md\n" +
+			"--pre-write is a path, relative to the working directory or absolute inside\n" +
+			"the project root (the git top level). Writing " + IntentsDir + "/<NNNN-slug>/plan.md\n" +
 			"is blocked while that folder's spec.md is missing, unreadable or has no filled\n" +
 			"Acceptance row; any other path, or one outside the root, passes. It reads\n" +
 			"nothing else and writes nothing. Exit 0 with no output when every write\n" +

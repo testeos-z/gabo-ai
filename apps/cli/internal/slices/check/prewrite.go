@@ -15,10 +15,11 @@ var ErrPreWriteUsage = errors.New("usage: gabo check --pre-write <path>...")
 
 // PreWrite is the hook mode (intent 0001 S11): it judges pending writes to
 // paths with the intent stage gate before they happen, and writes nothing.
-// Each path is relative to the project root or absolute inside it; a path
-// outside the root, or one that is not docs/product/intents/<dir>/plan.md
+// Each path is relative to the working directory or absolute inside the
+// project root; a path outside the root, or one that is not docs/product/intents/<dir>/plan.md
 // (compared without case, for case-insensitive filesystems), passes. A path
-// is judged as written and at its symlink-resolved target, and blocked when
+// is judged as written and at its symlink-resolved target (a dangling link
+// at the target it would create), and blocked when
 // either is a plan.md whose folder's spec.md is missing or not accepted. A
 // spec.md that cannot be read, or a path whose symlinks cannot be resolved,
 // counts as not accepted (fail closed). The report holds one
@@ -35,7 +36,7 @@ func (u *UseCase) PreWrite(paths []string) (Report, error) {
 		plans, err := u.plansOf(p)
 		if err != nil {
 			shown := p
-			if rel, ok := relInside(u.s.Root, p); ok {
+			if rel, ok := relInside(u.s.Root, u.absOf(p)); ok {
 				shown = rel
 			}
 			r.fail("✗ " + shown + ": its symlinks cannot be resolved (" + err.Error() + "); it counts as not accepted")
@@ -68,12 +69,33 @@ func checkPreWritePaths(paths []string) error {
 	return nil
 }
 
+// maxLinks bounds how many dangling symlinks one path may follow, like the
+// kernel's limit on a symlink chain.
+const maxLinks = 40
+
+// absOf returns p made absolute against the working directory (Settings
+// WorkDir, else Root); with neither it returns p unchanged.
+func (u *UseCase) absOf(p string) string {
+	if filepath.IsAbs(p) {
+		return p
+	}
+	base := u.s.WorkDir
+	if base == "" {
+		base = u.s.Root
+	}
+	if base == "" {
+		return p
+	}
+	return filepath.Join(base, p)
+}
+
 // plansOf returns the project-relative plan.md files a write to p would
 // create or change: p as written and p with its symlinks resolved. An error
 // means the symlinks could not be resolved.
 func (u *UseCase) plansOf(p string) ([]string, error) {
 	var plans []string
-	if rel, ok := relInside(u.s.Root, p); ok && isPlan(rel) {
+	abs := u.absOf(p)
+	if rel, ok := relInside(u.s.Root, abs); ok && isPlan(rel) {
 		plans = append(plans, rel)
 	}
 	if u.s.Resolve == nil || u.s.Root == "" {
@@ -82,10 +104,6 @@ func (u *UseCase) plansOf(p string) ([]string, error) {
 	root, err := u.s.Resolve(u.s.Root)
 	if err != nil {
 		return nil, err
-	}
-	abs := p
-	if !filepath.IsAbs(abs) {
-		abs = filepath.Join(u.s.Root, p)
 	}
 	target, ok, err := u.resolveExisting(abs)
 	if err != nil {
@@ -101,17 +119,34 @@ func (u *UseCase) plansOf(p string) ([]string, error) {
 }
 
 // resolveExisting resolves the symlinks of the longest existing prefix of
-// abs and appends the rest; a plan.md being created does not exist yet. It
-// reports false when no prefix exists, and any error but a missing entry.
+// abs and appends the rest; a plan.md being created does not exist yet. A
+// prefix that is a dangling symlink is followed to its target, since a write
+// through it creates that target. It reports false when no prefix exists,
+// and any error but a missing entry, including too many links.
 func (u *UseCase) resolveExisting(abs string) (string, bool, error) {
 	dir, rest := filepath.Clean(abs), ""
-	for {
+	for links := 0; ; {
 		real, err := u.s.Resolve(dir)
 		if err == nil {
 			return filepath.Join(real, rest), true, nil
 		}
 		if !errors.Is(err, fs.ErrNotExist) {
 			return "", false, err
+		}
+		target, isLink, err := u.readlink(dir)
+		if err != nil {
+			return "", false, err
+		}
+		if isLink {
+			if links++; links > maxLinks {
+				return "", false, fmt.Errorf("%s: too many links", abs)
+			}
+			if !filepath.IsAbs(target) {
+				target = filepath.Join(filepath.Dir(dir), target)
+			}
+			dir = filepath.Join(target, rest)
+			rest = ""
+			continue
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
@@ -122,9 +157,22 @@ func (u *UseCase) resolveExisting(abs string) (string, bool, error) {
 	}
 }
 
+// readlink reports whether p is a symlink and its target; a missing p is no
+// link. Without Settings.Readlink nothing is a link.
+func (u *UseCase) readlink(p string) (string, bool, error) {
+	if u.s.Readlink == nil {
+		return "", false, nil
+	}
+	target, isLink, err := u.s.Readlink(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", false, nil
+	}
+	return target, isLink, err
+}
+
 // relInside returns p as a clean slash-separated path relative to root,
 // and whether it lies inside root (its prefix compared without case). A relative p is taken as relative to
-// root already.
+// root already; callers pass absolute paths (UseCase.absOf).
 func relInside(root, p string) (string, bool) {
 	rel := filepath.Clean(p)
 	if filepath.IsAbs(rel) {
