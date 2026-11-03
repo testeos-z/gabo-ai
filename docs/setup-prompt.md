@@ -1,6 +1,6 @@
 # Setup prompt
 
-The setup prompt is the only entry text of gabo-ai setup (TRD 9.4, D25, PRD R36). Your coding agent follows it, in your project, to install the CLI when it is missing, run `gabo init`, ask you the setup questions, write the config, build the gabo agents, run `gabo check` and verify each slot.
+The setup prompt is the only entry text of gabo-ai setup (TRD 9.4, D25, PRD R36). Your coding agent follows it, in your project, to install the CLI when it is missing, run `gabo init`, ask you the setup questions, write the config, build the gabo agents, run `gabo check`, verify each slot and guide the project into the per-change model (a short global context, then one intent at a time).
 
 The block under [Prompt](#prompt) is the prompt, byte for byte the file embedded in the CLI (`apps/cli/internal/setupprompt/setup-prompt.md`). Do not edit it here: change the embedded file and copy it over; a Go test fails when the two differ.
 
@@ -66,7 +66,7 @@ Both are user-supplied adapters: gabo-ai ships none for them. Setup records only
 
 ## When setup is done
 
-`gabo check` passes and each slot is reported as verified, or unverified with the failing operation and a question for you. The agent lists the files it changed (`gabo.yaml`, `.gabo/`, adapters, agent folders) for you to commit. After a gabo upgrade, run `gabo init` again and ask your agent to rebuild the agents, then rerun `gabo check`.
+`gabo check` passes and each slot is reported as verified, or unverified with the failing operation and a question for you. Your project then holds a short global context under `docs/product/` (a conceptual PRD, a conventions-only TRD with the stack you chose, an optional `DESIGN.md` and `MIGRATIONS.md`, and an empty `intents/` folder), and `wave.after` says whether a finished wave takes the next accepted intent or waits (the default). Each change starts as an intent, created through `gabo-pm`, and you accept its spec before a wave runs it. The agent lists the files it changed (`gabo.yaml`, `.gabo/`, adapters, agent folders, `docs/product/`) for you to commit. After a gabo upgrade, run `gabo init` again and ask your agent to rebuild the agents, then rerun `gabo check`.
 
 ## Prompt
 
@@ -80,6 +80,7 @@ Set up gabo-ai in this project. Work in this project's root directory, follow th
 5. With `gabo-agent-templates` and the runtime skill, build every agent of the neutral agent spec in this engine's format.
 6. Run `gabo check`, fix every failure it reports and rerun it until it passes.
 7. Run the per-slot smoke test from `gabo-setup` and report each slot as verified or unverified with the reason.
+8. Following `gabo-setup`, guide this project into the per-change model. Ask me which technologies to use (language, framework, database and hosting): I choose, you only propose options and help configure them, and the choice goes into the TRD. Scaffold a short global context: a conceptual PRD, a conventions-only TRD, a `DESIGN.md` only if the app has a UI, a `MIGRATIONS.md` only if it has a database, and an empty `docs/product/intents/`, with no upfront schema, plan or stories. Ask me about `wave.after`: `next` chains to the next accepted intent when a wave ends, `wait` stops after the wave and is the default; I accept each spec one at a time. Then point me to creating the first intent.
 
 About memory: before you configure the memory slot, explain that one memory backend and one memory project name should be shared by every agent of this project, local and cloud, for every developer, except the reviewer, which never reads or writes it; a local-only memory is fine, for example for a solo developer. Offer Engram with Engram Cloud sync first as the recommendation, list the other backends `gabo-setup` names, record only the memory adapter and the memory project name, and never set up the backend or its credentials. The memory smoke test writes only under a scratch topic and deletes the probe afterwards, or writes nothing when the backend cannot delete.
 <!-- gabo-setup-prompt:end -->
