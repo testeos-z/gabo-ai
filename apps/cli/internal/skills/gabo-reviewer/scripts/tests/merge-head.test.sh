@@ -36,6 +36,9 @@ gate() {
       REVIEWER_REPO=example-org/example-repo REVIEWER_CHECKS='go test ./...' \
       REVIEWER_HUMAN_ONLY_PATHS='.claude/ .github/ gabo.yaml AGENTS.md CLAUDE.md'
     for kv in "$@"; do export "${kv?}"; done
+    # Run outside any checkout: the script reads repo keys from the caller's
+    # gabo.yaml, and the repository running these tests has its own.
+    cd "$fx" || exit 1
     bash "$skill/merge-head.sh" 7 "$sha" 2>&1 | tail -n 1 | cut -d' ' -f2-
   )
 }
