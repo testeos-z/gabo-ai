@@ -1,0 +1,89 @@
+---
+name: gabo-runtime-codex
+description: "Trigger: build gabo agents for Codex, rebuild Codex agents, runtimes codex, .codex/agents, .agents/skills, gabo check reports a Codex agent or link. Builds the gabo agents as Codex TOML agents and places skills and links."
+license: Apache-2.0
+metadata:
+  author: gabo-ai
+  version: "0.1"
+  agent_dir: .codex/agents
+  skill_dir: .agents/skills
+  reviewer_link: $HOME/.agents/skills/gabo-reviewer
+---
+## Activation Contract
+
+Load when any of `runtimes.coder`, `runtimes.reviewer` or `runtimes.assistant` in `gabo.yaml` is `codex` and the gabo agents must be built or rebuilt: after setup, after `gabo init` refreshed the catalog, or when `gabo check` reports `✗ agent <id> missing` or an agent built with another version (TRD 8.1, 9.4, D24; intent 0002 S4, S5). Load `gabo-agent-templates` with it: that skill owns the spec, the templates and the slot rules; this skill only turns them into Codex files.
+
+`metadata.agent_dir` above is the directory `gabo check` searches for the agent files of this runtime (it accepts any extension and reads `gabo-version:` in a TOML comment); `metadata.skill_dir` is where it requires the links of build steps 2 and 3, and `metadata.reviewer_link` the user-level link of step 4 (outside CI). Never change them without changing where you build. `gabo check` reports a missing or wrong link as `✗ skill link <path> …` or `✗ reviewer link <path> …`: rebuild with this skill.
+
+## Hard Rules
+
+- Build every agent of `.gabo/skills/gabo-agent-templates/agents.yaml`, each as `.codex/agents/<id>.toml`, whatever runtime each agent plays: `gabo check` requires all of them in `.codex/agents` (D2).
+- Read the spec, the templates and `.gabo/VERSION` from the project; never build from memory. A missing or empty `.gabo/VERSION` or catalog: stop and tell the user to run `gabo init`.
+- Fill only the template slots, as below, and invent nothing: no TOML key, skill, model or rule the spec and template do not give. No `model`, `sandbox_mode` or `features` key is written, also not for the read-only agents `gabo-plan-reviewer` and `gabo-reviewer`: their limits stay in their instructions (D6).
+- Never place `gabo-reviewer` in the project: no `.agents/skills/gabo-reviewer`, no copy of its scripts, and never in an agent's skill line. Only link the user-level copy that `gabo init` installs (D20).
+- Never write under `~/.codex` or `$CODEX_HOME` (no `config.toml`, no user agents, no hook trust): this skill writes no user-level file but the reviewer link of step 4.
+- Overwrite only the agent files named after a spec id, the links this skill makes and the probe file it writes. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
+- Make every link of steps 2 to 4 on every build, also when the agent files are already current; a build that skips one is not finished.
+- Write no secret into any file (R21).
+
+## Sources
+
+Checked on 2026-11-03 against codex-cli 0.163.0 (`codex --version`) and these pages (intent 0002 spec, Evidence):
+
+| fact | used for | source |
+|---|---|---|
+| Custom agents are TOML files in `.codex/agents/` (project) or `~/.codex/agents/` (user), one agent per file; `name`, `description` and `developer_instructions` are required, and `name` is the identity, not the file name. | agent files | https://learn.chatgpt.com/docs/agent-configuration/subagents |
+| Optional agent keys are `model`, `model_reasoning_effort`, `model_reasoning_summary`, `model_verbosity`, `features.*` and `skills.config`; there is no per-agent tool allowlist and no skill preload key. `sandbox_mode` and `approval_policy` in an agent file do not override the parent's configuration. | no tool list, skill line, D6 | https://learn.chatgpt.com/docs/agent-configuration/subagents |
+| Skills are discovered in `.agents/skills/` of every directory from the working directory up to the repository root and in `$HOME/.agents/skills`; symlinked skill folders are followed. | catalog skills, fixed-name links, reviewer link | https://learn.chatgpt.com/docs/build-skills |
+| A TOML comment starts with `#`; a multi-line basic string `"""…"""` trims the newline right after its opening quotes and treats `\` as an escape. | `gabo-version` comment, escaping | https://toml.io/en/v1.0.0 |
+
+Recheck before you build: run `codex --version`. When it is not 0.163.0, read both Codex pages again and confirm each row. A row that no longer holds: stop, build nothing and report the row with what you found.
+
+## Capabilities
+
+Codex has no per-agent tool allowlist, so the spec's engine-neutral `tools` map to no TOML key: every agent gets the parent session's tools, and what an agent may not do stays in its template body (D6). Report this once per build, not per agent.
+
+## Fixed-Name Links
+
+Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/SKILL.md` gets one link `.agents/skills/gabo-<name>` (underscores become hyphens) to `<folder>`, as a relative symlink: `gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory` and so on. An adapter that is not a skill folder (for example the reviewer agent file) gets no link: report it. When the adapter folder already is `.agents/skills/gabo-<name>`, there is nothing to link.
+
+## Build Steps
+
+1. Recheck the sources. Read `gabo.yaml`, `.gabo/VERSION` and the spec.
+2. Catalog skills: for each skill in any agent's spec `skills`, make `.agents/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`, so a later `gabo init` refresh reaches it. An entry that already resolves to that folder is kept. A symlink this skill made earlier to another folder is replaced; a real folder or file is left and reported.
+3. Fixed-name links as above. Then remove each `.agents/skills/gabo-*` symlink that no spec skill or slot asks for any more and that this skill made: one that points into `../../.gabo/skills/` or to a folder a slot adapter of `gabo.yaml` named before. `.agents/skills/` is shared with other tools, so leave and report any other `gabo-*` symlink, and never remove a real folder or file.
+4. Reviewer link: make `$HOME/.agents/skills/gabo-reviewer` a symlink to `${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer` with the absolute path. That folder missing: stop and tell the user to run `gabo init`. An existing entry with another target: leave it and report it.
+5. For each spec agent, fill its template:
+
+   | slot | value |
+   |---|---|
+   | `{{id}}`, `{{role}}` | the spec `id` and `role` |
+   | `{{gabo_version}}` | the single line of `.gabo/VERSION` |
+   | `{{methodology}}` | `gabo-methodology` |
+   | `{{adapter:tasks}}`, `{{adapter:repository_host}}`, `{{adapter:memory}}` | `gabo-tasks`, `gabo-repository-host`, `gabo-memory` |
+   | `{{reviewer_script}}` | `$HOME/.agents/skills/gabo-reviewer/scripts/reviewer.sh`, written literally: the shell expands it on each machine |
+
+   A slot whose link does not exist (its slot has no skill adapter) cannot be filled: skip that agent and report it.
+6. Write `.codex/agents/<id>.toml` in exactly this shape, these keys in this order and no others:
+
+   ```toml
+   # gabo-version: <x.y.z>
+   name = "<id>"
+   description = "<role>"
+   developer_instructions = """
+   <filled body>
+
+   Load these skills by name before work: <skills>.
+   """
+   ```
+
+   - `# gabo-version: <x.y.z>` is the template's version line moved into a TOML comment, with the value of `.gabo/VERSION`; `gabo check` compares it with the stamp.
+   - `<filled body>` is the filled template without its first line `gabo-version: …` and the blank line after it.
+   - `<skills>` are the spec `skills` in spec order, then each fixed-name link the body names (`gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory`, in this order), comma-separated. Codex has no skill preload key, so this line is how the agent gets them. Omit the line and the blank line before it when the list is empty (the reviewer agent).
+   - Escaping: in `description` write each `\` as `\\` and each `"` as `\"`; in `developer_instructions` write each `\` as `\\` and each `"""` as `""\"`. Copy every other byte unchanged.
+7. Verify: each file must parse as TOML (with `python3 -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' <file>` when Python 3.11 or newer is present) with `name` equal to its id; then run `gabo check`, which also checks every link of steps 2 to 4. Fix every failure this skill caused and rerun until `gabo check` passes, except the `✗ agent <id> missing` lines of agents you skipped and reported in step 5; report any other failure.
+8. Probe, on every build. When this session is not Codex (for example Claude Code or Pi builds the Codex agents during setup), its subagents prove nothing about Codex: skip the probe, change nothing, and report `probe not run: run gabo-runtime-codex inside Codex`. When `.codex/agents` or `.agents/skills` did not exist when this Codex session started (you created it in this build), the session may not see the new agent or links: skip the probe, change nothing, and report `probe not run: restart Codex and rebuild`. Otherwise write `.codex/agents/gabo-probe.toml` in the same shape, with the skill line listing every fixed-name link made in step 3, and the instructions: run `git rev-parse --show-toplevel` once and reply with its output, then one line per skill of the skill line with the name it was listed under and its first Markdown heading. Launch it once as a subagent, then delete the file whatever the result. It passes when it ran the command and every link shows its adapter's heading. A link that does not load by its link name: in the skill line and in its slot fill, use the adapter's frontmatter `name` instead of the link name, rebuild the affected agents, repeat step 7 and probe once more; still failing, stop and report the link. A `gabo-probe.toml` that this skill did not write: leave it and report it, and report the probe as not run.
+
+## Output Contract
+
+Report the Codex version and whether the sources were rechecked; each agent file written with its id and `gabo-version`; each link made (catalog, fixed-name and reviewer); each entry left or slot not filled, with why; that the spec capabilities map to no TOML key; the TOML parse and `gabo check` results; and the probe result when it ran.
