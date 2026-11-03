@@ -25,5 +25,5 @@ As a solo developer, I want each wave to remove the worktrees and merged branche
 
 ## Notes
 
-- App flow journey: [J10 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J10 in APP_FLOW](../APP_FLOW-0.7.md).
 - Evidence: the vulcam disk-full incident of 2026-10-22 (PRD section 2, Evidence), where loose worktrees, reviewer copies and stopped containers filled the disk and the owner cleaned up by hand.

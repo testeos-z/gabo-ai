@@ -7,7 +7,7 @@ Updated: 2026-10-28 (plan change T063, issue #71: model B and the gabo-ai rename
 
 Persistence type: file-based (YAML configuration files, validated with JSON Schema); no database engine.
 
-**gabo-ai has no database.** It runs no server-side store, keeps no tables and needs no pooling, extensions or backups of its own. Its only own persistence is configuration files plus the files `gabo init` copies or installs (the skill catalog copy, its version stamp and the user-level reviewer skill) and the agent files the user's agent builds from them (approved owner 2026-10-27, TRD D24; this supersedes the agent compiler of 2026-10-26, TRD D18, which generated agent files and installed skills itself). Everything else lives in the team's tools, reached through slot adapters (TRD [Dynamic configuration](TRD.md#81-dynamic-configuration), D2):
+**gabo-ai has no database.** It runs no server-side store, keeps no tables and needs no pooling, extensions or backups of its own. Its only own persistence is configuration files plus the files `gabo init` copies or installs (the skill catalog copy, its version stamp and the user-level reviewer skill) and the agent files the user's agent builds from them (approved owner 2026-10-27, TRD D24; this supersedes the agent compiler of 2026-10-26, TRD D18, which generated agent files and installed skills itself). Everything else lives in the team's tools, reached through slot adapters (TRD [Dynamic configuration](TRD-0.9.md#81-dynamic-configuration), D2):
 
 - **Tasks and dependencies** live in the tracker (tasks slot, D4, D12).
 - **Decisions and auto-mode records** live in the memory provider (memory slot, D5).
@@ -69,7 +69,7 @@ This reverses the merge order for personal keys only: project keys keep user →
 
 ### Core keys versus the cloud slot
 
-The current config is cloud-shaped. Under the approved split, cloud fields leave the core config and move into the "where agents run" slot adapter, `slots.agent_host`, configured in a separate assistant session (TRD [Deployment view](TRD.md#6-deployment-view)).
+The current config is cloud-shaped. Under the approved split, cloud fields leave the core config and move into the "where agents run" slot adapter, `slots.agent_host`, configured in a separate assistant session (TRD [Deployment view](TRD-0.9.md#6-deployment-view)).
 
 | current key | destination | reason |
 |---|---|---|
@@ -143,7 +143,7 @@ Today the user layer accepts the same keys as the project file; under the split 
 | `plan_change.global_without_owner` | boolean | yes | Whether the global plan may change without the owner, still after the plan-change reviewer agrees (D7). Loaded and validated when set (T004); failing when missing is T005 | `false` |
 | `generation.targets` | removed | — | Removed (owner 2026-10-27, TRD D24; T006): the runtimes to build for come from `runtimes.*`; a file carrying `generation.*` fails as an unknown key | — |
 
-`plan_change.*`, `developers` and `repo.integration_branch` follow the names in TRD [Configuration shapes](TRD.md#93-configuration-shapes).
+`plan_change.*`, `developers` and `repo.integration_branch` follow the names in TRD [Configuration shapes](TRD-0.9.md#93-configuration-shapes).
 
 ### 3.3 Slot adapter files
 

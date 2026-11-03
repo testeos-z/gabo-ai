@@ -27,5 +27,5 @@ As a solo developer, I want directiva to produce the global plan once from my go
 
 ## Notes
 
-- App flow journey: [J2 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J2 in APP_FLOW](../APP_FLOW-0.7.md).
 - Approved (owner 2026-10-26): acceptance criteria aligned with TRD D18–D20 (the Go CLI only compiles the initial configuration; work is done by agents guided by skills).

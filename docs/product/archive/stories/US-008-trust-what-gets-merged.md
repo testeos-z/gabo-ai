@@ -27,5 +27,5 @@ As a tech lead, I want every PR validated by an isolated reviewer and linked to 
 
 ## Notes
 
-- App flow journey: [J8 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J8 in APP_FLOW](../APP_FLOW-0.7.md).
 - Approved (owner 2026-10-26): acceptance criteria aligned with TRD D18–D20 (the Go CLI only compiles the initial configuration; work is done by agents guided by skills).

@@ -55,6 +55,6 @@ As a solo developer, I want the assistant to guide me through configuring my age
 
 ## Notes
 
-- App flow journey: [J1 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J1 in APP_FLOW](../APP_FLOW-0.7.md).
 - Approved (owner 2026-10-26): acceptance criteria aligned with TRD D18–D20 (the Go CLI only compiles the initial configuration; work is done by agents guided by skills).
 - Approved (owner 2026-10-26): no setup terminal UI; setup starts from a pasted prompt (UX_UI 1.8, TRD D21); agents write config by editing the YAML and `gbai generate` validates it (TRD D18). Superseded in part (owner 2026-10-27): `gabo init` starts setup, the user's agent builds config and agents from skills, and `gabo check` validates (PRD R31–R34, issue #51).

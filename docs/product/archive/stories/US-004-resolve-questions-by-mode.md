@@ -27,4 +27,4 @@ As a solo developer, I want questions resolved according to the mode I chose and
 ## Notes
 
 - Approved (owner 2026-10-26): stored preferences have a stable layer in the global user file and a learning layer of observations in the memory slot (`user/preferences`); an observation repeated about 3 times is proposed for the stable layer (PRD 10.1 Personalization, TRD D22).
-- App flow journey: [J4 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J4 in APP_FLOW](../APP_FLOW-0.7.md).

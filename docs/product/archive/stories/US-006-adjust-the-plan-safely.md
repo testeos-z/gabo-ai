@@ -26,4 +26,4 @@ As a solo developer, I want the plan adjusted between or during waves without re
 
 ## Notes
 
-- App flow journey: [J6 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J6 in APP_FLOW](../APP_FLOW-0.7.md).

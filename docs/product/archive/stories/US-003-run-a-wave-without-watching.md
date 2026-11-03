@@ -26,4 +26,4 @@ As a solo developer, I want the assistant to start each wave and receive its rep
 
 ## Notes
 
-- App flow journey: [J3 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J3 in APP_FLOW](../APP_FLOW-0.7.md).

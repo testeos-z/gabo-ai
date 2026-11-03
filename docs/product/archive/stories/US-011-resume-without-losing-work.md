@@ -25,4 +25,4 @@ As a solo developer, I want an interrupted wave to resume from where it stopped,
 
 ## Notes
 
-- App flow journey: [J11 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J11 in APP_FLOW](../APP_FLOW-0.7.md).

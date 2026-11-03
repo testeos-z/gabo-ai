@@ -26,4 +26,4 @@ As a solo developer, I want to intervene in a task through the assistant or a di
 
 ## Notes
 
-- App flow journey: [J5 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J5 in APP_FLOW](../APP_FLOW-0.7.md).

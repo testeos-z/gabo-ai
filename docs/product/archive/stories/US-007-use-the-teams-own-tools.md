@@ -32,5 +32,5 @@ As a tech lead, I want gabo-ai to use my team's methodology and tracker, so that
 
 ## Notes
 
-- App flow journey: [J7 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J7 in APP_FLOW](../APP_FLOW-0.7.md).
 - Approved (owner 2026-10-26): acceptance criteria aligned with TRD D18–D20 (the Go CLI only compiles the initial configuration; work is done by agents guided by skills). Superseded in part (owner 2026-10-27): runtime support lives in runtime skills and the runtime builder; no Go installer table (PRD R34, R35, issue #51).

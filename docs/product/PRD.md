@@ -4,337 +4,227 @@
 |---|---|
 | status | Draft |
 | owner | gabo-pm |
-| version | 0.10 |
-| date | 2026-10-29 |
+| version | 0.11 |
+| date | 2026-11-03 |
 | scope | The gabo-ai framework itself |
-| linked docs | [TRD](TRD.md), stories `docs/product/stories/`, diagrams `docs/product/diagrams/` |
+| linked docs | [TRD](TRD.md), [MIGRATIONS](MIGRATIONS.md), intents [`docs/product/intents/`](intents/README.md), diagrams `docs/product/diagrams/`, previous version [PRD 0.10](archive/PRD-0.10.md) |
 
-## Auto-mode proposals (approved by owner 2026-10-25)
+This is the conceptual product document: what gabo-ai offers and what its user gets. It holds no acceptance criteria and no task links. Each change is an intent in [`docs/product/intents/`](intents/README.md), and its `spec.md` holds the requirements of that change with their acceptance criteria. The requirement ids R1–R39 and the section numbers are stable, because skills, tests and issues cite them (for example PRD 8.1, 10.1 and 10.2). The full acceptance criteria, the stories column and the dated amendment history of earlier versions are kept in [PRD 0.10](archive/PRD-0.10.md).
 
-This version was completed by the PM in auto mode (R6, R19). Every item below is a proposal, marked **Approved (auto proposal, owner 2026-10-25)** where it appears, with a one-line reason. Nothing previously approved was changed and no existing priority was raised. The owner approves or rejects these in one pass.
+## Amendment 2026-11-03: per-change model (feature `per-change-sdlc`)
 
-| # | section | proposal |
-|---|---|---|
-| P1 | 2. Problem — Evidence | Evidence from the owner's own project "vulcam" (2026-10-20 to 2026-10-24): disk exhaustion, an unclosable worktree, silently skipped board moves, owner-relayed coordination. |
-| P2 | 5. Appetite | First release limited to GitHub issues, local reviewer, Claude Code and Pi, manual and auto modes; no fixed wave budget; as many waves as the scope needs (updated 2026-10-26). |
-| P3 | 7. User stories | Eight proposed stories US-001 to US-008 mapped to requirement ids; story files not yet written. |
-| P4 | 8. Requirements — stories column | Stories column filled from the US mapping; R1 and R13 have no story yet. |
-| P5 | 8.1 Operating rules | Mid-wave task change applies when the coder finishes its current round (answers open question 1). |
-| P6 | 8.1 Operating rules | During a plan-change debate only the affected task is BLOCKED (answers open question 2). |
-| P7 | 8.1 Operating rules | At most 4 reviewer-to-coder fix rounds per PR, then BLOCKED and escalated (answers open question 3). |
-| P8 | 8. Requirements — R21–R23 | Security quality requirements: no secrets in agent context, isolated reviewer, auto mode deletes only its own resources. |
-| P9 | 8. Requirements — R24–R25 | Reliability quality requirements: verified task writes, resumable waves. |
-| P10 | 8. Requirements — R26–R27 | Cost quality requirements: one review per pushed head, plan-change reviewer only on proposals. |
-| P11 | 8. Requirements — R28 | Time-to-value quality requirement: first wave within one working session (initial target). |
-| P12 | 8. Requirements — R29–R30 | Observability quality requirements: a report per wave, every auto decision queryable. |
-| P13 | 9. Quality requirements | Section points to R21–R30 instead of "not yet defined". |
-
-## Owner decision 2026-10-27: three-command CLI, agents built from skills
-
-Approved (owner 2026-10-27), plan change issue #51. Guiding principle: technical simplicity and less over-engineering; a more universal tool with less configuration. This decision supersedes the "agent compiler" scope approved on 2026-10-26 wherever this document marks an item **Superseded (owner 2026-10-27)**; the earlier text stays for history.
+Approved (owner 2026-11-03, feature `per-change-sdlc`, applied directly by the owner's decision). gabo-ai's own documents now follow the model gabo ships: no upfront global plan, one intent per change, one wave per intent. Each changed requirement carries the note **Amended (owner 2026-11-03, per-change-sdlc)**.
 
 | # | change | where |
 |---|---|---|
-| O1 | The CLI offers only `gabo init`, `gabo check` and `gabo version`. Removed: `gbai generate` (with `--check`), `gbai config set`, the Go generation targets and the per-runtime installer table. Amended (Proposed (auto), issue #148, see G1): a fourth command, `gabo prompt`, prints the embedded setup prompt. | R31, 10.1 |
-| O2 | Superseded in part (issue #74, see O10 and R32): the entry file and the non-zero exit on an existing config no longer apply. Original text: `gbai init` copies the embedded skill catalog into a neutral project location, writes a short neutral entry file, installs the user-level `gbai-reviewer` skill and prints the next step. When a config already exists it writes nothing and exits non-zero pointing to `gbai check`; it never writes the config or builds agents. | R32 |
-| O3 | Superseded in part (issue #74, see O10 and R33): "nothing stale against the templates" is replaced by slot coverage, the catalog version stamp and the agent version lines (O11). Original text: `gbai check` validates read-only and independent of the engine: the config files against their JSON Schemas, every agent of the neutral agent spec present, nothing stale against the templates. | R33 |
-| O4 | The runtime's own agent builds the configuration and the agents from skills: the setup skill asks the questions, a config-writer skill writes the config files, a runtime skill builds the agents from fixed templates, then the agent runs `gabo check` and fixes what fails. | R34, 10.1 |
-| O5 | A neutral agent spec defines, per agent, its role, the skills it loads, the tools it needs and who launches whom, independent of any engine. | R34 |
-| O6 | Runtime support lives in skills: shipped and tested runtime skills for Claude Code and Pi, plus a runtime builder skill that researches and writes a runtime skill for an engine without one. Adding a runtime needs no Go change and no release. | R35, 5, 6 |
-| O7 | Skill catalog direction (new skills, `gbai-orca-inbox` removed) is a technical detail recorded in the TRD. | — |
-| O8 | Setup has two entries: (a) a developer runs `gabo init` in the terminal and then asks their agent to configure gabo-ai; (b) a user pastes the published setup prompt into their agent, which installs the CLI and continues. The published prompt is the same literal text embedded in the CLI: one source, shipped in the binary and published in the documentation (answers open question 10). | R36, 10.1 |
-| O9 | Approved (owner 2026-10-27, answers open question 12): the product is renamed gabo-ai and the CLI is invoked through the alias `gabo` (`gabo init`, `gabo check`, `gabo version`). Names that follow the product name, derived first and confirmed by the owner on 2026-10-27 (approved): skills `gabo-*`, project config file `gabo.yaml`, global user file under a `gabo` directory. R31–R36, PRD 10.1 (both setup-entry paragraphs), UX_UI U7, U16, 1.8 and 2.1, the APP_FLOW CLI surface row and J1, and the new acceptance criteria of US-001 and US-007 use the new names. The existing `gabo-*` skill names, `gabo.yaml`, the `gabo` command and the `gabo` global directory stay in every other section and in the repository until the rename task lands. The rename itself is a separate task. | R31–R36 |
-| O10 | Approved (owner 2026-10-27, issue #74): `gabo init` writes a catalog version stamp and prints the embedded setup prompt instead of writing an entry file; in an existing project it refreshes the catalog only when the stamp is older or missing, self-updates the CLI when it is newer (O12) (the reviewer skill is installed whenever it is missing or differs, R32), and never touches the config. `gabo check` validates the config, the agents of the neutral spec, slot coverage and the version stamp. Answers open question 11. | R32, R33 |
-| O11 | Approved (owner 2026-10-27, issue #74): each built agent file carries one line with the gabo version it was built from, and its file name stays fixed. `gabo check` fails when an agent's version line is missing or differs from the catalog stamp, so agents never rebuilt after an upgrade are caught. There are no template hashes; template-hash stale detection is superseded by this rule. | R33 |
-| O12 | Approved (owner 2026-10-27, issue #74, refined after review): when the repository stamp is newer than the running CLI, only `gabo init`, run interactively, offers to update the CLI. It asks `this repo needs gabo <w>, you have <v>. Update? This affects all your projects.` and only on yes updates the CLI to exactly the stamp version, verified as an authentic release (a signature or provenance check, not only a checksum; details in the TRD), and then continues; on no it changes nothing, prints the upgrade command and exits 1. Interactive means a developer at a terminal who answers that confirmation; the confirmation is the boundary, and exact detection is in the TRD (PR #54, 9.4). When the stamp is older than the running CLI, `gabo check` only warns (`this project uses gabo <stamp>; run gabo init to upgrade it`) and does not fail; this applies everywhere, including CI and the reviewer (O13). If it cannot self-update (CLI installed by a package manager, no network), it stops and prints the exact upgrade command. `gabo check` never self-updates: it stays read-only and fails with the exact upgrade command. CI and the reviewer never self-update: they need a gabo CLI at least as new as the base branch's stamp (a minimum, not an exact pin; one global binary per machine, no version cache) and otherwise fail with the upgrade command; the PR head's stamp never changes this minimum, so a PR cannot lower what the reviewer requires (R9). The catalog is never refreshed backwards. A non-interactive `gabo init` with a newer stamp changes nothing, prints the upgrade command and exits 1. The stamp has the fixed path `.gabo/VERSION` (`.gabo/VERSION` until the rename), and a PR that changes it is an upgrade PR. The reviewer always treats the stamp as human-only, built in and independent of `review.human_only_paths`, so auto mode never merges a stamp change; the owner merges it. The catalog subtree (`.gabo/skills/`, `.gabo/skills/` until the rename) is also always human-only, built into the reviewer like the stamp: the catalog changes only when `gabo init` writes it, in upgrade PRs the owner merges, so a normal PR cannot weaken `gabo check` and auto mode never merges a catalog edit. On an upgrade PR, CI and the reviewer run the CLI they have (at least the base stamp) and validate only the config schemas; they skip every check that depends on the spec (agents exist, slot coverage and both version checks) and report `upgrade PR: only config validated, human merge required`. The human merge is the gate. The upgrade PR report also lists the changed paths outside the catalog subtree and the agent directories, so the owner sees what rode along; the PR's scope is not restricted. When the base branch has no stamp there is no minimum yet: CI and the reviewer use the CLI they have. The TRD (PR #54: 9.4, D24, D6, D20) holds the technical details; DB_SCHEMA follows in T063 (plan PR #54). Superseded in part (owner 2026-10-27, O13, issue #79): the exact base pin and a strict CI check on an older stamp. Superseded (owner 2026-10-27, option A): self-update without asking, and failing the local check on an older stamp. Superseded (review of PR #75): `gabo check` self-updating, and checksum-only verification. | R32, R33 |
-| O13 | Approved (owner 2026-10-27, issue #79): the base branch's stamp is a minimum gabo version, not an exact pin. CI and the reviewer need gabo at least as new as the base stamp, otherwise they fail with the upgrade command; there is one global binary per machine and no version cache. `gabo check` reads the neutral agent spec and the contract operations from the repository's copied catalog, not from the binary, so a newer CLI validates an older project correctly. A stamp older than the CLI only warns, everywhere including CI; a newer stamp fails, and so does an agent version line that does not match the stamp. On an upgrade PR the reviewer runs the CLI it has (at least the base stamp) and validates only the config, as before. The catalog subtree is always human-only in the reviewer, like the stamp (review of PR #80). | R32, R33 |
-
-## Plan change 2026-10-27 (issue #107): shared project memory
-
-Owner request 2026-10-27, written by the PM in auto mode. Each item is **Proposed (auto)** and waits for the owner's approval of this plan change (D7). Reason for all: the owner asked for it explicitly; the PM only worded it and researched the alternatives. Owner decision 2026-10-27 (review of PR #108): shared memory is a suggestion, not a mechanism gabo configures; credentials and access are part of the user's own backend setup, outside gabo.
-
-| # | change | where |
-|---|---|---|
-| M1 | gabo-ai recommends that every project use one memory layer shared by all the agents that work on it (local and cloud, every developer), except the reviewer, which stays isolated (R9). It is a recommendation, not a requirement: a local-only memory is acceptable, for example for a solo developer. | R37, 6, 10.1 |
-| M2 | Setup tells the user about the recommendation and helps them choose a backend: Engram with Engram Cloud sync is offered first; claude-mem and Mem0 are listed for users who only use Claude Code. gabo does not configure the backend, its credentials or its access. | R38, 10.1 |
-| M3 | The cloud agent image (a Dockerfile that prepares cloud agents for working on gabo-ai) is an internal task of this repository, not a product requirement; it is recorded only in the implementation plan. | IMPLEMENTATION_PLAN |
-
-**Memory backends researched (2026-10-27).** "Shares" means two developers or a cloud agent on another machine read the same memory.
-
-| backend | how agents connect | shares across machines | shares across developers | notes | sources |
-|---|---|---|---|---|---|
-| Engram + Engram Cloud (recommended) | `engram mcp` registered as an MCP server in Claude Code (and other engines); autosync to a self-hosted Engram Cloud server | yes, through the cloud server with autosync | yes, per enrolled project; a project is always synced whole | Self-hostable; cloud sync is opt-in (autosync) and always project-scoped | [AGENT-SETUP](https://raw.githubusercontent.com/Gentleman-Programming/engram/main/docs/AGENT-SETUP.md), [DOCS](https://raw.githubusercontent.com/Gentleman-Programming/engram/main/DOCS.md), [TEAM-USAGE](https://raw.githubusercontent.com/Gentleman-Programming/engram/main/docs/TEAM-USAGE.md) |
-| claude-mem (thedotmack/claude-mem) | Claude Code plugin with a local SQLite store; also supports Cursor, OpenCode, Codex CLI and others | only with Cloud Sync (cmem.ai Pro, paid): a per-user sync hub shared by up to 64 devices of the same account | not through Cloud Sync (per user); TeamBrain (team plan, paid) shares selected projects' work with teammates; export/import shares snapshots | Local install alone does not meet R37; headless use for cloud agents is documented only for Cloud Sync | [introduction](https://docs.claude-mem.ai/introduction), [Cloud Sync](https://docs.claude-mem.ai/cloud-sync.md), [TeamBrain](https://docs.claude-mem.ai/usage/teambrain.md), [index](https://docs.claude-mem.ai/llms.txt) |
-| Mem0 (hosted Mem0 MCP) | Remote MCP at `https://mcp.mem0.ai/mcp`; browser sign-in or an API key as bearer token for headless clients | yes, memories live in the Mem0 account, not on the machine | through a shared Mem0 organization and project; the API key resolves the org and project | Hosted service, not self-hosted; scoping is by user, agent, app or run | [Mem0 MCP](https://docs.mem0.ai/platform/mem0-mcp.md), [organizations and projects](https://docs.mem0.ai/api-reference/organizations-projects) |
-| OpenMemory (Mem0, local) | Local MCP server shared by the MCP clients of one machine | no | no | Local-first; does not meet R37 | [OpenMemory](https://docs.mem0.ai/openmemory), [announcement](https://mem0.ai/blog/introducing-openmemory-mcp) |
-
-**Backend setup note (Engram Cloud, observed 2026-10-27; outside gabo).** The `gabo-ai` project got HTTP 403 (`policy_forbidden`) although it was listed in `ENGRAM_CLOUD_ALLOWED_PROJECTS`. That allowlist governs only legacy server credentials; managed principals (users and their issued credentials) are deny-by-default and need an explicit per-project grant (dashboard or admin API, or `--grant-project` at bootstrap). Setup may mention this when the user picks Engram Cloud; granting access remains the user's backend setup.
-
-## Plan change 2026-10-29 (issue #148): `gabo prompt` command
-
-Owner request 2026-10-29 (Leo), written by the PM in auto mode. Each item is **Proposed (auto)** and waits for the owner's approval of this plan change (D7). Reason for all: the owner asked for the command explicitly; the PM only worded it against the existing setup-prompt rules (R36, O8). It amends the three-command constraint of the 2026-10-27 owner decision (O1, R31); the setup prompt stays the single entry text (R36, TRD D25): same text, one more way to print it.
-
-| # | change | where |
-|---|---|---|
-| G1 | The CLI offers four commands: `gabo init`, `gabo check`, `gabo version` and `gabo prompt`. Amends O1 and R31 (three commands). | R31, 10.1 |
-| G2 | `gabo prompt` prints exactly the embedded setup prompt to standard output and nothing else, and exits 0. It is read-only: it writes no file and no config, does not touch the catalog, the stamp or the user-level reviewer skill, and needs no project. The owner can re-print the prompt at any time (for example to paste it into a new agent session) without rerunning `gabo init`. | R39, US-001 |
-| G3 | Follow-up outside this PR (dev-lead): TRD D24 and D25 and the CLI tests that assert exactly three commands change; an implementation task is added to the plan after this PR merges. | TRD, IMPLEMENTATION_PLAN |
-
-## Plan change 2026-10-30 (issue #165): UX and UI and design norms templates
-
-Owner request 2026-10-30 (Leo, relayed from the vulcam session), written by the PM in auto mode. Each item is **Proposed (auto)** and waits for the owner's approval of this plan change (D7). Reason for all: the owner asked for it explicitly; the PM only worded it against the templates of #162 (PR #163) and #164. It moves the R20 edit out of code PR #163, since plan changes never travel with code.
-
-| # | change | where |
-|---|---|---|
-| U1 | The planning documents created from directiva templates include UX and UI and the design norms (`DESIGN.md`), alongside user stories, PRD, TRD, data and config schema, app flow and implementation plan. | R20 |
-| U2 | The design norms template states every rule as one row `\| id \| rule \| level \| rationale \| verification \| examples \| source \|`: a stable id, an RFC 2119 level (MUST, SHOULD, MAY), a one-line rationale, how it is verified (automated test or lint, or a manual review step), do and don't examples, and its source (WCAG criterion, PRD requirement or owner decision). A rule without verification is SHOULD at most. | R20, #162 |
-| U3 | UX and UI keeps the "what" (product principles, components, screens, flows, concrete messages) and links to the design norms for the "how" (tokens, color, accessibility rules, wording rules), so no rule lives in two documents. | R20, #164 |
+| C1 | Planning is per change: intent, then spec, then (after a human accepts the spec) plan and tasks. There is no global implementation plan and no user-story set; the tracker is the global view. | R2, R20, 3, 7 |
+| C2 | A wave is one intent. `wave.after` (`next` or `wait`, unset means `wait`) decides whether the assistant chains the next intent or waits for the owner. | R3, R4, 3 |
+| C3 | Directiva adjusts an intent's `plan.md` and its tasks without re-planning; there is no global plan to redo. | R7, 11 |
+| C4 | Plan-change scopes are one task, one intent, or several intents or the PRD/TRD conventions. | R19, R27, 10.2 |
+| C5 | `gabo check` also validates the intent folders, including the human acceptance of a spec before its plan. | R33 |
+| C6 | The PRD is conceptual: the requirements table has no acceptance criteria, stories or verification columns. | 8 |
 
 ## 1. Product in one sentence
 
-gabo-ai is a framework that organizes a team of AI agents (direction, development and review) around an assistant that is your default point of contact, so that work moves forward wave after wave without stopping and questions reach whoever can resolve them, using your methodology, your tracker and your infrastructure.
+gabo-ai is a framework that organizes a team of AI agents (direction, development and review) around an assistant that is your default point of contact, so that each change moves from intent to merged code wave after wave, and questions reach whoever can resolve them, using your methodology, your tracker and your infrastructure.
 
 ## 2. Problem
 
 In AI-agent development the human is both the strongest and the weakest point of the flow. Strongest, because only they validate code and plans and turn ideas into product. Weakest, because they get exhausted, and today they also act as the glue between agents: they plan with one, launch coders with another, review results and answer every question.
 
-When the human is tired or absent, work stops. Coder questions get lost or are resolved by guessing, the plan is not adjusted between waves, and each team has to adapt to the methodology, tracker and infrastructure a tool imposes.
+When the human is tired or absent, work stops. Coder questions get lost or are resolved by guessing, the plan is not adjusted between waves, and each team has to adapt to the methodology, tracker and infrastructure a tool imposes. Planning everything upfront makes it worse: every iteration collides with a plan written before anyone knew the details.
 
 gabo-ai protects the human's time and energy for what only they can do: validate, plan and decide.
 
-**Evidence.** The problem statement describes current practice: the human plans with one agent, launches coders with another, reviews results and answers every question.
+### Evidence
 
-**Approved (auto proposal, owner 2026-10-25):** observed incidents from the owner's own project "vulcam", an agent-built product where the owner coordinated coder and reviewer agents, between 2026-10-20 and 2026-10-24. Reason: first-hand observations of the exact flow gabo-ai targets are the strongest evidence available.
+Observed in the owner's own project "vulcam", an agent-built product where the owner coordinated coder and reviewer agents, between 2026-10-20 and 2026-10-24 (approved by the owner on 2026-10-25):
 
-- **Resources left behind filled the disk.** On 2026-10-22 the disk filled: about 6 GB of loose worktrees, about 6 GB of reviewer end-to-end copies and 126 GB in podman, including 121 stopped containers. Host load reached 88. The owner had to clean up by hand.
-- **Worktrees could not be closed cleanly.** The worktree for issue #280 could not be closed because of leftover debug files and had to be force-removed by the owner.
-- **Tracker updates were silently skipped.** Project board moves (Backlog → Ready) were skipped by the agents without notice; the owner had to notice and move the cards.
+- **Resources left behind filled the disk.** On 2026-10-22 the disk filled: about 6 GB of loose worktrees, about 6 GB of reviewer end-to-end copies and 126 GB in podman, including 121 stopped containers. The owner had to clean up by hand.
+- **Worktrees could not be closed cleanly.** The worktree for issue #280 had to be force-removed by the owner.
+- **Tracker updates were silently skipped.** Board moves (Backlog → Ready) were skipped without notice.
 - **The human was the relay.** Coordination between the planning session, the coder sessions and the reviewer was relayed by the owner.
 
 ## 3. Users
 
 The first release covers both users.
 
-1. **Solo developer working with AI agents.** Today they are the glue between agents. They want to plan once, let the agent team work, and receive only the decisions that matter.
+1. **Solo developer working with AI agents.** Today they are the glue between agents. They want to describe a change, let the agent team build it, and receive only the decisions that matter.
 2. **Tech lead of a small team mixing people and agents.** The team already has its tracker (GitHub issues, Plane, Trello), methodology and infrastructure. They want to add agents without changing how the team works.
 
 ### Roles
 
-| role | who | responsibility |
-|---|---|---|
-| Owner | The session owner, identified by git user and alias | Product decisions, validation, answers to unresolved questions |
-| Assistant | Default spokesperson for the whole flow; not part of directiva | Starts waves, receives reports, routes questions, answers the owner |
-| Directiva | pm, dev-lead, db-master and frontend agents | Write `docs/product`, create tasks, adjust the plan, research answers |
-| Development | gabo-cycle (runs waves), coders (native subagents), reviewer (independent process) | Implement, review and report task outcomes |
+| role | needs |
+|---|---|
+| Owner (the session owner, identified by git user and alias) | Make product decisions, accept each spec, validate, answer the questions the team could not resolve |
+| Assistant (default spokesperson; not part of directiva) | Start waves, receive reports, route questions, answer the owner |
+| Directiva (pm, dev-lead, db-master and frontend agents) | Write the PRD, the TRD and each intent's documents, create and adjust tasks, research answers |
+| Development (gabo-cycle, coders as native subagents, an independent reviewer) | Implement, review and report task outcomes |
 
 ### Journeys
 
-Detailed flows live in the app flow and `docs/product/diagrams/`.
+The global flows live in the [app flow](APP_FLOW.md) and `docs/product/diagrams/`.
 
-1. **Global planning, once.** Directiva writes `docs/product` and creates every task in the tracker with dependencies (blocked by / unblocks): the work route map.
-2. **Waves derive from the map.** A wave is the set of tasks whose dependencies are done.
-3. **Each wave.** Assistant starts the wave → cycle launches coders → coders open PRs → reviewer comments the verdict and returns it to the coder → coder reports DONE or BLOCKED → cycle updates the tracker and sends the wave report and questions to the assistant.
-4. **Between waves.** The assistant asks directiva for changes or researched answers; directiva adjusts tasks (not a re-plan); the assistant starts the next wave.
+1. **Configure the team, once.** Setup guides the owner through the stack, the slots and the agents; `gabo check` confirms the result.
+2. **One change at a time.** Amended (owner 2026-11-03, per-change-sdlc). The owner states a change; directiva writes its intent and spec; a human accepts the spec; directiva writes its plan and creates its tasks in the tracker with dependencies. Specs are accepted one at a time; there is no batch of accepted intents.
+3. **One wave per intent.** Amended (owner 2026-11-03, per-change-sdlc). The assistant starts the wave of one accepted intent → the cycle launches coders on its unblocked tasks → coders open PRs → the reviewer returns its verdict → coders report → the cycle updates the tracker and sends the wave report to the assistant.
+4. **Between waves.** The assistant asks directiva for adjustments or researched answers; directiva adjusts the intent's plan and tasks, not a re-plan. Then `wave.after` decides: `next` starts the next accepted intent without the owner, `wait` stops until the owner asks.
 5. **End.** The assistant answers the owner.
-
-Task lifecycle: **creation** (directiva) → **read** (cycle, at wave start) ← **modification** (cycle updates status, directiva adjusts). Modified tasks are read again.
 
 ## 4. Goals, non-goals and later
 
 **Goals**
 
-1. **Protect the human's energy.** The human receives product decisions, validations and questions the team could not resolve, not coordination work.
+1. **Protect the human's energy.** The human receives product decisions, spec acceptances, validations and questions the team could not resolve, not coordination work.
 2. **Work never stalls.** Waves advance without the human launching, watching or relaying anything.
 3. **Questions surface.** Every question reaches whoever can resolve it (directiva, assistant or human). In auto mode each decision is recorded with its reason.
-4. **A living plan.** The plan is made once and adjusted between waves or mid-wave without redoing it.
-5. **Adapts to the team.** Methodology, tracker, infrastructure and reviewer are chosen by the user; the assistant guides configuration.
+4. **Plan per change, not upfront.** Amended (owner 2026-11-03, per-change-sdlc). Each change is planned when it comes and adjusted without redoing it; no waterfall plan collides with later iterations.
+5. **Adapts to the team.** Methodology, tracker, infrastructure, stack and reviewer are chosen by the user; the assistant helps configure them.
 
 **Non-goals (permanent)**
 
-- Imposing a development methodology.
+- Imposing a development methodology or a stack.
 - Replacing the tracker or being one.
-- Replacing the human in product decisions or final validation.
+- Replacing the human in product decisions, spec acceptance or final validation.
 - Being an IDE or a coding agent.
 - Providing its own infrastructure.
-- Providing its own TODO or dashboard tool (tracker views and the assistant cover it; there is no Go status command, TRD D18).
+- Providing its own TODO or dashboard tool (tracker views and the assistant cover it).
 
-**Later (deferred, out of the first release)** — see [Later](#12-later).
+**Later** — see [section 12](#12-later).
 
 ## 5. Appetite
 
-**Approved (auto proposal, owner 2026-10-25):** the first release is scoped to one supported tracker (GitHub issues), the local reviewer, the Claude Code and Pi runtimes, and manual and auto modes. There is no fixed wave budget (updated 2026-10-26, owner): the release takes as many waves as needed to finish its scope. Reason: the Later section already defers other trackers and reviewer placements; scope, not a wave count, bounds the release.
-
-Approved (owner 2026-10-27): Claude Code and Pi are the runtimes shipped and tested in the first release, as runtime skills (R34). The user's agent can add another engine through the runtime builder skill (R35) without a gabo-ai release.
+The first release is scoped to one supported tracker (GitHub issues), the local reviewer, the Claude Code and Pi runtimes, and manual and auto modes. There is no fixed wave budget: the release takes as many waves as its scope needs. Claude Code and Pi are shipped and tested as runtime skills (R34); the user's agent can add another engine through the runtime builder (R35) without a gabo-ai release.
 
 ## 6. Assumptions and dependencies
 
-- **Agent runtimes.** Agents run on the supported runtimes Claude Code and Pi (TRD D3). Approved (owner 2026-10-26): Pi core has no subagents, so a Pi target needs a subagent package; gentle-pi (with its `gentle-shell` launcher) is recommended and setup offers to install it when missing; another subagent package is acceptable. **Superseded (owner 2026-10-27):** `gbai generate` refuses Pi targets when none is present and prints what to install (TRD D21). Now the Pi runtime skill refuses to build Pi agents when no subagent package is present and says what to install (R34).
-- **Engines.** Approved (owner 2026-10-27): an engine is usable only when it supports subagents and skills, or an equivalent. The runtime builder skill needs web access or a documentation MCP; without them it asks the user for documentation links (R35).
-- **Direct sessions.** Direct sessions and the single assistant terminal depend on Orca; the first release supports Orca only (R14, R18).
-- **Tracker.** The team's tracker is reachable through an adapter (skill plus plugin or MCP); GitHub issues in the first release (R11).
+- **Agent runtimes.** Agents run on Claude Code and Pi. Pi core has no subagents, so a Pi target needs a subagent package; gentle-pi is recommended and setup offers to install it. Any engine is usable only when it supports subagents and skills, or an equivalent.
+- **Runtime builder access.** The runtime builder needs web access or a documentation MCP; without them it asks the user for documentation links (R35).
+- **Direct sessions.** Direct sessions and the single assistant terminal depend on Orca in the first release (R14, R18).
+- **Tracker.** The team's tracker is reachable through an adapter; GitHub issues in the first release (R11). It holds the product cards, their intents' tasks and the dependencies between them.
 - **Repository host.** A git host (GitHub or GitLab) for PRs, comments and merges (R9, R10).
-- **Persistent memory.** A memory provider (for example Engram) records auto-mode decisions (R6). Proposed (auto) (issue #107): gabo-ai recommends that this memory be shared by every agent of the project except the reviewer, on every machine and for every developer, so they work from the same context; it is a suggestion, not a requirement (R37).
-- **Recommended stack.** Approved (owner 2026-10-26): gabo-ai recommends, but does not require, the gentle-ai stack: gentle-ai with ODD (methodology slot), RDD (receipt-driven review as the coder-side validation inside the methodology adapter) and Engram (memory slot). Setup offers it as the recommended option and installs it only if the user accepts (TRD D21).
+- **Persistent memory.** A memory provider (for example Engram) records auto-mode decisions (R6). gabo-ai recommends that it be shared by every agent of the project except the reviewer (R37).
+- **Recommended stack.** gabo-ai recommends, but does not require, the gentle-ai stack: ODD in the methodology slot, RDD as coder-side review, Engram in the memory slot. Setup offers it first and installs it only if the user accepts.
 - **Notifications.** A chat tool (for example Slack) or a request on the task may be used to notify the owner (R16).
 
-## 7. User stories
+### Memory backends researched
 
-The PM proposes user stories (INVEST with Given-When-Then) in `docs/product/stories/` for owner approval.
+Researched 2026-10-27 (issue #107). "Shares" means two developers or a cloud agent on another machine read the same memory. Credentials and access are the user's own backend setup, outside gabo.
 
-**Approved (auto proposal, owner 2026-10-25):** the index below. Story files were written on 2026-10-26 and US-009 to US-011 were added (owner approval 2026-10-26). Reason: each story groups the requirements one user needs for one outcome, so every functional requirement except R1 and R13 is traced to at least one story.
+| backend | how agents connect | shares across machines | shares across developers | notes |
+|---|---|---|---|---|
+| Engram + Engram Cloud (recommended) | `engram mcp` as an MCP server; autosync to a self-hosted Engram Cloud server | yes, through the cloud server | yes, per enrolled project | Self-hostable; cloud sync is opt-in and project-scoped. Managed principals need an explicit per-project grant. |
+| claude-mem | Claude Code plugin with a local SQLite store | only with paid Cloud Sync (per user) | only with the paid team plan | Local install alone does not meet R37 |
+| Mem0 (hosted MCP) | Remote MCP with browser sign-in or an API key | yes | through a shared Mem0 organization and project | Hosted, not self-hosted |
+| OpenMemory (Mem0, local) | Local MCP server for one machine | no | no | Does not meet R37 |
 
-Updated (owner 2026-10-27): US-001 traces R31–R34 and R36 and US-007 traces R34 and R35.
+Sources for each row are listed in [PRD 0.10](archive/PRD-0.10.md#plan-change-2026-10-27-issue-107-shared-project-memory).
 
-Proposed (auto) (issue #107): US-012 traces R37 and R38.
+## 7. How work is organized
 
-Proposed (auto) (issue #148): US-001 also traces R39.
+Amended (owner 2026-11-03, per-change-sdlc). This section replaces the former user-story index; the stories are archived in [`archive/stories/`](archive/stories/README.md).
 
-| id | title | user | requirement ids | status | file |
-|---|---|---|---|---|---|
-| US-001 | Configure the team | Solo developer | R12, R16, R8, R31, R32, R33, R34, R36, R39 | approved | [US-001-configure-the-team.md](stories/US-001-configure-the-team.md) |
-| US-002 | Plan the product once | Solo developer | R2, R3, R20 | approved | [US-002-plan-the-product-once.md](stories/US-002-plan-the-product-once.md) |
-| US-003 | Run a wave without watching | Solo developer | R4, R5, R15 | approved | [US-003-run-a-wave-without-watching.md](stories/US-003-run-a-wave-without-watching.md) |
-| US-004 | Resolve questions by mode | Solo developer | R5, R6, R17 | approved | [US-004-resolve-questions-by-mode.md](stories/US-004-resolve-questions-by-mode.md) |
-| US-005 | Intervene in a task | Solo developer | R14, R18 | approved | [US-005-intervene-in-a-task.md](stories/US-005-intervene-in-a-task.md) |
-| US-006 | Adjust the plan safely | Solo developer | R7, R19 | approved | [US-006-adjust-the-plan-safely.md](stories/US-006-adjust-the-plan-safely.md) |
-| US-007 | Use the team's own tools | Tech lead | R8, R11, R34, R35 | approved | [US-007-use-the-teams-own-tools.md](stories/US-007-use-the-teams-own-tools.md) |
-| US-008 | Trust what gets merged | Tech lead | R9, R10 | approved | [US-008-trust-what-gets-merged.md](stories/US-008-trust-what-gets-merged.md) |
-| US-009 | Single point of contact | Solo developer | R1 | approved | [US-009-single-point-of-contact.md](stories/US-009-single-point-of-contact.md) |
-| US-010 | My machine stays clean | Solo developer | R13 | approved | [US-010-my-machine-stays-clean.md](stories/US-010-my-machine-stays-clean.md) |
-| US-011 | Resume without losing work | Solo developer | R25 | approved | [US-011-resume-without-losing-work.md](stories/US-011-resume-without-losing-work.md) |
-| US-012 | Share one memory across all agents | Tech lead | R37, R38 | proposed | [US-012-share-one-memory-across-all-agents.md](stories/US-012-share-one-memory-across-all-agents.md) |
+- **Product card → intents.** A product card in the tracker can hold several intents, because one product change can need several technical changes.
+- **Intent → spec → plan → tasks.** An intent states the problem. Its spec states the requirements, acceptance criteria, UX and flow, and any data change, and a human accepts it. Only then is its plan written, with one task per reviewable PR. Each task belongs to exactly one intent; its dependencies may cross intents.
+- **One wave per intent.** A wave runs the unblocked tasks of one accepted intent. Chaining waves is optional (`wave.after`).
+- **Global documents.** This PRD (what the product offers), the [TRD](TRD.md) (global conventions), the optional `DESIGN.md` (global design norms; gabo-ai has none) and [MIGRATIONS](MIGRATIONS.md) (the step-by-step log of data and config changes). There is no upfront database schema and no global plan.
+- **Methodology stays open.** The spec is per change; the methodology slot (ODD or another) still governs how a coder builds a task.
 
-## 8. Requirements
+## 8. What the product offers
 
-Type: F functional, Q quality, C constraint. All requirements are `must` unless marked otherwise. The stories column lists proposed story ids (section 7).
+Conceptual only. Type: F functional, Q quality, C constraint. The ids are stable so an intent or a TRD decision can cite them; the acceptance criteria of each change live in its intent's `spec.md`, and those of the requirements as first built are in [PRD 0.10](archive/PRD-0.10.md#8-requirements).
 
-| id | type | requirement | acceptance criteria | priority | stories | verification |
-|---|---|---|---|---|---|---|
-| R1 | F | When a session opens, the system shall present the assistant as the human's default interlocutor and shall let the human talk to any agent directly. | A new session opens with the assistant as the human's point of contact. The human can address any directiva or development agent directly without the assistant blocking it. | must | US-009 | demo |
-| R2 | F | When given a goal, directiva shall produce the global plan. | Given a goal, directiva produces `docs/product` and creates the tracker tasks with blocked-by / unblocks dependencies. Every task belongs to the dependency map and no task is created outside it. | must | US-002 | test, inspection |
-| R3 | F | The system shall handle tasks in three blocks: creation, read, modification. | Directiva creates tasks; the cycle reads them at wave start; the cycle updates status and directiva adjusts content. A task modified after a wave is read again with its changes at the start of the next wave. | must | US-002 | test |
-| R4 | F | The assistant shall start each wave and receive its report, without the human relaying anything. | Each wave is started by the assistant and its report reaches the assistant. Across a full wave, the human performs no launch, relay or copy step. | must | US-003 | demo |
-| R5 | F | When a coder raises a question, the system shall surface it. | Every question a coder raises reaches the assistant and appears in the wave report. No question is closed without a recorded answer and who gave it. | must | US-003, US-004 | test |
-| R6 | F | The system shall support manual and auto modes. | In manual mode, methodology and development questions reach the owner through the assistant. In auto mode, the assistant decides and records the decision and its reason in persistent memory; the owner can query those records later. | must | US-004 | test |
-| R7 | F | Directiva shall adjust the plan without re-planning and shall be able to return researched answers. | Directiva can adjust tasks between waves or mid-wave without recreating the global plan (existing tasks keep their identity). Directiva can return a researched answer to a development question. | must | US-006 | test |
-| R8 | F | The system shall use the methodology declared in configuration. | (updated 2026-10-27) The project config declares the methodology slot `slots.methodology.adapter` (skill name or path). The runtime skill links it under the fixed name `gabo-methodology` when it builds the agents, and the coder skill only instructs loading it. Changing methodology requires editing one line in `gabo.yaml` (by hand or through the config-writer skill), having the agent rebuild the affected agents, and a passing `gabo check` (Approved (owner 2026-10-27), R34). Superseded (owner 2026-10-27): linking by the agent compiler `gbai generate` and editing with `gbai config set` (owner 2026-10-26, TRD D18). | must | US-001, US-007 | test, inspection |
-| R9 | F | The system shall review every PR in two layers with an isolated reviewer. | Coder-side review (for example GGA or gentle-ai receipt-driven review) is optional per methodology. Reviewer-side validation (tests, build and lint as in CI, plus an independent agent review of the PR) is a mandatory merge gate. Approved (owner 2026-10-26): the reviewer-side validation runs in deterministic reviewer scripts bundled in the `scripts/` folder of the `gabo-reviewer` skill, which `gabo init` installs at user level (updated owner 2026-10-27; earlier `gbai generate`), outside the repository, so PR code cannot modify the scripts that review it; a reviewer agent built by the runtime skill only validates the review request, invokes the script and relays its final `VERDICT` line to the coder (TRD D20). The scripts are the same everywhere; where they run (local, separate server, GitHub Actions, GitLab CI) is set per repository; the local default is single-user mode, and an isolated two-user mode is available through the reviewer placement or agent host adapter. The reviewer uses its own clone, home and cache and a clean environment, never the coder's. The verdict is commented on the PR and returned to the coder; the merge gate never merges into main. The reviewer skill documents both layers. | must | US-008 | test, inspection |
-| R10 | F | When a coder reports, the cycle shall update the tracker status and link the PR to its task. | After each coder report, the task status in the tracker reflects DONE or BLOCKED. Every PR is linked to its task (for example "Closes #n" for GitHub issues, or through the tracker plugin otherwise). | must | US-008 | test |
-| R11 | F | The system shall support pluggable trackers. | GitHub issues work in the first release. A new tracker is added through a provider skill plus a plugin or MCP, without changing the agents' skills. Plane, Trello and others are later. | must (gh); should (others) | US-007 | test, inspection |
-| R12 | F | When configuring, the assistant shall guide the user and apply no silent defaults. | The assistant asks before configuring anything and applies no silent defaults, only suggestions. It asks where each agent runs and which tracker is used, and explains whether and how the chosen agents can communicate. | should | US-001 | demo |
-| R13 | F | When a wave closes, the system shall remove the worktrees and merged branches that wave created. | At wave close, the worktrees and merged branches created by that wave are removed. Anything that could not be cleaned is listed in the wave report. | should | US-010 | test |
-| R14 | F | When the human intervenes in a task, the assistant shall mediate by default and offer a direct session if mediation drags on. | Case A (default): the human talks to the assistant, which mediates with the working agent in one session. Case B: if mediation drags on, the assistant offers a direct session; on acceptance it opens a named Orca session in the task's worktree, briefs it with prior context, and the human switches to it. In both cases the assistant then resumes from the traces (commits, task, memory), coordinates with the coder and closes the task without redoing work. The first release supports Orca only. | must | US-005 | demo |
-| R15 | F | While an auto-mode run is in progress, the system shall not prompt the human. | During an auto-mode run the human receives no prompts; they receive only the final answer and can query the recorded decisions. | must | US-003 | test, demo |
-| R16 | F | When setup runs, the system shall identify the session owner and address them by alias. | Setup detects the git user. The project config keeps a catalog of developers (git user → alias). If no alias exists, the assistant asks once ("call you by your git name X or another name?"), stores the mapping and from then on addresses the session owner by that alias. The assistant addresses only the session owner; it may notify through a chat tool (for example Slack) or a request on the task. Company-internal organization is out of scope. | must | US-001 | test |
-| R17 | F | The assistant shall keep per-user interaction preferences and, when a wave closes, ask about interaction comfort. | The assistant keeps, per user, the preferred number of interactions (many or few questions) and speaking style. At each wave close it briefly asks how comfortable the owner felt with the interactions and applies the answer in the next wave. The aim is the interactions the owner needs to feel comfortable, not the fewest. Approved (owner 2026-10-26): preferences live in two layers (see 10.1 Personalization): a stable layer in the global user file read by every gabo-ai agent, and a learning layer of observations in the memory slot read by the assistant at session start; an observation repeated about 3 times is proposed for the stable layer. | must | US-004 | test, demo |
-| R18 | F | The system shall open only the assistant's Orca terminal by default. | By default only the assistant's terminal is opened. Additional terminals open only when the user requests them. | must | US-005 | demo |
-| R19 | F | When a critical question arises, the system shall turn it into a plan-change proposal and never resolve it silently. | A critical question is one whose answer would drastically change the global plan. In any mode it is never resolved silently. Before work starts the configuration defines which plan scope may change (one task, a group of tasks, or the global plan) and a boolean decides whether the global plan may change without the owner; the assistant asks the owner to set both. Plan changes never travel with code changes: each proposal gets its own issue and its own PR that change only the plan documents and tasks, and its git history explains what changed and why. Every plan change is debated before it applies: with the owner when present, otherwise with a plan-change reviewer, a fresh clean-context session that indexes the repository and must agree or propose a different improvement. A dedicated skill defines how that reviewer behaves. | must | US-006 | test, inspection |
-| R20 | F | The system shall create the planning documents from its own templates and block the next planning step on a traceability gap. | The directiva skills shipped by gabo-ai create user stories, PRD, TRD, data and config schema, UX and UI, design norms, app flow and implementation plan from their templates (Approved (owner 2026-10-26), TRD D19; no gabo command; UX and UI and design norms amended (owner 2026-10-30, issue #162)). Each template carries fixed questions that the assistant asks one at a time; the directiva agent fills the document; the PM recommends likely user stories. Templates follow open conventions (ISO/IEC/IEEE 29148, EARS, INVEST with Given-When-Then, arc42 with C4 and MADR-style decisions). A traceability check, run by the directiva agent as an instruction of its skill, blocks the next planning step when a story has no requirement, a requirement has no decision, task or verification, a task has no story, or the dependency graph has a cycle. | must | US-002 | test, inspection |
-| R21 | Q | Approved (auto proposal, owner 2026-10-25): Secrets and credentials shall never enter agent context or generated files. | No agent prompt, generated agent file, plan document, PR, comment or report contains a secret or credential value; agents receive only references to where secrets live. Reason: derived from the reviewer isolation principle (R9) and the setup flow that embeds only adapter instructions (10.1). | should | — | inspection, test |
-| R22 | Q | Approved (auto proposal, owner 2026-10-25): The reviewer shall run isolated from the coder. | Every reviewer run uses its own clone, home and cache and shares no writable state with any coder session. Reason: restates R9's isolation as a measurable quality property. | should | — | test, inspection |
-| R23 | Q | Approved (auto proposal, owner 2026-10-25): In auto mode the system shall delete only resources it or its subagents created in the workflow. | Every deletion performed in auto mode targets a resource recorded as created by that workflow; a deletion of any other resource is refused and reported. Reason: derived from the auto-mode limits (10.2) and the vulcam cleanup incidents (section 2). | should | — | test |
-| R24 | Q | Approved (auto proposal, owner 2026-10-25): Every task write shall be verified by re-reading it. | After each create or update of a task in the tracker, the writer re-reads the task and confirms the change; an unverified write is reported in the wave report, never silently skipped. Reason: derived from R3 and R10 and the silently skipped board moves (section 2). | should | — | test |
-| R25 | Q | Approved (auto proposal, owner 2026-10-25): An interrupted wave shall be resumable without redoing finished tasks. | After an interruption, the wave resumes from the tracker state and memory traces; tasks already DONE are not reworked. Reason: derived from R14's resume-from-traces principle. | should | US-011 | test, demo |
-| R26 | Q | Approved (auto proposal, owner 2026-10-25): The reviewer shall review each pushed head at most once. | For any PR, no head commit receives more than one reviewer verdict. Reason: keeps reviewer cost proportional to actual changes (R9). | should | — | test |
-| R27 | Q | Approved (auto proposal, owner 2026-10-25): The plan-change reviewer shall run only when a plan change is proposed. | Plan-change reviewer sessions are started only by a plan-change proposal (R19) and their count equals the number of proposals debated without the owner. Reason: limits the cost of R19's debate to the cases that need it. | should | — | test, inspection |
-| R28 | Q | Approved (auto proposal, owner 2026-10-25): A new team shall reach its first wave quickly after install. | Time from install to the first wave running with the team's tracker and methodology is measured (success metric 5). Initial target: within one working session, to be calibrated after the first waves. Reason: goal 5 (adapts to the team) only pays off if setup is short. | should | — | demo |
-| R29 | Q | Approved (auto proposal, owner 2026-10-25): Every wave shall produce a report. | Each wave report lists interactions and their reasons, decisions, questions with resolver, and cleanup leftovers. Reason: derived from R4, R5, R13 and the success metrics (section 11). | should | — | test, inspection |
-| R30 | Q | Approved (auto proposal, owner 2026-10-25): Every auto-mode decision shall be queryable. | The owner can list every decision taken in auto mode with its reason, wave and task. Reason: derived from R6 and R15. | should | — | test |
-| R31 | C | Approved (owner 2026-10-27), amended Proposed (auto) (owner request 2026-10-29, issue #148): The gabo CLI shall offer only the commands `gabo init`, `gabo check`, `gabo version` and `gabo prompt`. | The CLI help lists exactly these four commands (amended from three, issue #148). No CLI command writes the config, builds agents, installs per-runtime artifacts or runs a work-time operation; `gbai generate` (with `--check`) and `gbai config set` do not exist. | must | US-001 | test, inspection |
-| R32 | F | Approved (owner 2026-10-27, updated issue #74): When the user runs `gabo init` in a project, the CLI shall set up or refresh the copied skill catalog and never touch the config. | A fresh project has no config; an existing project has a config. The copied catalog lives in its own subtree (for example `.gabo/skills/`), separate from the adapters, the config and the stamp. Fresh project: `gabo init` copies the embedded skill catalog into that subtree, writes a version stamp (the gabo version) and prints the embedded setup prompt (R36) as the next step. When a catalog and stamp exist but no config (init ran, setup did not), it refreshes the catalog if the stamp is older, prints the setup prompt again and exits 0. Existing project: it never touches the config or the adapters; when the stamp is older than the CLI version, or is missing, it refreshes the catalog and updates the stamp. When the stamp is newer than the running CLI and `gabo init` runs interactively, it asks `this repo needs gabo <w>, you have <v>. Update? This affects all your projects.`; only on yes does gabo update itself to exactly the stamp version, verified as an authentic release (a signature or provenance check, not only a checksum; details in the TRD), and then continue; on no it changes nothing, prints the upgrade command and exits 1; if it cannot self-update (for example the CLI came from a package manager, or there is no network) it stops and prints the exact upgrade command. Interactive means a developer at a terminal who answers that confirmation; the confirmation is the boundary, and exact detection is in the TRD (PR #54, 9.4). A non-interactive run (an agent, CI, the reviewer) never self-updates: with a newer stamp it changes nothing, prints the upgrade command and exits 1 (O12). The catalog is never refreshed backwards. The catalog is only ever written by `gabo init`, as a byte-identical copy of its embedded catalog; a later, newer binary does not re-verify that copy. A refresh removes and rewrites only the catalog subtree: skills removed in the new version are deleted and local edits to copied skills are overwritten, because customization belongs in adapters, not in the catalog. When `gabo init` writes the catalog, on a fresh copy or a refresh, the copied skills are byte-identical to its embedded catalog. Independent of the stamp, every run installs the user-level `gabo-reviewer` skill with its scripts outside the repository (R9) when it is missing or differs from the embedded one, so a second developer who clones a configured repository gets it too. When the stamp matches the CLI version and the reviewer skill is current, it changes nothing and exits 0 with a short message. The same version always produces the same files. `gabo init` writes no config file and builds no agent. Superseded (issue #74): the neutral entry file, and the non-zero exit with nothing written on an existing config. | must | US-001 | test |
-| R33 | F | Approved (owner 2026-10-27, updated issues #74 and #79): When the user, an agent, the reviewer or CI runs `gabo check`, the CLI shall validate the project read-only and independent of the engine. | `gabo check` validates five things: the global user file and `gabo.yaml` against their JSON Schemas, that every agent of the neutral agent spec exists, slot coverage (every contract operation is explained by its adapter), that the catalog version stamp is present and not newer than the CLI version, and that every agent's version line exists and matches the catalog stamp. Stamp messages: older stamp, a local warning `this project uses gabo <stamp>; run gabo init to upgrade it` that does not fail the check (everywhere, including CI and the reviewer, O13); missing stamp, `no stamp: run gabo init`; newer stamp, `catalog version <w> is newer than gabo <v>` with the exact upgrade command, and `gabo check` never self-updates (O12); agent version line missing or different, `agent <id> built with <v>, catalog is <w>: ask your agent to rebuild`. CI and the reviewer never self-update: they need a gabo CLI at least as new as the base branch's stamp (a minimum, not an exact pin; one global binary per machine, no version cache) and otherwise fail with the upgrade command; the PR head's stamp never changes this minimum, so a PR cannot lower what the reviewer requires (R9). The stamp has the fixed path `.gabo/VERSION` (`.gabo/VERSION` until the rename), and a PR that changes it is an upgrade PR. The reviewer always treats the stamp as human-only, built in and independent of `review.human_only_paths`, so auto mode never merges a stamp change; the owner merges it. The catalog subtree (`.gabo/skills/`, `.gabo/skills/` until the rename) is also always human-only, built into the reviewer like the stamp: the catalog changes only when `gabo init` writes it, in upgrade PRs the owner merges, so a normal PR cannot weaken `gabo check` and auto mode never merges a catalog edit. On an upgrade PR, CI and the reviewer run the CLI they have (at least the base stamp) and validate only the config schemas; they skip every check that depends on the spec (agents exist, slot coverage and both version checks) and report `upgrade PR: only config validated, human merge required`. The human merge is the gate. The upgrade PR report also lists the changed paths outside the catalog subtree and the agent directories, so the owner sees what rode along; the PR's scope is not restricted. When the base branch has no stamp there is no minimum yet: CI and the reviewer use the CLI they have. The TRD (PR #54: 9.4, D24, D6, D20) holds the technical details; DB_SCHEMA follows in T063 (plan PR #54). Each built agent file carries one line with the gabo version it was built from, under a fixed file name (O11); there are no template hashes. `gabo check` reads the neutral agent spec and the contract operations from the repository's copied catalog, not from the binary, so a newer CLI validates an older project correctly (O13). It is read-only: it writes nothing, exits non-zero on any failure and reports each failure in the UX_UI section 4 shape. | must | US-001 | test |
-| R34 | F | Approved (owner 2026-10-27): When the user asks their agent to configure gabo-ai, the agent shall build the configuration and the agents from gabo-ai skills without inventing content. | The setup skill asks the setup questions one at a time (R12). The config-writer skill writes `gabo.yaml` and the global user file. The runtime skill for the engine in use builds every agent of the neutral agent spec in that engine's format from fixed templates; the agent fills only the templates' slots. Every agent file the runtime skill and its templates write carries the `gabo-version` line with the gabo version it was built from (O11). The neutral agent spec defines, per agent, its role, the skills it loads, the tools it needs and who launches whom, independent of any engine. The agent then runs `gabo check` and fixes every failure before it reports setup as done. Claude Code and Pi have shipped, tested runtime skills. | must | US-001, US-007 | test, demo |
-| R35 | F | Approved (owner 2026-10-27): Where no runtime skill exists for the user's engine, the runtime builder skill shall produce one from verified sources without inventing. | The runtime builder researches the engine's official documentation first, checks it against the installed version and its CLI help, and cites the source and the version each fact applies to. When the documentation is unclear it asks the user one concrete question. Without web access or a documentation MCP it asks the user for documentation links. It refuses an engine without subagent and skill support, or an equivalent. It tests with a probe agent and then `gabo check`, and writes the new runtime skill for reuse; that skill and its templates write the `gabo-version` line in every agent file (O11). Adding a runtime needs no Go change and no gabo-ai release. | must | US-007 | test, demo |
-| R36 | C | Approved (owner 2026-10-27): The setup prompt shall have a single source: the literal text embedded in the gabo CLI, published unchanged in the gabo-ai documentation. | The prompt published in the documentation is identical to the text embedded in the CLI binary of the same version; there is one text to maintain. A user who pastes it into their agent gets the agent to install the CLI, run `gabo init` and continue with the same setup as entry (a) (R32, R34). How the CLI exposes the embedded text is a TRD detail. | must | US-001 | test, inspection |
-| R37 | F | Proposed (auto) (owner request 2026-10-27, issue #107): gabo-ai should recommend that every project use one memory backend shared by all the agents that work on it, local and cloud, for every developer, except the reviewer. | The recommendation names one memory backend and one memory project name for the whole project, so a decision saved by one agent can be found by an agent on another machine. The reviewer is excluded: it never reads or writes the shared project memory, so it keeps its own clean environment (R9) and no content written by coders reaches the merge gate. It is a recommendation, consistent with "Recommended options, not defaults" (10.1) and the recommended stack (6): a local-only memory is acceptable, for example for a solo developer. gabo does not configure the backend, its credentials or its access; those are part of the user's own backend setup. Reason: agents coordinate best when they work from the same context. | should | US-012 | inspection, demo |
-| R38 | F | Proposed (auto) (owner request 2026-10-27, issue #107): When setup configures the memory slot, the assistant shall explain the shared-memory recommendation and help the user choose a backend. | Before configuring the memory slot, setup explains the recommendation of R37 in plain words, including that the reviewer is excluded. It offers Engram with Engram Cloud sync first, as the recommended option with its reason, and applies nothing silently (R12). For users who only use Claude Code it also lists claude-mem and Mem0 with whether each shares memory across machines and across developers (section "Memory backends researched"). The user may keep a local-only memory. Setup records only the chosen adapter and the memory project name; it does not set up the backend, its credentials or its access. When setup checks that the memory slot works, it writes and reads only under a dedicated scratch topic and deletes that probe afterwards, so nothing stays in the project memory. The setup prompt and the setup documentation say the same (R36). | should | US-012 | test, inspection, demo |
-| R39 | F | Proposed (auto) (owner request 2026-10-29, issue #148): When the user runs `gabo prompt`, the CLI shall print the embedded setup prompt (R36) to standard output and change nothing. | Standard output is byte for byte the setup prompt text embedded in the binary, the same text `gabo init` prints as its next step and the documentation publishes (R36); nothing else is printed and the exit code is 0. It writes no file and no config, does not create, refresh or read the catalog, the stamp or the user-level `gabo-reviewer` skill, and works the same inside a configured project, an unconfigured project or a directory that is no project. | should | US-001 | test |
+| id | type | what the product offers | what the user gets | priority |
+|---|---|---|---|---|
+| R1 | F | The assistant is the default point of contact of every session, and any directiva or development agent can still be addressed directly. | One place to talk to the whole team, without being blocked from any agent. | must |
+| R2 | F | Amended (owner 2026-11-03, per-change-sdlc): directiva turns each change into an intent, a spec and, once a human accepts the spec, a plan whose tasks it creates in the tracker with blocked-by / unblocks dependencies. There is no global plan written upfront. | Work is planned when a change comes, every task traces to its intent, and there is no waterfall plan to redo. | must |
+| R3 | F | Amended (owner 2026-11-03, per-change-sdlc): tasks are handled in three blocks: creation (directiva, per intent), read (the cycle, at the start of that intent's wave) and modification (the cycle updates status, directiva adjusts content). A task changed after a wave is read again at the next wave of its intent. | Task state stays consistent across waves without anyone re-entering it. | must |
+| R4 | F | Amended (owner 2026-11-03, per-change-sdlc): the assistant starts each wave and receives its report, with no relay by the human. A wave runs one accepted intent. When it closes, `wave.after` decides: `next` starts the next accepted intent with unblocked tasks, `wait` (the default when unset) stops until the owner asks. | A single wave can run unattended, for example in the cloud while the owner is away, and the owner chooses whether waves chain. | must |
+| R5 | F | Every question a coder raises reaches the assistant and the wave report, and is closed only with an answer and who gave it. | No question is lost or settled by guessing. | must |
+| R6 | F | Manual and auto modes: in manual mode questions reach the owner through the assistant; in auto mode the assistant decides and records each decision with its reason in persistent memory. | The owner chooses how involved to be and can audit every decision taken without them. | must |
+| R7 | F | Amended (owner 2026-11-03, per-change-sdlc): directiva adjusts an intent's `plan.md` and its tasks between waves or mid-wave without re-planning (existing tasks keep their identity), and returns researched answers to development questions. There is no global plan. | The owner changes course without losing work or restarting planning. | must |
+| R8 | F | The coder uses the methodology declared in the methodology slot, linked as `gabo-methodology`; switching it is one config line, a rebuild of the affected agents and a passing `gabo check`. | The team keeps its own way of building software. | must |
+| R9 | F | Every PR is reviewed in two layers: an optional coder-side review per methodology, and a mandatory reviewer-side merge gate (tests, build, lint and an independent agent review) run by deterministic scripts installed at user level, in a clean environment, never merging into main. | Only validated code merges, and PR code cannot change the scripts that review it. | must |
+| R10 | F | After each coder report the tracker shows the task status, and every PR is linked to its task. | The tracker always reflects the real state of the work. | must |
+| R11 | F | Pluggable trackers: GitHub issues in the first release; another tracker is a provider skill plus a plugin or MCP, without changing the agents' skills. | The team keeps its tracker. | must (gh); should (others) |
+| R12 | F | Setup is guided: the assistant asks before configuring anything, suggests options and applies no silent default, including the stack, where each agent runs and which tracker is used. | Nothing is configured behind the user's back. | should |
+| R13 | F | When a wave closes, the worktrees and merged branches it created are removed, and what could not be removed is reported. | The machine stays clean without manual cleanup. | should |
+| R14 | F | When the human intervenes in a task, the assistant mediates by default and, if mediation drags on, offers a named Orca session in the task's worktree; afterwards it resumes from the traces without redoing work. | The owner can steer any task without losing its context. | must |
+| R15 | F | During an auto-mode run the human receives no prompts, only the final answer. | The owner can step away while the team works. | must |
+| R16 | F | Setup identifies the session owner by git user and addresses them by an alias stored in the developer catalog. | The assistant knows who it is talking to and addresses only the session owner. | must |
+| R17 | F | The assistant keeps per-user interaction preferences in two layers and asks about interaction comfort at each wave close. | The number and style of interactions fit the owner. | must |
+| R18 | F | Only the assistant's Orca terminal opens by default; more open on request. | A calm workspace with one conversation. | must |
+| R19 | F | Amended (owner 2026-11-03, per-change-sdlc): a critical question becomes a plan-change proposal and is never resolved silently. The config sets the widest scope that may change, one task in an intent's `plan.md`, one whole intent (its spec and plan) or several intents and the PRD/TRD conventions, and whether that widest scope may change without the owner. Each proposal has its own issue and PR touching only the product documents and tasks, and is debated with the owner or, when absent, with a clean-context plan-change reviewer. | Large changes never slip in unnoticed, and the owner's absence does not stop small ones. | must |
+| R20 | F | Amended (owner 2026-11-03, per-change-sdlc): directiva writes the PRD, the TRD, each intent's `intent.md`, `spec.md` and `plan.md`, the optional `DESIGN.md` and the MIGRATIONS log from its own templates, asking their fixed questions one at a time. A traceability check over intents, specs, plans and tracker tasks blocks the next planning step on a gap, and `gabo check` enforces the intent stage order. | Consistent documents, and gaps are caught before any coder starts. | must |
+| R21 | Q | Secrets and credentials never enter agent context or generated files; agents receive only references to where secrets live. | Safe to use with real credentials. | should |
+| R22 | Q | The reviewer runs isolated from the coder, with its own clone, home and cache. | The review cannot be influenced by the code it reviews. | should |
+| R23 | Q | In auto mode the system deletes only resources it or its subagents created in the workflow. | Nothing of the user's is deleted by the agents. | should |
+| R24 | Q | Every task write is verified by re-reading it; an unverified write is reported, never skipped silently. | Tracker updates can be trusted. | should |
+| R25 | Q | An interrupted wave resumes from tracker state and memory traces without redoing finished tasks. | Interruptions cost no work. | should |
+| R26 | Q | The reviewer reviews each pushed head at most once. | Review cost follows actual changes. | should |
+| R27 | Q | Amended (owner 2026-11-03, per-change-sdlc): the plan-change reviewer runs only when a plan change is proposed, at any of the three scopes (one task, one intent, or several intents and the PRD/TRD conventions). | Debate cost is paid only when a plan actually changes. | should |
+| R28 | Q | A new team reaches its first wave quickly after install; the time is measured (initial target: one working session). | Setup pays off fast. | should |
+| R29 | Q | Every wave produces a report: interactions and reasons, decisions, questions with resolver, cleanup leftovers. | The owner sees what happened without asking. | should |
+| R30 | Q | Every auto-mode decision is queryable with its reason, wave and task. | Full accountability for auto mode. | should |
+| R31 | C | The gabo CLI offers only `gabo init`, `gabo check`, `gabo version` and `gabo prompt`; agents do everything else with skills. | A small, universal tool with little to learn. | must |
+| R32 | F | `gabo init` sets up or refreshes the copied skill catalog and its version stamp, installs the user-level reviewer skill and prints the setup prompt; it never touches the config. | One safe command to start or upgrade a project. | must |
+| R33 | F | `gabo check` validates the project read-only and independent of the engine: config schemas, agents of the neutral spec, slot coverage, catalog stamp and agent version lines. Amended (owner 2026-11-03, per-change-sdlc): it also validates the intent folders, including that no plan exists before a human accepted its spec. | One check that agents, the reviewer and CI all trust. | must |
+| R34 | F | The user's agent builds the configuration and the agents from gabo-ai skills and fixed templates, without inventing content, then runs `gabo check`. | Any supported engine gets a working team without hand-written agent files. | must |
+| R35 | F | Where no runtime skill exists, the runtime builder writes one from verified sources and tests it. | A new engine needs no gabo-ai release. | must |
+| R36 | C | The setup prompt has a single source: the text embedded in the CLI, published unchanged in the documentation. | Both setup entries behave the same. | must |
+| R37 | F | Proposed (auto) (issue #107): gabo-ai recommends one memory backend shared by every agent of the project except the reviewer, on every machine and for every developer; a local-only memory stays acceptable. | Agents work from the same context. | should |
+| R38 | F | Proposed (auto) (issue #107): setup explains the shared-memory recommendation and helps the user choose a backend, applying nothing silently. | An informed memory choice. | should |
+| R39 | F | Proposed (auto) (issue #148): `gabo prompt` prints the embedded setup prompt and changes nothing. | The setup prompt can be reprinted at any time. | should |
 
-### 8.1 Operating rules (proposed)
+### 8.1 Operating rules
 
-These rules answer open questions 1–3. Each is **Approved (auto proposal, owner 2026-10-25)** and applies only once the owner approves it.
+Approved by the owner on 2026-10-25.
 
-1. **Mid-wave task change (R7, R3).** Approved (auto proposal, owner 2026-10-25): a change directiva makes to a task a coder is working on applies when the coder finishes its current round; the coder is not interrupted. Reason: interrupting mid-round wastes partial work and risks inconsistent commits.
-2. **Task state during a plan-change debate (R19).** Approved (auto proposal, owner 2026-10-25): only the affected task is BLOCKED while the proposal is debated or waits for the owner; the rest of the wave continues. Reason: goal 2 (work never stalls) applies to every task the proposal does not touch.
-3. **Reviewer-to-coder rounds (R9, R10).** Approved (auto proposal, owner 2026-10-25): at most 4 fix rounds per PR; after that the task is reported BLOCKED and the question escalates to the assistant. Reason: matches the current gabo-coder rule and bounds review cost.
+1. **Mid-wave task change (R7, R3).** A change directiva makes to a task a coder is working on applies when the coder finishes its current round; the coder is not interrupted.
+2. **Task state during a plan-change debate (R19).** Only the affected task is BLOCKED while the proposal is debated or waits for the owner; the rest of the wave continues.
+3. **Reviewer-to-coder rounds (R9, R10).** At most 4 fix rounds per PR; after that the task is reported BLOCKED and the question escalates to the assistant.
 
 ## 9. Quality requirements
 
-**Approved (auto proposal, owner 2026-10-25):** quality requirements are rows R21–R30 (type Q) in section 8: security (R21–R23), reliability (R24–R25), cost (R26–R27), time-to-value (R28) and observability (R29–R30). Each is derived only from principles already stated in this PRD and the TRD; numeric targets are initial and calibrated after the first waves. Performance targets are not set in the first release. Reason: completes the PRD without inventing new product scope.
+Quality requirements are rows R21–R30 (type Q) in section 8: security (R21–R23), reliability (R24–R25), cost (R26–R27), time-to-value (R28) and observability (R29–R30). Numeric targets are initial and calibrated after the first waves. Performance targets are not set in the first release.
 
 ## 10. Constraints
 
 ### 10.1 Configuration standard
 
-**Two files.**
-
-- **Global user file**: personal preferences (alias or name, interaction level, tone and speaking style, language); this is the stable personalization layer (see Personalization below).
-- **Project file `gabo.yaml`**: team and repository settings (tracker, reviewer placement and runtime, methodology slot, memory provider, notifications, direct sessions, developer catalog).
-
-**Precedence.** For project keys, the local file wins. For personal keys, the global file always wins.
-
-**Contracts and adapters.** Every configurable slot has a contract shipped by gabo-ai (what the agents must be able to do) and an adapter supplied by the user or written with the assistant: a Markdown skill or document explaining how to do it with the team's tool. Tool-specific behavior is never compiled code.
-
-**Setup flow.**
-
-1. **Ask**: the assistant asks how the slot is handled and with what, looking at what is already installed to suggest options.
-2. **Receive the adapter**: the user points to a skill or document, or writes one with the assistant.
-3. **Check coverage**: the assistant checks the adapter explains every operation of the contract and asks about gaps.
-4. **Build the agents**: the runtime skill builds the agents in the engine's format from fixed templates, with their tools and the adapter instructions embedded; then the agent runs `gabo check` and fixes what fails (updated owner 2026-10-27, R34; earlier: gabo-ai generated the runtime-native agent files).
-5. **Verify**: a subagent of the kind that will do the work runs a harmless operation (for example, read one task).
-
-Switching tool means changing the adapter and rebuilding the agents: edit the YAML (by hand or through the config-writer skill), ask the agent to rebuild the affected agents, then run `gabo check` (updated owner 2026-10-27; `gbai config set` and `gbai generate` are removed). Custom adapters live in the repository.
-
-**Setup entry.** Approved (owner 2026-10-27, updated issue #74), R32, R34: the user installs the gabo CLI and runs `gabo init` in the project. It copies the skill catalog, writes the version stamp, installs the user-level `gabo-reviewer` skill and prints the embedded setup prompt. The user opens their agent (Claude Code, Pi or another engine) in the project and asks it to configure gabo-ai; the agent follows that setup prompt and the setup, config-writer and runtime skills, then runs `gabo check`. Superseded (issue #74): `init` writing a neutral entry file for the agent to follow. There is still no setup terminal UI.
-
-**Second setup entry.** Approved (owner 2026-10-27), R36, answers open question 10: a user can instead paste the published setup prompt into their agent; the agent installs the gabo CLI, runs `gabo init` and continues with the same setup. The published prompt is the same literal text embedded in the CLI, so there is a single text to maintain.
-
-**Superseded (owner 2026-10-27), setup entry of 2026-10-26.** Approved (owner 2026-10-26): there is no setup terminal UI. The user copies a setup prompt (with a link) from the gbai documentation and pastes it into Claude Code or Pi; that agent installs gbai, runs the setup question burst above, writes the config files and runs `gbai generate`. `gbai generate` installs the per-runtime artifacts for each runtime in `generation.targets` (skills, agents, and the runtime's way of adding tools, such as MCP servers, plugins or packages) from one table of what goes where (TRD D21).
-
-**Config writes.** Approved (owner 2026-10-26), updated (owner 2026-10-27): during setup and during the work, agents write preferences and config by editing the YAML files directly (during setup through the config-writer skill); JSON Schema validation runs at the next `gabo check`. Superseded (owner 2026-10-27): `gbai config set` as an owner convenience; the command is removed.
-
-**Go CLI scope.** Approved (owner 2026-10-27), R31–R33: the Go CLI only copies the skill catalog and installs the user-level `gabo-reviewer` skill (`gabo init`), validates read-only (`gabo check`) and prints its version. Proposed (auto) (issue #148, R39): it also prints the embedded setup prompt on demand (`gabo prompt`), read-only. Agents build the configuration and the agents from skills (R34); everything during the work is done by agents with their own tools guided by skills and adapters. The planning templates and the traceability check (R20) live in the directiva skills (TRD D19); the reviewer runs on the scripts of the user-level `gabo-reviewer` skill (R9, TRD D20).
-
-**Superseded (owner 2026-10-27), Go CLI scope of 2026-10-26.** Approved (owner 2026-10-26): the gbai Go CLI is used only for this initial configuration: it validates the config, compiles the agents and installs the skills (including the user-level `gbai-reviewer` skill with its scripts), the adapters and the other per-runtime artifacts. Everything during the work is done by agents with their own tools guided by skills and adapters (TRD D18). The planning templates and the traceability check (R20) live in the directiva skills (TRD D19); the reviewer runs on the scripts of the user-level `gbai-reviewer` skill (R9, TRD D20).
-
-**Context cost.** Agents receive their adapters through the agent files the runtime skill builds; skills not in use cost only their one-line description. Personal preferences are a few lines read at session start.
-
-**Documentation.** Each provider's skill is its documentation. Approved (owner 2026-10-26): there is no read-only `gbai config` command; the assistant reads the effective configuration from the files, and `gabo check` reports schema and agent errors (section 13, question 7; updated owner 2026-10-27, earlier `gbai generate`).
-
-**Personalization.** Approved (owner 2026-10-26), R16, R17:
-
-- **Stable layer.** The global user file holds alias or name, `language`, `tone` and `interaction_level`; every gabo-ai agent reads it.
-- **Learning layer.** Observations about the user (for example "prefers short answers") are saved in the memory slot (Engram or claude-mem, per adapter) under a fixed topic, `user/preferences`; the assistant reads them at session start.
-- **Promotion.** An observation repeated about 3 times is proposed for the stable layer: in manual mode the assistant asks the owner; in auto mode it applies the change to the global file and records the decision in memory (R6, R30).
-- **Comfort question.** At wave close the answer adjusts `interaction_level` and `tone` (R17).
-- **Scope.** Personal preferences go in the global memory scope; project preferences in the project scope.
-- **Never stored.** Secrets, credentials or sensitive personal data (R21).
-
-**Configurable slots.** Identity, mode (manual or auto), methodology slot, runtime per agent, tracker, repository host (GitHub or GitLab), reviewer placement, reviewer runtime (claude, pi), reviewer signing or marker, coder-side review, persistent memory (for example Engram), notification channel, direct-session manager (Orca), integration branch, parallelism, kept worktrees.
-
-**Recommended options, not defaults.** Approved (owner 2026-10-26): for the methodology slot setup recommends gentle-ai ODD with RDD as the coder-side review, and for the memory slot Engram. A recommendation is offered first, with its reason, and is installed and configured only if the user accepts; otherwise the user's own adapter is used. No slot gets a silent default (R12). With RDD, validation keeps two layers: RDD on the coder side and the isolated gabo reviewer as the PR-side merge gate (R9).
-
-**Shared project memory.** Proposed (auto) (issue #107), R37, R38: gabo-ai recommends, but does not require, that the memory slot of every project point to one backend shared by all agents of the project except the reviewer, on every machine and for every developer. Setup explains this, recommends Engram with Engram Cloud sync, lists the alternatives for Claude-Code-only users, and accepts a local-only memory. Credentials and access are the user's own backend setup, outside gabo; see the Engram Cloud backend setup note in the plan change section at the top of this document.
+- **Two files.** The global user file holds personal preferences (alias, interaction level, tone, language): the stable personalization layer. The project file `gabo.yaml` holds team and repository settings. Field-level shapes are in [TRD 9.3](TRD.md#93-configuration-shapes).
+- **Precedence.** For project keys the local file wins; for personal keys the global file always wins.
+- **Contracts and adapters.** Every configurable slot has a contract shipped by gabo-ai and an adapter supplied by the user or written with the assistant: a Markdown skill or document. Tool-specific behavior is never compiled code.
+- **Setup flow.** Ask how each slot is handled → receive the adapter → check it covers the contract → build the agents through the runtime skill → run `gabo check` → verify with a harmless operation by a subagent of the working kind.
+- **Setup entries.** (a) Run `gabo init` in the project, then ask the agent to configure gabo-ai; (b) paste the published setup prompt into the agent, which installs the CLI and continues. Both use the same prompt text (R36). There is no setup terminal UI.
+- **Config writes.** Agents edit the YAML files directly (during setup through the config-writer skill); validation runs at the next `gabo check`.
+- **Go CLI scope.** The CLI copies the skill catalog, installs the user-level reviewer skill, validates read-only, prints its version and prints the setup prompt (R31–R33, R39). Everything during the work is done by agents with their own tools, guided by skills and adapters.
+- **Personalization (R16, R17).** Stable layer: the global user file, read by every agent. Learning layer: observations in the memory slot under `user/preferences`, read by the assistant at session start; an observation repeated about 3 times is proposed for the stable layer. The comfort answer at wave close adjusts `interaction_level` and `tone`. Secrets and sensitive personal data are never stored.
+- **Configurable slots.** Identity, mode (manual or auto), methodology, runtime per agent, tracker, repository host, reviewer placement, reviewer runtime, reviewer signing or marker, coder-side review, persistent memory, notification channel, direct-session manager (Orca), integration branch, parallelism, kept worktrees, wave chaining (`wave.after`).
+- **Recommended options, not defaults.** Setup recommends gentle-ai ODD with RDD for the methodology slot and Engram for the memory slot; a recommendation is offered first with its reason and installed only if the user accepts. No slot gets a silent default (R12).
+- **Stack chosen by the user.** The user chooses the technologies of their project and the assistant helps configure them; the TRD records the choice and never imposes one.
+- **Shared project memory (R37, R38).** Recommended, not required: one backend for every agent except the reviewer. Credentials and access are the user's own backend setup.
 
 ### 10.2 Auto-mode limits
 
 In auto mode the assistant:
 
 - **May merge** only into the integration branch it was assigned, **never into main**.
-- **May delete** only resources it or its subagents created in this workflow (for example test or development containers, a test database), never anything else.
-- **Changes the plan only within the configured scope** (R19). The global plan changes only when the owner's boolean allows it, and only after the plan-change reviewer agreed; otherwise the proposal waits for the owner. Plan changes always go in their own issue and PR, never in a code PR.
+- **May delete** only resources it or its subagents created in this workflow, never anything else.
+- **Changes the plan only within the configured scope** (R19). Amended (owner 2026-11-03, per-change-sdlc): a change to several intents or to the PRD/TRD conventions applies without the owner only when `plan_change.global_without_owner` allows it, and only after the plan-change reviewer agreed; otherwise the proposal waits for the owner. Plan changes always go in their own issue and PR, never in a code PR.
+- **Never accepts a spec.** A human accepts each intent's spec before its plan is written, and a human makes the production decision.
 
 ## 11. Success metrics
 
 | metric | how it is measured |
 |---|---|
-| Interactions per wave and their reasons | Counted in each wave report. This is an input to learn the owner's comfort, not a reduction target; the verdict is qualitative: the owner feels comfortable. |
+| Interactions per wave and their reasons | Counted in each wave report. An input to learn the owner's comfort, not a reduction target. |
 | Share of waves closed by the assistant without the human launching or relaying anything | Waves closed without human launch or relay steps, divided by total waves. |
 | Questions recorded and resolved, and by whom | Count of questions raised, resolved, and resolver (directiva, assistant, owner). |
-| Plan adjustments per wave without redoing the global plan | Count of task adjustments per wave; any global re-plan is reported separately. |
+| Plan adjustments per wave without re-planning an intent | Count of task adjustments per wave; any intent whose plan was rewritten is reported separately. Amended (owner 2026-11-03, per-change-sdlc). |
 | Time from install to the first wave running with the team's tracker and methodology | Elapsed time from install to the start of the first wave. |
 
-**Targets.** The first release measures without targets. After 3 to 5 real waves the baseline is known and the owner sets targets; from then on each wave report compares against them.
+**Targets.** The first release measures without targets. After 3 to 5 real waves the baseline is known and the owner sets targets.
 
 ## 12. Later
 
@@ -345,51 +235,42 @@ Out of the first release.
 - Additional reviewer runtimes.
 - Direct sessions with other terminal managers (for example herdr).
 - Target values for the success metrics.
-- Shipped memory adapters for claude-mem and Mem0 (pending open question 13); until then they are user-supplied adapters.
+- Shipped memory adapters for claude-mem and Mem0 (open question 13); until then they are user-supplied adapters.
 
 ## 13. Open questions
 
+Questions 1–12 are answered; their answers are in [PRD 0.10](archive/PRD-0.10.md#13-open-questions).
+
 | # | question | status |
 |---|---|---|
-| 1 | When directiva adjusts a task mid-wave, how does the change reach a coder already working on that task: is the coder interrupted, or does the change apply only after it reports? | answered — approved by owner 2026-10-25 (8.1 Operating rules, rule 1) |
-| 2 | While a plan-change proposal (R19) is being debated or waits for the owner, does the affected task stay BLOCKED while the rest of the wave continues? | answered — approved by owner 2026-10-25 (8.1 Operating rules, rule 2) |
-| 3 | How many reviewer-to-coder rounds are allowed on a PR before the task is reported BLOCKED and the question escalates to the assistant? | answered — approved by owner 2026-10-25 (8.1 Operating rules, rule 3) |
-| 4 | What documented evidence supports the problem (sources, observations, data)? | answered — approved by owner 2026-10-25 (2. Problem, Evidence) |
-| 5 | What is the appetite (time and effort budget) for the first release? | answered — approved by owner 2026-10-25 (5. Appetite) |
-| 6 | What are the quality requirements (performance, security, reliability, cost) for the first release? | answered — approved by owner 2026-10-25 (R21–R30, 9. Quality requirements) |
-| 7 | Does the read-only `gbai config [--json]` command stay in the agent compiler (TRD D18), or is the effective configuration read by the assistant from the files? | answered — Approved (owner 2026-10-26): removed; the assistant reads the files and `gbai generate` reports errors (10.1 Documentation) |
-| 8 | Where does the compiler install the reviewer scripts in the repository? Proposed: `.gabo/reviewer/` (TRD D20, DB_SCHEMA). | answered — Approved (owner 2026-10-26): not in the repository; the scripts live in the `scripts/` folder of the `gabo-reviewer` skill, installed at user level so PR code cannot modify them (R9, TRD D20) |
-| 9 | Does the terminal UI (TUI) for the initial configuration stay in scope, or is setup done only with the assistant plus `gbai config set` and `gbai generate` (UX_UI section 5, milestone M4)? | answered — Approved (owner 2026-10-26): the TUI is removed; setup starts from a prompt pasted into Claude Code or Pi (10.1 Setup entry, TRD D21) |
-| 10 | Does the published setup prompt stay as an alternative entry (the pasted prompt has the agent install gabo-ai and run `gabo init`), or is the only entry `gabo init` followed by asking the agent to configure gabo-ai (owner decision 2026-10-27)? | answered — Approved (owner 2026-10-27): both entries stay; the published prompt is the same literal text embedded in the CLI (O8, R36, 10.1 Setup entry) |
-| 11 | When gabo-ai is upgraded in a project that already has a config, how does the user refresh the copied skill catalog, given that `gabo init` never overwrites an existing config and points to `gabo check`? | answered — Approved (owner 2026-10-27, issue #74): `gabo init` refreshes the catalog when its version stamp is older than the CLI version (a newer stamp self-updates the CLI, O12), then the agent rebuilds the agents; `gabo check` fails until the stamp matches (R32, R33) |
-| 12 | Pending owner decision (2026-10-27), not applied: the CLI will be renamed "gabo" ("GABO CLI"). Does the rename cover only the binary, or also the skill prefixes (`gabo-*`) and the config file name (`gabo.yaml`)? Nothing is renamed until the scope is confirmed. | answered — Approved (owner 2026-10-27): product gabo-ai, CLI alias `gabo`; skills `gabo-*`, `gabo.yaml` and a `gabo` global directory, confirmed by the owner 2026-10-27; the rename is a separate task (O9) |
-| 13 | Does gabo-ai ship memory adapters for claude-mem and Mem0 in the first release, or only list them in setup as user-supplied adapters, with Engram the only shipped memory adapter? Proposed (auto): list only; shipped adapters move to section 12 Later. Reason: both need a paid tier to share memory across developers, and Engram already covers R37. | open (issue #107) |
+| 13 | Does gabo-ai ship memory adapters for claude-mem and Mem0 in the first release, or only list them in setup as user-supplied adapters, with Engram the only shipped memory adapter? Proposed (auto): list only. | open (issue #107) |
 
 ## 14. Glossary
 
 | term | meaning |
 |---|---|
-| Owner | The session owner, identified by git user and alias; makes product decisions and validates. |
+| Owner | The session owner, identified by git user and alias; makes product decisions, accepts specs and validates. |
 | Assistant | The default point of contact for the whole flow; starts waves, receives reports, routes questions. Not part of directiva. |
-| Directiva | The direction agents: pm, dev-lead, db-master and frontend. They write `docs/product`, create and adjust tasks, research answers. |
-| gabo-cycle | The agent that runs one wave: reads tasks, launches coders, updates the tracker, reports to the assistant. |
-| Coder | A native subagent of the cycle that implements one wave task and opens its PR. |
-| Reviewer | An independent, isolated reviewer: deterministic scripts bundled in the user-level `gabo-reviewer` skill validate each PR and comment the verdict; a reviewer agent built by the runtime skill invokes them and relays the verdict. |
-| Plan-change reviewer | A fresh clean-context session that indexes the repository and must agree with a plan change or propose a different improvement. |
-| Wave | The set of tasks whose dependencies are done. |
-| Work route map | The global plan: every task with its blocked-by / unblocks dependencies. |
-| Critical question | A question whose answer would drastically change the global plan; it becomes a plan-change proposal. |
+| Directiva | The direction agents: pm, dev-lead, db-master and frontend. They write the product documents, create and adjust tasks, research answers. |
+| gabo-cycle | The agent that runs one wave: reads the intent's tasks, launches coders, updates the tracker, reports to the assistant. |
+| Coder | A native subagent of the cycle that implements one task and opens its PR. |
+| Reviewer | An independent, isolated reviewer: deterministic scripts in the user-level `gabo-reviewer` skill validate each PR and comment the verdict; a reviewer agent invokes them and relays the verdict. |
+| Plan-change reviewer | A fresh clean-context session that must agree with a plan change or propose a different improvement. |
+| Intent | One change, in `docs/product/intents/<NNNN-slug>/`: its problem (`intent.md`), its spec, its plan and its review findings. |
+| Spec | The requirements, acceptance criteria, UX and flow and data changes of one intent; a human accepts it. |
+| Plan | The ordered steps and the tasks of one intent, written after its spec is accepted. |
+| Wave | The run of one accepted intent's unblocked tasks. Amended (owner 2026-11-03, per-change-sdlc); earlier: the set of all tasks whose dependencies are done. |
+| `wave.after` | What the assistant does when a wave closes: `next` starts the next accepted intent, `wait` (default) stops. |
+| Critical question | A question whose answer would change an intent's spec or plan, several intents, or the PRD/TRD conventions; it becomes a plan-change proposal. |
 | Manual / auto mode | Manual: questions reach the owner through the assistant. Auto: the assistant decides and records each decision with its reason. |
 | Slot | A configurable part of the system (for example tracker, memory, reviewer placement). |
-| Shared project memory | The recommended single memory backend and project name used by every agent of a project except the reviewer, on every machine and for every developer (R37). |
 | Contract | What the agents must be able to do for a slot; shipped by gabo-ai. |
-| Adapter | A Markdown skill or document in the repository explaining how to fulfil a contract with the team's tool. |
-| Agent builder | **Superseded (owner 2026-10-27)** by the runtime skill and `gabo init` / `gabo check`. Former meaning: the generic gbai code (the agent compiler, the only Go part) that validates the configuration, generates runtime-native agent files and installs the per-runtime artifacts (skills, including the reviewer skill and its scripts, adapters, and tool registrations) from one table of what goes where. |
-| Setup prompt | A prompt with a link, published in the gabo-ai documentation, that the user pastes into Claude Code or Pi to have that agent install and configure gabo-ai. Since 2026-10-27 its text is the same literal text embedded in the CLI (one source); pasting it is the second setup entry (R36). Proposed (auto) (issue #148): `gabo prompt` prints it at any time (R39). |
-| Entry file | **Superseded (owner 2026-10-27, issue #74)**: no longer written; `gabo init` prints the embedded setup prompt and writes a version stamp instead. Former meaning: a short, engine-neutral file written by `gbai init` that tells any agent which skills to load, which agents to create, which config files to write and how to verify (R32). |
-| Neutral agent spec | The engine-independent list of gabo-ai agents: for each, its role, the skills it loads, the tools it needs and who launches whom (R34). |
-| Runtime skill | A shipped skill that builds the agents of the neutral agent spec in one engine's format from fixed templates; Claude Code and Pi in the first release (R34). |
-| Runtime builder | A skill that researches an engine without a runtime skill from verified sources, tests a probe agent and writes a new runtime skill for reuse (R35). |
-| Stable layer / learning layer | The two personalization layers: preferences in the global user file, read by every agent; observations in the memory slot under `user/preferences`, read by the assistant at session start. |
-| Direct session | An extra Orca terminal in a task's worktree, opened only on the user's request. |
+| Adapter | A Markdown skill or document explaining how to fulfil a contract with the team's tool. |
+| Neutral agent spec | The engine-independent list of gabo-ai agents: role, skills, tools and who launches whom (R34). |
+| Runtime skill | A shipped skill that builds the agents of the neutral agent spec in one engine's format (R34). |
+| Runtime builder | A skill that writes a runtime skill for an engine without one, from verified sources (R35). |
+| Setup prompt | The text embedded in the CLI and published in the documentation that starts setup in the user's agent (R36, R39). |
+| Shared project memory | The recommended single memory backend used by every agent of a project except the reviewer (R37). |
+| Stable layer / learning layer | Preferences in the global user file / observations in the memory slot under `user/preferences`. |
+| Direct session | An extra Orca terminal in a task's worktree, opened only on the owner's request. |
 | Integration branch | The branch the assistant may merge into in auto mode; never main. |

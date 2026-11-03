@@ -25,4 +25,4 @@ As a solo developer, I want the assistant as my default point of contact while s
 
 ## Notes
 
-- App flow journey: [J9 in APP_FLOW](../APP_FLOW.md).
+- App flow journey: [J9 in APP_FLOW](../APP_FLOW-0.7.md).
