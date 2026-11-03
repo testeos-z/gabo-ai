@@ -191,3 +191,59 @@ func TestPreWriteResolvesSymlinks(t *testing.T) {
 		})
 	}
 }
+
+// A plan.md that is a symlink to another intent's plan is judged as written
+// and at its target: the write is blocked when either spec is not accepted.
+func TestPreWriteJudgesALinkedPlanAtBothEnds(t *testing.T) {
+	t.Parallel()
+	proj := intentWith(acceptedMD)
+	other := "docs/product/intents/0010-y/plan.md"
+	exists := []string{"/proj", "/proj/docs", "/proj/docs/product", "/proj/docs/product/intents", "/proj/docs/product/intents/0009-x", "/proj/docs/product/intents/0010-y", "/proj/" + other}
+	s := Settings{Root: preRoot, Resolve: fakeResolve(map[string]string{"/proj/" + prePlan: "/proj/" + other}, exists...)}
+	rep, err := NewUseCase(proj, nil, nil, s).PreWrite([]string{prePlan})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"✗ " + other + ": no spec.md; a plan starts only after a human accepts the spec"}
+	if !slices.Equal(rep.Lines, want) || !rep.Failed {
+		t.Fatalf("lines = %q, want %q", rep.Lines, want)
+	}
+}
+
+// A path whose symlinks cannot be resolved for another reason than a
+// missing entry is blocked: the gate fails closed.
+func TestPreWriteUnresolvablePathFailsClosed(t *testing.T) {
+	t.Parallel()
+	denied := func(p string) (string, error) {
+		return "", &fs.PathError{Op: "lstat", Path: p, Err: fs.ErrPermission}
+	}
+	for _, root := range []string{preRoot, "/broken"} {
+		resolve := denied
+		if root == preRoot {
+			resolve = func(p string) (string, error) {
+				if p == preRoot {
+					return p, nil
+				}
+				return denied(p)
+			}
+		}
+		s := Settings{Root: root, Resolve: resolve}
+		rep, err := NewUseCase(intentWith(acceptedMD), nil, nil, s).PreWrite([]string{"notes.md"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(rep.Lines) != 1 || !rep.Failed || !strings.HasPrefix(rep.Lines[0], "✗ notes.md: its symlinks cannot be resolved (") || !strings.HasSuffix(rep.Lines[0], "); it counts as not accepted") {
+			t.Fatalf("root %s: lines = %q", root, rep.Lines)
+		}
+	}
+}
+
+// On a case-insensitive filesystem an absolute path may spell the root in
+// another case; it is still inside the root.
+func TestPreWriteRootComparedWithoutCase(t *testing.T) {
+	t.Parallel()
+	rep := preWrite(t, intentWith(unfilledMD), "/PROJ/"+prePlan)
+	if !slices.Equal(rep.Lines, []string{notAccepted}) {
+		t.Fatalf("lines = %q, want %q", rep.Lines, []string{notAccepted})
+	}
+}
