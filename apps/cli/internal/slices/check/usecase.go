@@ -3,7 +3,8 @@
 // agent spec in each runtime's declared agent directory, each agent's
 // version line, the skill and reviewer links a runtime skill declares
 // (metadata.skill_dir, metadata.reviewer_link), every slot adapter's
-// contract coverage and the catalog version stamp.
+// contract coverage, the catalog version stamp and the stage of each
+// intent folder under docs/product/intents/.
 //
 // The spec and the contracts come from the project's catalog copy (.gabo/skills/), never from
 // the binary, so a newer CLI checks an older project against its own version.
@@ -114,6 +115,9 @@ func (u *UseCase) Run() (Report, error) {
 		if err := u.checkSlots(&r, cfg); err != nil {
 			return Report{}, err
 		}
+	}
+	if err := u.checkIntents(&r); err != nil {
+		return Report{}, err
 	}
 	if !r.Failed {
 		r.Lines = append(r.Lines, PassedLine)
