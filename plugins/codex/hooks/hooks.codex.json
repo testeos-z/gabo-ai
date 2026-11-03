@@ -1,6 +1,17 @@
 {
-  "description": "gabo checks: after Codex applies a patch to a gabo file, gabo check runs and its failures come back as additional context.",
+  "description": "gabo checks: before Codex applies a patch to a gabo file, gabo check --pre-write denies a patch that breaks the stage gate; after it, gabo check runs and its failures come back as additional context.",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${PLUGIN_ROOT}/scripts/gabo-pre-write.sh\" codex"
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "apply_patch",
