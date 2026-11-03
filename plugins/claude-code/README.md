@@ -39,9 +39,9 @@ These questions from the [spec](../../docs/product/intents/0001-claude-code-plug
 
 ## Release checklist
 
-The plugin `version` equals the gabo CLI release version `x.y.z` and lives in `plugin.json` only; the marketplace entry has no `version`. There is no release pipeline yet, so these are manual steps of every CLI release `apps/cli/v<x.y.z>`:
+The plugin `version` equals the gabo CLI release version `x.y.z`. It lives in the two plugin manifests only, this plugin's and the [Codex plugin](../codex/README.md)'s, and both always carry the same version; the marketplace entries have no `version`. There is no release pipeline yet, so these are manual steps of every CLI release `apps/cli/v<x.y.z>`:
 
-1. In the release commit, set `version` in `plugins/claude-code/.claude-plugin/plugin.json` to `x.y.z`, the same version as the CLI tag `apps/cli/v<x.y.z>`.
+1. In the release commit, set `version` to `x.y.z`, the same version as the CLI tag `apps/cli/v<x.y.z>`, in both `plugins/claude-code/.claude-plugin/plugin.json` and `plugins/codex/.codex-plugin/plugin.json`.
 2. Run `claude plugin validate .` and `claude plugin validate plugins/claude-code`; both must pass.
-3. Run `go -C apps/cli test ./...`; it asserts the marketplace entry carries no `version`.
+3. Run `go -C apps/cli test ./...`; it asserts both manifests carry the same version, the marketplace entries carry no `version`, and the Codex plugin's skill and script copies equal their sources.
 4. After the release commit is on the release branch, run `claude plugin tag plugins/claude-code` (`--dry-run` first). It must succeed and create `gabo--v<x.y.z>`, matching `apps/cli/v<x.y.z>`; push it with `--push`.
