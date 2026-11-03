@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"maps"
 	"os"
 	"path/filepath"
@@ -226,4 +227,93 @@ func TestFoldsCase(t *testing.T) {
 	if got, want := swapLastLetterCase("/a/Proj1"), "/a/ProJ1"; got != want {
 		t.Fatalf("swapLastLetterCase = %q, want %q", got, want)
 	}
+}
+
+// With --pre-write and no path the hook's tool-call JSON comes on stdin.
+// A Claude Code PreToolUse JSON whose tool_input.file_path is the plan.md
+// gives the path-argument result; a Codex apply_patch gives one result per
+// target in tool_input.command; malformed or empty stdin exits 2 with one
+// usage line.
+func TestCheckPreWriteFromStdin(t *testing.T) {
+	notAccepted := "✗ " + prePlan + ": spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan\n"
+	noSpecY := "✗ docs/product/intents/0010-y/plan.md: no spec.md; a plan starts only after a human accepts the spec\n"
+	claude := func(project string) string {
+		return hookJSON(t, map[string]any{"hook_event_name": "PreToolUse", "tool_name": "Write", "cwd": project,
+			"tool_input": map[string]any{"file_path": filepath.Join(project, filepath.FromSlash(prePlan)), "content": "# plan\n"}})
+	}
+	codex := func(string) string {
+		return hookJSON(t, map[string]any{"hook_event_name": "PreToolUse", "tool_name": "apply_patch", "tool_input": map[string]any{"command": "*** Begin Patch\n" +
+			"*** Add File: " + prePlan + "\n+# plan\n" +
+			"*** Update File: README.md\n@@\n-a\n+b\n" +
+			"*** Add File: docs/product/intents/0010-y/plan.md\n+# plan\n" +
+			"*** End Patch\n"}})
+	}
+	tests := []struct {
+		name   string
+		specMD string
+		stdin  func(project string) string
+		out    string
+		code   int
+	}{
+		{name: "Claude Code, unaccepted spec", specMD: unfilledMD, stdin: claude, out: notAccepted, code: 1},
+		{name: "Claude Code, filled Acceptance row", specMD: acceptedMD, stdin: claude},
+		{name: "Claude Code, no spec.md", stdin: claude, out: "✗ " + prePlan + ": no spec.md; a plan starts only after a human accepts the spec\n", code: 1},
+		{name: "Codex apply_patch, unaccepted spec", specMD: unfilledMD, stdin: codex, out: notAccepted + noSpecY, code: 1},
+		{name: "Codex apply_patch, filled Acceptance row", specMD: acceptedMD, stdin: codex, out: noSpecY, code: 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			project := preWriteProject(t, tt.specMD)
+			stdinOut, stdinCode := runPreWriteStdinIn(t, project, tt.stdin(project))
+			if stdinCode != tt.code || stdinOut != tt.out {
+				t.Fatalf("exit %d, output %q; want exit %d, output %q", stdinCode, stdinOut, tt.code, tt.out)
+			}
+		})
+	}
+	// The Claude Code case equals the path-argument case.
+	project := preWriteProject(t, unfilledMD)
+	argOut, argCode := runPreWriteIn(t, project, prePlan)
+	stdinOut, stdinCode := runPreWriteStdinIn(t, project, claude(project))
+	if argOut != stdinOut || argCode != stdinCode {
+		t.Fatalf("stdin: exit %d, output %q; path argument: exit %d, output %q", stdinCode, stdinOut, argCode, argOut)
+	}
+}
+
+func TestCheckPreWriteBadStdinExitsTwo(t *testing.T) {
+	project := preWriteProject(t, unfilledMD)
+	for _, stdin := range []string{"", "{\"tool_input\":", "not json"} {
+		_, err := runCheckStdin(t, project, "1.2.3", stdin, "--pre-write")
+		var msg bytes.Buffer
+		if code := exitCode(&msg, err); code != 2 {
+			t.Fatalf("%q: exit %d (%v), want 2", stdin, code, err)
+		}
+		if line := msg.String(); !strings.HasPrefix(line, "gabo: usage: gabo check --pre-write <path>...") || strings.Count(line, "\n") != 1 {
+			t.Fatalf("%q: stderr %q, want one usage line", stdin, line)
+		}
+	}
+}
+
+// runPreWriteStdinIn runs `gabo check --pre-write` with stdin in project,
+// like runPreWriteIn.
+func runPreWriteStdinIn(t *testing.T, project, stdin string) (string, int) {
+	t.Helper()
+	before, beforeTimes := snapshot(t, project), modes(t, project)
+	out, err := runCheckStdin(t, project, "1.2.3", stdin, "--pre-write")
+	if !maps.Equal(before, snapshot(t, project)) || !maps.Equal(beforeTimes, modes(t, project)) {
+		t.Fatal("check --pre-write changed the project tree or modification times")
+	}
+	msg := ""
+	if err != nil {
+		msg = err.Error()
+	}
+	return out + msg, exitOf(err)
+}
+
+func hookJSON(t *testing.T, v any) string {
+	t.Helper()
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
 }
