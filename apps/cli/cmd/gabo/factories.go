@@ -103,6 +103,7 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 			Former:      config.FormerNames(getenv, project),
 			Getenv:      getenv,
 			ReviewerDir: reviewerDir,
+			Root:        project,
 			CI:          getenv("CI") != "",
 		}), nil
 	}

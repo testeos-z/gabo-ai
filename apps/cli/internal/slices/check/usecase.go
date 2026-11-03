@@ -63,6 +63,9 @@ type Settings struct {
 	// ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer; empty when
 	// it cannot be known.
 	ReviewerDir string
+	// Root is the absolute project directory; the pre-write hook mode
+	// resolves absolute paths against it.
+	Root string
 	// CI (CI set) skips the user-level reviewer link: the reviewer scripts
 	// and CI run with their own HOME.
 	CI bool

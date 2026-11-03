@@ -62,3 +62,62 @@ func TestCommandHelpNamesTheIntentCheck(t *testing.T) {
 		t.Fatalf("help lacks %q:\n%s", line, out)
 	}
 }
+
+func runPreWrite(t *testing.T, proj fs.FS, args ...string) (string, error) {
+	t.Helper()
+	cmd := NewCommand(func(context.Context) (*UseCase, error) {
+		return NewUseCase(proj, failingReader{}, goodUser(), Settings{Root: preRoot}), nil
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs(append([]string{}, args...))
+	err := cmd.ExecuteContext(context.Background())
+	return out.String(), err
+}
+
+// The hook mode judges only the given paths: it never reads the config
+// (failingReader would fail the run) and prints only the blocked paths.
+func TestCommandPreWrite(t *testing.T) {
+	t.Parallel()
+	out, err := runPreWrite(t, intentWith(unfilledMD), "--pre-write", "README.md", prePlan)
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != ExitFailed || ee.Err != nil {
+		t.Fatalf("err = %v, want a silent exit %d", err, ExitFailed)
+	}
+	if out != notAccepted+"\n" {
+		t.Fatalf("stdout = %q, want %q", out, notAccepted+"\n")
+	}
+	out, err = runPreWrite(t, intentWith(acceptedMD), "--pre-write", prePlan, "README.md")
+	if err != nil || out != "" {
+		t.Fatalf("accepted: err = %v, stdout = %q, want nil and no output", err, out)
+	}
+}
+
+func TestCommandPreWriteUsageExitsTwo(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--pre-write", "--bogus", prePlan}} {
+		out, err := runPreWrite(t, intentWith(""), args...)
+		var ee *ExitError
+		if !errors.As(err, &ee) || ee.Code != ExitUsage {
+			t.Fatalf("%q: err = %v, want exit %d", args, err, ExitUsage)
+		}
+		if !strings.Contains(err.Error(), "usage: gabo check --pre-write <path>...") || out != "" {
+			t.Fatalf("%q: err = %v, stdout = %q", args, err, out)
+		}
+	}
+}
+
+func TestCommandHelpNamesThePreWriteFlag(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{"--pre-write", "gabo check --pre-write <path>..."} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}

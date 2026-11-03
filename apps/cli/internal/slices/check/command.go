@@ -39,11 +39,15 @@ func (e *ExitError) ExitCode() int { return e.Code }
 // Factory builds the run lazily, so help and usage errors never read the project.
 type Factory func(ctx context.Context) (*UseCase, error)
 
-// NewCommand builds the `check` driving adapter. It takes no arguments and no
-// flags.
+// preWriteFlag is the hook mode flag (intent 0001 S11).
+const preWriteFlag = "pre-write"
+
+// NewCommand builds the `check` driving adapter. Without --pre-write it takes
+// no arguments and no flags; with it, the paths of the pending writes.
 func NewCommand(factory Factory) *cobra.Command {
+	var preWrite bool
 	cmd := &cobra.Command{
-		Use:   "check",
+		Use:   "check [--pre-write <path>...]",
 		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
 		Long: "Validate the project read-only and engine-neutral (PRD R33):\n" +
 			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
@@ -67,16 +71,32 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    spec.md before any plan.md, and the plan's task ids and dependency graph.\n" +
 			"With GABO_UPGRADE_PR=1 only the config is validated.\n" +
 			"It writes nothing and never updates itself.\n" +
-			"Exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error.",
+			"Exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error.\n" +
+			"\n" +
+			"Hook mode, gabo check --pre-write <path>..., judges pending writes before\n" +
+			"they happen, for the engines' pre-write hooks. Each path is relative to the\n" +
+			"project root or absolute inside it. Writing " + IntentsDir + "/<NNNN-slug>/plan.md\n" +
+			"is blocked while that folder's spec.md is missing, unreadable or has no filled\n" +
+			"Acceptance row; any other path, or one outside the root, passes. It reads\n" +
+			"nothing else and writes nothing. Exit 0 with no output when every write\n" +
+			"passes, 1 with one \"✗ <path>: <reason>\" line per blocked path, 2 on a\n" +
+			"usage error.",
 		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) > 0 {
+			if len(args) > 0 && !preWrite {
 				return usage(fmt.Errorf("check takes no arguments, got %q", strings.Join(args, " ")))
 			}
 			return nil
 		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if preWrite {
+				return judgePreWrite(cmd, factory, args)
+			}
 			var set []string
-			cmd.Flags().Visit(func(f *pflag.Flag) { set = append(set, "--"+f.Name) })
+			cmd.Flags().Visit(func(f *pflag.Flag) {
+				if f.Name != preWriteFlag {
+					set = append(set, "--"+f.Name)
+				}
+			})
 			if len(set) > 0 {
 				return usage(fmt.Errorf("check takes no flags, got %s", strings.Join(set, " ")))
 			}
@@ -97,8 +117,38 @@ func NewCommand(factory Factory) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usage(err) })
+	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths with the intent stage gate (hook mode)")
+	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
+		if preWrite {
+			return preWriteUsage(err)
+		}
+		return usage(err)
+	})
 	return cmd
+}
+
+// judgePreWrite runs the hook mode: silent exit 0 when every write passes,
+// the blocked lines and exit 1 otherwise, exit 2 on a usage error.
+func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
+	uc, err := factory(cmd.Context())
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	rep, err := uc.PreWrite(paths)
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	if !rep.Failed {
+		return nil
+	}
+	if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.Join(rep.Lines, "\n")); err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	return &ExitError{Code: ExitFailed}
+}
+
+func preWriteUsage(err error) error {
+	return &ExitError{Code: ExitUsage, Err: errors.Join(err, ErrPreWriteUsage)}
 }
 
 func usage(err error) error {
