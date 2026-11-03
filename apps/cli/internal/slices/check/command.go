@@ -39,11 +39,15 @@ func (e *ExitError) ExitCode() int { return e.Code }
 // Factory builds the run lazily, so help and usage errors never read the project.
 type Factory func(ctx context.Context) (*UseCase, error)
 
-// NewCommand builds the `check` driving adapter. It takes no arguments and no
-// flags.
+// preWriteFlag is the hook mode flag (intent 0001 S11).
+const preWriteFlag = "pre-write"
+
+// NewCommand builds the `check` driving adapter. Without --pre-write it takes
+// no arguments and no flags; with it, the paths of the pending writes.
 func NewCommand(factory Factory) *cobra.Command {
+	var preWrite bool
 	cmd := &cobra.Command{
-		Use:   "check",
+		Use:   "check [--pre-write <path>...]",
 		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
 		Long: "Validate the project read-only and engine-neutral (PRD R33):\n" +
 			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
@@ -67,14 +71,38 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    spec.md before any plan.md, and the plan's task ids and dependency graph.\n" +
 			"With GABO_UPGRADE_PR=1 only the config is validated.\n" +
 			"It writes nothing and never updates itself.\n" +
-			"Exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error.",
-		Args: func(_ *cobra.Command, args []string) error {
+			"Exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error.\n" +
+			"\n" +
+			"Hook mode, gabo check --pre-write <path>..., judges pending writes before\n" +
+			"they happen, for the engines' pre-write hooks. Every argument after\n" +
+			"--pre-write is a path, relative to the working directory or absolute inside\n" +
+			"the project root (the git top level). Writing " + IntentsDir + "/<NNNN-slug>/plan.md\n" +
+			"is blocked while that folder's spec.md is missing, unreadable or has no filled\n" +
+			"Acceptance row; any other path, or one outside the root, passes. It reads\n" +
+			"nothing else and writes nothing. Exit 0 with no output when every write\n" +
+			"passes, 1 with one \"✗ <path>: <reason>\" line per blocked path (every path\n" +
+			"when the project cannot be read), 2 on a usage error.",
+		// The command parses its own flags, so a flag error knows the mode
+		// wherever --pre-write stands among the arguments.
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, raw []string) error {
+			flags, paths := splitPreWrite(raw)
+			if err := cmd.Flags().Parse(flags); err != nil {
+				if hasPreWrite(raw) {
+					return preWriteUsage(err)
+				}
+				return usage(err)
+			}
+			if help, _ := cmd.Flags().GetBool("help"); help {
+				return cmd.Help()
+			}
+			args := append(cmd.Flags().Args(), paths...)
+			if preWrite {
+				return judgePreWrite(cmd, factory, args)
+			}
 			if len(args) > 0 {
 				return usage(fmt.Errorf("check takes no arguments, got %q", strings.Join(args, " ")))
 			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, _ []string) error {
 			var set []string
 			cmd.Flags().Visit(func(f *pflag.Flag) { set = append(set, "--"+f.Name) })
 			if len(set) > 0 {
@@ -97,8 +125,86 @@ func NewCommand(factory Factory) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error { return usage(err) })
+	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths with the intent stage gate (hook mode)")
 	return cmd
+}
+
+// splitPreWrite splits raw after the first --pre-write in any form (bare or
+// --pre-write=<value>, before any "--"): every later argument is a path,
+// also one that starts with "-", so a path's name can never turn a hook's
+// call into a usage error. One "--" right after the flag is dropped.
+func splitPreWrite(raw []string) (flags, paths []string) {
+	for i, a := range raw {
+		if a == "--" {
+			break
+		}
+		if isPreWriteArg(a) {
+			paths = raw[i+1:]
+			if len(paths) > 0 && paths[0] == "--" {
+				paths = paths[1:]
+			}
+			return raw[:i+1], paths
+		}
+	}
+	return raw, nil
+}
+
+// isPreWriteArg reports whether a is the hook mode flag, bare or with a
+// value.
+func isPreWriteArg(a string) bool {
+	return a == "--"+preWriteFlag || strings.HasPrefix(a, "--"+preWriteFlag+"=")
+}
+
+// hasPreWrite reports whether raw sets the hook mode flag before a "--".
+func hasPreWrite(raw []string) bool {
+	for _, a := range raw {
+		if a == "--" {
+			return false
+		}
+		if isPreWriteArg(a) {
+			return true
+		}
+	}
+	return false
+}
+
+// judgePreWrite runs the hook mode: silent exit 0 when every write passes,
+// the blocked lines and exit 1 otherwise, exit 2 on a usage error. A project
+// that cannot be loaded (the factory fails, e.g. the working directory
+// cannot be read) blocks every path with exit 1: the hook fails closed.
+func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
+	if err := checkPreWritePaths(paths); err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	uc, err := factory(cmd.Context())
+	if err != nil {
+		var r Report
+		for _, p := range paths {
+			r.fail("✗ " + p + ": the project cannot be read (" + err.Error() + "); it counts as not accepted")
+		}
+		return printBlocked(cmd, r)
+	}
+	rep, err := uc.PreWrite(paths)
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	if !rep.Failed {
+		return nil
+	}
+	return printBlocked(cmd, rep)
+}
+
+// printBlocked prints the blocked lines and exits 1; an output error still
+// exits 1, so a hook never lets the writes through.
+func printBlocked(cmd *cobra.Command, rep Report) error {
+	if _, err := fmt.Fprintln(cmd.OutOrStdout(), strings.Join(rep.Lines, "\n")); err != nil {
+		return &ExitError{Code: ExitFailed, Err: err}
+	}
+	return &ExitError{Code: ExitFailed}
+}
+
+func preWriteUsage(err error) error {
+	return &ExitError{Code: ExitUsage, Err: errors.Join(err, ErrPreWriteUsage)}
 }
 
 func usage(err error) error {

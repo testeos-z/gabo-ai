@@ -103,14 +103,12 @@ func (u *UseCase) checkIntentFiles(f *intentFolder) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	spec, err := u.readOptional(path.Join(f.dir(), "spec.md"))
-	switch {
-	case errors.Is(err, fs.ErrNotExist):
-		fails = append(fails, "✗ "+f.plan()+": no spec.md; a plan starts only after a human accepts the spec")
-	case err != nil:
+	reason, err := u.specGate(f.dir())
+	if err != nil {
 		return nil, err
-	case !specAccepted(spec):
-		fails = append(fails, "✗ "+f.plan()+": spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan")
+	}
+	if reason != "" {
+		fails = append(fails, "✗ "+f.plan()+": "+reason)
 	}
 	rows, ok := parseTable(plan, "id", "title", "spec refs", "depends_on", "unblocks")
 	if !ok {
@@ -271,6 +269,23 @@ func refList(cell string) []string {
 		}
 	}
 	return out
+}
+
+// specGate is the intent stage gate (S7) for a plan.md in dir, shared by
+// the folder check and the pre-write hook mode: it returns why a plan is
+// blocked there, or "" when dir's spec.md is accepted. A read error other
+// than a missing spec.md is returned, with no reason.
+func (u *UseCase) specGate(dir string) (string, error) {
+	spec, err := u.readOptional(path.Join(dir, "spec.md"))
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return "no spec.md; a plan starts only after a human accepts the spec", nil
+	case err != nil:
+		return "", err
+	case !specAccepted(spec):
+		return "spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan", nil
+	}
+	return "", nil
 }
 
 // specAccepted reports whether the spec's Acceptance table has a row with

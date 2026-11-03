@@ -63,6 +63,22 @@ type Settings struct {
 	// ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer; empty when
 	// it cannot be known.
 	ReviewerDir string
+	// Root is the absolute project directory; the pre-write hook mode
+	// resolves absolute paths against it.
+	Root string
+	// Resolve returns a path with every symlink resolved
+	// (filepath.EvalSymlinks); nil compares paths as written.
+	Resolve func(string) (string, error)
+	// Readlink reports whether a path is a symlink and its target as
+	// stored (os.Lstat plus os.Readlink), so the pre-write hook mode can
+	// follow a dangling link; nil follows none.
+	Readlink func(string) (target string, isLink bool, err error)
+	// WorkDir is the absolute working directory; the pre-write hook mode
+	// takes relative paths from it. Empty means Root.
+	WorkDir string
+	// FoldCase reports a case-insensitive filesystem at Root: the pre-write
+	// hook mode then matches the root in an absolute path without case.
+	FoldCase bool
 	// CI (CI set) skips the user-level reviewer link: the reviewer scripts
 	// and CI run with their own HOME.
 	CI bool
