@@ -37,7 +37,7 @@ For details, see the diagrams [team-flow.html](docs/product/diagrams/team-flow.h
 
 - Go, at the version named in [`apps/cli/go.mod`](apps/cli/go.mod), to install the CLI.
 - git, and a git repository for your project.
-- A coding agent engine: Claude Code or Pi. Pi also needs a subagent package; [gentle-pi](https://www.npmjs.com/package/gentle-pi) is recommended. See [Your engine](docs/setup-prompt.md#your-engine).
+- A coding agent engine: Claude Code or Pi. Pi has no subagents, so gabo refuses to build on Pi without a subagent package; [gentle-pi](https://www.npmjs.com/package/gentle-pi) is recommended for subagents, and the full [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) (methodology, RDD and Engram memory) is the recommended setup. See [Your engine](docs/setup-prompt.md#your-engine).
 - Whatever tools your adapters use. For example, the GitHub adapters use the `gh` CLI.
 
 ## Install

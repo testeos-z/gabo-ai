@@ -28,6 +28,10 @@ Owner quotes are verbatim (Spanish), with an English gloss after each.
 - **S12. Methodology slot stays open.** "gabo no te obliga a usar openspac o SDD". `spec.md` is per change, and the methodology slot (ODD or another) still governs how a coder builds a task.
 - **S13. Gabo helps configure projects.** "que gabo ayude a configurar el proyecto apra esto". Setup or configuration guides a project into this model.
 - **S14. Spec acceptance and production gate stay human.** Playbook: "A human team mate always makes this call".
+- **S15. Pi refusal recommends Gentle AI.**
+  - Owner, verbatim (voice transcript): "Ok, recomendaremos \"Piellen\" como subagentes y me parece bien que se llega a trabajar si no tiene un paquete subagentes. Si no lo tienen, recomendaremos todo el marco de \"Genteel AI\"."
+  - Correction, verbatim: "no gavos sino tiene un paquete para su pagente se va a negar a trabajar en pie y en por lo menos le va a decir mira te recomiendo no tiene su agentes no puede trabajar si necesitas te recomiendo usar este"
+  - Meaning: there is NO fallback. Without a subagent package, gabo refuses to build on Pi; this is already the behavior. The refusal recommends gentle-pi for subagents and the full Gentle AI framework.
 - **Out of scope.** "los hook y del layout <slug>/. de ghiaog123 podemops evaluarlos". The ghiaog123 hooks are evaluated only, not implemented here.
 
 ## Tasks
@@ -42,6 +46,7 @@ Owner quotes are verbatim (Spanish), with an English gloss after each.
 | T6 (E) | S11 | One wave = one intent, plus an after-wave key (next or wait): both schemas, config Go, the example, gabo-cycle, gabo-assistant, skills_test wave part, e2e wave test, `gabo.yaml`. Depends on T4. Risk: item 3 (config format). Route: delegated writer (runs parallel with T2). | done; RED→GREEN in config and skills, e2e Wave passes, default wait | 1b36a39 |
 | T7 (F) | S7 | Deterministic intent-stage check in `gabo check`. `slices/check/{intents.go, usecase.go, command.go, tests}`. Depends on T2. Route: delegated writer (parallel). | done; RED→GREEN on 13 fixtures; differential identical against a control build | df6fcd2 |
 | T8 (G) | S6 S13 | Setup guides stack choice and the intent model. `SRC/gabo-setup/SKILL.md`, `setup_test.go`, both setup-prompt copies. Depends on T2 and T6. Route: delegated writer (parallel with T9); also updates the gabo-cycle agent role. | done; RED→GREEN on setup and prompt tests; full suite ok | 3fc1017 |
+| T10 | S15 | The Pi refusal message also recommends the full Gentle AI framework. No fallback. Route: delegated writer. Files: the gabo-runtime-pi skill, runtimepi_test, the README and the setup prompts. | done; RED→GREEN; full suite ok; gentle-pi 4.5.1 tools verified | see the T10 commit |
 | T9 (H) | S2 S3 S4 S10 S14 | Product docs: conceptual PRD (R3/R4/R7/R19/R27), conventions TRD (5.1, D7, D19), retire IMPLEMENTATION_PLAN, DB_SCHEMA and stories, README. May need two slices. Depends on T3, T5 and T6. Route: delegated writer (parallel with T8). Retired docs are archived under docs/product/archive (assumption). | done; 0 broken links; `gabo check` passes with an intents README and rejects a bad folder | 37a4047 |
 
 ## Log

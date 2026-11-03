@@ -26,7 +26,11 @@ Run in the repository root, read-only:
 1. `pi --version` must succeed; else refuse: `Pi is not installed: see https://github.com/earendil-works/pi`.
 2. `pi list` (lists user and project packages, writes nothing). A subagent package is present when it lists `npm:gentle-pi` or a `git:` source of gentle-pi, or `gentle-shell` is on `PATH` (`npm i -g gentle-pi` ships it with its own Pi).
 3. Another subagent package is acceptable (for example `pi-subagents-j0k3r`) only after you confirm from its docs that it discovers project agents in `<cwd>/.pi/agents/` and the tool names it registers; else treat it as absent.
-4. None present: refuse, build nothing, and say: `Pi needs a subagent package to run gabo agents. Recommended: gentle-pi, installed with npm i -g gentle-pi (adds the gentle-shell launcher) or pi install npm:gentle-pi (inside plain Pi); another subagent package is acceptable. Then ask me to rebuild.` The commands are `npm i -g gentle-pi` and `pi install npm:gentle-pi`.
+4. None present: refuse, build nothing, install nothing, and say:
+
+   > Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild.
+
+   There is no fallback: without a subagent package, gabo does not build on Pi.
 
 ## Inputs
 
@@ -102,14 +106,14 @@ All links are relative symbolic links, so the committed tree works in every clon
 
 ## Sources
 
-Checked 2026-10-28 against Pi 1.4.0 and gentle-pi 4.4.0 (installed packages and their docs):
+Checked 2026-11-03 against Pi 1.4.0 and gentle-pi 4.5.1 (installed packages and their docs; 4.5.1 still registers the seven `subagent_*` tools above and discovers `<cwd>/.pi/agents/`):
 
 | fact | source |
 |---|---|
 | project skills in `.pi/skills/` (also `.agents/skills/`), linked directories followed, same file skipped | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md; Pi 1.4.0 `dist/core/skills.js` |
-| `pi list`, `pi install <source> [-l]`; npm packages under `<agent-home>/npm/`; git packages cloned to `<agent-home>/git/<host>/<path>` (user) and `.pi/git/<host>/<path>` (project, after trust) | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md; Pi 1.4.0 `dist/core/package-manager.js` `getGitInstallPath`, `getGitInstallRoot`; gentle-pi 4.4.0 `docs/readme-reference.md` (Git-managed `agent-home/git/github.com/Gentleman-Programming/gentle-pi`) |
-| agents in `<cwd>/.pi/agents/`, `<cwd>/.pi/subagents/` and the home's `agents/`, `subagents/` (project beats global); frontmatter `name`, `description`, `tools`; `subagent_*` tools; `subagents.json` owned by the package | gentle-pi 4.4.0 `docs/gentle-shell.md` (Subagents), `lib/agents-config.ts` |
-| agent home `GENTLE_PI_AGENT_HOME`, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`; `gentle-shell` home `~/.gentle-shell/agent`, `--link` | gentle-pi 4.4.0 `docs/gentle-shell.md`, `docs/readme-reference.md`, `lib/agent-home.ts` |
+| `pi list`, `pi install <source> [-l]`; npm packages under `<agent-home>/npm/`; git packages cloned to `<agent-home>/git/<host>/<path>` (user) and `.pi/git/<host>/<path>` (project, after trust) | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md; Pi 1.4.0 `dist/core/package-manager.js` `getGitInstallPath`, `getGitInstallRoot`; gentle-pi 4.5.1 `docs/readme-reference.md` (Git-managed `agent-home/git/github.com/Gentleman-Programming/gentle-pi`) |
+| agents in `<cwd>/.pi/agents/`, `<cwd>/.pi/subagents/` and the home's `agents/`, `subagents/` (project beats global); frontmatter `name`, `description`, `tools`; `subagent_*` tools; `subagents.json` owned by the package | gentle-pi 4.5.1 `docs/gentle-shell.md` (Subagents), `lib/agents-config.ts` |
+| agent home `GENTLE_PI_AGENT_HOME`, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`; `gentle-shell` home `~/.gentle-shell/agent`, `--link` | gentle-pi 4.5.1 `docs/gentle-shell.md`, `docs/readme-reference.md`, `lib/agent-home.ts` |
 
 Recheck these against `pi --version` and the installed gentle-pi when either is newer, and update this table.
 
