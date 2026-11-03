@@ -17,6 +17,7 @@ Use whenever a gabo agent reads or writes tasks. This adapter fills the `tasks` 
 - PRs target `dev`, not the default branch, so closing keywords do not close issues. Close issues explicitly (see Change status).
 - Never post the reviewer marker (`gbai-reviewer-bot`) anywhere, even quoted.
 - Never close, relabel or reassign an issue you were not asked to work on.
+- Hierarchy: product card issue → intent sub-issue (`I####: <title>`, body links `docs/product/intents/<NNNN-slug>/`) → task sub-issues (`T###: <title>`). A task has exactly one parent intent; `blocked_by` edges may cross intents.
 
 ## Labels
 
@@ -42,7 +43,8 @@ Dependencies use the issue `id` (`gh api repos/$R/issues/<n> --jq .id`):
 
 - blocked by: `gh api -X POST repos/$R/issues/<n>/dependencies/blocked_by -F issue_id=<blocker id>`; remove: `gh api -X DELETE repos/$R/issues/<n>/dependencies/blocked_by/<blocker id>`.
 - unblocks: the inverse edge, add `<n>` as `blocked_by` on each task it unblocks; list: `gh api repos/$R/issues/<n>/dependencies/blocking`.
-- sub-issue (optional parent): `gh api -X POST repos/$R/issues/<parent>/sub_issues -F sub_issue_id=<child id>`; list: `gh api repos/$R/issues/<parent>/sub_issues`.
+- parent intent (optional input `parent`, intent issue `<i>`): `gh api -X POST repos/$R/issues/<i>/sub_issues -F sub_issue_id=<task id>`; add `-F replace_parent=true` to move a task that already has a parent; list: `gh api repos/$R/issues/<i>/sub_issues`.
+- new intent (once, when its folder is created): `gh issue create -R $R --title "I0001: <title>" --body "Intent folder: docs/product/intents/0001-<slug>/"`, then `gh api -X POST repos/$R/issues/<card>/sub_issues -F sub_issue_id=<intent id>` under the product card.
 
 Return the new issue number.
 
@@ -55,11 +57,19 @@ gh issue list -R $R --state open --limit 500 --json number,title,labels --jq 'so
 gh api repos/$R/issues/<n>/dependencies/blocked_by --jq '[.[]|select(.state=="open")]|length'
 ```
 
+Optional `intent` filter (intent issue `<i>`, one wave reads one intent): take the candidates from its sub-issues, then apply the same label and blocker checks; a blocker in another intent still counts:
+
+```bash
+gh api --paginate repos/$R/issues/<i>/sub_issues --jq '[.[]|select(.state=="open")|{number,title,labels:[.labels[].name]}]|sort_by(.title)'
+```
+
 ### read one
 
 ```bash
 gh issue view <n> -R $R --json number,title,state,labels,assignees,body,comments
 ```
+
+Parent intent (not in `gh issue view`; a 404 means no parent): `gh api repos/$R/issues/<n>/parent --jq '{number,title}'`.
 
 ### claim
 
@@ -85,7 +95,7 @@ The PR body carries `Refs #<n>`; then `gh issue comment <n> -R $R --body "PR #<p
 
 ### verify by re-read
 
-Repeat `read one` (or `gh api repos/$R/issues/<n>/dependencies/blocked_by` for dependencies) and compare the changed field. Retry a missing write once, then report it as `unverified`.
+Repeat `read one` (or `gh api repos/$R/issues/<n>/dependencies/blocked_by` for dependencies, `gh api repos/$R/issues/<n>/parent` for the parent intent) and compare the changed field. Retry a missing write once, then report it as `unverified`.
 
 Endpoints verified against docs.github.com REST "Sub-issues" and "Issue dependencies" on 2026-10-26.
 
