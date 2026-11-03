@@ -163,11 +163,38 @@ func TestCommandPreWriteArgumentsAfterTheFlagArePaths(t *testing.T) {
 		{"--pre-write", "-x/../" + prePlan},
 		{"--pre-write", "--help", prePlan},
 		{"--pre-write", "--", prePlan},
+		{"--pre-write=true", "-x/../" + prePlan},
+		{"--pre-write=1", "--help", prePlan},
+		{"--pre-write=true", "--", prePlan},
 	} {
 		out, err := runPreWrite(t, intentWith(unfilledMD), args...)
 		var ee *ExitError
 		if !errors.As(err, &ee) || ee.Code != ExitFailed || out != notAccepted+"\n" {
 			t.Fatalf("%q: err = %v, stdout = %q, want exit %d and %q", args, err, out, ExitFailed, notAccepted)
 		}
+	}
+}
+
+// A project that cannot be loaded (here the working directory cannot be
+// read) blocks the writes: the hook fails closed with exit 1 and a ✗ line,
+// never exit 2, which hooks let through.
+func TestCommandPreWriteFactoryErrorFailsClosed(t *testing.T) {
+	t.Parallel()
+	cmd := NewCommand(func(context.Context) (*UseCase, error) {
+		return nil, errors.New("getwd: no such file or directory")
+	})
+	cmd.SilenceUsage, cmd.SilenceErrors = true, true
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&bytes.Buffer{})
+	cmd.SetArgs([]string{"--pre-write", prePlan})
+	err := cmd.ExecuteContext(context.Background())
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != ExitFailed {
+		t.Fatalf("err = %v, want exit %d", err, ExitFailed)
+	}
+	want := "✗ " + prePlan + ": the project cannot be read (getwd: no such file or directory); it counts as not accepted\n"
+	if out.String() != want {
+		t.Fatalf("stdout = %q, want %q", out.String(), want)
 	}
 }

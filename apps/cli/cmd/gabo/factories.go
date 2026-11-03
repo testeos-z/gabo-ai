@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unicode"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel"
@@ -108,9 +109,43 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 			Resolve:     filepath.EvalSymlinks,
 			Readlink:    readlink,
 			WorkDir:     wd,
+			FoldCase:    foldsCase(project),
 			CI:          getenv("CI") != "",
 		}), nil
 	}
+}
+
+// foldsCase reports whether the filesystem at dir ignores case: dir with
+// its last letter's case swapped names the same directory. A dir without
+// letters cannot be spelled in another case and reports false.
+func foldsCase(dir string) bool {
+	swapped := swapLastLetterCase(dir)
+	if swapped == dir {
+		return false
+	}
+	a, err := os.Stat(dir)
+	if err != nil {
+		return false
+	}
+	b, err := os.Stat(swapped)
+	return err == nil && os.SameFile(a, b)
+}
+
+// swapLastLetterCase returns s with the case of its last cased letter
+// swapped.
+func swapLastLetterCase(s string) string {
+	r := []rune(s)
+	for i := len(r) - 1; i >= 0; i-- {
+		if up, low := unicode.ToUpper(r[i]), unicode.ToLower(r[i]); up != low {
+			if r[i] == up {
+				r[i] = low
+			} else {
+				r[i] = up
+			}
+			return string(r)
+		}
+	}
+	return s
 }
 
 // readlink reports whether p is a symlink and its target as stored.

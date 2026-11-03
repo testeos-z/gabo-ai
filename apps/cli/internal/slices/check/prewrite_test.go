@@ -242,7 +242,10 @@ func TestPreWriteUnresolvablePathFailsClosed(t *testing.T) {
 // another case; it is still inside the root.
 func TestPreWriteRootComparedWithoutCase(t *testing.T) {
 	t.Parallel()
-	rep := preWrite(t, intentWith(unfilledMD), "/PROJ/"+prePlan)
+	rep, err := NewUseCase(intentWith(unfilledMD), nil, nil, Settings{Root: preRoot, FoldCase: true}).PreWrite([]string{"/PROJ/" + prePlan})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !slices.Equal(rep.Lines, []string{notAccepted}) {
 		t.Fatalf("lines = %q, want %q", rep.Lines, []string{notAccepted})
 	}
@@ -347,5 +350,37 @@ func TestPreWriteRelativeToTheWorkingDirectory(t *testing.T) {
 				t.Fatalf("lines = %q, want %q", rep.Lines, tt.want)
 			}
 		})
+	}
+}
+
+// A ".." after a symlink climbs from the link's target, as the kernel
+// does, not from the link's own folder: lnk/../0009-x/plan.md with lnk
+// pointing at an intent folder writes that intent's plan.md.
+func TestPreWriteDotDotAfterASymlink(t *testing.T) {
+	t.Parallel()
+	links := map[string]string{"/proj/lnk": "/proj/docs/product/intents/0010-y"}
+	exists := []string{"/proj", "/proj/docs", "/proj/docs/product", "/proj/docs/product/intents", "/proj/docs/product/intents/0009-x", "/proj/docs/product/intents/0010-y", "/proj/" + preSpec}
+	for _, p := range []string{"lnk/../0009-x/plan.md", "/proj/lnk/../0009-x/plan.md", "./lnk/./../0009-x//plan.md"} {
+		s := Settings{Root: preRoot, WorkDir: preRoot, Resolve: fakeResolve(links, exists...), Readlink: fakeReadlink(links, exists...)}
+		rep, err := NewUseCase(intentWith(unfilledMD), nil, nil, s).PreWrite([]string{p})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !slices.Equal(rep.Lines, []string{notAccepted}) || !rep.Failed {
+			t.Fatalf("%s: lines = %q, want %q", p, rep.Lines, []string{notAccepted})
+		}
+	}
+}
+
+// On a case-sensitive filesystem /PROJ is another directory than /proj:
+// a path there is outside the root and passes.
+func TestPreWriteRootComparedWithCaseOnACaseSensitiveFilesystem(t *testing.T) {
+	t.Parallel()
+	rep, err := NewUseCase(intentWith(unfilledMD), nil, nil, Settings{Root: preRoot}).PreWrite([]string{"/PROJ/" + prePlan})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rep.Lines) != 0 || rep.Failed {
+		t.Fatalf("lines = %q, want none", rep.Lines)
 	}
 }

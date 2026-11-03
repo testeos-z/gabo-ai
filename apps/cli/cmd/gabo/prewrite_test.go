@@ -188,3 +188,42 @@ func TestCheckPreWriteRelativeToTheWorkingDirectory(t *testing.T) {
 		t.Fatalf("exit %d, output %q; want exit 1, output %q", exitOf(err), out.String(), want)
 	}
 }
+
+// A ".." after a real symlink climbs from the link's target: lnk points at
+// another intent folder, so lnk/../0009-x/plan.md writes intent 0009-x's
+// plan.md and is judged as that plan.
+func TestCheckPreWriteDotDotAfterASymlink(t *testing.T) {
+	project := preWriteProject(t, unfilledMD)
+	other := filepath.Join(project, filepath.FromSlash("docs/product/intents/0010-y"))
+	if err := os.MkdirAll(other, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(other, filepath.Join(project, "lnk")); err != nil {
+		t.Fatal(err)
+	}
+	want := "✗ " + prePlan + ": spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan\n"
+	out, code := runPreWriteIn(t, project, "lnk/../0009-x/plan.md")
+	if code != 1 || out != want {
+		t.Fatalf("exit %d, output %q; want exit 1, output %q", code, out, want)
+	}
+}
+
+// foldsCase tells a case-insensitive filesystem by the root spelled in
+// another case naming the same directory; the test machine's temporary
+// directory is case-sensitive, and a path without letters cannot be
+// spelled otherwise.
+func TestFoldsCase(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "proj")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if foldsCase(dir) {
+		t.Fatalf("foldsCase(%s) = true on a case-sensitive filesystem", dir)
+	}
+	if foldsCase(string(filepath.Separator)) {
+		t.Fatal("foldsCase(/) = true")
+	}
+	if got, want := swapLastLetterCase("/a/Proj1"), "/a/ProJ1"; got != want {
+		t.Fatalf("swapLastLetterCase = %q, want %q", got, want)
+	}
+}
