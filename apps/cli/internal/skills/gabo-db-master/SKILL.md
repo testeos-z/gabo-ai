@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use to choose and configure the database and write `docs/product/DB_SCHEMA.md`, the data and config schema, scaffolded from `templates/DB_SCHEMA.md`. It covers a product with a database and a config-only product whose persistence is files.
+Use to choose and configure the database and write `docs/product/MIGRATIONS.md`, the ordered log of migrations and data scripts, scaffolded from `templates/MIGRATIONS.md`, plus section 4 of each intent's `spec.md`. It covers a product with a database and a config-only product whose persistence is files.
 
 ## Hard Rules
 

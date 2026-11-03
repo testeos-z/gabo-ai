@@ -32,7 +32,7 @@ Scaffold for `docs/product/TRD.md`: arc42 sections, C4 views and MADR-style deci
 | owner | gabo-dev-lead |
 | version | 0.1 |
 | date | <YYYY-MM-DD> |
-| linked docs | [PRD](PRD.md), stories `docs/product/stories/`, [DB_SCHEMA](DB_SCHEMA.md), [UX_UI](UX_UI.md), [APP_FLOW](APP_FLOW.md) |
+| linked docs | [PRD](PRD.md), stories `docs/product/stories/`, [MIGRATIONS](MIGRATIONS.md), `DESIGN.md`, intents `docs/product/intents/` |
 
 ## 1. Introduction and quality goals
 
@@ -72,7 +72,7 @@ Scaffold for `docs/product/TRD.md`: arc42 sections, C4 views and MADR-style deci
 
 ## 8. Crosscutting concepts
 
-<Configuration, error handling, security, observability, data and persistence (details in DB_SCHEMA).>
+<Configuration, error handling, security, observability, data and persistence (details in MIGRATIONS and each intent's spec).>
 
 ## 9. Architecture decisions
 

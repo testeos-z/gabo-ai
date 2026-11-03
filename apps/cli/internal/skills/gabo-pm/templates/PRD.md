@@ -75,7 +75,7 @@ Scaffold for `docs/product/PRD.md` (ISO/IEC/IEEE 29148, D14). Answer every fixed
 
 ## 7. User stories
 
-Stories follow `templates/STORY.md` of the gabo-pm skill and live in `docs/product/stories/`.
+Stories live in `docs/product/stories/`. Each change to the product is an intent in `docs/product/intents/<NNNN-slug>/`, scaffolded from `templates/intent.md` of the gabo-pm skill.
 
 | id | title | user | requirement ids | status | file |
 |---|---|---|---|---|---|

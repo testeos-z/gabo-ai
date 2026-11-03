@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use to write `docs/product/UX_UI.md` (from `templates/UX_UI.md`), `docs/product/APP_FLOW.md` (from `templates/APP_FLOW.md`) and the repository `DESIGN.md`, and to plan Storybook components.
+Use to write the repository `DESIGN.md` (from `templates/DESIGN.md`, optional, global styles only), section `## 3. UX and app flow (optional)` of each intent's `spec.md`, and to plan Storybook components.
 
 ## Hard Rules
 
@@ -33,8 +33,8 @@ Any gap blocks the next planning step: fix it in your own documents or return it
 ## Execution Steps
 
 1. Read PRD requirements and personas.
-2. Answer the UX_UI fixed questions, then write UX_UI (principles, tokens, component inventory, accessibility, messages) and DESIGN.md (the token source of truth).
-3. Answer the APP_FLOW fixed questions, then write APP_FLOW as a surface list, the journeys and a flow diagram (Mermaid).
+2. Answer the DESIGN fixed questions, then write DESIGN.md (principles, tokens, component inventory, accessibility, messages; the token source of truth).
+3. Answer the spec's UX and app flow question, then write that spec section as a surface list, the journeys and a flow diagram (Mermaid).
 4. Run the traceability check before the next planning step.
 
 ## Output Contract

@@ -40,14 +40,46 @@ var templates = map[string]struct {
 			"## 14. Glossary",
 		},
 	},
-	"gabo-pm/templates/STORY.md": {
-		columns: []string{"| field | value |"},
+	// Per-change folder docs/product/intents/<NNNN-slug>/ (S7): the intent
+	// holds the problem only; the spec holds the design of one change, its
+	// optional UX/app flow (S5) and migration steps (S4), and a human acceptance
+	// record (S14).
+	"gabo-pm/templates/intent.md": {
+		columns: []string{
+			"| field | value |",
+			"| # | question | status |",
+			"| kind | reference |",
+		},
 		headings: []string{
-			"# US-0NN <Title>",
-			"## Story",
-			"## Acceptance criteria",
-			"## Out of scope",
-			"## Notes",
+			"# Intent <NNNN> <Title>",
+			"## Problem",
+			"## Who is affected",
+			"## Desired outcome",
+			"## Constraints",
+			"## Open questions",
+			"## Links",
+		},
+	},
+	"gabo-pm/templates/spec.md": {
+		columns: []string{
+			"| field | value |",
+			"| id | requirement | acceptance criteria | verification |",
+			"| id | decision | options considered | choice | consequences |",
+			"| surface | entry points | primary action | empty and error states |",
+			"| order | file | purpose | rollback |",
+			"| policy | conflict | resolution |",
+			"| # | question | status |",
+			"| accepted by | date | notes |",
+		},
+		headings: []string{
+			"# Spec <NNNN> <Title>",
+			"## 1. Requirements",
+			"## 2. Design",
+			"## 3. UX and app flow (optional)",
+			"## 4. DB migration steps (optional)",
+			"## 5. Policy conflicts",
+			"## 6. Open questions",
+			"## 7. Acceptance",
 		},
 	},
 	// T028: arc42 sections, the MADR decision table and the requirement coverage table.
@@ -80,61 +112,37 @@ var templates = map[string]struct {
 			"## 13. Open questions",
 		},
 	},
-	"gabo-dev-lead/templates/IMPLEMENTATION_PLAN.md": {
+	// The plan of one intent (S9): ordered steps and the task table, no
+	// milestones and no global waves; depends_on may cross intents (S8).
+	"gabo-dev-lead/templates/plan.md": {
 		columns: []string{
 			"| field | value |",
-			"| id | title | stories | requirements | decisions | depends_on | unblocks | acceptance | size |",
-			"| wave | tasks | goal |",
-			"| story | tasks |",
-			"| req | tasks |",
-			"| milestone | goal | tasks | waves | exit check |",
+			"| id | title | spec refs | depends_on | unblocks | acceptance | size |",
 			"| risk | impact | mitigation |",
 		},
 		headings: []string{
-			"# Implementation Plan",
-			"## Prerequisites",
+			"# Plan <NNNN> <Title>",
+			"## Steps",
 			"## Tasks",
-			"## Waves",
-			"## Coverage",
-			"## Roadmap and milestones",
 			"## Risks to the plan",
 			"## Open questions",
 		},
 	},
-	// The data and config schema template keeps the DB_SCHEMA.md file name (plan A8).
-	"gabo-db-master/templates/DB_SCHEMA.md": {
+	// No upfront schema (S4): one ordered row per migration or script.
+	"gabo-db-master/templates/MIGRATIONS.md": {
 		columns: []string{
 			"| field | value |",
-			"| store | kind | location | owner / scope | written by | committed? |",
-			"| key | type | required | description | example |",
-			"| column | type | null | default | constraints | description |",
-			"| index | columns | query it serves |",
-			"| order | migration | purpose | rollback |",
+			"| order | intent | file | purpose | rollback |",
 		},
 		headings: []string{
-			"# Data and Config Schema",
-			"## 1. Storage choice",
-			"### Persistence inventory",
-			"## 2. Schema per file",
-			"## 3. Migration",
-			"## 4. Data",
-			"## 5. Open questions",
-		},
-	},
-	"gabo-frontend/templates/APP_FLOW.md": {
-		columns: []string{
-			"| field | value |",
-			"| surface | entry points | primary action | empty and error states |",
-		},
-		headings: []string{
-			"# App Flow",
-			"## Surfaces",
-			"## Journeys",
-			"## Flow",
+			"# Migrations",
+			"## Conventions",
+			"## Log",
 			"## Open questions",
 		},
 	},
-	"gabo-frontend/templates/UX_UI.md": {
+	// Global styles only (S5); UX and app flow live in each spec.
+	"gabo-frontend/templates/DESIGN.md": {
 		columns: []string{
 			"| field | value |",
 			"| token | custom property | value | use |",
@@ -142,7 +150,7 @@ var templates = map[string]struct {
 			"| case | what happened | why | what to do next |",
 		},
 		headings: []string{
-			"# UX and UI",
+			"# Design",
 			"## 1. Principles",
 			"## 2. Design tokens",
 			"## 3. Component inventory",
@@ -209,11 +217,35 @@ func TestTemplatesKeepStableColumnsAndSections(t *testing.T) {
 	}
 }
 
-func TestPMSkillPointsToTemplatesAndStoryNaming(t *testing.T) {
+// The global planning templates are gone (S4, S5, S9) and the plan carries
+// no milestones or global waves (S9, S10).
+func TestGlobalPlanningTemplatesAreRemoved(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for _, p := range []string{
+		"gabo-pm/templates/STORY.md",
+		"gabo-dev-lead/templates/IMPLEMENTATION_PLAN.md",
+		"gabo-db-master/templates/DB_SCHEMA.md",
+		"gabo-frontend/templates/APP_FLOW.md",
+		"gabo-frontend/templates/UX_UI.md",
+	} {
+		if _, ok := byPath[p]; ok {
+			t.Errorf("%s: removed template still shipped", p)
+		}
+	}
+	plan := strings.ToLower(byPath["gabo-dev-lead/templates/plan.md"])
+	for _, s := range []string{"milestone", "| wave"} {
+		if strings.Contains(plan, s) {
+			t.Errorf("gabo-dev-lead/templates/plan.md: has %q", s)
+		}
+	}
+}
+
+func TestPMSkillPointsToTemplates(t *testing.T) {
 	t.Parallel()
 	skill := embeddedByPath(t)["gabo-pm/SKILL.md"]
 	for _, s := range []string{
-		"templates/PRD.md", "templates/STORY.md", "US-0NN-<kebab>.md",
+		"templates/PRD.md", "templates/intent.md", "templates/spec.md", "docs/product/intents/<NNNN-slug>/",
 		"| id | type | requirement | acceptance criteria | priority | stories | verification |",
 	} {
 		if !strings.Contains(skill, s) {
@@ -229,16 +261,16 @@ func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
 	byPath := embeddedByPath(t)
 	for skill, want := range map[string][]string{
 		"gabo-dev-lead/SKILL.md": {
-			"templates/TRD.md", "templates/IMPLEMENTATION_PLAN.md", "## Fixed questions", "arc42", "MADR",
+			"templates/TRD.md", "templates/plan.md", "## Fixed questions", "arc42", "MADR",
 			"| id | decision | options considered | choice | consequences | status | requirement ids |",
 			"| req | decisions | sections | stories | verification → test layer |",
-			"| id | title | stories | requirements | decisions | depends_on | unblocks | acceptance | size |",
+			"| id | title | spec refs | depends_on | unblocks | acceptance | size |",
 		},
 		"gabo-db-master/SKILL.md": {
-			"templates/DB_SCHEMA.md", "## Fixed questions", "config-only", "Persistence inventory",
+			"templates/MIGRATIONS.md", "## Fixed questions", "config-only", "Persistence inventory",
 		},
 		"gabo-frontend/SKILL.md": {
-			"templates/APP_FLOW.md", "templates/UX_UI.md", "## Fixed questions",
+			"templates/DESIGN.md", "## 3. UX and app flow (optional)", "## Fixed questions",
 		},
 	} {
 		doc, ok := byPath[skill]

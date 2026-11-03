@@ -8,12 +8,12 @@ metadata:
 ---
 ## Activation Contract
 
-Load in the `gabo-dev-lead` subagent to write `docs/product/TRD.md` and `docs/product/IMPLEMENTATION_PLAN.md` and to turn plan tasks into tracker issues through the `tasks` slot adapter.
+Load in the `gabo-dev-lead` subagent to write `docs/product/TRD.md` and each intent's `docs/product/intents/<NNNN-slug>/plan.md` and to turn plan tasks into tracker issues through the `tasks` slot adapter.
 
 ## Hard Rules
 
 - TRD on arc42 with C4 views and MADR-style decisions (D14), scaffolded from `templates/TRD.md`: decisions table `| id | decision | options considered | choice | consequences | status | requirement ids |` and requirement coverage table `| req | decisions | sections | stories | verification → test layer |`; every decision traces to PRD requirement ids.
-- Plan scaffolded from `templates/IMPLEMENTATION_PLAN.md`: tasks in `T###` notation with the table `| id | title | stories | requirements | decisions | depends_on | unblocks | acceptance | size |`, `[P]` for parallel. `depends_on` and `unblocks` must mirror each other and be acyclic.
+- Plan scaffolded from `templates/plan.md`: tasks in `T<n>` notation, local to the intent, with the table `| id | title | spec refs | depends_on | unblocks | acceptance | size |`; a dependency in another intent is written `<NNNN>/T<n>`. `depends_on` and `unblocks` must mirror each other and be acyclic.
 - Templates are canonical (D19): answer each template's `## Fixed questions` before writing its sections, and never rename or reorder its table columns; the traceability check reads them.
 - Fixed questions one at a time: ask the template's `## Fixed questions` in order, one per message, and wait for each answer before the next (manual mode). In auto mode answer each yourself, mark it **Proposed (auto)** with a one-line reason and present them together for one-pass approval.
 - Each task is issue-ready: one reviewable PR (about 400 changed lines), test-first, acceptance a reviewer can check.
