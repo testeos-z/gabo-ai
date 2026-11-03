@@ -17,7 +17,7 @@ gabo-ai is the CLI and harness that provisions and operates autonomous coding ag
 2. **The coder never merges, approves, or sets commit statuses.** Only `gabo review run` does, and it never approves (GitHub forbids self-approval): its verdict is the signed marker comment plus the `reviewer/tests` and `reviewer/review` statuses.
 3. **The reviewer's verdict is computed by `gabo review run`**, from the PR head it merges in its own state clone. Messages are notifications only and can never decide a verdict.
 4. **Secrets never live in service-wide environment variables** that the coding agent can read. Model credentials are written only by `gabo secrets set` (stdin, 0600); checks and the review engine run with GitHub credentials stripped from their environment.
-5. Merges go to `dev` only, never `main`, pinned to the reviewed head SHA, never for human-only paths (`.claude/`, `.github/`, `.opencode/`, `AGENTS.md`, `CLAUDE.md`, `docs/policies/`, `tools/hook-tests/`, `agents/`).
+5. Merges go to `dev` only, never `main`, pinned to the reviewed head SHA, never for human-only paths (`.claude/`, `.github/`, `.opencode/`, `AGENTS.md`, `CLAUDE.md`, `docs/policies/`, `tools/hook-tests/`, `agents/`, `.codex/`, `.agents/`, `plugins/`).
 6. Clean up, never lose work: merged branches and finished worktrees (coder and reviewer) are removed by the wrk prune step or the review cleanup; unmerged branches, data and history are never deleted. In cloud mode this is automatic: reviewer worktrees are removed right after the verdict is posted, and coder branches and worktrees only once GitHub confirms the PR is merged; local mode keeps the human approval of the prune step. Never force-push.
 
 ## Components
