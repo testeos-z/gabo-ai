@@ -35,9 +35,9 @@ func TestReviewerConfigSkill(t *testing.T) {
 		"install nothing and write nothing",
 		// the scripts reach user level only through gabo init (D20).
 		"only through `gabo init`", "`${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer`", "D20",
-		// isolation test: only codex and opencode, never claude or pi.
-		"`claude` and `pi` need no isolation test", "isolation test", "pass marker",
-		"leave `runtimes.reviewer` unchanged",
+		// isolation test: only codex and opencode; fail or missing script refuses the engine.
+		"`claude` and `pi` need no isolation test", "Isolation test (`codex`, `opencode` only)", "pass marker",
+		"record no pass marker", "has no isolation-test script yet", "leave `runtimes.reviewer` unchanged",
 		// the skill never reviews.
 		"never runs a review",
 		"`gabo-config-writer`", "`gabo check`",
