@@ -158,3 +158,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner) | 2026-11-03 | Accepted by the owner in session: "si autorizo los spec" |
