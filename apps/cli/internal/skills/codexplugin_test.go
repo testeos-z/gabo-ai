@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -170,7 +171,7 @@ func requireCopy(t *testing.T, copyPath, src string) {
 	if err != nil {
 		t.Fatalf("copy source %s: %v", src, err)
 	}
-	fix := fmt.Sprintf("refresh it from the catalog: rm -r %[1]s && cp -r %[2]s %[1]s (run from apps/cli/internal/skills)", copyPath, src)
+	fix := fmt.Sprintf("refresh it from its source: rm -r %[1]s && cp -r %[2]s %[1]s (run from apps/cli/internal/skills)", copyPath, src)
 	for _, rel := range sortedUnion(cp, sp) {
 		c, inCopy := cp[rel]
 		s, inSrc := sp[rel]
@@ -260,4 +261,85 @@ func dirNames(t *testing.T, dir string) []string {
 		names = append(names, e.Name())
 	}
 	return names
+}
+
+// codexHookScripts are the shared hook scripts of the Claude Code plugin the
+// Codex plugin ships as real copies under scripts/ (intent 0002 S7, D5, spec
+// open question 5 option c): codex-cli leaves symlinked files out of its
+// plugin cache. gabo-hook-filter.sh is sourced by gabo-check.sh.
+var codexHookScripts = []string{"gabo-check.sh", "gabo-hook-filter.sh"}
+
+// The Codex plugin's scripts/ holds exactly the shared hook scripts (plus
+// their tests), each a regular file byte-identical, with the same mode, to its
+// plugins/claude-code/scripts/ source (intent 0002 S7, D5).
+func TestCodexPluginScriptsCopyTheSharedHookScripts(t *testing.T) {
+	t.Parallel()
+	dir := filepath.Join(repoRoot, codexPluginDir, "scripts")
+	var got []string
+	for _, n := range dirNames(t, dir) {
+		if n != "tests" {
+			got = append(got, n)
+		}
+	}
+	want := slices.Sorted(slices.Values(codexHookScripts))
+	if !slices.Equal(got, want) {
+		t.Fatalf("Codex plugin scripts\n got %v\nwant %v", got, want)
+	}
+	for _, name := range codexHookScripts {
+		requireCopy(t, filepath.Join(dir, name), filepath.Join(repoRoot, pluginDir, "scripts", name))
+	}
+}
+
+// The Codex manifest names its own hook file, and hooks.codex.json wires the
+// post-write check: PostToolUse on apply_patch runs scripts/gabo-check.sh from
+// the plugin root with the argument codex (intent 0002 S1, S7, D5).
+func TestCodexPluginHooksWirePostWriteCheck(t *testing.T) {
+	t.Parallel()
+	p := readJSON(t, codexPluginDir+"/.codex-plugin/plugin.json")
+	if p["hooks"] != "./hooks/hooks.codex.json" {
+		t.Fatalf("Codex plugin hooks %v, want ./hooks/hooks.codex.json", p["hooks"])
+	}
+	root := absReal(t, filepath.Join(repoRoot, codexPluginDir))
+	hooksFile := absReal(t, filepath.Join(root, "hooks", "hooks.codex.json"))
+	if !strings.HasPrefix(hooksFile, root+string(filepath.Separator)) {
+		t.Fatalf("Codex plugin hooks path %s resolves outside the plugin root %s", hooksFile, root)
+	}
+	h := readJSON(t, codexPluginDir+"/hooks/hooks.codex.json")
+	hooks, _ := h["hooks"].(map[string]any)
+	post, _ := hooks["PostToolUse"].([]any)
+	if len(post) != 1 {
+		t.Fatalf("hooks.codex.json PostToolUse %v, want exactly one matcher group", hooks["PostToolUse"])
+	}
+	group, _ := post[0].(map[string]any)
+	if group["matcher"] != "apply_patch" {
+		t.Fatalf("PostToolUse matcher %v, want apply_patch", group["matcher"])
+	}
+	cmds, _ := group["hooks"].([]any)
+	if len(cmds) != 1 {
+		t.Fatalf("PostToolUse hooks %v, want exactly one command", group["hooks"])
+	}
+	cmd, _ := cmds[0].(map[string]any)
+	want := `bash "${PLUGIN_ROOT}/scripts/gabo-check.sh" codex`
+	if cmd["type"] != "command" || cmd["command"] != want {
+		t.Fatalf("PostToolUse hook %v, want command %s", cmd, want)
+	}
+	if _, err := os.Stat(filepath.Join(root, "scripts", "gabo-check.sh")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The Codex copy of the post-write hook script passes its shell tests with a
+// fake gabo on PATH and Codex PostToolUse inputs (intent 0002 S7, S8, S9).
+func TestCodexPluginPostWriteHookScript(t *testing.T) {
+	if testing.Short() {
+		t.Skip("shell tests skipped in -short mode")
+	}
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skipf("bash not found: %v", err)
+	}
+	test := filepath.Join(repoRoot, codexPluginDir, "scripts", "tests", "gabo-check.test.sh")
+	out, err := exec.Command("bash", test).CombinedOutput()
+	if err != nil {
+		t.Fatalf("Codex post-write hook shell tests: %v\n%s", err, out)
+	}
 }
