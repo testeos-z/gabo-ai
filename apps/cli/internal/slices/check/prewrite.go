@@ -102,12 +102,24 @@ func (u *UseCase) rawAbsOf(p string) string {
 // create or change: p as written and p with its symlinks resolved. An error
 // means the symlinks could not be resolved.
 func (u *UseCase) plansOf(p string) ([]string, error) {
-	var plans []string
-	if rel, ok := relInside(u.s.Root, u.absOf(p), u.s.FoldCase); ok && isPlan(rel) {
-		plans = append(plans, rel)
+	targets, err := u.targetsOf(p)
+	if err != nil {
+		return nil, err
+	}
+	return slices.DeleteFunc(targets, func(rel string) bool { return !isPlan(rel) }), nil
+}
+
+// targetsOf returns the project-relative paths a write to p would create or
+// change: p as written and p with its symlinks resolved, each once and only
+// when inside the project root. An error means the symlinks could not be
+// resolved.
+func (u *UseCase) targetsOf(p string) ([]string, error) {
+	var targets []string
+	if rel, ok := relInside(u.s.Root, u.absOf(p), u.s.FoldCase); ok {
+		targets = append(targets, rel)
 	}
 	if u.s.Resolve == nil || u.s.Root == "" {
-		return plans, nil
+		return targets, nil
 	}
 	root, err := u.s.Resolve(u.s.Root)
 	if err != nil {
@@ -118,12 +130,12 @@ func (u *UseCase) plansOf(p string) ([]string, error) {
 		return nil, err
 	}
 	if !ok {
-		return plans, nil
+		return targets, nil
 	}
-	if rel, ok := relInside(root, target, u.s.FoldCase); ok && isPlan(rel) && !slices.Contains(plans, rel) {
-		plans = append(plans, rel)
+	if rel, ok := relInside(root, target, u.s.FoldCase); ok && !slices.Contains(targets, rel) {
+		targets = append(targets, rel)
 	}
-	return plans, nil
+	return targets, nil
 }
 
 // resolveRaw resolves the absolute, uncleaned path abs component by

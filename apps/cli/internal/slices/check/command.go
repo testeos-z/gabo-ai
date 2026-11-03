@@ -2,6 +2,7 @@ package check
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -88,7 +89,17 @@ func NewCommand(factory Factory) *cobra.Command {
 			"tool_input.file_path, or the \"*** Add File:\", \"*** Update File:\" and\n" +
 			"\"*** Move to:\" headers of a Codex apply_patch in tool_input.command. A patch\n" +
 			"that writes no file passes; empty stdin or stdin that is not such a JSON\n" +
-			"object exits 2 with one usage line.",
+			"object exits 2 with one usage line.\n" +
+			"Stdin holding a JSON object with the key gabo_facts is an engine extension's\n" +
+			"session facts (intent 0003): {\"gabo_facts\": 1, \"event\": \"session_start\" or\n" +
+			"\"tool_call\", \"engine\": \"pi\", \"tools\": [<registered tool names>],\n" +
+			"\"package_version\": \"x.y.z\", \"target_paths\": [<paths>, tool_call only]}.\n" +
+			"While no tool is subagent_run, session_start warns with the subagent refusal\n" +
+			"and a tool_call writing under .pi/agents/ is blocked with it. It prints one\n" +
+			"JSON object, {\"notify\": [{\"level\": \"warning\" or \"info\", \"text\": ...}],\n" +
+			"\"block\": null or {\"reason\": ...}}, and exits 0 without a block, 1 with\n" +
+			"one, 2 with one usage line on a bad object (malformed, unknown schema\n" +
+			"version, engine or event, or a tool_call without target_paths).",
 		// The command parses its own flags, so a flag error knows the mode
 		// wherever --pre-write stands among the arguments.
 		DisableFlagParsing: true,
@@ -189,6 +200,9 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 		if err != nil {
 			return &ExitError{Code: ExitUsage, Err: fmt.Errorf("%w: stdin cannot be read (%v)", ErrPreWriteUsage, err)}
 		}
+		if IsFacts(data) {
+			return judgeFacts(cmd, factory, data)
+		}
 		if paths, err = PreWriteTargets(data); err != nil {
 			return &ExitError{Code: ExitUsage, Err: err}
 		}
@@ -215,6 +229,41 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 		return nil
 	}
 	return printBlocked(cmd, rep)
+}
+
+// judgeFacts runs the session-facts mode (intent 0003 D9): it prints one
+// FactsResult JSON object and exits 0 without a block, 1 with one and 2 on
+// a bad facts object. A project that cannot be loaded blocks a tool_call
+// (fail closed), after the subagent refusal when it applies; session_start
+// needs no project.
+func judgeFacts(cmd *cobra.Command, factory Factory, data []byte) error {
+	f, err := ParseFacts(data)
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	uc, err := factory(cmd.Context())
+	var r FactsResult
+	switch {
+	case err == nil:
+		r = uc.JudgeFacts(f)
+	case f.Event == EventToolCall:
+		reasons := []string{"the project cannot be read (" + err.Error() + "); the write counts as blocked"}
+		if !hasSubagentTool(f.Tools) {
+			reasons = append([]string{SubagentRefusal}, reasons...)
+		}
+		r = FactsResult{Notify: []Notification{}, Block: &Block{Reason: strings.Join(reasons, "\n")}}
+	default:
+		r = (&UseCase{}).JudgeFacts(f)
+	}
+	enc := json.NewEncoder(cmd.OutOrStdout())
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(r); err != nil {
+		return &ExitError{Code: ExitFailed, Err: err}
+	}
+	if r.Block != nil {
+		return &ExitError{Code: ExitFailed}
+	}
+	return nil
 }
 
 // printBlocked prints the blocked lines and exits 1; an output error still
