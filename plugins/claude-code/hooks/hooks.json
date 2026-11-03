@@ -1,6 +1,17 @@
 {
-  "description": "gabo post-write check: runs gabo check after Claude writes or edits a gabo file (off with the checks option).",
+  "description": "gabo checks: before Claude writes or edits a gabo file, gabo check --pre-write blocks a write that breaks the stage gate; after it, gabo check runs (both off with the checks option).",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/gabo-pre-write.sh\""
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit",
