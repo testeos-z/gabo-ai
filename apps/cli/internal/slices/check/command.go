@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -47,7 +48,7 @@ const preWriteFlag = "pre-write"
 func NewCommand(factory Factory) *cobra.Command {
 	var preWrite bool
 	cmd := &cobra.Command{
-		Use:   "check [--pre-write <path>...]",
+		Use:   "check [--pre-write [<path>...]]",
 		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
 		Long: "Validate the project read-only and engine-neutral (PRD R33):\n" +
 			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
@@ -81,7 +82,13 @@ func NewCommand(factory Factory) *cobra.Command {
 			"Acceptance row; any other path, or one outside the root, passes. It reads\n" +
 			"nothing else and writes nothing. Exit 0 with no output when every write\n" +
 			"passes, 1 with one \"✗ <path>: <reason>\" line per blocked path (every path\n" +
-			"when the project cannot be read), 2 on a usage error.",
+			"when the project cannot be read), 2 on a usage error.\n" +
+			"With no path, gabo check --pre-write < tool-call.json reads the engine hook's\n" +
+			"tool-call JSON from stdin and judges the paths it would write: Claude Code's\n" +
+			"tool_input.file_path, or the \"*** Add File:\", \"*** Update File:\" and\n" +
+			"\"*** Move to:\" headers of a Codex apply_patch in tool_input.command. A patch\n" +
+			"that writes no file passes; empty stdin or stdin that is not such a JSON\n" +
+			"object exits 2 with one usage line.",
 		// The command parses its own flags, so a flag error knows the mode
 		// wherever --pre-write stands among the arguments.
 		DisableFlagParsing: true,
@@ -125,7 +132,7 @@ func NewCommand(factory Factory) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths with the intent stage gate (hook mode)")
+	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths, or to the paths of the tool-call JSON on stdin, with the intent stage gate (hook mode)")
 	return cmd
 }
 
@@ -172,7 +179,23 @@ func hasPreWrite(raw []string) bool {
 // the blocked lines and exit 1 otherwise, exit 2 on a usage error. A project
 // that cannot be loaded (the factory fails, e.g. the working directory
 // cannot be read) blocks every path with exit 1: the hook fails closed.
+//
+// With no path the targets come from the engine hook's tool-call JSON on
+// stdin (PreWriteTargets); stdin that cannot be read or is no tool call
+// exits 2, and a tool call that writes no file passes.
 func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
+	if len(paths) == 0 {
+		data, err := io.ReadAll(cmd.InOrStdin())
+		if err != nil {
+			return &ExitError{Code: ExitUsage, Err: fmt.Errorf("%w: stdin cannot be read (%v)", ErrPreWriteUsage, err)}
+		}
+		if paths, err = PreWriteTargets(data); err != nil {
+			return &ExitError{Code: ExitUsage, Err: err}
+		}
+		if len(paths) == 0 {
+			return nil
+		}
+	}
 	if err := checkPreWritePaths(paths); err != nil {
 		return &ExitError{Code: ExitUsage, Err: err}
 	}

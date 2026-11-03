@@ -11,7 +11,7 @@ import (
 )
 
 // ErrPreWriteUsage marks a usage error of the pre-write hook mode.
-var ErrPreWriteUsage = errors.New("usage: gabo check --pre-write <path>...")
+var ErrPreWriteUsage = errors.New("usage: gabo check --pre-write <path>... (or no path and the hook's tool-call JSON on stdin)")
 
 // PreWrite is the hook mode (intent 0001 S11): it judges pending writes to
 // paths with the intent stage gate before they happen, and writes nothing.

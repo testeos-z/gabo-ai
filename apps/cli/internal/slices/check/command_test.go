@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"strings"
@@ -65,6 +66,13 @@ func TestCommandHelpNamesTheIntentCheck(t *testing.T) {
 
 func runPreWrite(t *testing.T, proj fs.FS, args ...string) (string, error) {
 	t.Helper()
+	return runPreWriteStdin(t, proj, "", args...)
+}
+
+// runPreWriteStdin runs the command like runPreWrite with stdin as its
+// standard input.
+func runPreWriteStdin(t *testing.T, proj fs.FS, stdin string, args ...string) (string, error) {
+	t.Helper()
 	cmd := NewCommand(func(context.Context) (*UseCase, error) {
 		return NewUseCase(proj, failingReader{}, goodUser(), Settings{Root: preRoot}), nil
 	})
@@ -72,6 +80,7 @@ func runPreWrite(t *testing.T, proj fs.FS, args ...string) (string, error) {
 	var out bytes.Buffer
 	cmd.SetOut(&out)
 	cmd.SetErr(&out)
+	cmd.SetIn(strings.NewReader(stdin))
 	cmd.SetArgs(append([]string{}, args...))
 	err := cmd.ExecuteContext(context.Background())
 	return out.String(), err
@@ -196,5 +205,87 @@ func TestCommandPreWriteFactoryErrorFailsClosed(t *testing.T) {
 	want := "✗ " + prePlan + ": the project cannot be read (getwd: no such file or directory); it counts as not accepted\n"
 	if out.String() != want {
 		t.Fatalf("stdout = %q, want %q", out.String(), want)
+	}
+}
+
+const (
+	claudeUnaccepted = `{"hook_event_name":"PreToolUse","tool_name":"Write","tool_input":{"file_path":"/proj/docs/product/intents/0009-x/plan.md","content":"# plan"}}`
+	codexPatch       = "*** Begin Patch\n*** Add File: README.md\n+hi\n*** Update File: docs/product/intents/0009-x/plan.md\n@@\n-a\n+b\n*** End Patch\n"
+)
+
+// With --pre-write and no path the targets come from the hook's tool-call
+// JSON on stdin: Claude Code's tool_input.file_path, or the Add File and
+// Update File headers of a Codex apply_patch in tool_input.command. The
+// result equals the path-argument result.
+func TestCommandPreWriteFromStdin(t *testing.T) {
+	t.Parallel()
+	codexJSON, err := json.Marshal(map[string]any{"tool_name": "apply_patch", "tool_input": map[string]any{"command": codexPatch}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name, specMD, stdin string
+		want                string
+		code                int
+	}{
+		{name: "Claude Code, unaccepted spec", specMD: unfilledMD, stdin: claudeUnaccepted, want: notAccepted + "\n", code: ExitFailed},
+		{name: "Claude Code, accepted spec", specMD: acceptedMD, stdin: claudeUnaccepted},
+		{name: "Claude Code, not a plan", specMD: unfilledMD, stdin: `{"tool_input":{"file_path":"/proj/README.md"}}`},
+		{name: "Codex apply_patch, unaccepted spec", specMD: unfilledMD, stdin: string(codexJSON), want: notAccepted + "\n", code: ExitFailed},
+		{name: "Codex apply_patch, accepted spec", specMD: acceptedMD, stdin: string(codexJSON)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			out, err := runPreWriteStdin(t, intentWith(tt.specMD), tt.stdin, "--pre-write")
+			code := 0
+			var ee *ExitError
+			if errors.As(err, &ee) {
+				code = ee.Code
+				if ee.Err != nil {
+					t.Fatalf("err = %v, want a silent exit", err)
+				}
+			} else if err != nil {
+				t.Fatalf("err = %v", err)
+			}
+			if code != tt.code || out != tt.want {
+				t.Fatalf("exit %d, stdout %q; want exit %d, stdout %q", code, out, tt.code, tt.want)
+			}
+		})
+	}
+}
+
+// Stdin is read only when no path is given: with paths it is ignored.
+func TestCommandPreWritePathsIgnoreStdin(t *testing.T) {
+	t.Parallel()
+	out, err := runPreWriteStdin(t, intentWith(unfilledMD), claudeUnaccepted, "--pre-write", "README.md")
+	if err != nil || out != "" {
+		t.Fatalf("err = %v, stdout = %q, want nil and no output", err, out)
+	}
+}
+
+// Empty, malformed or targetless stdin is a usage error: exit 2 with one
+// usage line, nothing on stdout, and the project is never loaded.
+func TestCommandPreWriteBadStdinExitsTwo(t *testing.T) {
+	t.Parallel()
+	for _, stdin := range []string{"", " \n", "{", "not json", "[]", `"x"`, `{}`, `{"tool_input":{}}`, `{"tool_input":{"file_path":""}}`, `{"tool_input":{"file_path":7}}`, `{"tool_input":{"command":7}}`, `{"tool_input":{"file_path":"a"}} {}`} {
+		cmd := NewCommand(func(context.Context) (*UseCase, error) {
+			t.Errorf("%q: the factory was called", stdin)
+			return nil, errors.New("unexpected")
+		})
+		cmd.SilenceUsage, cmd.SilenceErrors = true, true
+		var out bytes.Buffer
+		cmd.SetOut(&out)
+		cmd.SetErr(&out)
+		cmd.SetIn(strings.NewReader(stdin))
+		cmd.SetArgs([]string{"--pre-write"})
+		err := cmd.ExecuteContext(context.Background())
+		var ee *ExitError
+		if !errors.As(err, &ee) || ee.Code != ExitUsage {
+			t.Fatalf("%q: err = %v, want exit %d", stdin, err, ExitUsage)
+		}
+		if msg := err.Error(); !strings.HasPrefix(msg, "usage: gabo check --pre-write <path>...") || strings.Contains(msg, "\n") || out.String() != "" {
+			t.Fatalf("%q: err = %q, stdout = %q, want one usage line", stdin, msg, out.String())
+		}
 	}
 }
