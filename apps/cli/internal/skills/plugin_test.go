@@ -3,6 +3,7 @@ package skills
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"slices"
@@ -151,4 +152,68 @@ func absReal(t *testing.T, p string) string {
 		t.Fatal(err)
 	}
 	return real
+}
+
+// plugin.json declares the checks option as a boolean that is on by default,
+// so one /config row turns both hooks off (intent 0001 D9).
+func TestPluginDeclaresChecksOption(t *testing.T) {
+	t.Parallel()
+	p := readJSON(t, pluginDir+"/.claude-plugin/plugin.json")
+	cfg, _ := p["userConfig"].(map[string]any)
+	checks, ok := cfg["checks"].(map[string]any)
+	if !ok {
+		t.Fatalf("plugin.json userConfig %v has no checks option (D9)", p["userConfig"])
+	}
+	if checks["type"] != "boolean" || checks["default"] != true {
+		t.Fatalf("userConfig.checks type %v default %v, want boolean true (D9)", checks["type"], checks["default"])
+	}
+	for _, key := range []string{"title", "description"} {
+		if s, _ := checks[key].(string); s == "" {
+			t.Fatalf("userConfig.checks has no %s", key)
+		}
+	}
+}
+
+// hooks.json wires the post-write hook: PostToolUse on Write|Edit runs
+// scripts/gabo-check.sh from the plugin root (intent 0001 S6, D8).
+func TestPluginHooksWirePostWriteCheck(t *testing.T) {
+	t.Parallel()
+	h := readJSON(t, pluginDir+"/hooks/hooks.json")
+	hooks, _ := h["hooks"].(map[string]any)
+	post, _ := hooks["PostToolUse"].([]any)
+	if len(post) != 1 {
+		t.Fatalf("hooks.json PostToolUse %v, want exactly one matcher group", hooks["PostToolUse"])
+	}
+	group, _ := post[0].(map[string]any)
+	if group["matcher"] != "Write|Edit" {
+		t.Fatalf("PostToolUse matcher %v, want Write|Edit", group["matcher"])
+	}
+	cmds, _ := group["hooks"].([]any)
+	if len(cmds) != 1 {
+		t.Fatalf("PostToolUse hooks %v, want exactly one command", group["hooks"])
+	}
+	cmd, _ := cmds[0].(map[string]any)
+	want := `bash "${CLAUDE_PLUGIN_ROOT}/scripts/gabo-check.sh"`
+	if cmd["type"] != "command" || cmd["command"] != want {
+		t.Fatalf("PostToolUse hook %v, want command %s", cmd, want)
+	}
+	if _, err := os.Stat(filepath.Join(repoRoot, pluginDir, "scripts", "gabo-check.sh")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The post-write hook script passes its shell tests with a fake gabo on PATH
+// (intent 0001 S6, S7, S8).
+func TestPluginPostWriteHookScript(t *testing.T) {
+	if testing.Short() {
+		t.Skip("shell tests skipped in -short mode")
+	}
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skipf("bash not found: %v", err)
+	}
+	test := filepath.Join(repoRoot, pluginDir, "scripts", "tests", "gabo-check.test.sh")
+	out, err := exec.Command("bash", test).CombinedOutput()
+	if err != nil {
+		t.Fatalf("post-write hook shell tests: %v\n%s", err, out)
+	}
 }
