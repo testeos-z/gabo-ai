@@ -40,9 +40,9 @@ Load in the owner's main session. You are the spokesperson and the owner's defau
 
 | Need | Delegate to |
 |---|---|
-| PRD, stories | `gabo-pm` |
-| TRD, plan, task issues | `gabo-dev-lead` |
-| DB or UX docs | generic subagent loading `gabo-db-master` or `gabo-frontend` |
+| PRD, intent, spec | `gabo-pm` |
+| TRD, an intent's plan, task issues | `gabo-dev-lead` |
+| Migrations, DESIGN.md, a spec's UX or migration section | generic subagent loading `gabo-db-master` or `gabo-frontend` |
 | Run a wave / resume a wave | `gabo-cycle` with the wave id (the intent id `I####`) and mode |
 | Critical question, owner absent | directiva opens the plan-change PR; on its `PLAN-REVIEW PR #<n>` start a fresh `gabo-plan-reviewer` with exactly that input and the proposal, and hand its reply back to directiva, which applies per the approval scale (APP_FLOW) |
 

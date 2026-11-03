@@ -19,11 +19,12 @@ var templates = map[string]struct {
 	columns  []string
 	headings []string
 }{
+	// Conceptual PRD (S2): what the product offers and what the user gets; no
+	// stories and no acceptance criteria, which live in each intent's spec.
 	"gabo-pm/templates/PRD.md": {
 		columns: []string{
 			"| field | value |",
-			"| id | title | user | requirement ids | status | file |",
-			"| id | type | requirement | acceptance criteria | priority | stories | verification |",
+			"| id | type | what the product offers | what the user gets | priority |",
 			"| metric | how it is measured |",
 			"| # | question | status |",
 			"| term | meaning |",
@@ -34,10 +35,10 @@ var templates = map[string]struct {
 			"### Evidence",
 			"## 5. Appetite",
 			"## 6. Assumptions and dependencies",
-			"## 8. Requirements",
-			"## 9. Quality requirements",
-			"## 10. Constraints",
-			"## 14. Glossary",
+			"## 7. What the product offers",
+			"## 8. Quality requirements",
+			"## 9. Constraints",
+			"## 13. Glossary",
 		},
 	},
 	// Per-change folder docs/product/intents/<NNNN-slug>/ (S7): the intent
@@ -82,34 +83,30 @@ var templates = map[string]struct {
 			"## 7. Acceptance",
 		},
 	},
-	// T028: arc42 sections, the MADR decision table and the requirement coverage table.
+	// Conventions-only TRD (S3): the stack the user chose (S6), architecture,
+	// code and test conventions and the MADR decision table; per-change design
+	// and requirement coverage live in each intent's spec and plan.
 	"gabo-dev-lead/templates/TRD.md": {
 		columns: []string{
 			"| field | value |",
-			"| quality goal | scenario | requirement ids |",
+			"| area | choice | version | chosen by | notes |",
 			"| constraint | kind | source |",
 			"| id | decision | options considered | choice | consequences | status | requirement ids |",
-			"| req | decisions | sections | stories | verification → test layer |",
-			"| id | risk or debt | requirement and decision ids | mitigation |",
+			"| id | risk or debt | decision ids | mitigation |",
 			"| term | meaning |",
 		},
 		headings: []string{
 			"# Technical Requirements (TRD)",
-			"## 1. Introduction and quality goals",
+			"## 1. Stack and tooling",
 			"## 2. Constraints",
-			"## 3. Context and scope",
-			"## 4. Solution strategy",
-			"## 5. Building block view",
-			"## 6. Runtime view",
-			"## 7. Deployment view",
-			"## 8. Crosscutting concepts",
-			"## 9. Architecture decisions",
-			"### Requirement coverage",
-			"## 10. Quality requirements",
-			"### Testing strategy",
-			"## 11. Risks and technical debt",
-			"## 12. Glossary",
-			"## 13. Open questions",
+			"## 3. Architecture conventions",
+			"## 4. Code conventions",
+			"## 5. Test conventions",
+			"## 6. Deployment and environments",
+			"## 7. Architecture decisions",
+			"## 8. Risks and technical debt",
+			"## 9. Glossary",
+			"## 10. Open questions",
 		},
 	},
 	// The plan of one intent (S9): ordered steps and the task table, no
@@ -233,6 +230,14 @@ func TestGlobalPlanningTemplatesAreRemoved(t *testing.T) {
 			t.Errorf("%s: removed template still shipped", p)
 		}
 	}
+	for _, p := range []string{"gabo-pm/templates/PRD.md", "gabo-dev-lead/templates/TRD.md"} {
+		doc := strings.ToLower(byPath[p])
+		for _, s := range []string{"stories", "story", "us-0", "requirement coverage"} {
+			if strings.Contains(doc, s) {
+				t.Errorf("%s: has %q", p, s)
+			}
+		}
+	}
 	plan := strings.ToLower(byPath["gabo-dev-lead/templates/plan.md"])
 	for _, s := range []string{"milestone", "| wave"} {
 		if strings.Contains(plan, s) {
@@ -246,7 +251,8 @@ func TestPMSkillPointsToTemplates(t *testing.T) {
 	skill := embeddedByPath(t)["gabo-pm/SKILL.md"]
 	for _, s := range []string{
 		"templates/PRD.md", "templates/intent.md", "templates/spec.md", "docs/product/intents/<NNNN-slug>/",
-		"| id | type | requirement | acceptance criteria | priority | stories | verification |",
+		"| id | type | what the product offers | what the user gets | priority |",
+		"highest `NNNN` plus one", "never an agent",
 	} {
 		if !strings.Contains(skill, s) {
 			t.Errorf("gabo-pm/SKILL.md: missing %q", s)
@@ -261,13 +267,15 @@ func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
 	byPath := embeddedByPath(t)
 	for skill, want := range map[string][]string{
 		"gabo-dev-lead/SKILL.md": {
-			"templates/TRD.md", "templates/plan.md", "## Fixed questions", "arc42", "MADR",
+			"templates/TRD.md", "templates/plan.md", "## Fixed questions", "MADR",
 			"| id | decision | options considered | choice | consequences | status | requirement ids |",
-			"| req | decisions | sections | stories | verification → test layer |",
+			"| area | choice | version | chosen by | notes |",
 			"| id | title | spec refs | depends_on | unblocks | acceptance | size |",
+			"only after a human accepted the spec", "`parent`",
 		},
 		"gabo-db-master/SKILL.md": {
 			"templates/MIGRATIONS.md", "## Fixed questions", "config-only", "Persistence inventory",
+			"`## Conventions`",
 		},
 		"gabo-frontend/SKILL.md": {
 			"templates/DESIGN.md", "## 3. UX and app flow (optional)", "## Fixed questions",
@@ -356,18 +364,71 @@ func fixedQuestions(doc string) ([][3]string, error) {
 	return rows, nil
 }
 
-// traceabilityGaps is the gap list of the traceability check (D19, T031):
-// every directiva skill carries it word for word, so the four skills block a
-// planning step on the same gaps.
+// traceabilityGaps is the gap list of the traceability check (D19, per-change
+// model S7-S9): every directiva skill carries it word for word, so the four
+// skills block a planning step on the same gaps.
 var traceabilityGaps = []string{
-	"story without requirement",
-	"requirement without decision, task or verification",
-	"task without story",
-	"dependency cycle",
-	"dangling id",
-	"`depends_on` / `unblocks` mismatch",
+	"an intent without spec;",
+	"an accepted spec without plan;",
+	"a plan task without a tracker task, or the reverse;",
+	"a task whose parent is not exactly one intent;",
+	"a requirement in the spec not covered by any plan task;",
+	"a dependency cycle;",
+	"a dangling id, including a cross-intent `<NNNN>/T<n>` reference;",
+	"a `depends_on`/`unblocks` mismatch.",
 	"Rows marked removed",
 	"blocks the next planning step",
+}
+
+// The per-change model retires stories, the global plan, milestones, global
+// waves and the global DB, UX and app-flow docs from every planning skill (S7, S9).
+var retiredPlanningTerms = []string{
+	"user stor", "docs/product/stories", "US-0", "story without", "without story",
+	"IMPLEMENTATION_PLAN", "milestone", "DB_SCHEMA", "UX_UI", "APP_FLOW",
+}
+
+func TestPlanningSkillsDropRetiredGlobalPlanning(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for _, skill := range []string{
+		"gabo-pm/SKILL.md", "gabo-dev-lead/SKILL.md", "gabo-db-master/SKILL.md", "gabo-frontend/SKILL.md",
+		"gabo-doc-guide/SKILL.md",
+	} {
+		body := byPath[skill]
+		if i := strings.Index(body, "\n---\n"); i >= 0 {
+			body = body[i:]
+		}
+		for _, s := range retiredPlanningTerms {
+			if strings.Contains(body, s) {
+				t.Errorf("%s: still has %q", skill, s)
+			}
+		}
+	}
+	if strings.Contains(strings.ToLower(byPath["gabo-dev-lead/SKILL.md"]), "wave") {
+		t.Errorf("gabo-dev-lead/SKILL.md: still plans waves")
+	}
+}
+
+// Ownership in the per-change model (S7, S8, S14).
+func TestPlanningSkillsOwnTheirIntentArtifacts(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for skill, want := range map[string][]string{
+		"gabo-pm/SKILL.md":        {"intent.md", "spec.md", "Acceptance"},
+		"gabo-dev-lead/SKILL.md":  {"plan.md", "`parent`", "product card"},
+		"gabo-db-master/SKILL.md": {"spec.md", "MIGRATIONS.md"},
+		"gabo-frontend/SKILL.md":  {"spec.md", "DESIGN.md"},
+		"gabo-doc-guide/SKILL.md": {
+			"docs/product/PRD.md", "docs/product/TRD.md", "docs/product/DESIGN.md", "docs/product/MIGRATIONS.md",
+			"docs/product/intents/<NNNN-slug>/", "intent.md", "spec.md", "plan.md", "review findings",
+		},
+	} {
+		for _, s := range want {
+			if !strings.Contains(byPath[skill], s) {
+				t.Errorf("%s: missing %q", skill, s)
+			}
+		}
+	}
 }
 
 // T031 (J2, J6): the directiva skills ask their template's fixed questions one

@@ -246,8 +246,8 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 		"gabo-contract-methodology/SKILL.md": {"coder-side review", "RDD", "gabo-methodology"},
 		// T055: the doc guide maps every product doc, the setup prompt and the catalog.
 		"gabo-doc-guide/SKILL.md": {
-			"docs/product/PRD.md", "docs/product/stories/", "docs/product/TRD.md", "docs/product/IMPLEMENTATION_PLAN.md",
-			"docs/product/DB_SCHEMA.md", "docs/product/UX_UI.md", "docs/product/APP_FLOW.md", "DESIGN.md",
+			"docs/product/PRD.md", "docs/product/TRD.md", "docs/product/DESIGN.md", "docs/product/MIGRATIONS.md",
+			"docs/product/intents/<NNNN-slug>/", "review findings",
 			"setup prompt", ".gabo/skills/", "adds no rule", "`gabo-plan-reviewer`",
 		},
 		// The former cloud keys of the core config (DB_SCHEMA 2.3).

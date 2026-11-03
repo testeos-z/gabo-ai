@@ -4,7 +4,7 @@ description: "Trigger: which doc to read, where is it documented, doc map, find 
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.0"
+  version: "2.0"
 ---
 ## Activation Contract
 
@@ -12,18 +12,19 @@ Load when an agent or the owner needs to know which gabo document answers a ques
 
 ## Product docs
 
-Each project keeps its product docs in `docs/product/`, written from the templates of the directiva skills.
+Each project keeps its product docs in `docs/product/`, written from the templates of the directiva skills. Global docs hold what every change shares; each change is an intent with its own folder. There is no global plan: the tracker is the global view of tasks.
 
 | question | read | written by |
 |---|---|---|
-| What are we building, for whom, which requirements (R#), what is out of scope? | `docs/product/PRD.md` | `gabo-pm` |
-| What does one user story ask for, with its acceptance criteria? | `docs/product/stories/` (`US-NNN-*.md`) | `gabo-pm` |
-| How is it built: constraints, building blocks, decisions (D#), slot contracts, open technical questions? | `docs/product/TRD.md` | `gabo-dev-lead` |
-| Which tasks exist, their dependencies, waves and coverage of stories and requirements? | `docs/product/IMPLEMENTATION_PLAN.md` | `gabo-dev-lead` |
-| Which database or configuration schema, keys, layering and migrations? | `docs/product/DB_SCHEMA.md` | `gabo-db-master` |
-| How does it look and read: principles, components, messages, accessibility? | `docs/product/UX_UI.md` | `gabo-frontend` |
-| Which design tokens are the source of truth? | `DESIGN.md` (repository root) | `gabo-frontend` |
-| How does a user move through the product, and how are plan changes approved? | `docs/product/APP_FLOW.md` | `gabo-frontend` |
+| What does the product offer, for whom, and what does the user get? | `docs/product/PRD.md` | `gabo-pm` |
+| Which stack did the user choose, and which architecture, code and test conventions and global decisions (D#) apply? | `docs/product/TRD.md` | `gabo-dev-lead` |
+| Which global styles, tokens and components apply (optional, only when the product warrants UX/UI)? | `docs/product/DESIGN.md` | `gabo-frontend` |
+| Which migrations and data scripts were applied, in which order, and how does persistence work? | `docs/product/MIGRATIONS.md` | `gabo-db-master` |
+| What problem does one change solve? | `docs/product/intents/<NNNN-slug>/intent.md` | `gabo-pm` |
+| What exactly does the change require and how is it designed (requirements, UX and app flow, migration steps), and who accepted it? | `docs/product/intents/<NNNN-slug>/spec.md` | `gabo-pm` (UX section `gabo-frontend`, migration section `gabo-db-master`; acceptance by the owner) |
+| Which tasks deliver the change, with their dependencies? | `docs/product/intents/<NNNN-slug>/plan.md` | `gabo-dev-lead` |
+| What did the reviews of the change find? | review findings in `docs/product/intents/<NNNN-slug>/` | reviewers |
+| How are plan changes approved? | `gabo-plan-reviewer` | — |
 
 ## Setup prompt
 
@@ -44,11 +45,11 @@ Each project keeps its product docs in `docs/product/`, written from the templat
 | How is a config key written, in which file, and what happens after the write? | `gabo-config-writer` |
 | How does a coder work one task, open its PR and close the task? | `gabo-coder` |
 | How does the review gate work, and what does a `VERDICT` line mean? | `gabo-reviewer-notes` |
-| How are product requirements and stories written? | `gabo-pm` |
-| How are the TRD, the plan and the task issues written? | `gabo-dev-lead` |
+| How are the PRD, an intent and its spec written? | `gabo-pm` |
+| How are the TRD, an intent's plan and the task issues written? | `gabo-dev-lead` |
 | How does a plan change travel, which approval scale applies, and how does the plan reviewer decide? | `gabo-plan-reviewer` |
-| How is the database or configuration schema designed? | `gabo-db-master` |
-| How are UX, UI, tokens and the app flow designed? | `gabo-frontend` |
+| How are migrations and the persistence conventions written? | `gabo-db-master` |
+| How are global styles, tokens and an intent's UX and app flow designed? | `gabo-frontend` |
 | Which agents exist and what is each one's body template? | `gabo-agent-templates` |
 | Which operations must an adapter for a slot cover? | `gabo-contract-<slot>` (`tasks`, `repository-host`, `memory`, `methodology`, `reviewer-placement`, `notifications`, `direct-sessions`, `agent-host`), each with an example adapter under `examples/` |
 | How does the reviewer run on the owner's machine (local placement)? | `gabo-reviewer-placement-local` |
