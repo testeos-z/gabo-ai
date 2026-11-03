@@ -110,6 +110,7 @@ Not applicable: the change alters no stored data, no config shape and no catalog
 | PRD R36, TRD D25 (one source for the setup prompt) | A plugin command with the setup prompt would be a third copy. | No commands in this intent (D7). |
 | TRD 9.4 project-relative spec | In a gabo project the session sees both the project copy (`gabo-pm`) and the plugin copy (`gabo:gabo-pm`), possibly of different versions. | Agents keep preloading the project copy by bare name, so waves are unaffected; how the main session picks between them is owner question 5. |
 | Intent constraint "hooks limited to the deterministic checks" | None in the chosen design: the only hook runs `gabo check`. | A version-mismatch or context hook is out of scope unless the owner widens the constraint (owner question 5). |
+| `gabo-runtime-builder` and sibling runtime skills: "never edit the engine's own config" | Amended for project-level operational keys. | **Owner rule (2026-11-03), from intent 0004 open question 7**: gabo writes the engine configuration it needs to operate, only those keys, at project level only, merged with any existing project config, reported, and verified by `gabo check`; it never writes the user's global engine config. This intent needs no such key: the plugin and its hooks need no Claude Code setting written by gabo. See intent 0004 section 5 and D7. |
 | TRD 9.6 Claude Code Plugins row | None: install by `claude plugin marketplace add` and `claude plugin install`, never by editing `~/.claude/plugins` files. | Followed. |
 
 ## 6. Open questions

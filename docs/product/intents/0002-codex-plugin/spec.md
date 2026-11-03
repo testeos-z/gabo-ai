@@ -134,6 +134,7 @@ Not applicable: the change alters no stored data. The `runtimes.*` enum gains a 
 | D27: reviewer runtime (`claude` or `pi`) | The owner now accepts all four engines as reviewer. | **Decided (owner 2026-11-03): all four engines in all roles**: D27 is amended to `claude`, `codex`, `pi`, `opencode`; S6 and S12 here, intent 0004 S1 and S15; TRD wording follow-up carried to `gabo-dev-lead` |
 | `review.human_only_paths` (`config/required.go`) lists `.claude/`, `agents/`, `AGENTS.md`, but not `.codex/`, `.agents/` or `.codex-plugin/` | Codex agent files, Codex skill links and the Codex manifest could be merged without a human | Carried to the plan: add `.codex/`, `.agents/` and the plugin directory to `review.human_only_paths` in the same release |
 | PRD R31 (CLI surface) | none: no new command | — |
+| `gabo-runtime-builder` and sibling runtime skills: "never edit the engine's own config" | Amended for project-level operational keys. | **Owner rule (2026-11-03), from intent 0004 open question 7**: gabo writes the engine configuration it needs to operate, only those keys, at project level only, merged with any existing project config, reported, and verified by `gabo check`; it never writes the user's global engine config. This intent needs no such key. Hook trust is not one: it lives in the user's `~/.codex/config.toml` (`[hooks.state.*]` with `trusted_hash`), is a user-level security approval, and stays the owner's `/hooks` action (S10); S9 still forbids writing any user-level file. See intent 0004 section 5 and D7. |
 
 ## 6. Open questions
 
