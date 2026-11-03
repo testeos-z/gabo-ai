@@ -64,5 +64,9 @@ plan_change:
 
 parallelism: 3
 
+# A wave is one intent; after it closes, wait for the owner (next would chain).
+wave:
+  after: wait
+
 worktree:
   keep: []

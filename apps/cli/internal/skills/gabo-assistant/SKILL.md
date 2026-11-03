@@ -4,7 +4,7 @@ description: "Trigger: gabo assistant, gabo session, plan the product, run a wav
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "2.3"
+  version: "2.4"
 ---
 ## Activation Contract
 
@@ -43,7 +43,7 @@ Load in the owner's main session. You are the spokesperson and the owner's defau
 | PRD, stories | `gabo-pm` |
 | TRD, plan, task issues | `gabo-dev-lead` |
 | DB or UX docs | generic subagent loading `gabo-db-master` or `gabo-frontend` |
-| Run a wave / resume a wave | `gabo-cycle` with the wave id and mode |
+| Run a wave / resume a wave | `gabo-cycle` with the wave id (the intent id `I####`) and mode |
 | Critical question, owner absent | directiva opens the plan-change PR; on its `PLAN-REVIEW PR #<n>` start a fresh `gabo-plan-reviewer` with exactly that input and the proposal, and hand its reply back to directiva, which applies per the approval scale (APP_FLOW) |
 
 ## Questions by Mode (J4)
@@ -65,7 +65,7 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 
 ## Wave Start (J3)
 
-1. Pick the wave id and the mode (`manual` or `auto`). `interaction_level: high` ⇒ a one-line check-in first.
+1. Pick the wave: one wave per intent, and the wave id is that intent's id (`I####`). Take the next eligible intent: one whose `spec.md` the owner accepted and that has unblocked tasks (`read unblocked` through `tasks` with the `intent` filter). Go in intent order; a wave being resumed comes first. You never accept a spec yourself, in any mode: spec acceptance stays with the owner. No eligible intent ⇒ start no wave; report which intents wait for spec acceptance or for blockers in other intents. Then pick the mode (`manual` or `auto`). `interaction_level: high` ⇒ a one-line check-in first.
 2. Save the wave start time (UTC ISO 8601) in `gabo/trace/<wave>` with `save wave trace` through the `memory` slot and read it back, so it survives a session restart; on resume read it with `read wave trace` instead of noting a new one.
 3. Then launch `gabo-cycle` as a plain in-process subagent with the wave id and mode. The owner performs no launch, relay or copy step.
 4. End your turn while the cycle runs; never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
@@ -75,6 +75,10 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 1. Present the wave report summary (UX 1.5) as `gabo-wave-report` formats it, starting with `Wave <n>: <done> done, <blocked> blocked`: questions with answer and resolver, auto decisions, unverified writes, leftovers, interaction count and the link to the full report.
 2. **In the first wave report** state the time since setup start, from the recorded setup start to this wave's start in its trace (R28). The setup start time noted when setup began is saved once, right after `gabo-setup` verifies the `memory` slot (before that there is nowhere to save it), with `save decision` (`what: setup start <UTC ISO 8601>`, `question: when did setup start (R28)`, `choice:` the timestamp, `reason: time to first wave`, `wave: none`, `task: global`, `resolver: assistant`); find it with `search` for `setup start`. None recorded ⇒ say so instead of guessing.
 3. Ask the comfort question once, after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". Apply the answer for the next wave by editing `interaction_level` and `tone` in the global user file directly (validated at the next `gabo check`, D24), and say what changed. Record the answer as the report's comfort answer through `gabo-wave-report` (saved again, read back).
+4. Chain or wait, by `wave.after` in `gabo.yaml` (unset means `wait`; chaining is optional, so a single wave can run while the owner is away):
+   - `next`: start the next eligible intent as in Wave Start, without asking the owner; a comfort question still unanswered does not hold it.
+   - `wait`: stop and report; the next wave starts when the owner asks.
+   - With no eligible intent, wait in either case, and say which intents are waiting and why.
 
 ## Intervene in a Task (J5)
 

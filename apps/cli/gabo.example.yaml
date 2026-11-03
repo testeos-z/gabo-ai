@@ -60,9 +60,16 @@ review:
 # coder:
 #   login: vulcam-coder
 
-# Most coder sessions the cycle runs at once (required). 3 leaves room for
-# the reviewer's checks on the same machine; lower it on a smaller one.
+# Most coder sessions the cycle runs at once within one wave, that is within
+# one intent's tasks (required). 3 leaves room for the reviewer's checks on
+# the same machine; lower it on a smaller one.
 parallelism: 3
+
+# A wave is one intent. When it closes the assistant either starts the next
+# intent whose spec is accepted (next) or stops and reports (wait). Optional;
+# unset means wait. With no eligible intent it waits either way.
+wave:
+  after: wait
 
 # Read by the cycle at wave cleanup.
 worktree:

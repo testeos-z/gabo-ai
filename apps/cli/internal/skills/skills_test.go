@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -162,6 +163,11 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"`gabo/ledger/<wave>`",
 			// T061: the report format lives in gabo-wave-report.
 			"`gabo-wave-report`",
+			// S11: one wave is one accepted intent, read through the tasks filter.
+			"exactly one accepted intent", "the wave id is the intent id (`I####`)",
+			"`read unblocked` with the `intent` filter", "stays blocked",
+			"reported, never pulled in", "every task of that intent is DONE or BLOCKED",
+			"coders in parallel within this intent",
 		},
 		// T061: J3 wave report (TRD 9.2) formatted once and saved through memory.
 		"gabo-wave-report/SKILL.md": {
@@ -193,6 +199,11 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"after `gabo-setup` verifies the `memory` slot", "save wave trace",
 			// T061: the summary and the comfort answer follow gabo-wave-report.
 			"`gabo-wave-report`",
+			// S11, S14: one wave per intent, chained only by `wave.after`.
+			"## Wave Start", "next eligible intent", "`spec.md` the owner accepted",
+			"never accept a spec", "has unblocked tasks", "`wave.after`",
+			"`next`: start the next eligible intent", "`wait`: stop and report",
+			"no eligible intent", "wait in either case", "unset means `wait`",
 			// T033: J5 intervene in a task: mediate by default, offer a direct session
 			// once after three mediated exchanges (APP_FLOW A5), open it through the
 			// `direct_sessions` slot, resume from the traces; R14, R18, D9, D18.
@@ -758,4 +769,24 @@ func scaleRows(t *testing.T, doc, heading string) []string {
 		}
 	}
 	return rows
+}
+
+// S11: a wave no longer takes every unblocked task of the tracker, and the
+// assistant no longer picks a free-form wave id.
+func TestWaveIsOneIntent(t *testing.T) {
+	t.Parallel()
+	for file, gone := range map[string][]string{
+		"gabo-cycle/SKILL.md":     {"take the unblocked ones (every blocker closed) up to `parallelism`"},
+		"gabo-assistant/SKILL.md": {"Pick the wave id and the mode (`manual` or `auto`)."},
+	} {
+		b, err := fs.ReadFile(Catalog(), file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, g := range gone {
+			if strings.Contains(string(b), g) {
+				t.Errorf("%s still says %q", file, g)
+			}
+		}
+	}
 }
