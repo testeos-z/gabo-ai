@@ -1,8 +1,9 @@
 // Fake Pi engine API for the extension tests (intent 0003, plan TRD 11).
 // It mirrors the parts of Pi 1.4.0 dist/core/extensions/types.d.ts the gabo
-// extension may use: ExtensionAPI.on and getAllTools (ToolInfo), and the
-// ExtensionContext passed to handlers (cwd, mode, hasUI, ui.notify). Any
-// other ExtensionAPI member throws, so an unexpected use fails the test.
+// extension may use: ExtensionAPI.on and getAllTools (ToolInfo), the
+// ExtensionContext passed to handlers (cwd, mode, hasUI, ui.notify) and the
+// handlers' return values (ToolCallEventResult). Any other ExtensionAPI
+// member throws, so an unexpected use fails the test.
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -56,20 +57,30 @@ export function fakePi(tools: FakeToolInfo[]) {
     },
   });
 
-  // Fires an event the way Pi does: every handler in order, awaited.
-  async function emit(event: { type: string } & Record<string, unknown>, cwd: string): Promise<Notified[]> {
+  // Fires an event the way Pi does: every handler in order, awaited. Returns
+  // what the handlers showed and what each returned (Pi 1.4.0: a tool_call
+  // handler may return a ToolCallEventResult { block?, reason? }).
+  async function fire(
+    event: { type: string } & Record<string, unknown>,
+    cwd: string,
+  ): Promise<{ notified: Notified[]; results: unknown[] }> {
     const notified: Notified[] = [];
+    const results: unknown[] = [];
     const ctx = {
       cwd,
       mode: "tui",
       hasUI: true,
       ui: { notify: (message: string, type?: string) => notified.push({ message, type }) },
     };
-    for (const handler of handlers.get(event.type) ?? []) await handler(event, ctx);
-    return notified;
+    for (const handler of handlers.get(event.type) ?? []) results.push(await handler(event, ctx));
+    return { notified, results };
   }
 
-  return { pi, handlers, used, emit };
+  async function emit(event: { type: string } & Record<string, unknown>, cwd: string): Promise<Notified[]> {
+    return (await fire(event, cwd)).notified;
+  }
+
+  return { pi, handlers, used, emit, fire };
 }
 
 // A fake `gabo` executable in its own bin dir. Each run records its argv,

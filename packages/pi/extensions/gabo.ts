@@ -7,11 +7,14 @@
 //   session_start (T6): in a gabo project (gabo.yaml in the working
 //   directory) run gabo once with the session facts and show each returned
 //   notification unchanged; gabo missing or failing -> one warning.
-//   tool_call (T7): reuses sessionFacts and runGabo below.
+//   tool_call (T7): for Pi's write and edit tools in a gabo project, run
+//   gabo once with the session facts plus the call's input.path, unchanged,
+//   as the one target path; gabo's block becomes { block: true, reason }
+//   with gabo's reason; gabo missing or failing -> no block, one warning.
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionContext, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 
 export type GaboEvent = "session_start" | "tool_call";
 
@@ -130,6 +133,34 @@ export function showNotifications(ctx: ExtensionContext, result: GaboResult): vo
   for (const n of result.notify) ctx.ui.notify(n.text, n.level as "info" | "warning" | "error");
 }
 
+// Pi's file-writing tools whose target gabo judges (S5, S6).
+const WRITE_TOOLS = new Set(["write", "edit"]);
+
+// Relays one write or edit call to gabo and applies gabo's answer: exit 1
+// with a block reason blocks the call with that reason unchanged; any other
+// outcome lets it run. Which paths block is gabo's decision, not this one.
+export async function onToolCall(
+  pi: ExtensionAPI,
+  event: ToolCallEvent,
+  ctx: ExtensionContext,
+): Promise<ToolCallEventResult | undefined> {
+  if (!WRITE_TOOLS.has(event.toolName) || !isGaboProject(ctx.cwd)) return undefined;
+  const facts = { ...sessionFacts(pi, "tool_call"), target_paths: [event.input.path as string] };
+  const run = await runGabo(ctx.cwd, facts);
+  if (!run.ok) {
+    warnGaboUnavailable(ctx, run.problem);
+    return undefined;
+  }
+  showNotifications(ctx, run.result);
+  if (run.code !== 1) return undefined;
+  const reason = run.result.block?.reason;
+  if (typeof reason !== "string") {
+    warnGaboUnavailable(ctx, "exit 1 without a block reason");
+    return undefined;
+  }
+  return { block: true, reason };
+}
+
 export default function gabo(pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
     if (!isGaboProject(ctx.cwd)) return;
@@ -137,4 +168,5 @@ export default function gabo(pi: ExtensionAPI): void {
     if (run.ok) showNotifications(ctx, run.result);
     else warnGaboUnavailable(ctx, run.problem);
   });
+  pi.on("tool_call", (event, ctx) => onToolCall(pi, event, ctx));
 }
