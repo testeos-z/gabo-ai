@@ -77,7 +77,7 @@ Intent tracker item: [#173](https://github.com/testeos-z/gabo-ai/issues/173) und
 | T8 | [#214](https://github.com/testeos-z/gabo-ai/issues/214) |
 | T9 | [#215](https://github.com/testeos-z/gabo-ai/issues/215) |
 | T10 | [#216](https://github.com/testeos-z/gabo-ai/issues/216) |
-| T11 | pending (created after the plan-change PR merges) |
+| T11 | [#235](https://github.com/testeos-z/gabo-ai/issues/235) |
 
 ## Risks to the plan
 
