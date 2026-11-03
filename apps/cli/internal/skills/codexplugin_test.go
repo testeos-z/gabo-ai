@@ -1,6 +1,10 @@
 package skills
 
 import (
+	"bytes"
+	"fmt"
+	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -119,14 +123,21 @@ func TestCodexPluginManifest(t *testing.T) {
 	}
 }
 
-// The Codex plugin skills directory lists exactly the entries of the Claude
-// Code plugin skills directory, and each entry is a relative symlink that
-// resolves to the catalog folder of the same name, so both plugins carry one
-// skill source (intent 0002 S3, D4).
-func TestCodexPluginSkillsMatchTheClaudeCodePlugin(t *testing.T) {
+// The Codex plugin skills directory holds exactly the catalog skills the
+// Claude Code plugin ships (every skill gabo init copies minus the
+// review-running ones), each as a real copy, never a symlink, byte-identical
+// to its catalog folder: codex-cli leaves symlinked skill folders and files out
+// of its plugin cache (intent 0002 S1, S3, D4, spec open question 5 option c).
+func TestCodexPluginSkillsCopyTheCatalog(t *testing.T) {
 	t.Parallel()
-	got := dirNames(t, filepath.Join(repoRoot, codexPluginDir, "skills"))
-	want := dirNames(t, filepath.Join(repoRoot, pluginDir, "skills"))
+	dir := filepath.Join(repoRoot, codexPluginDir, "skills")
+	got := dirNames(t, dir)
+	var want []string
+	for _, n := range Names() {
+		if !slices.Contains(pluginExcluded, n) {
+			want = append(want, n)
+		}
+	}
 	if !slices.Equal(got, want) {
 		t.Fatalf("Codex plugin skills\n got %v\nwant %v", got, want)
 	}
@@ -134,29 +145,99 @@ func TestCodexPluginSkillsMatchTheClaudeCodePlugin(t *testing.T) {
 		t.Fatal("Codex plugin skills miss gabo-reviewer-config (S3)")
 	}
 	for _, name := range pluginExcluded {
-		if slices.Contains(got, name) {
-			t.Fatalf("Codex plugin ships excluded skill %s (S3)", name)
+		if _, err := os.Lstat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("Codex plugin ships excluded skill %s (err %v)", name, err)
 		}
 	}
-
-	catalog := absReal(t, ".")
-	dir := filepath.Join(repoRoot, codexPluginDir, "skills")
 	for _, name := range got {
-		link := filepath.Join(dir, name)
-		target, err := os.Readlink(link)
-		if err != nil {
-			t.Fatalf("%s is not a symlink: %v", name, err)
-		}
-		if filepath.IsAbs(target) {
-			t.Fatalf("%s links to absolute %s, want a relative link", name, target)
-		}
-		if resolved, want := absReal(t, link), filepath.Join(catalog, name); resolved != want {
-			t.Fatalf("%s resolves to %s, want %s", name, resolved, want)
-		}
-		if _, err := os.Stat(filepath.Join(link, "SKILL.md")); err != nil {
-			t.Fatalf("%s: %v", name, err)
+		requireCopy(t, filepath.Join(dir, name), name)
+	}
+}
+
+// requireCopy fails unless copyPath, a file or directory, is a real copy of
+// src (both relative to the catalog package directory): no symlink at or
+// below copyPath, the same set of files and directories as src, and each file
+// byte-identical with the same mode. It names the first drifted path. The
+// Codex plugin's skill folders and hook scripts all go through it.
+func requireCopy(t *testing.T, copyPath, src string) {
+	t.Helper()
+	cp, err := treeEntries(copyPath)
+	if err != nil {
+		t.Fatalf("Codex plugin copy %s: %v", copyPath, err)
+	}
+	sp, err := treeEntries(src)
+	if err != nil {
+		t.Fatalf("copy source %s: %v", src, err)
+	}
+	for _, rel := range sortedUnion(cp, sp) {
+		c, inCopy := cp[rel]
+		s, inSrc := sp[rel]
+		at := filepath.Join(copyPath, rel)
+		switch {
+		case !inCopy:
+			t.Fatalf("%s: missing from the copy of %s", at, filepath.Join(src, rel))
+		case !inSrc:
+			t.Fatalf("%s: not in the source %s", at, src)
+		case c.mode != s.mode:
+			t.Fatalf("%s: mode %v, source %s has %v", at, c.mode, filepath.Join(src, rel), s.mode)
+		case !bytes.Equal(c.data, s.data):
+			t.Fatalf("%s: content differs from %s", at, filepath.Join(src, rel))
 		}
 	}
+}
+
+// treeEntry is one file or directory of a copied tree; data is nil for
+// directories.
+type treeEntry struct {
+	mode fs.FileMode
+	data []byte
+}
+
+// treeEntries reads root (a file or a directory) into entries keyed by the
+// path relative to root ("." for root itself). Any symlink is an error.
+func treeEntries(root string) (map[string]treeEntry, error) {
+	out := map[string]treeEntry{}
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, p)
+		if err != nil {
+			return err
+		}
+		info, err := os.Lstat(p)
+		if err != nil {
+			return err
+		}
+		switch {
+		case info.Mode()&fs.ModeSymlink != 0:
+			return fmt.Errorf("%s is a symlink, want a real copy", p)
+		case info.IsDir():
+			out[rel] = treeEntry{mode: info.Mode()}
+		case info.Mode().IsRegular():
+			b, err := os.ReadFile(p)
+			if err != nil {
+				return err
+			}
+			out[rel] = treeEntry{mode: info.Mode(), data: b}
+		default:
+			return fmt.Errorf("%s is not a regular file or directory (mode %v)", p, info.Mode())
+		}
+		return nil
+	})
+	return out, err
+}
+
+// sortedUnion returns the keys of a and b, sorted and without duplicates.
+func sortedUnion(a, b map[string]treeEntry) []string {
+	keys := slices.Collect(maps.Keys(a))
+	for k := range b {
+		if _, ok := a[k]; !ok {
+			keys = append(keys, k)
+		}
+	}
+	slices.Sort(keys)
+	return keys
 }
 
 // dirNames lists the entry names of dir in directory order.
