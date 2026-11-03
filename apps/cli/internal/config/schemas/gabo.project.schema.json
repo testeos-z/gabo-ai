@@ -177,11 +177,11 @@
           "additionalProperties": false,
           "properties": {
             "scope": {
-              "description": "Widest plan scope agents may change (R19, D7).",
+              "description": "Widest plan scope agents may change (R19, D7): task is one task in one intent's plan.md; group is one whole intent, its spec.md and plan.md; global is several intents or the PRD/TRD conventions.",
               "enum": ["task", "group", "global", "", null]
             },
             "global_without_owner": {
-              "description": "Whether the global plan may change without the owner (D7).",
+              "description": "Whether a global-scope change (several intents or the PRD/TRD conventions) may apply without the owner (D7).",
               "type": ["boolean", "null"]
             }
           }

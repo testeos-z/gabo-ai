@@ -212,6 +212,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"fresh", "clean context", "index the repository", "never edit",
 			"`AGREE`", "`COUNTER-PROPOSAL`", "BLOCKED", "R19", "D7", "D8",
 			"never applies automatically", "save decision",
+			"intent → spec → plan → task → test", "one intent's `plan.md`",
 		},
 		"gabo-pm/SKILL.md":                       {"`gabo-plan-reviewer`", "## Plan-Change Flow"},
 		"gabo-dev-lead/SKILL.md":                 {"`gabo-plan-reviewer`", "## Plan-Change Flow"},
@@ -734,7 +735,7 @@ func TestPlanReviewerCarriesTheAppFlowApprovalScale(t *testing.T) {
 	if len(got) != 6 {
 		t.Fatalf("approval scale has %d table lines, want header, rule and 4 scopes", len(got))
 	}
-	for i, scope := range []string{"One task", "Group of tasks", "Global plan", "Any scope beyond `plan_change.scope`"} {
+	for i, scope := range []string{"One task", "One intent", "Several intents or the PRD/TRD conventions", "Any scope beyond `plan_change.scope`"} {
 		if !strings.HasPrefix(got[i+2], "| "+scope) {
 			t.Errorf("row %d = %q, want scope %q", i+1, got[i+2], scope)
 		}

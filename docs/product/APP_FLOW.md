@@ -47,9 +47,11 @@ Proposed (auto) A6. Source: TRD D7, PRD 10.2 and operating rule 2. Applies in an
 | proposal scope | owner present | owner absent |
 |---|---|---|
 | One task | Debated with the owner | Applies automatically once the plan-change reviewer agrees |
-| Group of tasks | Debated with the owner | Applies automatically only if the config allows group scope and the reviewer agrees; otherwise waits for the owner |
-| Global plan | Debated with the owner | Waits for the owner unless `plan_change.global_without_owner` is true, and still needs the reviewer's agreement |
+| One intent | Debated with the owner | Applies automatically only if the config allows group scope and the reviewer agrees; otherwise waits for the owner |
+| Several intents or the PRD/TRD conventions | Debated with the owner | Waits for the owner unless `plan_change.global_without_owner` is true, and still needs the reviewer's agreement |
 | Any scope beyond `plan_change.scope`, or rejected by the reviewer | Debated with the owner | Never applies automatically; waits for the owner |
+
+Scopes map to `plan_change.scope` (`task` < `group` < `global`): one task is one task inside one intent's `plan.md`; one intent is its `spec.md` and `plan.md` together; several intents or the PRD/TRD conventions is `global`. There is no global implementation plan.
 
 While a proposal is debated or waits, only the affected task is BLOCKED (operating rule 2). Every proposal has its own issue and PR touching only `docs/product` and tasks.
 
