@@ -14,13 +14,13 @@
 #   template     body template, relative to this directory
 agents:
   - id: gabo-pm
-    role: Directiva product manager; writes the PRD and user stories and opens plan-change proposals.
+    role: Directiva product manager; writes the PRD, each intent and its spec, and opens plan-change proposals.
     skills: [gabo-pm, gabo-plan-reviewer]
     tools: [read, search, edit, shell, web, tracker, repository-host, memory, skills]
     launched_by: main-session
     template: agents/gabo-pm.md
   - id: gabo-dev-lead
-    role: Directiva dev lead; writes the TRD, the implementation plan and the task issues with dependencies.
+    role: Directiva dev lead; writes the TRD, each intent's plan and the task issues with dependencies.
     skills: [gabo-dev-lead, gabo-plan-reviewer]
     tools: [read, search, edit, shell, web, tracker, repository-host, memory, skills]
     launched_by: main-session
@@ -44,7 +44,7 @@ agents:
     launched_by: main-session
     template: agents/gabo-plan-reviewer.md
   - id: gabo-cycle
-    role: Wave runner; claims unblocked tasks, creates worktrees, launches coders, keeps the resource ledger and reports the wave.
+    role: Wave runner; runs one intent per wave, claims its unblocked tasks, creates worktrees, launches coders, keeps the resource ledger and reports the wave.
     skills: [gabo-cycle, gabo-wave-report]
     tools: [read, search, shell, git, tracker, repository-host, memory, skills, subagents]
     launched_by: main-session

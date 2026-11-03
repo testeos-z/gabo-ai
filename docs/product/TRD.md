@@ -4,39 +4,24 @@
 |---|---|
 | status | Draft |
 | owner | gabo-dev-lead |
-| version | 0.9 |
-| date | 2026-10-27 |
-| linked docs | [PRD](PRD.md) (R1–R39; R31–R36 from plan change #51, PR #52; R31 amended and R39 added by plan change #148, PR #149), stories `docs/product/stories/` (US-001–US-011), [DB_SCHEMA](DB_SCHEMA.md), diagrams `docs/product/diagrams/` |
+| version | 0.10 |
+| date | 2026-11-03 |
+| linked docs | [PRD](PRD.md) (R1–R39), [MIGRATIONS](MIGRATIONS.md), intents [`docs/product/intents/`](intents/README.md), [APP_FLOW](APP_FLOW.md), diagrams `docs/product/diagrams/`, previous version [TRD 0.9](archive/TRD-0.9.md) |
 
-Every decision traces to PRD requirement ids.
+The global technical conventions every intent of gabo-ai follows: the stack, the architecture, code and test conventions, the slot contracts, the configuration shapes and the MADR-style decisions. It holds no per-change design and no per-requirement mapping; those live in each intent's `spec.md` and `plan.md`. Decisions cite PRD requirement ids. The section numbers and decision ids are stable, because skills and tests cite them (for example TRD 9.2, 9.4, D7, D19). The auto-mode proposal table, the dated owner-decision notes and the requirement coverage table of earlier versions are kept in [TRD 0.9](archive/TRD-0.9.md).
 
-## Auto-mode proposals (awaiting owner)
+## Amendment 2026-11-03: per-change model (feature `per-change-sdlc`)
 
-This version was completed by the dev-lead in auto mode. Each item is marked **Proposed (auto)** where it appears, with a one-line reason. Approved decisions D1–D14 keep their meaning and ids. The owner approves or rejects these in one pass.
+Approved (owner 2026-11-03, feature `per-change-sdlc`, applied directly by the owner's decision). Each changed part carries the note **Amended (owner 2026-11-03, per-change-sdlc)**.
 
-| # | section | proposal |
+| # | change | where |
 |---|---|---|
-| A1 | 9 Interfaces | Finalized: key names aligned to DB_SCHEMA, `agent_host` contract added, operating rules (9.5) added. |
-| A2 | 9.2 Inter-agent payloads | Reviewer verdict marker carries the reviewed head SHA (R26). |
-| A3 | 9.1 / 9.2 | Auto decisions are recorded with wave, task, question, choice and reason (R30). |
-| A4 | 10 D15 | Per-wave resource ledger drives cleanup and auto-mode deletions (R13, R23). Accepted (owner 2026-10-26): the cycle keeps it in the memory slot through its skill; no CLI, no state dir. Amended by D23 (owner 2026-10-27): the coder that owns a task closes it after its PR merges (task issue DONE, worktree, local then remote branch), the coder's resume handle is recorded in the ledger, and the cycle's wave close is a fallback sweep over ledger entries no coder could close. |
-| A5 | 10 D16 | Traceability check is generic Go in the `plan` slice (R20). Accepted (owner 2026-10-26), then superseded by D19 (owner 2026-10-26): the check is a skill instruction. |
-| A6 | 10 D17 | Wave resume recomputes from tracker state and memory traces (R25). Accepted (owner 2026-10-26): done by the cycle skill; no CLI, no state dir. |
-| A7 | 8.4 Observability | Time to first wave measured from setup start to first wave start (R28). |
-| A8 | 11 Testing strategy | Finalized: layers linked to the PRD verification column; R21–R30 mapped to tests and inspections. |
-| A9 | 12 Risks and technical debt | Finalized: new risks plus technical debt TD1–TD7 from the current config and skills. |
-| A10 | 10 Requirement coverage | Coverage table requirement → decisions, sections, stories, verification. |
-| A11 | 8.1 Generation | Pi agents generated in `.pi/agents/`; targets read from `generation.targets`. |
-
-**Owner decisions (2026-10-26).** Approved (owner 2026-10-26): the gabo Go CLI is only an agent compiler for the initial configuration (D18); the traceability check and the plan templates live in the skills (D19, supersedes D16); the reviewer runs on deterministic scripts the compiler installs into the repository (D20). Every Go command used during the work itself is removed; sections 2, 3, 4, 5, 6, 8, 9, 10, 11 and 12 are updated accordingly.
-
-**Owner decisions (2026-10-26, second pass).** Approved (owner 2026-10-26): the read-only `gbai config [--json]` is removed (question 7); the reviewer scripts live in the `scripts/` folder of the `gabo-reviewer` skill, installed at user level and not in the repository (question 8, D20 amended); the setup TUI is removed and setup starts from a prompt pasted into Claude Code or Pi, after which `gbai generate` installs the per-runtime artifacts from one installer table (question 9, D21); agents write config by editing the YAML directly and validation runs at the next `gbai generate` (question 10, D18 amended); personalization has a stable layer and a learning layer (D22).
-
-**Owner decision (2026-10-27), model B.** Approved (owner 2026-10-27, plan change issue #51; PRD R31–R35): the CLI keeps only `gabo init`, `gabo check` and `gabo version`; the runtime's own agent writes the config and builds the agents from skills (a neutral agent spec, runtime skills for Claude Code and Pi, and a runtime builder for other engines). `gbai generate` (with `--check`), `gbai config set`, the Go generation targets and the per-runtime installer table are removed. Recorded as D24, which supersedes D18 and D21 in part and amends D3. Principle: technical simplicity, less over-engineering. Technical details marked **Proposed (dev-lead 2026-10-27)** in D24 and section 9.4 (catalog location, check behavior, user-level reviewer location, skill catalog; simplified by the owner below) await the owner in the plan-change PR. Sections 1, 2, 3, 4, 8, 9, 10, 11 and 12 are updated; superseded text is marked and kept for history. **Simplified (owner 2026-10-27, review of PR #54):** the setup prompt is the only entry text (no separate entry file); `generation.targets` is dropped in favor of `runtimes.*`; there is no template hash; instead each built agent file carries a `gabo-version: <x.y.z>` line (owner 2026-10-27) that `gabo check` compares with the catalog stamp, `gabo check` checks config, that every spec agent exists, slot coverage and the catalog version stamp; after a gabo upgrade the user runs `gabo init` (it refreshes the catalog when the stamp is older or missing and reinstalls the user-level reviewer by its own version, never touching the config) and asks the agent to rebuild; `gabo-reviewer` never enters the in-repository catalog copy.
-
-**Owner decision (2026-10-27), rename.** Approved (owner 2026-10-27): the product is renamed gabo-ai and the CLI is invoked as `gabo`; skills become `gabo-*`, the project config `gabo.yaml` and the global user directory `gabo` (D26). Plan task T062 applied the rename and T066 renamed this TRD: it uses the `gabo` names, and the former names remain only in dated history and superseded entries.
-
-**Owner decisions (2026-10-26, third pass).** Approved (owner 2026-10-26): gabo-ai recommends, but does not require, the gentle-ai stack (gentle-ai with ODD in the methodology slot, RDD as coder-side validation inside the methodology adapter, Engram in the memory slot); setup offers it as the recommended option and installs it only if the user accepts. Pi targets need a subagent package: gentle-pi with its `gentle-shell` launcher is recommended and setup offers to install it when missing; another subagent package is acceptable; `gbai generate` refuses Pi targets only when no subagent package is present. gabo-ai never edits a subagent package's own configuration (D21 amended, question 11 resolved).
+| T1 | A wave runs one accepted intent; `wave.after` (`next` or `wait`, unset means `wait`) decides whether the assistant chains the next intent. | 5.1, D12, 9.3 |
+| T2 | Plan-change scopes: `task` is one task in one intent's `plan.md`, `group` is one whole intent, `global` is several intents or the PRD/TRD conventions. There is no global plan. | D7, 9.2 |
+| T3 | Planning documents are the PRD, the TRD, per intent `intent.md`, `spec.md` and `plan.md`, the optional `DESIGN.md` and the MIGRATIONS log; user stories, the global implementation plan and the upfront schema are retired. | D14, 7 |
+| T4 | The traceability check reads intents, specs, plans and tracker tasks; `gabo check` enforces the intent stage order. | D19, 9.4 |
+| T5 | The configuration shapes formerly in DB_SCHEMA move to 9.3; data and config changes are logged in MIGRATIONS. | 7, 9.3 |
+| T6 | The requirement coverage table is dropped: requirement-to-task traceability lives in each intent. | 10, 11 |
 
 ## 1. Introduction and quality goals
 
@@ -49,7 +34,7 @@ PRD goals and the requirements that carry them:
 | Protect the human's energy | R1, R4, R15, R17, R18 |
 | Work never stalls | R3, R4, R10, R13 |
 | Questions surface | R5, R6, R19 |
-| A living plan | R2, R7, R19, R20 |
+| Plan per change, not upfront | R2, R7, R19, R20 |
 | Adapts to the team | R8, R9, R11, R12, R14, R16, R31–R36 |
 
 Quality goals come from the PRD quality requirements: security (R21–R23), reliability (R24–R25), cost (R26–R27), time to value (R28) and observability (R29–R30). The first release sets no performance targets.
@@ -108,7 +93,7 @@ flowchart LR
 - Native subagents for agent communication; Orca only for the reviewer and direct sessions (D1).
 - Contract skills plus repository adapters for every tool-specific part; generic Go code only (D2, D4).
 - Runtime-native agent files built by the user's agent from the neutral agent spec and fixed templates through a runtime skill, and committed (D3 amended, D24); `gabo check` detects missing agents and a stale catalog version. After a gabo upgrade the user runs `gabo init` and asks the agent to rebuild (9.4).
-- Waves computed by the cycle skill from tracker dependencies read through the `tasks` adapter (D12); no Go wave command.
+- One wave per accepted intent, computed by the cycle skill from that intent's tracker dependencies read through the `tasks` adapter, with `wave.after` deciding whether waves chain (D12, 5.1); no Go wave command. Amended (owner 2026-11-03, per-change-sdlc).
 - An isolated reviewer as the mandatory merge gate (D6), run by deterministic scripts bundled in the `gabo-reviewer` skill and installed at user level by `gabo init` (D24), out of reach of PR code; the reviewer agent only validates the request and invokes the script (D20).
 - Runtime knowledge lives in runtime skills (Claude Code, Pi) and the runtime builder, not in Go (D24); setup starts with `gabo init`, after which the user's agent configures gabo-ai, offering the recommended (not required) gentle-ai stack and, for Pi, a subagent package (gentle-pi recommended). Superseded (owner 2026-10-27): one Go installer table of what goes where per runtime (D21).
 - Go only copies the catalog, installs the reviewer skill and validates (D24); every work-time operation is an agent using its own tools under a skill (D18).
@@ -182,6 +167,8 @@ User flows live in `docs/product/diagrams/`. Key internal sequences:
 
 ### 5.1 Wave run (R3, R4, R5, R10, R13)
 
+Amended (owner 2026-11-03, per-change-sdlc). A wave is one accepted intent: the wave id is the intent id (`I####`), and the cycle takes only that intent's tasks, through the `tasks` contract's `read unblocked` with the `intent` filter. `parallelism` bounds the coders within that intent. A task of this intent blocked by a task of another intent stays blocked and is reported; the other intent's task is never pulled in. The assistant picks the next eligible intent (its spec accepted by a human, with unblocked tasks) in intent order, a resumed wave first. When the wave closes, `wave.after` in `gabo.yaml` decides: `next` starts the next eligible intent without asking the owner; `wait` (also when unset) stops and reports, and the next wave starts when the owner asks. With no eligible intent the assistant waits either way. Chaining is optional, so a single wave can run in the cloud while the owner is away.
+
 ```mermaid
 sequenceDiagram
   participant A as Assistant
@@ -190,8 +177,9 @@ sequenceDiagram
   participant K as Coder
   participant M as Memory
   participant H as Repository host
-  A->>C: start wave
-  C->>T: read tasks and blocked-by links, take the unblocked ones
+  A->>T: pick the next eligible intent (spec accepted, unblocked tasks)
+  A->>C: start wave <intent id>
+  C->>T: read unblocked with the intent filter, take up to parallelism
   C->>K: launch one in-process coder per task
   C->>M: record the coder's resume handle in the wave ledger
   K-->>C: outcome (HANDED / BLOCKED, PR, questions, resources created)
@@ -204,8 +192,13 @@ sequenceDiagram
   K->>H: remove worktree (no force), delete local then remote branch
   K-->>A: close report (removed, leftovers)
   A->>M: mark ledger entries removed or leftover
-  C->>C: wave close: fallback sweep over ledger entries no coder closed
-  C-->>A: wave report (statuses, questions, leftovers)
+  C->>C: wave close when every task of the intent is DONE or BLOCKED: fallback sweep over ledger entries no coder closed
+  C-->>A: wave report (statuses, questions, blocked across intents, leftovers)
+  alt wave.after is next and an eligible intent exists
+    A->>C: start wave <next intent id>
+  else wave.after is wait, unset, or no eligible intent
+    A-->>A: stop and report to the owner
+  end
 ```
 
 ### 5.2 Review (R9)
@@ -252,7 +245,7 @@ sequenceDiagram
 
 ## 7. Data
 
-Config files and their schemas are detailed in [DB_SCHEMA.md](DB_SCHEMA.md); gabo-ai has no database. High-level shapes are under [Configuration shapes](#93-configuration-shapes).
+Amended (owner 2026-11-03, per-change-sdlc). gabo-ai has no database and no upfront schema. Its config files, their shapes and the files `gabo init` writes are under [Configuration shapes](#93-configuration-shapes). Every data or config change is logged step by step in [MIGRATIONS](MIGRATIONS.md) by the intent that makes it (its `spec.md` section 4). The former DB_SCHEMA document is archived in [`archive/DB_SCHEMA.md`](archive/DB_SCHEMA.md).
 
 ## 8. Crosscutting concepts
 
@@ -339,7 +332,7 @@ Every task write is followed by a verifying re-read. This rule lives in the cycl
 
 ## 9. Interfaces (proposed (auto), awaiting owner)
 
-Proposed (auto). Reason: reviewed against PRD R1–R30, stories US-001–US-011 and DB_SCHEMA; key names follow DB_SCHEMA.
+Key names follow [9.3](#93-configuration-shapes) and the JSON Schemas in `schemas/`.
 
 ### 9.1 Slot contracts
 
@@ -347,7 +340,7 @@ Each contract is a gabo-ai skill; each operation must be covered by the adapter.
 
 | slot | operations | requirement ids |
 |---|---|---|
-| `tasks` | create (with blocked-by / unblocks), read unblocked, read one, claim, log progress, change status (DONE / BLOCKED), link PR, verify by re-read | R2, R3, R10, R24 |
+| `tasks` | create (with blocked-by / unblocks and, amended (owner 2026-11-03, per-change-sdlc), an optional parent intent), read unblocked (optionally filtered by intent), read one, claim, log progress, change status (DONE / BLOCKED), link PR, verify by re-read | R2, R3, R10, R24 |
 | `memory` | save decision (what, why, who, mode, wave, task), list decisions (filter by mode, wave, task), search, read one; save and read the per-wave resource ledger and wave traces (D15, D17); save and read preference observations under the fixed topic `user/preferences` in the global or project scope (D22). Recommended, not required (owner 2026-10-26): Engram | R6, R13, R17, R23, R25, R30 |
 | `notifications` | notify owner, notify a developer by alias | R16 |
 | `direct_sessions` | open session in a worktree with a brief, send message, read state, close | R14, R18 |
@@ -358,25 +351,95 @@ Each contract is a gabo-ai skill; each operation must be covered by the adapter.
 
 **Recommended adapters (Approved (owner 2026-10-26)).** A recommendation is an option setup offers first and installs only if the user accepts; it is never a silent default (R12).
 
-Proposed (auto): `agent_host` contract row and the `memory` filters. Reason: DB_SCHEMA defines the slot, and R30 needs decisions listable by wave and task.
+Proposed (auto): `agent_host` contract row and the `memory` filters. Reason: 9.3 defines the slot, and R30 needs decisions listable by wave and task.
 
 ### 9.2 Inter-agent payloads
 
 - **Coder → cycle (outcome).** `status` (HANDED, BLOCKED), task id, PR link, summary, open questions, resources created (worktrees, branches, containers, test databases), reviewer fix rounds used. HANDED means the review is clean and the coder stays resumable. The cycle appends the resources and the coder's resume handle to the wave ledger in the `memory` slot (D15, D23).
 - **Coder → assistant (close report).** Returned when the assistant resumes the owning coder after its PR merged (D23): task id, PR, merged SHA, `status` DONE only once the merge is verified on the host and the task issue is closed (the coder is the only writer of DONE), and each ledger resource as removed or leftover with the reason. The assistant marks the ledger entries removed or leftover.
-- **Cycle → assistant (wave report).** Wave id; per task: status, PR, verdict; questions raised with answer and resolver (R5); interaction count and reasons (R29); unverified task writes (R24); cleanup leftovers from coder task closes and the wave-close sweep, including merged tasks still open because no coder could close them (R13); plan-change proposals; the owner's comfort answer to apply next wave (R17).
+- **Cycle → assistant (wave report).** Wave id (the intent id, amended (owner 2026-11-03, per-change-sdlc)); tasks of the intent blocked across intents; per task: status, PR, verdict; questions raised with answer and resolver (R5); interaction count and reasons (R29); unverified task writes (R24); cleanup leftovers from coder task closes and the wave-close sweep, including merged tasks still open because no coder could close them (R13); plan-change proposals; the owner's comfort answer to apply next wave (R17).
 - **Reviewer → PR.** One comment carrying the marker from `reviewer.signing`, the reviewed head SHA, the verdict (approve / changes requested / blocked) and per-check statuses (tests, build, lint, agent review). **Reviewer → coder.** Orca message relaying the script's final `VERDICT` line (PR, head SHA, verdict, merge result) and pointing to that comment (D20). Proposed (auto): the marker carries the head SHA and the reviewer skips a head that already has a verdict. Reason: makes R26 (one verdict per pushed head) checkable.
-- **Plan-change proposal.** Trigger question, scope (task, group, global), affected task ids, proposed change, rationale, debater (owner or plan-change reviewer) and outcome (agreed, counter-proposal, waiting for owner); delivered as its own issue and PR touching only `docs/product` and tasks (D7).
+- **Plan-change proposal.** Trigger question, scope (task: one task in one intent's `plan.md`; group: one whole intent, its `spec.md` and `plan.md`; global: several intents or the PRD/TRD conventions; amended (owner 2026-11-03, per-change-sdlc)), affected task ids, proposed change, rationale, debater (owner or plan-change reviewer) and outcome (agreed, counter-proposal, waiting for owner); delivered as its own issue and PR touching only `docs/product` and tasks (D7).
 - **Auto decision record.** What was decided, question, choice, reason, mode, wave, task, resolver; written through the `memory` slot (R6, R30).
 
 ### 9.3 Configuration shapes
 
-High level only; field-level details are in [DB_SCHEMA.md](DB_SCHEMA.md).
+Amended (owner 2026-11-03, per-change-sdlc): the field-level shapes formerly in DB_SCHEMA sections 1–5 live here; the steps that built them are logged in [MIGRATIONS](MIGRATIONS.md). The JSON Schemas in `schemas/` (embedded in the CLI by `go generate ./internal/config`, a test fails when the copies differ) and the Go structs in `apps/cli/internal/config/` are the source of truth; a unit test asserts both accept and reject the same fixtures.
 
-- Global user file: `version`, `alias`, `interaction_level` (`low`, `balanced`, `high`), `tone`, `language` (the stable personalization layer, D22).
-- Project `gabo.yaml`: `version`, `mode`, `slots.<name>.adapter` (including `slots.methodology` and the host slot `slots.agent_host`, local or cloud), `reviewer.{placement, signing}`, `runtimes.{coder, reviewer, assistant}` (`runtimes.reviewer` is the only reviewer runtime key), `plan_change.{scope, global_without_owner}`, `developers` (git email → alias), `generation.targets` (dropped, owner 2026-10-27, D24: the runtimes to build for come from `runtimes.{coder, reviewer, assistant}`), `repo.{name, integration_branch}`, `review.*`, `parallelism`, `worktree.keep`.
-- Cloud fields (Railway ids, OS user, bot, session prompts, `sessions.local_orca`, system layer) are not core keys; they live in the `agent_host` adapter.
-- Required keys have no code default; a missing required key fails with "run setup" (R12).
+#### Files gabo-ai owns
+
+| file | location | written by | committed |
+|---|---|---|---|
+| Global user file | `$XDG_CONFIG_HOME/gabo/config.yaml`, else `~/.config/gabo/config.yaml` | Agents editing the YAML (setup through `gabo-config-writer`), or the user | No |
+| Project config | `gabo.yaml` at the git top level | Agents editing the YAML, or the user | Yes |
+| Slot adapters | Paths from `slots.*.adapter`, suggested folder `.gabo/adapters/` | The user, or co-written with `gabo-adapter-writer` | Yes |
+| Skill catalog copy | `.gabo/skills/<name>/`, the embedded catalog byte for byte except `gabo-reviewer` | `gabo init` only | Yes; human-only for the reviewer (9.4) |
+| Catalog version stamp | `.gabo/VERSION`, one line with the bare version | `gabo init` only | Yes; human-only for the reviewer (9.4) |
+| Builder-written runtime skills | `.gabo/runtimes/<name>/` | The user's agent through `gabo-runtime-builder` | Yes |
+| Built agent files | The directory each runtime skill declares in `metadata.agent_dir` (for example `.claude/agents/<id>.md`, `.pi/agents/<id>.md`), each with a `gabo-version: <x.y.z>` line | The user's agent through the runtime skill | Yes |
+| `gabo-reviewer` skill and scripts | `${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer/`, never in the repository | `gabo init`, when missing or its `VERSION` differs | No |
+| Reviewer state | `review.state_dir`, else `$XDG_STATE_HOME/gabo/reviewer`; never inside the coder's checkout | The reviewer scripts | No (disposable) |
+
+Tasks live in the tracker, decisions and ledgers in the memory provider, verdicts as PR comments; gabo-ai stores none of them.
+
+#### Layering and key classes
+
+- The loader reads the user layer, then the project layer (`gabo.yaml` at `git rev-parse --show-toplevel`, or the current directory outside a repository). Missing files are skipped; with no file at all, loading fails and lists the paths it tried. The former system layer `/etc/gabo/gabo.yaml` belongs to the `agent_host` adapter.
+- Each file is decoded strictly (unknown keys fail in the file that holds them) and validated against its schema before the merge. Mappings merge key by key; scalars, lists and nulls in the higher layer replace the lower value; lists are never concatenated. Each file's `version` (0 to the newest supported; missing reads as 0) is checked on its own and not merged.
+- **Personal keys** (`alias`, `interaction_level`, `tone`, `language`): the global file always wins; one set in `gabo.yaml` is ignored with one warning per key (D11). **Project keys**: every other key; the local file wins.
+- `--config <file>` loads exactly that file, with no layering and no key-class filtering.
+- No silent defaults (R12): a missing required key fails with `✗ <key> missing` and `next: run setup`; former code defaults are only suggestions the assistant offers.
+
+#### Global user file
+
+| key | type | required | meaning |
+|---|---|---|---|
+| `version` | integer | no (missing = 0) | Schema version of this file |
+| `alias` | string | no | How the assistant addresses this person (R16, D11) |
+| `interaction_level` | `low`, `balanced`, `high` | no | Preferred number of interactions (R17) |
+| `tone` | string | no | Tone and speaking style (R17) |
+| `language` | BCP 47 tag | no | Conversation language; generated artifacts stay English |
+
+This file is the stable personalization layer (D22). The learning layer lives in the `memory` slot under `user/preferences`. Neither holds secrets or sensitive personal data (R21).
+
+#### Project `gabo.yaml`
+
+"Schema" marks the keys a complete file must set by the JSON Schema; setup asks for the others before writing them (R12).
+
+| key | type | schema | meaning |
+|---|---|---|---|
+| `version` | integer | optional (missing = 0) | Schema version of this file |
+| `mode` | `manual`, `auto` | optional; setup asks | Who resolves questions (R6) |
+| `repo.name` | `owner/name` | required | Target repository |
+| `repo.integration_branch` | string | required (suggestion `dev`) | Only branch auto mode merges into, never main (D13) |
+| `runtimes.{coder, reviewer, assistant}` | `claude`, `pi` | required (suggestion `claude`) | Runtime per role; `runtimes.reviewer` is the only reviewer runtime key, and the Pi reviewer reuses the owner's Pi login (D27) |
+| `slots.<name>.adapter` | relative path or skill name | optional; setup asks | Adapter for `tasks`, `memory`, `notifications`, `direct_sessions`, `methodology` (required, linked as `gabo-methodology`), `repository_host`, `reviewer_placement`, and the optional host slot `agent_host` (D2) |
+| `reviewer.placement` | `local`, `server`, `github-actions`, `gitlab-ci` | optional; setup asks | Where the reviewer runs; first release `local` (D6) |
+| `reviewer.signing` | mapping | optional | Marker of the verdict comment, for example `{marker: gabo-review}` |
+| `coder.login` | string | optional | Coder login for the coder-merge audit rule |
+| `review.checks` | list of commands | required | Checks run in order in a credential-free copy of the merged tree; no shell |
+| `review.auto_merge` | boolean | optional | Reviewer merges on approve |
+| `review.human_only_paths` | list of paths | required | Paths only a human may change; `.gabo/VERSION` and `.gabo/skills/` are human-only regardless (9.4) |
+| `review.check_env` | list of env var names | optional | Variables the reviewer passes from its own environment to the checks, read from the base branch; never values (D27, R21) |
+| `review.pi_credential_env` | env var name | optional | Credential variable passed only to the Pi review step instead of reusing the owner's Pi login (D27) |
+| `review.state_dir` | absolute path | optional | Reviewer clone and workspaces |
+| `developers` | git email → alias | optional | Developer catalog (D10, R16) |
+| `plan_change.scope` | `task`, `group`, `global` | optional; setup asks | Widest plan scope agents may change (R19, D7): `task` is one task in one intent's `plan.md`, `group` one whole intent, `global` several intents or the PRD/TRD conventions. Amended (owner 2026-11-03, per-change-sdlc) |
+| `plan_change.global_without_owner` | boolean | optional; setup asks | Whether a `global` change may apply without the owner, still after the plan-change reviewer agrees (D7) |
+| `wave.after` | `next`, `wait` | optional (unset means `wait`) | What the assistant does when a wave closes: `next` starts the next eligible intent, `wait` stops and reports (5.1). Amended (owner 2026-11-03, per-change-sdlc) |
+| `parallelism` | positive integer | required (suggestion `3`) | Most coders at once within one intent's wave |
+| `worktree.keep` | list | optional | Worktrees never closed (D15, D23) |
+
+Cloud fields (Railway ids, OS user, bot, session prompts, `sessions.local_orca`, the system layer) are not core keys; they live in the `agent_host` adapter, and `gabo check` reports one in `gabo.yaml` as an error naming `slots.agent_host`. `generation.*` was removed (D24) and fails as an unknown key. The repository's own `gabo.yaml` and `apps/cli/gabo.example.yaml` are complete examples.
+
+#### JSON Schema conventions
+
+- Draft 2020-12, `additionalProperties: false` at every level, patterns that mirror the Go validators. A null or empty optional value means unset; a YAML number or boolean in a string key fails, so quote it.
+- The project schema root is a complete `gabo.yaml`; `#/$defs/layer` is one file as the loader reads it, `#/$defs/file` a complete file with every key class. The user schema accepts the personal keys plus project keys as a fallback and requires nothing.
+- No key holds a secret value; a credential is only the name of an environment variable in a key ending in `_env` (R21), enforced by a test.
+- Additive optional keys do not bump `version`; a breaking change bumps it and ships a new schema file, and is logged in MIGRATIONS.
+- Both files start with a `# yaml-language-server: $schema=<url>` comment written by the config writer, for editor validation.
+- `gabo check` is the single validation point for agents, the reviewer and CI (9.4).
 
 ### 9.4 CLI: `gabo init`, `gabo check`, `gabo version` and `gabo prompt` (D24)
 
@@ -403,14 +466,15 @@ Approved (owner 2026-10-27) for the command surface (PRD R31–R33). Every locat
 
 **After a gabo upgrade (owner 2026-10-27; answers PRD open question 11).** `gabo check` reports that new skills are available; the user runs `gabo init`, which refreshes the catalog and, by its own user-copy check, reinstalls the user-level `gabo-reviewer` skill, then asks the agent to rebuild the agents and reruns `gabo check`. No new command.
 
-**`gabo check`** (PRD R33). Read-only; it writes nothing, anywhere. It checks exactly five things (PRD R33): config, agents exist, slot coverage, catalog version, agent version lines. **Project-relative spec (review of PR #54 at 799220b).** The neutral agent spec and the contract operations are read from the project's own catalog copy (`.gabo/skills/`), never from the binary's embedded catalog, so a newer CLI checks an older project against that project's own version:
+**`gabo check`** (PRD R33). Read-only; it writes nothing, anywhere. It checks config, agents exist, slot coverage, catalog version, agent version lines (PRD R33) and, since the per-change model, the intent folders. **Project-relative spec (review of PR #54 at 799220b).** The neutral agent spec and the contract operations are read from the project's own catalog copy (`.gabo/skills/`), never from the binary's embedded catalog, so a newer CLI checks an older project against that project's own version:
 
 - **Config.** Reads the global user file and `gabo.yaml` through the layered config package, validates each layer and the merged result against their JSON Schemas, applies the key classes (a personal key in `gabo.yaml` is a warning; a former cloud key is an error naming `slots.agent_host`) and reports key path, file and next step.
 - **Agents exist.** For each distinct value of `runtimes.{coder, reviewer, assistant}`, `gabo check` reads the agent directory that runtime's skill declares in its frontmatter (`metadata.agent_dir`, for example `.claude/agents` or `.pi/agents`; Proposed). It must be a repository-relative path that stays inside the repository: `gabo check` rejects an absolute path or any `..` segment with `✗ runtime <name>: agent_dir must stay inside the repository`. The runtime skill is `gabo-runtime-<runtime>` in `.gabo/skills/`, or, for one written by `gabo-runtime-builder`, in `.gabo/runtimes/` (Proposed; outside the catalog copy, so a refresh keeps it). In each declared directory only (not recursive, never the whole tree), every agent id of the neutral agent spec needs a file whose base name without extension equals the id; a same-named file anywhere else (a doc, a fixture, a template in the catalog) does not count. A missing agent fails with `next: ask your agent to build it with the runtime skill, then rerun gabo check`; a runtime without a runtime skill or without `metadata.agent_dir` fails with `next: ask your agent to write it with gabo-runtime-builder`. `gabo check` does not judge an agent's content; the runtime skill's probe agent covers that. **Agent version (owner 2026-10-27).** Each built agent file carries one line `gabo-version: <x.y.z>`, the gabo version of the catalog it was built from, placed in the format's comment or frontmatter as the runtime skill specifies; the file name stays fixed and holds no version; there are no hashes. Every agent whose version line is missing or differs from the catalog stamp fails with `✗ agent <id> built with <v>, catalog is <w>: ask your agent to rebuild`. The templates (`gabo-agent-templates`) and the runtime skills write the line.
 - **Slots (absorbs the former coverage check, T011).** Every `slots.<name>.adapter` path exists and its operation headings cover every operation heading of its contract skill, read from the project's catalog copy; missing operations are listed per slot.
 - **Catalog version.** The stamp `.gabo/VERSION` against the CLI version. Older stamp: a warning everywhere, locally and in CI, `this project uses gabo <stamp>; run gabo init to upgrade it`, which never fails the check. Missing stamp: `no stamp: run gabo init` (failure). Newer stamp: `catalog version <w> is newer than gabo <v>` with the upgrade command above (failure). `gabo check` never self-updates. Agent version lines against the stamp stay strict everywhere (see Agents exist).
 - **Upgrade PRs and the base minimum (CI and the reviewer).** CI and the reviewer never self-update. The base branch's `.gabo/VERSION` is a minimum, not an exact version: they need a gabo binary at least that version, and fail with the upgrade command when theirs is older; one global binary is enough (no version cache, no per-version binaries). A newer CLI is safe on an older project because `gabo check` reads the spec and contracts from the project's catalog copy. When the base branch has no stamp there is no minimum, and they use the CLI they have. A PR that changes `.gabo/VERSION` is an upgrade PR: the reviewer scripts and CI detect it from the base-to-head diff and run the CLI they have (at least the base minimum) with `GABO_UPGRADE_PR=1`, which runs only the config schema validation, skips every spec-dependent check (agents exist, slot coverage and both version checks) and prints `upgrade PR: only config validated, human merge required`; the reviewer scripts add the list of changed paths outside the catalog subtree (`.gabo/skills/`) and the declared agent directories; the built-in human-only stamp path makes the owner merge it.
-- **Output and exit.** One line per failure in the UX_UI section 4 shape (`✗ <what>` · `next: <step>`); exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error. No flags.
+- **Intent folders.** Amended (owner 2026-11-03, per-change-sdlc): when `docs/product/intents/` exists, every folder in it is checked offline: a `NNNN-slug` name with a unique number, an `intent.md`, no `plan.md` before a `spec.md` whose acceptance table a human filled, unique `T<n>` task ids, `depends_on` and `unblocks` that resolve (including cross-intent `<NNNN>/T<n>`) and mirror each other, and no dependency cycle. Plain files in that folder are skipped; without the folder nothing is checked (D19).
+- **Output and exit.** One line per failure in the [UX_UI section 4](UX_UI.md#4-messages-and-errors) shape (`✗ <what>` · `next: <step>`); exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error. No flags.
 
 **`gabo version`** prints the version.
 
@@ -474,19 +538,19 @@ All decisions are MADR-style. D1–D14: accepted. D15–D17: accepted (owner 202
 | D4 | Task operations | Compiled tracker adapters; dynamic adapter skill | Dynamic adapter skill (gh CLI, Plane MCP, …); no compiled tracker adapters; every write verified by re-read | Adapter coverage must be checked at setup | accepted | R3, R10, R11 |
 | D5 | Decision memory | Files in repo; memory provider via MCP | Memory provider via MCP (for example Engram), as a dynamic slot | — | accepted | R6, R17, R37, R38 |
 | D6 | Reviewer | One script per placement; one script with placement adapters | One script with placement adapters (local, server, GitHub Actions, GitLab CI; configured per repo; first release local), always own clone, home and cache. Two layers: coder-side optional (GGA, gentle-ai RDD) and reviewer-side mandatory merge gate (tests, build, lint + independent agent review). Verdict commented on the PR and returned to the coder | Reviewer runs once per PR update | accepted; amended (owner 2026-10-27, D24): the reviewer needs a gabo binary at least the version in the integration branch's `.gabo/VERSION` (a minimum, never taken from the PR head; none when the base has no stamp), never self-updates, and leaves upgrade PRs to a human merge (9.4) | R9 |
-| D7 | Plan changes | Plan edits inside code PRs; separate plan PRs | Config defines changeable scope (one task, task group, global) and a boolean for global changes without the owner. Each change in its own branch, issue and PR touching only `docs/product` and tasks; git history explains what and why. Approval scale: one task applies automatically once the plan-change reviewer agrees; a task group applies automatically only if the config enables it, otherwise it waits for the owner; the global plan waits for the owner unless the global boolean is on, and still needs the plan-change reviewer's agreement. A change the plan-change reviewer rejects never applies automatically; it goes to the owner | Plan changes never travel with code changes | accepted | R19 |
+| D7 | Plan changes | Plan edits inside code PRs; separate plan PRs | Config defines the widest changeable scope (`plan_change.scope`) and a boolean for the widest scope without the owner. Amended (owner 2026-11-03, per-change-sdlc): the scopes are `task`, one task inside one intent's `plan.md`; `group`, one whole intent, its `spec.md` and `plan.md` together; `global`, several intents or the PRD/TRD conventions; there is no global implementation plan. Each change in its own branch, issue and PR touching only `docs/product` and tasks; git history explains what and why. Approval scale ([APP_FLOW](APP_FLOW.md#plan-change-approval-scale)): one task applies automatically once the plan-change reviewer agrees; one intent applies automatically only if the config allows `group`, otherwise it waits for the owner; several intents or the PRD/TRD conventions wait for the owner unless `plan_change.global_without_owner` is true, and still need the plan-change reviewer's agreement. A change the plan-change reviewer rejects, or beyond `plan_change.scope`, never applies automatically; it goes to the owner | Plan changes never travel with code changes | accepted; scopes amended (owner 2026-11-03, per-change-sdlc) | R19, R27 |
 | D8 | Plan-change reviewer | No debate in owner absence; same-session self-review; fresh session | Every plan change is debated: with the owner if present, else with a fresh clean-context session that indexes the repo and must agree or propose a different improvement. A dedicated skill defines its behavior | Added cost, limited to plan changes | accepted | R19 |
 | D9 | Direct session | Any terminal manager; Orca | The assistant opens it with the Orca CLI in the task worktree with a context brief; first release Orca only | Other terminal managers are Later | accepted | R14 |
 | D10 | Identity | Ask every session; catalog | Git email as catalog key → alias; the assistant asks once if missing | — | accepted | R16 |
 | D11 | Personal preferences | Project file; global user file | Name, tone and interaction level in the global user config (the stable layer of D22) | — | accepted | R17 |
-| D12 | Waves | Manual wave lists; computed | Computed from tracker dependencies (blocked by / unblocks); a wave is the set of tasks whose dependencies are done | Wave computation must handle cycles and dangling ids | accepted | R2, R3 |
+| D12 | Waves | Manual wave lists; computed | Computed from tracker dependencies (blocked by / unblocks). Amended (owner 2026-11-03, per-change-sdlc): a wave is one accepted intent, and it takes that intent's tasks whose dependencies are done (`read unblocked` with the `intent` filter); a blocker in another intent keeps its task blocked and is reported. `wave.after` (`next` or `wait`, unset means `wait`) decides whether the assistant chains the next eligible intent (5.1). Earlier: a wave was every task whose dependencies were done | Wave computation must handle cycles, dangling ids and cross-intent blockers | accepted; amended (owner 2026-11-03, per-change-sdlc) | R2, R3, R4 |
 | D13 | Auto-mode limits | Unrestricted; bounded | Merge only into the assigned integration branch, never main; delete only resources created by the assistant or its subagents in this workflow | — | accepted | R15, R19, PRD Auto-mode limits |
-| D14 | Planning document conventions | Adopt an existing tool (BMAD, Task Master); invent our own format; own templates built on open conventions | Own templates and fixed questions built on open conventions: PRD on ISO/IEC/IEEE 29148 (header, evidence, appetite, assumptions and dependencies, quality requirements, constraints, glossary; requirements as `id \| type \| EARS requirement \| acceptance \| priority \| stories \| verification`); user stories on INVEST with Given-When-Then; TRD on arc42 with C4 diagrams and MADR-style decisions (consequences, status); plan tasks in `T###` notation with `[P]` and story links. Traceability chain: story → requirement → decision → task → test | Traceability chain story → requirement → decision → task → test | accepted | R2, R20 |
+| D14 | Planning document conventions | Adopt an existing tool (BMAD, Task Master); invent our own format; own templates built on open conventions | Own templates and fixed questions built on open conventions. Amended (owner 2026-11-03, per-change-sdlc): global documents are the conceptual PRD (ISO/IEC/IEEE 29148 header, evidence, appetite, assumptions, quality requirements, constraints, glossary; requirements as `id \| type \| what the product offers \| what the user gets \| priority`), the conventions-only TRD (arc42 with C4 diagrams and MADR-style decisions), the optional `DESIGN.md` and the MIGRATIONS log. Each change is an intent in `docs/product/intents/<NNNN-slug>/` with `intent.md`, `spec.md` (EARS requirements with acceptance criteria, UX and flow, data changes, a human acceptance record), `plan.md` (task table `id \| title \| spec refs \| depends_on \| unblocks \| acceptance \| size`) and review findings. Traceability chain: intent → spec requirement → plan task → tracker task → test. Earlier: user stories (INVEST, Given-When-Then), a global implementation plan with `T###` tasks and story links, an upfront DB schema and global UX/app-flow documents | Templates must keep stable table columns | accepted; amended (owner 2026-11-03, per-change-sdlc) | R2, R20 |
 | D15 | Resource ownership for cleanup and deletion | Clean by naming convention; per-wave ledger | Per-wave resource ledger kept by the cycle skill in the `memory` slot (for example Engram): every worktree, branch, container or test database a subagent creates is reported in its outcome and appended by the cycle; at wave close the cycle cleans only ledger entries with ordinary git worktree, git and container commands per its skill (amended by D18: `gbai worktree close` is removed); auto mode deletes only ledger entries; anything not removed is a leftover in the report. No CLI command and no state dir. Reason: R13 and R23 need a record of what the workflow created, and agents already have the tools | Resources created outside the ledger are never deleted, only reported | accepted (owner 2026-10-26); amended by D23 (owner 2026-10-27): the owning coder removes its own worktree and branches after its PR merges, and the wave close is a fallback sweep over ledger entries no coder could close | R13, R23 |
 | D16 | Traceability check | Agent-only review; generic Go check | Generic Go check in the `plan` slice over the `docs/product` tables (stories, requirements, decisions, plan tasks with `depends_on`); fails on a story without requirement, a requirement without decision, task or verification, a task without story, or a dependency cycle; the assistant runs it before each next planning step. Reason: R20 needs a deterministic block, and the inputs are gabo-ai's own templates; it also prevents dependency loops | Templates must keep stable table columns | superseded by D19 (owner 2026-10-26) | R2, R20 |
 | D17 | Wave resume | Restart the wave; resume from traces | The cycle skill recomputes the wave from tracker state (through the `tasks` adapter) plus the memory ledger and traces, skips DONE tasks, re-attaches open PRs and worktrees and continues. No CLI command and no state dir. Reason: R25 had no technical mechanism | Depends on verified task writes (D4) and the ledger (D15) | accepted (owner 2026-10-26) | R14, R25 |
 | D18 | Scope of the Go CLI | Go CLI for setup and work-time operations (status, audit, sessions, provision, secrets, repo setup, worktree close, MCP server, doctor, plan, review); Go CLI as an agent compiler only | Agent compiler only: validate config (global user file + `gabo.yaml`, JSON Schema), compile runtime-native agents into `.claude/agents/` and `.pi/agents/`, install the per-runtime artifacts (D21: embedded skills, the user's Markdown adapters, the user-level `gabo-reviewer` skill with its scripts, tool registrations); change a key and recompile with `gbai generate`; `gabo init` is the first generate; plus `gabo version` and `gbai config set`. Amended (owner 2026-10-26): the read-only `gbai config [--json]` is removed (question 7); agents write preferences and config by editing the YAML directly, during setup and during the work, and JSON Schema validation runs at the next `gbai generate`; `gbai config set` is an owner convenience at configuration time only, not a required writer (question 10). Every removed command's job is done by agents with their own tools (gh, git, Orca, Railway MCP) guided by skills and adapters; `doctor` validation folds into generate. Reason: agents already have the tools; Go keeps only what must be deterministic before the work starts | Existing slices are retired; skills carry the operating instructions | approved (owner 2026-10-26); superseded in part by D24 (owner 2026-10-27): the agent compiler, `gbai generate`, `gbai config set` and the generation targets are removed; config validation now runs in `gabo check` | R8, R11, R12, R21 |
-| D19 | Traceability check and plan templates | Generic Go check (D16); skill instruction | Supersedes D16. The plan templates and their fixed questions live in the directiva skills; the traceability check (story without requirement; requirement without decision, task or verification; task without story; dependency cycle, dangling id or `depends_on` / `unblocks` mismatch) is an instruction in those skills that the agent runs before each next planning step and that blocks the step on a gap. Reason: D18 removes `gbai plan`; the inputs stay gabo-ai's own templates | The check is no longer deterministic Go; templates must keep stable table columns so the agent can read them | approved (owner 2026-10-26) | R2, R20 |
+| D19 | Traceability check and plan templates | Generic Go check (D16); skill instruction | Supersedes D16. The templates and their fixed questions live in the directiva skills; the traceability check is an instruction in those skills that the agent runs before each next planning step (before the next document, before creating or updating tasks, and before returning) and that blocks the step on a gap. Amended (owner 2026-11-03, per-change-sdlc): it reads the intent folders (`intent.md`, the spec requirements and acceptance record, the plan task table) and the tracker tasks through the `tasks` contract, ignores rows marked removed, and a gap is: an intent without spec; an accepted spec without plan; a plan task without a tracker task, or the reverse; a task whose parent is not exactly one intent; a requirement in the spec not covered by any plan task; a dependency cycle; a dangling id, including a cross-intent `<NNNN>/T<n>` reference; a `depends_on`/`unblocks` mismatch. `gabo check` deterministically enforces the intent stage order and the plan tables offline (9.4). Reason: D18 removes `gbai plan`; the inputs stay gabo-ai's own templates | The tracker side of the check is not deterministic Go; templates must keep stable table columns so the agent can read them | approved (owner 2026-10-26); gap list amended (owner 2026-11-03, per-change-sdlc) | R2, R20, R33 |
 | D20 | Reviewer execution | Go reviewer runner (the now removed `gbai review run`); deterministic scripts installed into the repository (proposed `.gabo/reviewer/`); deterministic scripts bundled in a user-level skill | Amended (owner 2026-10-26, question 8): the scripts live in the `scripts/` folder of the `gabo-reviewer` skill, which the compiler installs at user level for the reviewer's runtime (D21), not in the repository, so PR code cannot modify the scripts that review it. The scripts follow the vulcam pr-reviewer pattern: head-moved check, test merge of the PR into the integration branch, checks, agent review, verdict comment with marker and head SHA, merge gate (integration branch only, never main), all in a clean environment, ending with one `VERDICT` line. The generated reviewer agent only validates the request (PR number, 40-hex SHA) and invokes the script, then relays the `VERDICT` line. Local default is single-user mode: the owner's own account, preflight refuses unless the scripts run from a clean checkout of the integration branch; isolated two-user mode stays available through the `reviewer_placement` or `agent_host` adapter. The Go review slice is retired | The marker is trust-based in single-user mode; the scripts need their own tests; the user-level copy is not versioned with the repository, so `gbai generate` reinstalls it from the embedded skill and reports a differing copy | approved (owner 2026-10-26); amended by D24 (owner 2026-10-27): `gabo init` installs the skill in the engine-neutral user location and never into the in-repository catalog copy, on every `gabo init` run when the user copy is missing or its own `VERSION` differs from the binary, whatever the repository stamp says (section 9.4); the runtime skill links it and builds the reviewer agent from its template; never by `gbai generate`. Amended (owner 2026-10-27; review of PR #54 at 799220b): the base (integration) branch's `.gabo/VERSION` is a minimum for the reviewer scripts and CI, never taken from the PR head, so a PR cannot lower what the reviewer runs; they never self-update and fail with the upgrade command when their binary is older; `gabo check` reads the spec and contracts from the project's catalog copy, so one newer global binary serves older projects; with no base stamp there is no minimum; on an upgrade PR they run the CLI they have with `GABO_UPGRADE_PR=1`, validate only the config, report `upgrade PR: only config validated, human merge required` with the changed paths outside the catalog and agent directories, and leave the merge to a human; the stamp `.gabo/VERSION` and the catalog subtree `.gabo/skills/` are always human-only by built-in rule (owner 2026-10-27, issue #79; section 9.4) | R9, R22, R26, R32 |
 | D21 | Setup entry and per-runtime installation | Setup TUI in Go (former M4); setup by the user's agent from a pasted prompt, with a Go installer table | Approved (owner 2026-10-26): no TUI. The gabo-ai documentation publishes a setup prompt with a link; the user pastes it into Claude Code or Pi, and that agent installs gabo-ai, runs the setup question burst, writes the config and runs `gbai generate`. `gbai generate` installs the per-runtime artifacts for each runtime in `generation.targets` from one Go table of what goes where (Claude Code: skills, agents, MCP servers, plugins; Pi: skills, agents, MCP servers, packages and extensions), section 9.6. Amended (Approved (owner 2026-10-26)): setup recommends, but does not require, the gentle-ai stack (ODD in the methodology slot, RDD as coder-side validation inside the methodology adapter, Engram in the memory slot) and installs it only if the user accepts. Pi targets require a subagent package as a prerequisite: when Pi is in `generation.targets`, setup checks whether gentle-pi and `gentle-shell` are installed and, if no subagent package is present, explains why and offers to install them; another subagent package is acceptable. `gbai generate` refuses to compile Pi targets when no subagent package is present and prints what to install. gabo-ai never edits gentle-pi's own configuration; it only places its agents and skills | Adding a runtime or artifact kind means adding table rows; rows must be checked against the runtime docs, and unverified rows stay open items | approved (owner 2026-10-26); superseded in part by D24 (owner 2026-10-27): the Go installer table and the pasted-prompt-plus-`gbai generate` entry are removed; the verified rows of 9.6 become source facts of the runtime skills; the gentle-ai and Pi subagent-package recommendations stay | R8, R12, R28 |
 | D22 | Personalization layers | Preferences only in the global file; only in memory; two layers | Approved (owner 2026-10-26): a stable layer in the global user file (alias or name, `language`, `tone`, `interaction_level`), read by every compiled agent; a learning layer of observations in the `memory` slot (Engram or claude-mem, per adapter) under the fixed topic `user/preferences`, read by the assistant at session start. An observation repeated about 3 times is proposed for the stable layer: the assistant asks in manual mode, and in auto mode applies it and records the decision in memory. The wave-close comfort answer adjusts `interaction_level` and `tone`. Personal observations use the global memory scope, project ones the project scope. Secrets and sensitive data are never stored | The memory contract gains a preferences topic; the stable layer is edited directly and validated at the next `gbai generate` (D18 amended) | approved (owner 2026-10-26); amended by D24 (owner 2026-10-27): the stable layer is validated at the next `gabo check` | R16, R17, R21 |
@@ -498,55 +562,11 @@ All decisions are MADR-style. D1–D14: accepted. D15–D17: accepted (owner 202
 
 ### Requirement coverage
 
-Proposed (auto). Reason: traceability pass; every requirement maps to a decision or section, a story where one exists, and the test layer (section 11) for its PRD verification method.
-
-| req | decisions | sections | stories | verification → test layer |
-|---|---|---|---|---|
-| R1 | D1 | 4.3 | US-009 | demo → end-to-end session check |
-| R2 | D12, D14, D19 | 4.1, 9.1 | US-002 | test, inspection → skill review (traceability instruction, dependency loops), document review |
-| R3 | D4, D12 | 5.1, 8.2, 9.5 | US-002 | test → integration (fake tracker) |
-| R4 | D1 | 5.1, 9.2 | US-003 | demo → end-to-end mini wave |
-| R5 | — | 5.1, 9.2 | US-003, US-004 | test → integration (wave report) |
-| R6 | D5 | 8.4, 9.2 | US-004 | test → integration (fake memory) |
-| R7 | — | 4.3, 9.5 | US-006 | test → integration (task identity preserved) |
-| R8 | D2, D3, D18, D21, D24 | 8.1, 9.1 | US-001, US-007 | test, inspection → runtime skill probe plus `gabo check`, slot coverage in `gabo check` (earlier: generator golden) |
-| R9 | D6, D20, D24, D27 | 5.2, 8.3, 9.2, 9.4, 9.5 | US-008 | test, inspection → reviewer script tests, skill review |
-| R10 | D4, D23 | 5.1, 9.1, 9.5 | US-008 | test → integration (status and PR link) |
-| R11 | D2, D4, D18, D24, D26 | 8.1, 9.1, 9.4 | US-007 | test, inspection → slot coverage in `gabo check` |
-| R12 | D2, D18, D21, D24, D26 | 8.1, 9.3, 9.4 | US-001 | demo → setup walkthrough from `gabo init` and from the pasted prompt (D25); unit (no defaults, TD2) |
-| R13 | D15, D23 | 5.1, 9.2, 9.5 | US-010 | test → skill-level check in the end-to-end mini wave (coder task close and wave-close sweep) |
-| R14 | D9, D17 | 4.3 | US-005 | demo → direct-session walkthrough |
-| R15 | D13 | 8.3 | US-003 | test, demo → integration (no prompt in auto), end-to-end |
-| R16 | D10, D22 | 9.3 | US-001 | test → unit (catalog lookup) |
-| R17 | D11, D22 | 8.4, 9.1, 9.2, 9.3 | US-004 | test, demo → unit (precedence), end-to-end |
-| R18 | D1, D9 | 4.3 | US-005 | demo → end-to-end session check |
-| R19 | D7, D8, D13 | 5.3, 9.2, 9.5 | US-006 | test, inspection → integration (approval scale), skill review |
-| R20 | D14, D19 | 4.1 | US-002 | test, inspection → skill review (traceability instruction), template review |
-| R21 | D18, D24, D27 | 8.3, 9.4 | — | inspection, test → secret scan over the setup prompt, catalog and built agent files |
-| R22 | D6, D20, D27 | 8.3 | US-008 | test, inspection → reviewer script tests (separate clone, home, cache, clean env) |
-| R23 | D13, D15, D23 | 8.3 | US-010 | test → skill-level check in the end-to-end mini wave (deletion outside ledger refused) |
-| R24 | D4 | 8.2, 9.1 | — | test → integration (re-read; unverified write reported) |
-| R25 | D17 | 9.1 | US-011 | test, demo → skill-level check in the end-to-end mini wave (resume skips DONE) |
-| R26 | D6, D20 | 9.2 | — | test → reviewer script tests (same head reviewed once) |
-| R27 | D8 | 5.3 | US-006 | test, inspection → integration (session count = proposals) |
-| R28 | D21 | 8.4 | — | demo → measured in first wave report |
-| R29 | — | 8.4, 9.2 | — | test, inspection → skill-level check in the end-to-end mini wave (report fields), skill review |
-| R30 | D5 | 8.4, 9.1, 9.2 | US-004 | test → integration (list auto decisions) |
-| R31 | D24 | 2, 9.4 | US-001 | test, inspection → CLI help test lists exactly `init`, `check`, `version`, `prompt` (amended by plan change #148; T076) |
-| R32 | D20, D24, D25 | 9.4 | US-001 | test → `gabo init` unit tests (byte-identical copy without `gabo-reviewer` and a version stamp on a fresh project; on an existing project a refresh when the stamp is older or missing, no change when it matches, exit 1 with the upgrade command when it is newer, config never touched, exit 0; reviewer install in a temporary home; prompt printed; R32 amended by the PM in issue #74, PR #75, plan task T065) |
-| R33 | D24 | 9.4 | US-001 | test → `gabo check` unit tests (schema, key classes, spec agents present in the declared agent directories, same-named non-agent files ignored, slot coverage, catalog version stamp, read-only); agent version lines compared with the stamp (owner 2026-10-27; R33 amended by the PM in issue #74, PR #75, plan task T065) |
-| R34 | D3, D24 | 8.1 | US-001, US-007 | test, demo → runtime skill probe agent plus `gabo check`, setup walkthrough |
-| R35 | D24 | 8.1 | US-007 | test, demo → runtime builder dry run on a third engine ending in `gabo check` |
-| R36 | D25 | 9.4 | US-001 | test, inspection → Go test: the published prompt block equals the embedded file; `gabo init` output test; docs review |
-| R37 | D5, D6, D24 | 8.3, 9.1, 9.4 | US-012 | inspection, demo → setup skill review and setup walkthrough (T070); setup documentation review (T045) |
-| R38 | D5, D24, D25 | 9.1, 9.4 | US-012 | test, inspection, demo → Go test on the embedded setup prompt, setup skill review including the scratch-topic probe deletion, setup walkthrough (T070); documentation review (T045) |
-| R39 | D24, D25 | 9.4 | US-001 | test → `gabo prompt` CLI test: stdout equals `setupprompt.Text` byte for byte, empty stderr, exit 0, no file written when run in an empty temp directory (T076) |
-
-R5, R7 and R29 are covered by sections only, not by a dedicated decision; they need none beyond the approved ones.
+Removed (owner 2026-11-03, per-change-sdlc): the TRD holds no per-requirement mapping. Requirement-to-task traceability lives in each intent (spec requirement → plan task → tracker task), checked by D19. The last coverage table is in [TRD 0.9](archive/TRD-0.9.md#requirement-coverage).
 
 ## 11. Testing strategy (proposed (auto), awaiting owner)
 
-Proposed (auto). Reason: layers linked to the PRD verification column and to quality requirements R21–R30.
+Test layers and what each covers; quality requirements R21–R30 are checked as listed below. Each intent's `spec.md` names the checks of its own acceptance criteria.
 
 - **Unit (Go, per slice domain).** Config: personal vs project precedence, strict keys, a local-only config without cloud keys loads, missing required keys fail with "run setup" and no silent default is applied (R12); JSON Schema and Go validation accept and reject the same fixtures. Approved (owner 2026-10-27, D24): `gabo init` copies the catalog byte for byte and idempotently without `gabo-reviewer`, prints the setup prompt, installs the user-level `gabo-reviewer` skill into a temporary home and never touches an existing config; `gabo check` is tested on fixture projects for schema and key-class errors, missing agents, slot coverage gaps and a catalog version mismatch, and a test asserts it writes nothing; the catalog copy is tested to exclude `gabo-reviewer`; a help test lists exactly `init`, `check` and `version` (R31). Superseded (owner 2026-10-27): generator golden files per runtime driven by the installer table.
 - **Integration (skill-level).** Approved (owner 2026-10-26): wave work is agent behavior guided by skills, not Go use cases (D18), so these checks run the role agents against fake adapters: a scripted fake tracker for wave start, status update, PR link and re-read verification; a fake memory for decision records; operating rules (change applied after the current round, only the affected task BLOCKED, BLOCKED after 4 fix rounds).
@@ -560,7 +580,7 @@ Proposed (auto). Reason: layers linked to the PRD verification column and to qua
 - **Skill-level checks (D15, D17, D23).** The ledger, task close, sweep and resume are skill behavior, not Go code, so they have no Go unit tests; they are checked inside the end-to-end mini wave: the memory ledger lists every created resource and each coder's resume handle, a resumed coder closes its task after the merge (issue DONE, worktree, local then remote branch) and reports failures as leftovers, the wave-close sweep touches only ledger entries no coder closed and never writes DONE, only ledger entries are cleaned, a resource outside the ledger is reported and not deleted, and an interrupted wave resumes without reworking DONE tasks.
 - **gabo-ai's own PRs.** The reviewer scripts run `go test ./...`, build, lint, the reviewer script tests and, once the runtime skills that declare agent directories exist, `gabo check` as the mandatory merge gate (D24; earlier config schema validation and the generator no-diff check). `gabo check` joins `review.checks` in T052, after the Claude Code runtime skill builds gabo-ai's own agents, so it does not fail between the waves of T047 and T052.
 
-**PRD verification column.** "test" maps to unit, integration or end-to-end tests; "inspection" to the contract coverage check and document or skill review; "demo" to the end-to-end mini wave, the setup walkthrough and the subagent smoke test. Per-requirement mapping: [Requirement coverage](#requirement-coverage).
+**Verification methods.** "test" maps to unit, integration or end-to-end tests; "inspection" to the contract coverage check and document or skill review; "demo" to the end-to-end mini wave, the setup walkthrough and the subagent smoke test. Each intent's spec states which method proves each of its acceptance criteria; the former per-requirement mapping is in [TRD 0.9](archive/TRD-0.9.md#requirement-coverage).
 
 **Quality requirements.**
 
@@ -611,12 +631,12 @@ Proposed (auto). Reason: risks extended for D15–D17 and operating rules; techn
 
 | id | debt | conflicts with | fix direction |
 |---|---|---|---|
-| TD1 | Config validation requires `server.railway.{project_id, environment_id, service_id}`, so a local-only config fails to load | Deployment view, DB_SCHEMA migration step 2 | Make cloud keys optional, then move them to the `agent_host` adapter |
-| TD2 | `applyDefaults` silently sets `runtimes.reviewer: pi` and `repo.integration_branch: dev` (and other defaults) | R12 | Required keys fail with "run setup"; defaults become suggestions (DB_SCHEMA migration step 5) |
-| TD3 | Cloud fields (`server.*`, `users.*`, `bot.*`, `sessions.*`) and the system layer `/etc/gabo/gabo.yaml` are still in the core config | D2, Deployment view | DB_SCHEMA migration step 4 |
+| TD1 | Config validation requires `server.railway.{project_id, environment_id, service_id}`, so a local-only config fails to load | Deployment view, MIGRATIONS step 2 | Make cloud keys optional, then move them to the `agent_host` adapter |
+| TD2 | `applyDefaults` silently sets `runtimes.reviewer: pi` and `repo.integration_branch: dev` (and other defaults) | R12 | Required keys fail with "run setup"; defaults become suggestions (MIGRATIONS step 5) |
+| TD3 | Cloud fields (`server.*`, `users.*`, `bot.*`, `sessions.*`) and the system layer `/etc/gabo/gabo.yaml` are still in the core config | D2, Deployment view | MIGRATIONS step 4 |
 | TD4 | Plan templates in `apps/cli/internal/slices/plan/templates/` lack the new sections (evidence, appetite, quality requirements, MADR fields, coverage) and the fixed questions | R20, D14, D19 | Move the templates into the directiva skills, add the new sections and fixed questions; D19 depends on stable table columns |
 | TD5 | The `gabo-coder` skill hardcodes ODD test-first instead of loading `gabo-methodology` | R8, D2 | The coder skill only instructs loading the methodology slot |
-| TD6 | Resolved 2026-10-26: stories US-001 and US-007 referenced the legacy `coder.methodology` key and now use `slots.methodology.adapter` | R8 (updated 2026-10-26), DB_SCHEMA open question 2 | PM updates both stories to `slots.methodology.adapter` |
+| TD6 | Resolved 2026-10-26: stories US-001 and US-007 referenced the legacy `coder.methodology` key and now use `slots.methodology.adapter` | R8 (updated 2026-10-26), archived DB_SCHEMA open question 2 | PM updates both stories to `slots.methodology.adapter` |
 | TD7 | Go slices for work-time commands still exist (`status`, `audit`, `sessions`, `provision`, `secrets`, `repo`, `worktree`, `mcp`, `doctor`, `plan`, `review`), the read-only `gbai config` output exists, and `gabo init` registers the gabo-ai MCP server | D18, D20 | Retire them; `init` becomes the first generate; the review slice is retired once the installed reviewer scripts are in use |
 | TD8 | `configcmd`, the `gabo init` MCP registration and its runtime-specific skill placement exist, and no `check` slice exists | D24 | T042 removes `configcmd` and the MCP registration; T039 rewrites `gabo init`; T047 and T011 add `gabo check` |
 

@@ -1,0 +1,97 @@
+# Plan 0002 Codex plugin
+
+| field | value |
+|---|---|
+| intent | [0002-codex-plugin](intent.md) |
+| spec | [spec](spec.md) |
+| status | Draft |
+| owner | gabo-dev-lead |
+| date | 2026-11-03 |
+
+The spec was accepted by the owner on 2026-11-03 (spec section 7). `gabo.yaml` mode is `auto`: every fixed question below is answered by `gabo-dev-lead`, marked **Proposed (auto)** with a one-line reason, for one-pass approval.
+
+## Fixed questions
+
+| id | answer |
+|---|---|
+| Q1 | **Proposed (auto)**: shared Go and reviewer work first (runtime enum, `codex` reviewer engine and its isolation gate), then the `gabo-runtime-codex` skill, then the Codex plugin tree and its two hooks on the intent 0001 scripts, then docs and the owner-machine run (Steps). Reason: the plugin hooks reuse intent 0001's Go hook mode and scripts, and the runtime skill needs the enum. |
+| Q2 | **Proposed (auto)**: ten tasks T1 to T10, each one PR of at most about 400 changed lines (Tasks). Reason: the enum, the reviewer engine, the wave gate, the runtime skill, the TRD wording, the plugin tree, each hook, the docs and the manual run are separately reviewable behaviors. |
+| Q3 | **Proposed (auto)**: see the `spec refs` column. Reason: each task names the requirements and decisions it proves. |
+| Q4 | **Proposed (auto)**: see `depends_on` and `unblocks`; acyclic. Cross-intent: T2 on `0001/T5`, T6 on `0001/T6`, T7 on `0001/T7`, T8 on `0001/T2` and `0001/T8`. Reason: the reviewer-configuration skill, its isolation test, the plugin skill set, the hook scripts and the Go hook mode are built once in intent 0001 and reused here, never duplicated. |
+| Q5 | **Proposed (auto)**: see `acceptance` and `size`; every code task starts from a failing Go or shell test. Reason: TRD test-first convention. |
+| Q6 | **Proposed (auto)**: yes, S1 to S13 each have at least one task (S3's reviewer-configuration skill and isolation test through `0001/T4` and `0001/T5`, delivered to Codex by T6; S2 and the manual half of S3, S9, S10, S12 and S13 also through T10). Reason: checked against the spec table. |
+| Q7 | **Proposed (auto)**: see Risks to the plan. |
+| Q8 | **Proposed (auto)**: see Open questions; spec open questions 5, 7 and 10 stay with the owner and do not block any task. |
+
+Plan items the spec left to `gabo-dev-lead`, answered here:
+
+- **Shared enum edit (S6, intent 0004 S1)**: **Proposed (auto)** made once in this plan as **T1**, accepting `claude`, `codex`, `pi` and `opencode` in all three roles; intent 0004 depends on `0002/T1` and does not repeat it. Reason: the spec says the edit is made once; intent 0002 is planned first.
+- **Isolation pass-marker enforcement (S12, intent 0001 S10)**: **Proposed (auto)** read in two places from the marker of `0001/T5` (`${XDG_CONFIG_HOME:-$HOME/.config}/gabo/reviewer-isolation/<engine>`, holding the engine's `--version` line): `reviewer.sh preflight` refuses a `codex` or `opencode` engine whose marker is missing or differs from the installed `--version` (T2), and `gabo-cycle` runs that preflight before it claims any task of a wave (T3). Reason: the marker and the scripts are user level, out of any PR's reach, and `gabo check` stays a read-only project check that runs no engine. The check is written for both engines so intent 0004 reuses it as `0002/T2` and `0002/T3`.
+- **Plugin directory (D4, open question 5)**: **Proposed (auto)** `plugins/codex/` with `.codex-plugin/plugin.json`, beside intent 0001's `plugins/claude-code/`; its `skills/` entries are relative symlinks into `apps/cli/internal/skills/` and the shared hook scripts are relative symlinks to `plugins/claude-code/scripts/`. Reason: D4 says the final layout follows intent 0001, which chose one directory per tool with symlinks; one skill source and one script source remain.
+- **Codex hook config**: **Proposed (auto)** `plugins/codex/hooks/hooks.codex.json`, named in the manifest `hooks` key; the shared scripts take a first argument `codex` from it to read the `apply_patch` input and write Codex's output shapes. Reason: Codex would otherwise load a Claude-shaped `hooks/hooks.json`; an explicit argument is clearer than guessing the runtime from `CLAUDE_PLUGIN_ROOT`, which Codex also sets.
+- **Plugin-shipped agents (open question 6)**: **Proposed (auto)** (a) ignored; T10 probes the undocumented `subagents` key once and records the result for a later intent. Reason: the spec's recommendation; it changes nothing here.
+- **Policy follow-ups carried to `gabo-dev-lead` (spec section 5)**: TRD 8.1 tool-list wording for Codex and D27 amended to four engines are **T5**; `.codex/`, `.agents/` and `plugins/` in the `review.human_only_paths` required values are part of **T1**.
+
+## Steps
+
+1. Accept the four engines in `runtimes.*` and add the Codex paths to `review.human_only_paths` (T1). Delivers S6 and the section 5 `human_only_paths` follow-up.
+2. Add the `codex exec` reviewer engine with its pass-marker preflight on intent 0001's isolation test (T2), then make a wave start only after that preflight (T3). Delivers S12 and the wave half of S3.
+3. Create `gabo-runtime-codex` (T4). Delivers S4, S5.
+4. Record the amended D27 and the Codex agent-building wording in the TRD (T5). Supports S6, S12.
+5. Create the Codex marketplace and plugin tree with the intent 0001 skill set (T6). Delivers S1, S2, S3, S11.
+6. Add the post-write hook (T7), then the pre-write hook on the Go hook mode (T8). Delivers S7, S8, S9, S13.
+7. Document install, update, `/hooks` trust and the release checklist (T9). Delivers S10, S11.
+8. Owner-machine verification run (T10), spec section 2 Local verification steps 1 to 7 plus the reviewer engine on `codex-cli 0.163.0`. Delivers S2 and the manual checks of S3, S9, S10, S12, S13.
+
+## Tasks
+
+Task ids are local to the intent. A dependency in another intent is written `<NNNN>/T<n>`. `depends_on` and `unblocks` mirror each other; `—` means none. A removed task keeps its row, marked "(removed <YYYY-MM-DD>)", and the traceability check ignores it.
+
+| id | title | spec refs | depends_on | unblocks | acceptance | size |
+|---|---|---|---|---|---|---|
+| T1 | Config: `runtimes.*` accepts `claude`, `codex`, `pi`, `opencode` in all roles; Codex paths in `review.human_only_paths` (shared with intent 0004) | S6, D7 | — | T4, T5, 0004/T5, 0004/T8 | Test first: failing Go tests in `apps/cli/internal/config`: `runtimes.coder`, `runtimes.assistant` and `runtimes.reviewer` each pass with `codex` and with `opencode`; `runtimes.reviewer: foo` fails with one line naming `runtimes.reviewer` and `claude`, `codex`, `pi`, `opencode`; both schema copies (`apps/cli/internal/config/schemas/gabo.project.schema.json`, `schemas/gabo.project.schema.json`) list the four values in all three roles and stay byte-equal; the `review.human_only_paths` required values in `config/required.go` add `.codex/`, `.agents/` and `plugins/`; existing `claude` and `pi` configs still pass unchanged. | S |
+| T2 | Reviewer scripts: `codex exec` engine and isolation pass-marker preflight for `codex` and `opencode` | S12, S3, D7 | 0001/T5 | T3, T5, 0004/T8 | Test first: failing shell tests in `gabo-reviewer/scripts/tests/` with a fake `codex` that records argv, stdin and environment: `REVIEWER_ENGINE=codex` is accepted; the agent-review step runs `codex exec` with the prompt on stdin and `--ignore-user-config`, `--ignore-rules`, `-s read-only`, `--ephemeral`, `-C <reviewer clone>`, the same flags as `0001/T5`, in an `env -i` environment with a reviewer-owned `CODEX_HOME` and no GitHub token; the final message is read as the review text and the `VERDICT` line is found as for `claude` and `pi`; `git status` of the checkout is unchanged; `codex` missing from `PATH` fails with a line naming `REVIEWER_CODEX`; `reviewer.sh preflight` with engine `codex` or `opencode` fails naming the missing isolation test when `${XDG_CONFIG_HOME:-$HOME/.config}/gabo/reviewer-isolation/<engine>` is absent or differs from `<engine> --version`, and passes when it matches; `claude` and `pi` need no marker; the deterministic gates still run before the agent review; existing `claude` and `pi` tests pass unchanged. | M |
+| T3 | Wave start refuses a `codex` or `opencode` reviewer without an isolation pass | S12, S3 | T2 | T10, 0004/T11 | Test first: failing Go skill test in `apps/cli/internal/skills` that `gabo-cycle/SKILL.md` runs `reviewer.sh preflight` from the user-level copy before claiming any task when `runtimes.reviewer` is `codex` or `opencode`, auto mode included, and on failure starts no task and reports the preflight line naming the missing isolation test; `claude` and `pi` reviewers keep the current start; the skill names no other way around the check. | S |
+| T4 | Catalog skill `gabo-runtime-codex`: agents as `.codex/agents/<id>.toml`, skills under `.agents/skills/` | S4, S5, D1, D2, D6 | T1 | T9 | Test first: failing Go tests: `runtimecodex_test.go` (like `runtimeclaude_test.go`) checks the skill in `skills.Names()`, frontmatter with `metadata.agent_dir: .codex/agents`, the TOML shape of spec section 2 (`# gabo-version:` comment, `name`, `description`, `developer_instructions` with the "Load these skills by name" line), no `model`, `sandbox_mode` or `features` key, no write to `~/.codex` or any user-level file but the reviewer link, `gabo-reviewer` never placed in the project; a `gabo check` integration test on a fixture project with `runtimes.coder: codex`, the eight spec ids as parseable TOML in `.codex/agents/` and the `.agents/skills/` links reports no `✗ skill link` and no `✗ reviewer link`, and `.agents/skills/gabo-reviewer` does not exist; a TOML file with a stale `gabo-version` fails as for other runtimes. | M |
+| T5 | TRD: D27 amended to four reviewer engines and Codex agent-building wording | S6, S12, D6, D7 | T1, T2 | 0004/T9 | Docs-only PR touching `docs/product/TRD.md`: TRD 2 Supported runtimes and D27 name `claude`, `codex`, `pi`, `opencode` as accepted runtimes and reviewer engines, citing intents 0002 and 0004 and the pass-marker gate of T2 and T3; TRD 8.1 says a runtime without tool allowlists or skill preload keeps the limits in the instructions and the skills as an instruction line (Codex, D6); `gabo check` passes. | S |
+| T6 | Codex marketplace `gabo-ai` and plugin `plugins/codex` with the intent 0001 skill set | S1, S2, S3, S11, D3, D4, D8 | 0001/T6 | T7 | Test first: failing Go test that reads `.agents/plugins/marketplace.json` (name `gabo-ai`, exactly one entry `gabo`, source `./plugins/codex`, no `version`) and `plugins/codex/.codex-plugin/plugin.json` (`name` `gabo`, `version` `x.y.z` equal to `plugins/claude-code/.claude-plugin/plugin.json` and the CLI release version, `skills` `./skills/` resolving inside the plugin root, no `apps`, no `mcpServers`, no `.mcp.json`); `plugins/codex/skills/` lists exactly the entries of `plugins/claude-code/skills/` (the `gabo-reviewer-config` skill present, `gabo-reviewer` and `gabo-reviewer-placement-local` absent), each a relative symlink resolving to `apps/cli/internal/skills/<name>`; both marketplace files name plugin `gabo` with the source path of their own tool. | M |
+| T7 | Codex post-write hook: `hooks.codex.json` `PostToolUse` on `apply_patch` and the shared `gabo-check.sh` | S1, S7, S8, S9, D5 | T6, 0001/T7 | T8 | Test first: failing shell tests with a fake `gabo` on `PATH` and recorded Codex `PostToolUse` inputs: `gabo-check.sh codex` with a patch that updates an intent `plan.md` whose spec is unaccepted prints Codex JSON `hookSpecificOutput.additionalContext` holding gabo's `✗ … spec.md is not accepted` line and exits 0; a non-gabo path, no `.gabo/VERSION`, no `gabo` on `PATH` and `gabo` exit 2 each exit 0 with no output; the Claude Code tests of `0001/T7` pass unchanged; `plugins/codex/scripts/gabo-check.sh` is a relative symlink to `plugins/claude-code/scripts/gabo-check.sh`; `plugin.json` `hooks` names `./hooks/hooks.codex.json`, which wires `PostToolUse` matcher `apply_patch` to the script with argument `codex`; the script writes no file. | M |
+| T8 | Codex pre-write hook on the Go hook mode: `PreToolUse` on `apply_patch` denies an unaccepted `plan.md` | S13, S8, D5 | T7, 0001/T2, 0001/T8 | T9 | Test first: failing shell tests with a fake `gabo` that records argv and stdin: `gabo-pre-write.sh codex` pipes the Codex tool-call JSON unchanged to `gabo check --pre-write` in the project root; gabo exit 1 → Codex `PreToolUse` deny output (the shape of the Codex hooks docs, kept in a fixture) with gabo's `✗` lines as the reason; exit 0 → exit 0 silent; exit 2 → exit 0 silent; the four S8 cases → exit 0 silent without calling `gabo`; the Claude Code tests of `0001/T8` pass unchanged; `plugins/codex/scripts/gabo-pre-write.sh` is a relative symlink to the intent 0001 script; `hooks.codex.json` adds `PreToolUse` matcher `apply_patch`; a grep test proves the script holds no acceptance or path rule. | S |
+| T9 | README Codex install section and plugin release checklist | S10, S11, D3, D8 | T4, T8 | T10 | Docs PR: the README Codex section names `codex plugin marketplace add testeos-z/gabo-ai`, `codex plugin add gabo@gabo-ai`, `codex plugin marketplace upgrade`, `/hooks` to trust the two hooks, and that `gabo init` plus `gabo-runtime-codex` build the agents; `plugins/codex/README.md` exists; the release checklist bumps both manifests' `version` together with `apps/cli/v<x.y.z>`; `gabo check` passes. | S |
+| T10 | Owner-machine verification of the Codex plugin and the `codex` reviewer engine | S2, S3, S9, S10, S12, S13 | T3, T9 | — | Owner runs spec section 2 Local verification steps 1 to 7 on `codex-cli 0.163.0` or newer and records the results on the task: `gabo-ai` listed; cache `SKILL.md` files byte-identical to the catalog (`cmp`, proves symlink dereference); which skill copy a session loads (spec open question 4); the pre-write deny and its accepted output shape; the post-write context; nothing on a non-gabo file; `gabo check` passes after `gabo-runtime-codex`; `gabo-pm` answers as a subagent; `git status` shows only runtime-skill files; plus the `0001/T5` isolation test for `codex` writing its marker and one `reviewer.sh head` run with `REVIEWER_ENGINE=codex` on a scratch PR; plus one probe of the undocumented `subagents` manifest key (open question 6). | S |
+
+## Tracker
+
+Intent tracker item: [#173](https://github.com/testeos-z/gabo-ai/issues/173) under product card #171.
+
+| task | issue |
+|---|---|
+| T1 | [#204](https://github.com/testeos-z/gabo-ai/issues/204) |
+| T2 | [#206](https://github.com/testeos-z/gabo-ai/issues/206) |
+| T3 | [#207](https://github.com/testeos-z/gabo-ai/issues/207) |
+| T4 | [#210](https://github.com/testeos-z/gabo-ai/issues/210) |
+| T5 | [#211](https://github.com/testeos-z/gabo-ai/issues/211) |
+| T6 | [#212](https://github.com/testeos-z/gabo-ai/issues/212) |
+| T7 | [#213](https://github.com/testeos-z/gabo-ai/issues/213) |
+| T8 | [#214](https://github.com/testeos-z/gabo-ai/issues/214) |
+| T9 | [#215](https://github.com/testeos-z/gabo-ai/issues/215) |
+| T10 | [#216](https://github.com/testeos-z/gabo-ai/issues/216) |
+
+## Risks to the plan
+
+| risk | impact | mitigation |
+|---|---|---|
+| Intent 0004's plan also makes the enum edit or the pass-marker preflight. | T1, T2, T3, 0004 | This plan owns both for all engines; intent 0004 depends on `0002/T1`, `0002/T2`, `0002/T3`; a duplicate is a task-scope plan change in 0004. |
+| `runtimes.reviewer: opencode` is accepted by T1 before intent 0004 ships the `opencode` reviewer engine. | T1 | Fails closed: the preflight of T2 refuses an `opencode` engine without its script engine and marker, and T3 stops the wave. |
+| Codex does not dereference skill or script symlinks into its plugin cache. | T6, T7, T8, T10 | T10 step 2 proves it; the fallback (a copied tree kept equal by a Go byte-equality test, spec open question 5 option c) is a task-scope change to T6 to T8. |
+| The Codex `PreToolUse` deny output shape differs from the docs. | T8, T10 | T8 keeps the shape in one fixture; T10 records the shape Codex accepted and a mismatch is fixed in T8's script mapping only. |
+| `codex exec` loads a PR's project `AGENTS.md` or `.codex/` config despite the flags. | T2, T10 | The `0001/T5` isolation test refuses the engine and writes no marker; T2's preflight and T3's wave gate then keep it out (spec open question 11 option c). |
+| Codex is not installed in the coder or reviewer environment, so no real `codex` runs in CI. | T2, T6 to T8 | Fake `codex` and fake `gabo` shell tests and Go manifest tests; the real run is T10 on the owner's machine. |
+
+## Open questions
+
+1. Spec open question 5 (plugin layout and skill source) stays with the owner, shared with intent 0001; this plan assumes `plugins/codex/` with symlinks, and T10 step 2 decides the fallback (owner).
+2. Spec open question 7 (`sandbox_mode = "read-only"` on Codex read-only agents) stays with the owner; T4 writes no such key as D6 says (owner).
+3. Spec open question 10 (Codex desktop app in scope) stays with the owner; T9 documents the CLI only (owner).
+4. T5 edits TRD 2, 8.1 and D27 wording as spec section 5 carries to `gabo-dev-lead`; if the owner wants it as a separate global plan-change proposal instead of a docs task, T5 is replaced by that proposal (owner).
+5. Duplicate ownership with intent 0004: its plan, written in parallel, also claims the shared enum edit (`0004/T1`) and the pass-marker wave gate (`0004/T7`, as a `gabo check` rule plus a `gabo-cycle` step, while this plan uses the `reviewer.sh preflight` in T2 and T3). One plan keeps each piece and the other depends on it; the losing rows are removed by a task-scope adjustment and their tracker tasks closed. Until decided, 0002/T1 (#204) and 0002/T3 (#207) and their 0004 counterparts must not both be started (assistant, with the owner if the mechanism choice is contested).

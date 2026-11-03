@@ -4,9 +4,11 @@
 |---|---|
 | status | Draft |
 | owner | gabo-frontend |
-| version | 0.7 |
-| date | 2026-10-29 |
-| linked docs | [PRD](PRD.md), [TRD](TRD.md), [DB_SCHEMA](DB_SCHEMA.md), [APP_FLOW](APP_FLOW.md) |
+| version | 0.8 |
+| date | 2026-11-03 |
+| linked docs | [PRD](PRD.md), [TRD](TRD.md), [APP_FLOW](APP_FLOW.md), [MIGRATIONS](MIGRATIONS.md) |
+
+Amended (owner 2026-11-03, per-change-sdlc): under the per-change model the UX of each change belongs to its intent's `spec.md` and global design norms to an optional `DESIGN.md`. This document stays as gabo-ai's own global conversation and CLI contract, because skills cite its sections (for example UX 1.3, UX 1.5 and section 4 messages).
 
 gabo-ai is a CLI plus an agent framework with no graphical UI, so `DESIGN.md`, CSS tokens and Storybook do not apply. This document adapts the template to what gabo-ai actually presents: the assistant's conversation, the CLI command surface (four commands: `gabo init`, `gabo check`, `gabo version` and `gabo prompt`, Proposed (auto) (owner request 2026-10-29, plan change #158, issue #154, PRD R31, R39); three commands from owner 2026-10-27 until 2026-10-29, superseded; earlier an agent compiler used only for the initial configuration, TRD D18) and its messages. Approved (owner 2026-10-26): the proposed terminal UI (TUI) is withdrawn. Superseded (owner 2026-10-27): setup starts from a prompt the user pastes into Claude Code or Pi (TRD D21); since 2026-10-27 setup has two entries (section 1.8): `gabo init` followed by the user's own agent, or the published setup prompt pasted into the agent, which installs the CLI and continues; the prompt is the same literal text embedded in the CLI (PRD R36). Every gap this document had to fill is marked **Proposed (auto)**.
 
@@ -185,7 +187,7 @@ Format: `✗ <what happened>` on one line, then `why:` and `next:` lines, then o
 | Blocked task (cycle agent, wave report) | `✗ task #42 BLOCKED` · `why: 4 review rounds without approval` · `next: owner decision needed` (also in the wave report) |
 | Verification failure (setup; assistant after the subagent smoke test) | `✗ tasks slot not verified` · `why: "read one task" failed: gh: not authenticated` · `next: run gh auth login, then retry verify` |
 | Coverage gap (`gabo check`, slot coverage; also raised by the setup agent; earlier `gbai generate`) | `✗ adapter tasks-gh.md does not cover: link PR, verify by re-read` · `next: add those operations or write them with the assistant` |
-| Traceability gap (reported by the directiva agent, D19) | `✗ planning step blocked` · `why: R7 has no task; US-012 has no requirement` · `next: close the gaps; the check reruns before the next step` |
+| Traceability gap (reported by the directiva agent, D19; example amended 2026-11-03, per-change-sdlc) | `✗ planning step blocked` · `why: 0007-shared-memory/spec.md R2 has no plan task; plan task T3 has no tracker task` · `next: close the gaps; the check reruns before the next step` |
 | Missing config (`gabo check`) | `✗ no gabo.yaml found` · `next: run gabo init, then ask your agent to configure gabo-ai` (updated owner 2026-10-27; earlier: paste the setup prompt) |
 | Catalog refreshed (`gabo init`, exit 0) | `catalog refreshed from <old> to <new>` (plus `reviewer skill installed` when it was missing or differed) · `next: ask your agent to rebuild the agents, then run gabo check` |
 | Already up to date (`gabo init`, exit 0) | `catalog already at <version>; nothing changed` |

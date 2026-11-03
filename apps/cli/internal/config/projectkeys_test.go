@@ -152,3 +152,74 @@ func TestParseNewProjectKeysOptional(t *testing.T) {
 		t.Errorf("new keys got values without being set: %+v", cfg)
 	}
 }
+
+// S11: wave.after says what the assistant does when a wave (one intent)
+// closes: start the next eligible intent or wait. Unset reads as wait.
+func TestParseWaveAfter(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, yaml, set, want string
+	}{
+		{"next", "wave:\n  after: next\n", AfterNext, AfterNext},
+		{"wait", "wave:\n  after: wait\n", AfterWait, AfterWait},
+		{"missing key", "", "", AfterWait},
+		{"empty wave", "wave: {}\n", "", AfterWait},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			cfg, err := Parse([]byte(minimal + tt.yaml))
+			if err != nil {
+				t.Fatalf("Parse() error = %v", err)
+			}
+			if cfg.Wave.After != tt.set {
+				t.Errorf("wave.after = %q, want %q (Parse fills no value)", cfg.Wave.After, tt.set)
+			}
+			if got := cfg.AfterWave(); got != tt.want {
+				t.Errorf("AfterWave() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseRejectsBadWaveAfter(t *testing.T) {
+	t.Parallel()
+	_, err := Parse([]byte(minimal + "wave:\n  after: later\n"))
+	if err == nil {
+		t.Fatal("Parse() error = nil, want wave.after rejected")
+	}
+	want := `wave.after: must be "next" or "wait", got "later"`
+	if !strings.Contains(err.Error(), want) {
+		t.Errorf("Parse() error = %v, want it to contain %q", err, want)
+	}
+}
+
+// A config written before wave.after existed loads unchanged and marshals
+// without a wave key.
+func TestConfigWithoutWaveLoadsUnchanged(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(dbSchemaExample))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if cfg.Wave != (Wave{}) {
+		t.Errorf("wave = %+v, want zero", cfg.Wave)
+	}
+	if cfg.Parallelism != 3 || cfg.PlanChange.Scope != ScopeGroup {
+		t.Errorf("parallelism = %d, plan_change = %+v", cfg.Parallelism, cfg.PlanChange)
+	}
+	out, err := cfg.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "wave") {
+		t.Errorf("Marshal() added a wave key:\n%s", out)
+	}
+	again, err := Parse(out)
+	if err != nil {
+		t.Fatalf("Parse(Marshal()) error = %v", err)
+	}
+	if again.AfterWave() != AfterWait {
+		t.Errorf("AfterWave() after round trip = %q", again.AfterWave())
+	}
+}

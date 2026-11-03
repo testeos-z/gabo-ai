@@ -109,3 +109,25 @@ func TestPromptRecommendsASharedMemory(t *testing.T) {
 		}
 	}
 }
+
+// TestPromptGuidesThePerChangeModel: after the smoke test, the prompt guides
+// the project into the per-change model as gabo-setup does (S6, S13, S11).
+func TestPromptGuidesThePerChangeModel(t *testing.T) {
+	t.Parallel()
+	smoke := strings.Index(Text, "smoke test")
+	model := strings.Index(Text, "per-change model")
+	if smoke < 0 || model < smoke {
+		t.Fatalf("prompt must guide the per-change model after the smoke test")
+	}
+	for _, want := range []string{
+		"which technologies to use", "language, framework, database and hosting", "I choose",
+		"conceptual PRD", "conventions-only TRD", "`DESIGN.md` only if the app has a UI",
+		"`MIGRATIONS.md` only if it has a database", "empty `docs/product/intents/`",
+		"no upfront schema, plan or stories", "`wave.after`", "`next`", "`wait`", "the default",
+		"one at a time", "first intent",
+	} {
+		if !strings.Contains(Text, want) {
+			t.Errorf("prompt lacks %q", want)
+		}
+	}
+}

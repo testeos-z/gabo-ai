@@ -40,6 +40,10 @@ func TestRuntimePiSkill(t *testing.T) {
 		// prerequisite: a subagent package, checked read-only, never configured.
 		"`pi list`", "`npm i -g gentle-pi`", "`pi install npm:gentle-pi`", "another subagent package",
 		"Never edit", "`subagents.json`", "refuse",
+		// refusal without a subagent package: no fallback, recommends gentle-pi and the full Gentle AI framework (S15).
+		"Pi has no subagents, so gabo cannot work on Pi without a subagent package",
+		"the full Gentle AI framework", "https://github.com/Gentleman-Programming/gentle-ai",
+		"`gentle-ai install --agent pi`", "Then ask me to rebuild",
 		// inputs read from the project copy.
 		"`.gabo/skills/gabo-agent-templates/agents.yaml`", "`.gabo/VERSION`", "`runtimes.*`", "`slots.<slot>.adapter`",
 		// agents: one file per spec id, version line in the frontmatter.
@@ -57,7 +61,7 @@ func TestRuntimePiSkill(t *testing.T) {
 		// sources and versions (former TRD 9.6 rows), and the confirmed git clone path.
 		"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md",
 		"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md",
-		"Pi 1.4.0", "gentle-pi 4.4.0", "`<agent-home>/git/<host>/<path>`", "`.pi/git/<host>/<path>`",
+		"Pi 1.4.0", "gentle-pi 4.5.1", "`<agent-home>/git/<host>/<path>`", "`.pi/git/<host>/<path>`",
 	} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("gabo-runtime-pi/SKILL.md: missing %q", s)

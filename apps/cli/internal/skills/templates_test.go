@@ -19,11 +19,12 @@ var templates = map[string]struct {
 	columns  []string
 	headings []string
 }{
+	// Conceptual PRD (S2): what the product offers and what the user gets; no
+	// stories and no acceptance criteria, which live in each intent's spec.
 	"gabo-pm/templates/PRD.md": {
 		columns: []string{
 			"| field | value |",
-			"| id | title | user | requirement ids | status | file |",
-			"| id | type | requirement | acceptance criteria | priority | stories | verification |",
+			"| id | type | what the product offers | what the user gets | priority |",
 			"| metric | how it is measured |",
 			"| # | question | status |",
 			"| term | meaning |",
@@ -34,107 +35,111 @@ var templates = map[string]struct {
 			"### Evidence",
 			"## 5. Appetite",
 			"## 6. Assumptions and dependencies",
-			"## 8. Requirements",
-			"## 9. Quality requirements",
-			"## 10. Constraints",
-			"## 14. Glossary",
+			"## 7. What the product offers",
+			"## 8. Quality requirements",
+			"## 9. Constraints",
+			"## 13. Glossary",
 		},
 	},
-	"gabo-pm/templates/STORY.md": {
-		columns: []string{"| field | value |"},
+	// Per-change folder docs/product/intents/<NNNN-slug>/ (S7): the intent
+	// holds the problem only; the spec holds the design of one change, its
+	// optional UX/app flow (S5) and migration steps (S4), and a human acceptance
+	// record (S14).
+	"gabo-pm/templates/intent.md": {
+		columns: []string{
+			"| field | value |",
+			"| # | question | status |",
+			"| kind | reference |",
+		},
 		headings: []string{
-			"# US-0NN <Title>",
-			"## Story",
-			"## Acceptance criteria",
-			"## Out of scope",
-			"## Notes",
+			"# Intent <NNNN> <Title>",
+			"## Problem",
+			"## Who is affected",
+			"## Desired outcome",
+			"## Constraints",
+			"## Open questions",
+			"## Links",
 		},
 	},
-	// T028: arc42 sections, the MADR decision table and the requirement coverage table.
+	"gabo-pm/templates/spec.md": {
+		columns: []string{
+			"| field | value |",
+			"| id | requirement | acceptance criteria | verification |",
+			"| id | decision | options considered | choice | consequences |",
+			"| surface | entry points | primary action | empty and error states |",
+			"| order | file | purpose | rollback |",
+			"| policy | conflict | resolution |",
+			"| # | question | status |",
+			"| accepted by | date | notes |",
+		},
+		headings: []string{
+			"# Spec <NNNN> <Title>",
+			"## 1. Requirements",
+			"## 2. Design",
+			"## 3. UX and app flow (optional)",
+			"## 4. DB migration steps (optional)",
+			"## 5. Policy conflicts",
+			"## 6. Open questions",
+			"## 7. Acceptance",
+		},
+	},
+	// Conventions-only TRD (S3): the stack the user chose (S6), architecture,
+	// code and test conventions and the MADR decision table; per-change design
+	// and requirement coverage live in each intent's spec and plan.
 	"gabo-dev-lead/templates/TRD.md": {
 		columns: []string{
 			"| field | value |",
-			"| quality goal | scenario | requirement ids |",
+			"| area | choice | version | chosen by | notes |",
 			"| constraint | kind | source |",
 			"| id | decision | options considered | choice | consequences | status | requirement ids |",
-			"| req | decisions | sections | stories | verification → test layer |",
-			"| id | risk or debt | requirement and decision ids | mitigation |",
+			"| id | risk or debt | decision ids | mitigation |",
 			"| term | meaning |",
 		},
 		headings: []string{
 			"# Technical Requirements (TRD)",
-			"## 1. Introduction and quality goals",
+			"## 1. Stack and tooling",
 			"## 2. Constraints",
-			"## 3. Context and scope",
-			"## 4. Solution strategy",
-			"## 5. Building block view",
-			"## 6. Runtime view",
-			"## 7. Deployment view",
-			"## 8. Crosscutting concepts",
-			"## 9. Architecture decisions",
-			"### Requirement coverage",
-			"## 10. Quality requirements",
-			"### Testing strategy",
-			"## 11. Risks and technical debt",
-			"## 12. Glossary",
-			"## 13. Open questions",
+			"## 3. Architecture conventions",
+			"## 4. Code conventions",
+			"## 5. Test conventions",
+			"## 6. Deployment and environments",
+			"## 7. Architecture decisions",
+			"## 8. Risks and technical debt",
+			"## 9. Glossary",
+			"## 10. Open questions",
 		},
 	},
-	"gabo-dev-lead/templates/IMPLEMENTATION_PLAN.md": {
+	// The plan of one intent (S9): ordered steps and the task table, no
+	// milestones and no global waves; depends_on may cross intents (S8).
+	"gabo-dev-lead/templates/plan.md": {
 		columns: []string{
 			"| field | value |",
-			"| id | title | stories | requirements | decisions | depends_on | unblocks | acceptance | size |",
-			"| wave | tasks | goal |",
-			"| story | tasks |",
-			"| req | tasks |",
-			"| milestone | goal | tasks | waves | exit check |",
+			"| id | title | spec refs | depends_on | unblocks | acceptance | size |",
 			"| risk | impact | mitigation |",
 		},
 		headings: []string{
-			"# Implementation Plan",
-			"## Prerequisites",
+			"# Plan <NNNN> <Title>",
+			"## Steps",
 			"## Tasks",
-			"## Waves",
-			"## Coverage",
-			"## Roadmap and milestones",
 			"## Risks to the plan",
 			"## Open questions",
 		},
 	},
-	// The data and config schema template keeps the DB_SCHEMA.md file name (plan A8).
-	"gabo-db-master/templates/DB_SCHEMA.md": {
+	// No upfront schema (S4): one ordered row per migration or script.
+	"gabo-db-master/templates/MIGRATIONS.md": {
 		columns: []string{
 			"| field | value |",
-			"| store | kind | location | owner / scope | written by | committed? |",
-			"| key | type | required | description | example |",
-			"| column | type | null | default | constraints | description |",
-			"| index | columns | query it serves |",
-			"| order | migration | purpose | rollback |",
+			"| order | intent | file | purpose | rollback |",
 		},
 		headings: []string{
-			"# Data and Config Schema",
-			"## 1. Storage choice",
-			"### Persistence inventory",
-			"## 2. Schema per file",
-			"## 3. Migration",
-			"## 4. Data",
-			"## 5. Open questions",
-		},
-	},
-	"gabo-frontend/templates/APP_FLOW.md": {
-		columns: []string{
-			"| field | value |",
-			"| surface | entry points | primary action | empty and error states |",
-		},
-		headings: []string{
-			"# App Flow",
-			"## Surfaces",
-			"## Journeys",
-			"## Flow",
+			"# Migrations",
+			"## Conventions",
+			"## Log",
 			"## Open questions",
 		},
 	},
-	"gabo-frontend/templates/UX_UI.md": {
+	// Global styles only (S5); UX and app flow live in each spec.
+	"gabo-frontend/templates/DESIGN.md": {
 		columns: []string{
 			"| field | value |",
 			"| token | custom property | value | use |",
@@ -142,7 +147,7 @@ var templates = map[string]struct {
 			"| case | what happened | why | what to do next |",
 		},
 		headings: []string{
-			"# UX and UI",
+			"# Design",
 			"## 1. Principles",
 			"## 2. Design tokens",
 			"## 3. Component inventory",
@@ -209,12 +214,45 @@ func TestTemplatesKeepStableColumnsAndSections(t *testing.T) {
 	}
 }
 
-func TestPMSkillPointsToTemplatesAndStoryNaming(t *testing.T) {
+// The global planning templates are gone (S4, S5, S9) and the plan carries
+// no milestones or global waves (S9, S10).
+func TestGlobalPlanningTemplatesAreRemoved(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for _, p := range []string{
+		"gabo-pm/templates/STORY.md",
+		"gabo-dev-lead/templates/IMPLEMENTATION_PLAN.md",
+		"gabo-db-master/templates/DB_SCHEMA.md",
+		"gabo-frontend/templates/APP_FLOW.md",
+		"gabo-frontend/templates/UX_UI.md",
+	} {
+		if _, ok := byPath[p]; ok {
+			t.Errorf("%s: removed template still shipped", p)
+		}
+	}
+	for _, p := range []string{"gabo-pm/templates/PRD.md", "gabo-dev-lead/templates/TRD.md"} {
+		doc := strings.ToLower(byPath[p])
+		for _, s := range []string{"stories", "story", "us-0", "requirement coverage"} {
+			if strings.Contains(doc, s) {
+				t.Errorf("%s: has %q", p, s)
+			}
+		}
+	}
+	plan := strings.ToLower(byPath["gabo-dev-lead/templates/plan.md"])
+	for _, s := range []string{"milestone", "| wave"} {
+		if strings.Contains(plan, s) {
+			t.Errorf("gabo-dev-lead/templates/plan.md: has %q", s)
+		}
+	}
+}
+
+func TestPMSkillPointsToTemplates(t *testing.T) {
 	t.Parallel()
 	skill := embeddedByPath(t)["gabo-pm/SKILL.md"]
 	for _, s := range []string{
-		"templates/PRD.md", "templates/STORY.md", "US-0NN-<kebab>.md",
-		"| id | type | requirement | acceptance criteria | priority | stories | verification |",
+		"templates/PRD.md", "templates/intent.md", "templates/spec.md", "docs/product/intents/<NNNN-slug>/",
+		"| id | type | what the product offers | what the user gets | priority |",
+		"highest `NNNN` plus one", "never an agent",
 	} {
 		if !strings.Contains(skill, s) {
 			t.Errorf("gabo-pm/SKILL.md: missing %q", s)
@@ -229,16 +267,18 @@ func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
 	byPath := embeddedByPath(t)
 	for skill, want := range map[string][]string{
 		"gabo-dev-lead/SKILL.md": {
-			"templates/TRD.md", "templates/IMPLEMENTATION_PLAN.md", "## Fixed questions", "arc42", "MADR",
+			"templates/TRD.md", "templates/plan.md", "## Fixed questions", "MADR",
 			"| id | decision | options considered | choice | consequences | status | requirement ids |",
-			"| req | decisions | sections | stories | verification → test layer |",
-			"| id | title | stories | requirements | decisions | depends_on | unblocks | acceptance | size |",
+			"| area | choice | version | chosen by | notes |",
+			"| id | title | spec refs | depends_on | unblocks | acceptance | size |",
+			"only after a human accepted the spec", "`parent`",
 		},
 		"gabo-db-master/SKILL.md": {
-			"templates/DB_SCHEMA.md", "## Fixed questions", "config-only", "Persistence inventory",
+			"templates/MIGRATIONS.md", "## Fixed questions", "config-only", "Persistence inventory",
+			"`## Conventions`",
 		},
 		"gabo-frontend/SKILL.md": {
-			"templates/APP_FLOW.md", "templates/UX_UI.md", "## Fixed questions",
+			"templates/DESIGN.md", "## 3. UX and app flow (optional)", "## Fixed questions",
 		},
 	} {
 		doc, ok := byPath[skill]
@@ -324,18 +364,71 @@ func fixedQuestions(doc string) ([][3]string, error) {
 	return rows, nil
 }
 
-// traceabilityGaps is the gap list of the traceability check (D19, T031):
-// every directiva skill carries it word for word, so the four skills block a
-// planning step on the same gaps.
+// traceabilityGaps is the gap list of the traceability check (D19, per-change
+// model S7-S9): every directiva skill carries it word for word, so the four
+// skills block a planning step on the same gaps.
 var traceabilityGaps = []string{
-	"story without requirement",
-	"requirement without decision, task or verification",
-	"task without story",
-	"dependency cycle",
-	"dangling id",
-	"`depends_on` / `unblocks` mismatch",
+	"an intent without spec;",
+	"an accepted spec without plan;",
+	"a plan task without a tracker task, or the reverse;",
+	"a task whose parent is not exactly one intent;",
+	"a requirement in the spec not covered by any plan task;",
+	"a dependency cycle;",
+	"a dangling id, including a cross-intent `<NNNN>/T<n>` reference;",
+	"a `depends_on`/`unblocks` mismatch.",
 	"Rows marked removed",
 	"blocks the next planning step",
+}
+
+// The per-change model retires stories, the global plan, milestones, global
+// waves and the global DB, UX and app-flow docs from every planning skill (S7, S9).
+var retiredPlanningTerms = []string{
+	"user stor", "docs/product/stories", "US-0", "story without", "without story",
+	"IMPLEMENTATION_PLAN", "milestone", "DB_SCHEMA", "UX_UI", "APP_FLOW",
+}
+
+func TestPlanningSkillsDropRetiredGlobalPlanning(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for _, skill := range []string{
+		"gabo-pm/SKILL.md", "gabo-dev-lead/SKILL.md", "gabo-db-master/SKILL.md", "gabo-frontend/SKILL.md",
+		"gabo-doc-guide/SKILL.md",
+	} {
+		body := byPath[skill]
+		if i := strings.Index(body, "\n---\n"); i >= 0 {
+			body = body[i:]
+		}
+		for _, s := range retiredPlanningTerms {
+			if strings.Contains(body, s) {
+				t.Errorf("%s: still has %q", skill, s)
+			}
+		}
+	}
+	if strings.Contains(strings.ToLower(byPath["gabo-dev-lead/SKILL.md"]), "wave") {
+		t.Errorf("gabo-dev-lead/SKILL.md: still plans waves")
+	}
+}
+
+// Ownership in the per-change model (S7, S8, S14).
+func TestPlanningSkillsOwnTheirIntentArtifacts(t *testing.T) {
+	t.Parallel()
+	byPath := embeddedByPath(t)
+	for skill, want := range map[string][]string{
+		"gabo-pm/SKILL.md":        {"intent.md", "spec.md", "Acceptance"},
+		"gabo-dev-lead/SKILL.md":  {"plan.md", "`parent`", "product card"},
+		"gabo-db-master/SKILL.md": {"spec.md", "MIGRATIONS.md"},
+		"gabo-frontend/SKILL.md":  {"spec.md", "DESIGN.md"},
+		"gabo-doc-guide/SKILL.md": {
+			"docs/product/PRD.md", "docs/product/TRD.md", "docs/product/DESIGN.md", "docs/product/MIGRATIONS.md",
+			"docs/product/intents/<NNNN-slug>/", "intent.md", "spec.md", "plan.md", "review findings",
+		},
+	} {
+		for _, s := range want {
+			if !strings.Contains(byPath[skill], s) {
+				t.Errorf("%s: missing %q", skill, s)
+			}
+		}
+	}
 }
 
 // T031 (J2, J6): the directiva skills ask their template's fixed questions one

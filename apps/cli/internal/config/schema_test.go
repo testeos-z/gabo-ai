@@ -116,6 +116,10 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"spaces in check":         with("review: {checks: ['go -C apps/cli test ./...']}"),
 		"check env names":         with("review: {check_env: [AISHARE_TEST_DATABASE_URL, _X1, GHOST, CIRCLE]}"),
 		"empty check env":         with("review: {check_env: []}"),
+		"wave after next":         with("wave: {after: next}"),
+		"wave after wait":         with("wave: {after: wait}"),
+		"null wave":               with("wave:\n"),
+		"empty wave after":        with(`wave: {after: ""}`),
 	}
 	reject := map[string]string{
 		"missing runtimes.coder":      string(without(t, "runtimes.coder")),
@@ -177,6 +181,8 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"blank developer alias":       with(`developers: {"a@b.c": " "}`),
 		"bad plan scope":              with("plan_change: {scope: world}"),
 		"string global_without_owner": with("plan_change: {global_without_owner: maybe}"),
+		"bad wave after":              with("wave: {after: later}"),
+		"unknown wave field":          with("wave: {chain: true}"),
 		"bad interaction level":       with("interaction_level: max"),
 		"bad language":                with("language: 'not a tag'"),
 		"not a mapping":               "- a\n- b\n",

@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/intents/0001-alpha/plan.md: no task table (| id | title | spec refs | depends_on | unblocks | acceptance | size |)
+next: fix the intent folders above, then rerun gabo check

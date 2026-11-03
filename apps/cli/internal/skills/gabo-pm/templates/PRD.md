@@ -1,6 +1,6 @@
 # PRD template
 
-Scaffold for `docs/product/PRD.md` (ISO/IEC/IEEE 29148, D14). Answer every fixed question before filling its section; an answer you do not have goes to section 13 as an open question, never an invented decision.
+Scaffold for `docs/product/PRD.md`, the conceptual product document: what the product offers and what the user gets. It holds no acceptance criteria and no task links; each change is an intent in `docs/product/intents/<NNNN-slug>/`, and its `spec.md` holds the requirements with acceptance criteria. Answer every fixed question before filling its section; an answer you do not have goes to section 12 as an open question, never an invented decision.
 
 ## Fixed questions
 
@@ -13,13 +13,12 @@ Scaffold for `docs/product/PRD.md` (ISO/IEC/IEEE 29148, D14). Answer every fixed
 | Q5 | What are the goals, the non-goals and what is deferred to later? | 4. Goals, non-goals and later |
 | Q6 | How much time or effort is the first release worth (appetite)? | 5. Appetite |
 | Q7 | What do we assume, and what do we depend on outside our control? | 6. Assumptions and dependencies |
-| Q8 | Which user stories group the requirements? | 7. User stories |
-| Q9 | What must the product do, how is each requirement accepted and verified? | 8. Requirements |
-| Q10 | What are the quality requirements (security, reliability, cost, performance)? | 9. Quality requirements |
-| Q11 | Which constraints are fixed (platforms, standards, budget, legal)? | 10. Constraints |
-| Q12 | Which measurable outcomes tell us it worked? | 11. Success metrics |
-| Q13 | What is still undecided? | 13. Open questions |
-| Q14 | Which terms need a shared meaning? | 14. Glossary |
+| Q8 | What does the product offer, and what does the user get from each offer? | 7. What the product offers |
+| Q9 | What are the quality expectations (security, reliability, cost, performance)? | 8. Quality requirements |
+| Q10 | Which constraints are fixed (platforms, standards, budget, legal)? | 9. Constraints |
+| Q11 | Which measurable outcomes tell us it worked? | 10. Success metrics |
+| Q12 | What is still undecided? | 12. Open questions |
+| Q13 | Which terms need a shared meaning? | 13. Glossary |
 
 ## Template
 
@@ -33,7 +32,7 @@ Scaffold for `docs/product/PRD.md` (ISO/IEC/IEEE 29148, D14). Answer every fixed
 | version | 0.1 |
 | date | <YYYY-MM-DD> |
 | scope | <product or release> |
-| linked docs | [TRD](TRD.md), stories `docs/product/stories/` |
+| linked docs | [TRD](TRD.md), intents `docs/product/intents/` |
 
 ## 1. Product in one sentence
 
@@ -63,7 +62,7 @@ Scaffold for `docs/product/PRD.md` (ISO/IEC/IEEE 29148, D14). Answer every fixed
 
 - **Goals:** <outcome the first release achieves>
 - **Non-goals:** <what the product will not do>
-- **Later:** see section 12.
+- **Later:** see section 11.
 
 ## 5. Appetite
 
@@ -73,49 +72,41 @@ Scaffold for `docs/product/PRD.md` (ISO/IEC/IEEE 29148, D14). Answer every fixed
 
 - **<Assumption or dependency>.** <What we rely on and what happens if it fails.>
 
-## 7. User stories
+## 7. What the product offers
 
-Stories follow `templates/STORY.md` of the gabo-pm skill and live in `docs/product/stories/`.
+Conceptual only. Type: F functional, Q quality, C constraint. The ids are stable so an intent or a TRD decision can cite them; the acceptance criteria of each change live in its intent's `spec.md`.
 
-| id | title | user | requirement ids | status | file |
-|---|---|---|---|---|---|
-| US-001 | <Title> | <user> | R1 | proposed | [US-001-<kebab>.md](stories/US-001-<kebab>.md) |
+| id | type | what the product offers | what the user gets | priority |
+|---|---|---|---|---|
+| R1 | F | <capability, in product language> | <benefit or outcome for the user> | must |
 
-## 8. Requirements
+## 8. Quality requirements
 
-Type: F functional, Q quality, C constraint. Requirements use EARS wording (When/While/If ... the system shall ...).
+<Which rows of section 7 are type Q, grouped by security, reliability, cost, performance, observability.>
 
-| id | type | requirement | acceptance criteria | priority | stories | verification |
-|---|---|---|---|---|---|---|
-| R1 | F | <EARS requirement> | <observable acceptance> | must | US-001 | <test, inspection, demo or analysis> |
+## 9. Constraints
 
-## 9. Quality requirements
+<Fixed platforms, standards, budget or legal limits; the C rows of section 7.>
 
-<Which rows of section 8 are type Q, grouped by security, reliability, cost, performance, observability.>
-
-## 10. Constraints
-
-<Fixed platforms, standards, budget or legal limits; the C rows of section 8.>
-
-## 11. Success metrics
+## 10. Success metrics
 
 | metric | how it is measured |
 |---|---|
 | <metric> | <source and method> |
 
-## 12. Later
+## 11. Later
 
 Out of the first release.
 
 - <Deferred item.>
 
-## 13. Open questions
+## 12. Open questions
 
 | # | question | status |
 |---|---|---|
 | 1 | <question> | open |
 
-## 14. Glossary
+## 13. Glossary
 
 | term | meaning |
 |---|---|

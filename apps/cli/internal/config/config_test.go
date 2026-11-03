@@ -103,6 +103,9 @@ func TestLoadExampleFile(t *testing.T) {
 	if cfg.Repo.Name != "cappy-lab/vulcam" || cfg.Repo.IntegrationBranch != "dev" {
 		t.Fatalf("example config = %+v", cfg)
 	}
+	if cfg.Wave.After != AfterWait {
+		t.Errorf("example wave.after = %q, want %q", cfg.Wave.After, AfterWait)
+	}
 }
 
 func TestLoadMissingFile(t *testing.T) {
