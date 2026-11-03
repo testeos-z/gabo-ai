@@ -64,6 +64,21 @@ go -C apps/cli install -ldflags "-X main.buildVersion=<x.y.z>" ./cmd/gabo
 
 Check the install with `gabo version`.
 
+### Claude Code plugin
+
+The repository is its own Claude Code marketplace, `gabo-ai`, with one plugin, `gabo`. The plugin adds the gabo catalog skills (except the skills that run reviews) and two hooks that run `gabo check` around Claude's writes in a gabo project.
+
+```sh
+claude plugin marketplace add testeos-z/gabo-ai
+claude plugin install gabo@gabo-ai
+```
+
+- **Private repository.** While `testeos-z/gabo-ai` is private, Claude Code clones it with your own git credentials. Set them up first: run `gh auth setup-git`, or add an SSH key that can read the repository.
+- **The `checks` option.** On by default. Before Claude writes or edits a gabo file (`gabo.yaml`, `.gabo/`, `.claude/agents/`, `.claude/skills/`, `docs/product/`), `gabo check --pre-write` blocks a write that breaks the stage gate; after it, `gabo check` runs and reports failures to Claude. Both hooks do nothing outside a gabo project (no `.gabo/VERSION`) or when `gabo` is not on `PATH`. Turn them off with the plugin's `checks` row in `/config`.
+- **`gabo init` stays required.** The plugin does not configure a project. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see [Quick start](#quick-start)).
+
+See [`plugins/claude-code/README.md`](plugins/claude-code/README.md) for the plugin layout, the open owner decisions and the release checklist.
+
 ### Install with curl (planned)
 
 > **Not available yet.** A one-line install script is planned but does not exist. Use one of the methods above.
