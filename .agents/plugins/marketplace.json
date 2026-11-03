@@ -1,0 +1,19 @@
+{
+  "name": "gabo-ai",
+  "interface": {
+    "displayName": "gabo-ai"
+  },
+  "plugins": [
+    {
+      "name": "gabo",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex"
+      },
+      "policy": {
+        "installation": "AVAILABLE"
+      },
+      "category": "Coding"
+    }
+  ]
+}

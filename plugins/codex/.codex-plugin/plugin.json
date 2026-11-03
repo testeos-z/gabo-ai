@@ -1,0 +1,11 @@
+{
+  "name": "gabo",
+  "version": "0.2.0",
+  "description": "gabo catalog skills for Codex: plan, build and review work with the gabo SDLC.",
+  "author": {
+    "name": "testeos-z"
+  },
+  "repository": "https://github.com/testeos-z/gabo-ai",
+  "license": "MIT",
+  "skills": "./skills/"
+}
