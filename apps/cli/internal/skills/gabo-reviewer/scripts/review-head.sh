@@ -15,8 +15,9 @@
 #    variable named in review.check_env (base gabo.yaml) is passed from the
 #    reviewer's own environment; one unset or empty fails the checks before
 #    any runs. The worktree is removed when the run ends.
-# 4. Reviews the PR diff with the runtimes.reviewer engine (Claude Code or
-#    Pi), read-only, in the head checkout.
+# 4. Reviews the PR diff with the runtimes.reviewer engine (Claude Code, Pi
+#    or Codex), read-only, in the head checkout. A codex or opencode engine
+#    needs its isolation test pass marker; opencode has no review step yet.
 # 5. Posts one comment (first line: the verdict; last lines: the marker that
 #    signs the head and the footer), sets reviewer/tests and reviewer/review,
 #    and on a clean head runs merge-head.sh.
@@ -31,6 +32,9 @@ if ! is_number "$pr"; then
   exit 2
 fi
 problem="$(validate_config)"
+[[ -n "$problem" ]] || problem="$(engine_problem)"
+[[ -n "$problem" || "$ENGINE" != opencode ]] ||
+  problem="runtimes.reviewer opencode has no review step in these scripts yet (intent 0004); pick claude, codex or pi"
 if [[ -n "$problem" ]]; then
   echo "PREFLIGHT-FAILED $problem" >&2
   exit 2
@@ -366,7 +370,33 @@ review_log="$logs/review.log"
 prompt_file="$logs/prompt.md"
 agent_prompt >"$prompt_file"
 review_env=(env -i "PATH=$PATH" NO_COLOR=1 TERM=dumb)
-if [[ "$ENGINE" == pi ]]; then
+codex_last="$logs/codex-last-message.md"
+if [[ "$ENGINE" == codex ]]; then
+  # The flags of the isolation test the engine passed (gabo-reviewer-config,
+  # intent 0001 S10): --ignore-user-config skips config.toml in CODEX_HOME,
+  # --ignore-rules the user and project execpolicy rules, -s read-only keeps
+  # every command the model runs from writing, --ephemeral saves no session.
+  # The run gets only PATH, a reviewer-owned HOME and CODEX_HOME (env -i), so
+  # no GitHub token and none of the owner's Codex config, skills or MCP
+  # servers reach it; CODEX_HOME holds only a link to the owner's login. The
+  # prompt comes on stdin ("-"); the final message, written by codex itself
+  # outside the checkout, is the review text.
+  engine_name="Codex"
+  engine_model="$CODEX_MODEL"
+  engine_env || { log_event "RETRY" "#$pr $sha cannot create $REVIEW_HOME"; exit 1; }
+  review_env=("${ENGINE_ENV[@]}")
+  codex_auth="${CODEX_HOME:-$HOME/.codex}/auth.json"
+  if [[ -f "$codex_auth" ]]; then
+    ln -sfn -- "$codex_auth" "$CODEX_REVIEW_HOME/auth.json"
+  else
+    rm -f -- "$CODEX_REVIEW_HOME/auth.json"
+  fi
+  rm -f -- "$codex_last"
+  engine_cmd=("$CODEX" exec --ignore-user-config --ignore-rules -s read-only --ephemeral -C "$wt"
+    --output-last-message "$codex_last")
+  [[ -z "$CODEX_MODEL" ]] || engine_cmd+=(-m "$CODEX_MODEL")
+  engine_cmd+=(-)
+elif [[ "$ENGINE" == pi ]]; then
   # Read-only by construction: only the read, grep, find and ls tools exist
   # (no bash, edit or write). --no-approve ignores the PR's project files
   # (.pi/settings.json, .pi/mcp.json, .pi/extensions, ...); --no-extensions,
@@ -427,9 +457,16 @@ code=0
 (cd "$wt" && RUN_STDIN="$prompt_file" run_bounded $((REVIEW_TIMEOUT + 5)) "$review_log" \
   "${review_env[@]}" "${engine_cmd[@]}") || code=$?
 after="$(git -C "$wt" status --porcelain 2>/dev/null)"
-# One result object for both engines: Claude's final "result" record, or a
-# result built from Pi's last assistant message (stopReason "stop" is success).
-if [[ "$ENGINE" == pi ]]; then
+# One result object for every engine: Claude's final "result" record, a
+# result built from Pi's last assistant message (stopReason "stop" is
+# success), or Codex's final message (its exit code tells success).
+if [[ "$ENGINE" == codex ]]; then
+  result=""
+  if [[ -s "$codex_last" ]]; then
+    result="$(jq -Rsc --argjson e "$([[ $code == 0 ]] && echo false || echo true)" \
+      '{type: "result", is_error: $e, subtype: (if $e then "error" else "success" end), result: .}' "$codex_last")"
+  fi
+elif [[ "$ENGINE" == pi ]]; then
   result="$(jq -Rc 'fromjson? | select(type == "object" and .type == "message_end" and .message.role? == "assistant") | .message' \
     "$review_log" 2>/dev/null | tail -n 1 |
     jq -c '{type: "result", is_error: (.stopReason != "stop"), subtype: (if .stopReason == "stop" then "success" else (.stopReason // "unknown") end),

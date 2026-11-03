@@ -3,7 +3,8 @@
 # it after lib.sh. git itself is real; the origin is a local bare repository
 # standing in for GitHub, so every test runs offline.
 #
-# make_stubs <dir>: writes fake gh, claude, pi, go and gabo into <dir>. Every call
+# make_stubs <dir>: writes fake gh, claude, pi, codex, opencode, go and gabo
+# into <dir>. Every call
 # is appended to $STUB_LOG. The checks and the review run with a scrubbed
 # environment, so the stubs read their settings from <dir>/stub-context when
 # STUB_LOG is unset; write_stub_context <dir> refreshes that file.
@@ -20,13 +21,19 @@
 # Fake pi: prints a JSON event stream per $PI_MODE (pass | fail | error |
 # modify), records its argv, prompt and environment, and which of the owner's
 # Pi files (auth.json, settings.json in its agent dir) it can see.
+# Fake codex: `--version` prints "codex-cli $CODEX_VERSION" (default 0.163.0);
+# `exec` records its argv, prompt, environment (the variable names too) and
+# whether its CODEX_HOME holds auth.json, then writes the final message per
+# $CODEX_MODE (pass | fail | error | modify | silent) to the
+# --output-last-message file.
+# Fake opencode: `--version` prints $OPENCODE_VERSION (default 1.0.0).
 # Fake go and gabo: fail when their args match $FAIL_CHECK and record their
 # argv, cwd and whether a credential leaked into their environment. `gabo
 # version` prints "gabo $GABO_VERSION" (default 0.4.0).
 
 write_stub_context() {
   local v
-  for v in STUB_LOG FIXTURE FAIL_CHECK CLAUDE_MODE PI_MODE GABO_VERSION; do
+  for v in STUB_LOG FIXTURE FAIL_CHECK CLAUDE_MODE PI_MODE CODEX_MODE CODEX_VERSION OPENCODE_VERSION GABO_VERSION; do
     printf '%s=%q\n' "$v" "${!v:-}"
   done >"$1/stub-context"
 }
@@ -116,6 +123,43 @@ case "${PI_MODE:-pass}" in
   modify) echo "// changed" >>apps/cli/main.go; final "No blocking issues found." ;;
 esac
 PI
+  cat >"$dir/codex" <<'CODEX'
+#!/usr/bin/env bash
+[[ -n "${STUB_LOG:-}" || ! -f "$(dirname "$0")/stub-context" ]] || source "$(dirname "$0")/stub-context"
+if [[ "${1:-}" == --version ]]; then
+  echo "codex-cli ${CODEX_VERSION:-0.163.0}"
+  exit 0
+fi
+echo "codex $* cwd=$PWD" >>"$STUB_LOG"
+echo "codex-env GH_TOKEN=${GH_TOKEN:-unset} REVIEWER_GH_TOKEN=${REVIEWER_GH_TOKEN:-unset} CLAUDE_CODE_OAUTH_TOKEN=${CLAUDE_CODE_OAUTH_TOKEN:-unset} HOME=$HOME CODEX_HOME=${CODEX_HOME:-unset}" >>"$STUB_LOG"
+echo "codex-vars $(env | cut -d= -f1 | grep -vxE 'PWD|SHLVL|_|OLDPWD' | sort | paste -sd, -)" >>"$STUB_LOG"
+echo "codex-files auth=$([[ -f "${CODEX_HOME:-/nonexistent}/auth.json" ]] && echo yes || echo no)" >>"$STUB_LOG"
+cat >"$FIXTURE/prompt_seen.txt"
+last="" prev=""
+for a in "$@"; do
+  [[ "$prev" == -o || "$prev" == --output-last-message ]] && last="$a"
+  prev="$a"
+done
+final() {
+  echo "codex: reading the diff"
+  [[ -z "$last" ]] || printf '%s\n' "$1" >"$last"
+  printf '%s\n' "$1"
+}
+case "${CODEX_MODE:-pass}" in
+  pass) final $'No blocking issues found.\n\nAll files comply.' ;;
+  fail) final $'Blocking issues found.\n\n- apps/cli/main.go:3 High: nil dereference' ;;
+  error) echo "ERROR: unexpected status 401 Unauthorized" >&2; exit 1 ;;
+  modify) echo "// changed" >>apps/cli/main.go; final "No blocking issues found." ;;
+  silent) echo "codex: done" ;;
+esac
+CODEX
+  cat >"$dir/opencode" <<'OPENCODE'
+#!/usr/bin/env bash
+[[ -n "${STUB_LOG:-}" || ! -f "$(dirname "$0")/stub-context" ]] || source "$(dirname "$0")/stub-context"
+[[ "${1:-}" == --version ]] && { echo "${OPENCODE_VERSION:-1.0.0}"; exit 0; }
+echo "opencode $* cwd=$PWD" >>"$STUB_LOG"
+exit 1
+OPENCODE
   cat >"$dir/go" <<'GO'
 #!/usr/bin/env bash
 [[ -n "${STUB_LOG:-}" ]] || source "$(dirname "$0")/stub-context"
@@ -148,7 +192,7 @@ case "${1:-}" in
   *) echo "unexpected gabo call: $args" >&2; exit 3 ;;
 esac
 GABO
-  chmod +x "$dir/gh" "$dir/claude" "$dir/pi" "$dir/go" "$dir/gabo"
+  chmod +x "$dir/gh" "$dir/claude" "$dir/pi" "$dir/codex" "$dir/opencode" "$dir/go" "$dir/gabo"
 }
 
 # write_yaml <file>: a gabo.yaml for the fixture repository. Knobs (env):
