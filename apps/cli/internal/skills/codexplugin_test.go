@@ -157,8 +157,9 @@ func TestCodexPluginSkillsCopyTheCatalog(t *testing.T) {
 // requireCopy fails unless copyPath, a file or directory, is a real copy of
 // src (both relative to the catalog package directory): no symlink at or
 // below copyPath, the same set of files and directories as src, and each file
-// byte-identical with the same mode. It names the first drifted path. The
-// Codex plugin's skill folders and hook scripts all go through it.
+// byte-identical with the same mode as git records it (regular file, executable
+// or not). It names the first drifted path and how to refresh the copy. It
+// takes a file or a directory so later hook-script copies reuse it.
 func requireCopy(t *testing.T, copyPath, src string) {
 	t.Helper()
 	cp, err := treeEntries(copyPath)
@@ -169,25 +170,28 @@ func requireCopy(t *testing.T, copyPath, src string) {
 	if err != nil {
 		t.Fatalf("copy source %s: %v", src, err)
 	}
+	fix := fmt.Sprintf("refresh it from the catalog: rm -r %[1]s && cp -r %[2]s %[1]s (run from apps/cli/internal/skills)", copyPath, src)
 	for _, rel := range sortedUnion(cp, sp) {
 		c, inCopy := cp[rel]
 		s, inSrc := sp[rel]
 		at := filepath.Join(copyPath, rel)
 		switch {
 		case !inCopy:
-			t.Fatalf("%s: missing from the copy of %s", at, filepath.Join(src, rel))
+			t.Fatalf("%s: missing from the copy of %s; %s", at, filepath.Join(src, rel), fix)
 		case !inSrc:
-			t.Fatalf("%s: not in the source %s", at, src)
+			t.Fatalf("%s: not in the source %s; %s", at, src, fix)
 		case c.mode != s.mode:
-			t.Fatalf("%s: mode %v, source %s has %v", at, c.mode, filepath.Join(src, rel), s.mode)
+			t.Fatalf("%s: mode %v, source %s has %v; %s", at, c.mode, filepath.Join(src, rel), s.mode, fix)
 		case !bytes.Equal(c.data, s.data):
-			t.Fatalf("%s: content differs from %s", at, filepath.Join(src, rel))
+			t.Fatalf("%s: content differs from %s; %s", at, filepath.Join(src, rel), fix)
 		}
 	}
 }
 
-// treeEntry is one file or directory of a copied tree; data is nil for
-// directories.
+// treeEntry is one file or directory of a copied tree with its mode as git
+// records it: fs.ModeDir for a directory, 0o755 or 0o644 for a regular file
+// (git tracks only the executable bit; the rest follows the umask). data is
+// nil for directories.
 type treeEntry struct {
 	mode fs.FileMode
 	data []byte
@@ -213,13 +217,17 @@ func treeEntries(root string) (map[string]treeEntry, error) {
 		case info.Mode()&fs.ModeSymlink != 0:
 			return fmt.Errorf("%s is a symlink, want a real copy", p)
 		case info.IsDir():
-			out[rel] = treeEntry{mode: info.Mode()}
+			out[rel] = treeEntry{mode: fs.ModeDir}
 		case info.Mode().IsRegular():
 			b, err := os.ReadFile(p)
 			if err != nil {
 				return err
 			}
-			out[rel] = treeEntry{mode: info.Mode(), data: b}
+			mode := fs.FileMode(0o644)
+			if info.Mode()&0o100 != 0 {
+				mode = 0o755
+			}
+			out[rel] = treeEntry{mode: mode, data: b}
 		default:
 			return fmt.Errorf("%s is not a regular file or directory (mode %v)", p, info.Mode())
 		}
