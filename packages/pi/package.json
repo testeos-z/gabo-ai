@@ -1,0 +1,26 @@
+{
+  "name": "@testeos-z/gabo-pi",
+  "version": "0.2.0",
+  "description": "gabo for Pi: the gabo-pi bootstrap skill and the gabo extension.",
+  "keywords": ["pi-package"],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/testeos-z/gabo-ai.git",
+    "directory": "packages/pi"
+  },
+  "files": ["skills", "extensions"],
+  "pi": {
+    "skills": ["./skills/gabo-pi"],
+    "extensions": ["./extensions/gabo.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true }
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
