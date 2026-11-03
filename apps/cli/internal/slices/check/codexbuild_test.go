@@ -223,9 +223,11 @@ func TestCodexBuiltAgentsParseAsTOML(t *testing.T) {
 		if len(a.Skills) > 0 && !strings.Contains(kv["developer_instructions"], "\nLoad these skills by name before work: "+a.Skills[0]) {
 			t.Errorf("%s: no skill line in developer_instructions", a.ID)
 		}
-		if strings.Contains(kv["developer_instructions"], "Load these skills by name before work:") &&
-			strings.Contains(kv["developer_instructions"], "gabo-reviewer,") {
-			t.Errorf("%s: loads gabo-reviewer", a.ID)
+		if _, line, ok := strings.Cut(kv["developer_instructions"], "\nLoad these skills by name before work: "); ok {
+			line, _, _ = strings.Cut(line, "\n")
+			if slices.Contains(strings.Split(strings.TrimSuffix(line, "."), ", "), "gabo-reviewer") {
+				t.Errorf("%s: loads gabo-reviewer", a.ID)
+			}
 		}
 	}
 	slices.Sort(ids)

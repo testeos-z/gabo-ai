@@ -147,6 +147,8 @@ func TestRuntimeCodexKeepsUserFilesAndTheReviewerOut(t *testing.T) {
 		"${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer",
 		"$HOME/.agents/skills/gabo-reviewer/scripts/reviewer.sh",
 		"Never write under `~/.codex` or `$CODEX_HOME`",
+		"probe not run: run gabo-runtime-codex inside Codex",
+		"`.agents/skills/` is shared with other tools, so leave and report any other `gabo-*` symlink",
 		"no user-level file but the reviewer link",
 		"leave it and report it",
 		"`gabo check`",
