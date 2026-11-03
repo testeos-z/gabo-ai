@@ -171,7 +171,7 @@ claude plugin install gabo@gabo-ai
 
 ### Codex, Pi and OpenCode (planned)
 
-None of these installs work yet. The designs below come from draft specs.
+None of these installs work yet. The designs below come from the specs the owner accepted on 2026-11-03.
 
 - **Codex** ([I0002, #173](https://github.com/testeos-z/gabo-ai/issues/173)). A Codex plugin `gabo` in the same `gabo-ai` marketplace, with a `.codex-plugin/plugin.json` manifest, the same skills as the Claude Code plugin, post-write and pre-write `gabo check` hooks, a `gabo-runtime-codex` skill that builds agents in `.codex/agents/`, and a non-interactive `codex` reviewer engine. Spec: [intent 0002](docs/product/intents/0002-codex-plugin/spec.md).
 - **Pi** ([I0003, #174](https://github.com/testeos-z/gabo-ai/issues/174)). An npm Pi package installed with `pi install`, versioned with the CLI. It ships a bootstrap skill `gabo-pi`, `gabo-reviewer-config` and an extension that blocks a `write` or `edit` when gabo's hook mode rejects it (the subagent check and the intent stage gate). It writes no project file, does not count as a subagent package and ships no reviewer. The npm package name is still an open owner question. Spec: [intent 0003](docs/product/intents/0003-pi-package/spec.md).
