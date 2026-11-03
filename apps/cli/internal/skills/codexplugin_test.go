@@ -119,9 +119,10 @@ func TestCodexPluginManifest(t *testing.T) {
 	}
 }
 
-// The Codex plugin skills are exactly the Claude Code plugin skills, each a
-// relative symlink resolving to its catalog folder under the same name, so
-// both plugins carry one skill source (intent 0002 S3, D4).
+// The Codex plugin skills directory lists exactly the entries of the Claude
+// Code plugin skills directory, and each entry is a relative symlink that
+// resolves to the catalog folder of the same name, so both plugins carry one
+// skill source (intent 0002 S3, D4).
 func TestCodexPluginSkillsMatchTheClaudeCodePlugin(t *testing.T) {
 	t.Parallel()
 	got := dirNames(t, filepath.Join(repoRoot, codexPluginDir, "skills"))
