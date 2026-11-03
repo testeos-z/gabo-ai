@@ -74,8 +74,9 @@ func NewCommand(factory Factory) *cobra.Command {
 			"Exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error.\n" +
 			"\n" +
 			"Hook mode, gabo check --pre-write <path>..., judges pending writes before\n" +
-			"they happen, for the engines' pre-write hooks. Each path is relative to the\n" +
-			"project root or absolute inside it. Writing " + IntentsDir + "/<NNNN-slug>/plan.md\n" +
+			"they happen, for the engines' pre-write hooks. Every argument after\n" +
+			"--pre-write is a path, relative to the project root (the git top level) or\n" +
+			"absolute inside it. Writing " + IntentsDir + "/<NNNN-slug>/plan.md\n" +
 			"is blocked while that folder's spec.md is missing, unreadable or has no filled\n" +
 			"Acceptance row; any other path, or one outside the root, passes. It reads\n" +
 			"nothing else and writes nothing. Exit 0 with no output when every write\n" +
@@ -85,7 +86,8 @@ func NewCommand(factory Factory) *cobra.Command {
 		// wherever --pre-write stands among the arguments.
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, raw []string) error {
-			if err := cmd.Flags().Parse(raw); err != nil {
+			flags, paths := splitPreWrite(raw)
+			if err := cmd.Flags().Parse(flags); err != nil {
 				if hasPreWrite(raw) {
 					return preWriteUsage(err)
 				}
@@ -94,7 +96,7 @@ func NewCommand(factory Factory) *cobra.Command {
 			if help, _ := cmd.Flags().GetBool("help"); help {
 				return cmd.Help()
 			}
-			args := cmd.Flags().Args()
+			args := append(cmd.Flags().Args(), paths...)
 			if preWrite {
 				return judgePreWrite(cmd, factory, args)
 			}
@@ -125,6 +127,26 @@ func NewCommand(factory Factory) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths with the intent stage gate (hook mode)")
 	return cmd
+}
+
+// splitPreWrite splits raw after a bare --pre-write (before any "--"):
+// every later argument is a path, also one that starts with "-", so a
+// path's name can never turn a hook's call into a usage error. One "--"
+// right after the flag is dropped.
+func splitPreWrite(raw []string) (flags, paths []string) {
+	for i, a := range raw {
+		if a == "--" {
+			break
+		}
+		if a == "--"+preWriteFlag {
+			paths = raw[i+1:]
+			if len(paths) > 0 && paths[0] == "--" {
+				paths = paths[1:]
+			}
+			return raw[:i+1], paths
+		}
+	}
+	return raw, nil
 }
 
 // hasPreWrite reports whether raw sets the hook mode flag before a "--".

@@ -112,7 +112,7 @@ func TestCheckPreWriteUnreadableSpecFailsClosed(t *testing.T) {
 
 func TestCheckPreWriteUsageExitsTwo(t *testing.T) {
 	project := preWriteProject(t, "")
-	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--pre-write", "--bogus", prePlan}} {
+	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--bogus", "--pre-write", prePlan}} {
 		_, err := runCheck(t, project, "1.2.3", args...)
 		if exitOf(err) != 2 || !strings.Contains(err.Error(), "usage: gabo check --pre-write <path>...") {
 			t.Fatalf("check %q: exit %d (%v), want 2", args, exitOf(err), err)

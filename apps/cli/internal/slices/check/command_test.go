@@ -97,7 +97,7 @@ func TestCommandPreWrite(t *testing.T) {
 
 func TestCommandPreWriteUsageExitsTwo(t *testing.T) {
 	t.Parallel()
-	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--pre-write", "--bogus", prePlan}} {
+	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--bogus", "--pre-write", prePlan}} {
 		out, err := runPreWrite(t, intentWith(""), args...)
 		var ee *ExitError
 		if !errors.As(err, &ee) || ee.Code != ExitUsage {
@@ -126,7 +126,7 @@ func TestCommandHelpNamesThePreWriteFlag(t *testing.T) {
 // is not called and the flag may come anywhere.
 func TestCommandPreWriteUsageBeforeTheFactory(t *testing.T) {
 	t.Parallel()
-	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--bogus", "--pre-write", prePlan}, {prePlan, "--pre-write", "--bogus"}} {
+	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--bogus", "--pre-write", prePlan}, {"--pre-write=x", prePlan}} {
 		cmd := NewCommand(func(context.Context) (*UseCase, error) {
 			t.Fatalf("%q: factory called", args)
 			return nil, nil
@@ -151,5 +151,23 @@ func TestCommandPreWriteFalseIsAUsageError(t *testing.T) {
 	var ee *ExitError
 	if !errors.As(err, &ee) || ee.Code != ExitUsage || out != "" || !strings.Contains(err.Error(), "usage: gabo check") {
 		t.Fatalf("err = %v, stdout = %q, want exit %d", err, out, ExitUsage)
+	}
+}
+
+// Every argument after --pre-write is a path, also one that starts with
+// "-": a hook passing paths in argv cannot be turned into a usage error
+// (which hooks let through) by the path's name.
+func TestCommandPreWriteArgumentsAfterTheFlagArePaths(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{
+		{"--pre-write", "-x/../" + prePlan},
+		{"--pre-write", "--help", prePlan},
+		{"--pre-write", "--", prePlan},
+	} {
+		out, err := runPreWrite(t, intentWith(unfilledMD), args...)
+		var ee *ExitError
+		if !errors.As(err, &ee) || ee.Code != ExitFailed || out != notAccepted+"\n" {
+			t.Fatalf("%q: err = %v, stdout = %q, want exit %d and %q", args, err, out, ExitFailed, notAccepted)
+		}
 	}
 }
