@@ -78,3 +78,4 @@ Owner quotes are verbatim (Spanish), with an English gloss after each.
   - `docs/product/diagrams/*` still shows the old global-plan flow.
   - The ghiaog123 hooks are still to be evaluated.
 - **Next:** the owner decides on push and on the PR feat/per-change-sdlc → dev. Old next note: apply T3's `skills_test.go` edits after T6, run the seam check (the full suite), then T8 and T9.
+- **L13 (2026-11-03).** The owner accepted specs I0001–I0004 and authorized remote work on the Orca environment `gabo-cloud`: install the missing tools, update gentle-ai and gabo, write the plans and tasks, run waves and tests. For this run `gabo.yaml` sets `repo.integration_branch: feat/per-change-sdlc` and `wave.after: next`. **Before the final PR to dev, revert both values to `dev` and `wait`.**

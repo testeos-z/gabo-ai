@@ -9,7 +9,7 @@ mode: auto
 
 repo:
   name: testeos-z/gabo-ai
-  integration_branch: dev
+  integration_branch: feat/per-change-sdlc
 
 runtimes:
   coder: claude
@@ -66,7 +66,7 @@ parallelism: 3
 
 # A wave is one intent; after it closes, wait for the owner (next would chain).
 wave:
-  after: wait
+  after: next
 
 worktree:
   keep: []
