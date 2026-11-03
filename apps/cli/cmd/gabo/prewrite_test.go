@@ -133,3 +133,18 @@ func abs(paths ...string) func(string) []string {
 		return out
 	}
 }
+
+// An absolute path that reaches the project through a symlinked directory
+// is still judged: the gate is not skipped as "outside the root".
+func TestCheckPreWriteThroughASymlink(t *testing.T) {
+	project := preWriteProject(t, unfilledMD)
+	alias := filepath.Join(t.TempDir(), "alias")
+	if err := os.Symlink(project, alias); err != nil {
+		t.Fatal(err)
+	}
+	want := "✗ " + prePlan + ": spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan\n"
+	out, code := runPreWriteIn(t, project, filepath.Join(alias, filepath.FromSlash(prePlan)))
+	if code != 1 || out != want {
+		t.Fatalf("exit %d, output %q; want exit 1, output %q", code, out, want)
+	}
+}

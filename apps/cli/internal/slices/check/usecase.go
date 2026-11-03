@@ -66,6 +66,9 @@ type Settings struct {
 	// Root is the absolute project directory; the pre-write hook mode
 	// resolves absolute paths against it.
 	Root string
+	// Resolve returns a path with every symlink resolved
+	// (filepath.EvalSymlinks); nil compares paths as written.
+	Resolve func(string) (string, error)
 	// CI (CI set) skips the user-level reviewer link: the reviewer scripts
 	// and CI run with their own HOME.
 	CI bool

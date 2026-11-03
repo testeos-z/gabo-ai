@@ -81,22 +81,28 @@ func NewCommand(factory Factory) *cobra.Command {
 			"nothing else and writes nothing. Exit 0 with no output when every write\n" +
 			"passes, 1 with one \"✗ <path>: <reason>\" line per blocked path, 2 on a\n" +
 			"usage error.",
-		Args: func(_ *cobra.Command, args []string) error {
-			if len(args) > 0 && !preWrite {
-				return usage(fmt.Errorf("check takes no arguments, got %q", strings.Join(args, " ")))
+		// The command parses its own flags, so a flag error knows the mode
+		// wherever --pre-write stands among the arguments.
+		DisableFlagParsing: true,
+		RunE: func(cmd *cobra.Command, raw []string) error {
+			if err := cmd.Flags().Parse(raw); err != nil {
+				if hasPreWrite(raw) {
+					return preWriteUsage(err)
+				}
+				return usage(err)
 			}
-			return nil
-		},
-		RunE: func(cmd *cobra.Command, args []string) error {
+			if help, _ := cmd.Flags().GetBool("help"); help {
+				return cmd.Help()
+			}
+			args := cmd.Flags().Args()
 			if preWrite {
 				return judgePreWrite(cmd, factory, args)
 			}
+			if len(args) > 0 {
+				return usage(fmt.Errorf("check takes no arguments, got %q", strings.Join(args, " ")))
+			}
 			var set []string
-			cmd.Flags().Visit(func(f *pflag.Flag) {
-				if f.Name != preWriteFlag {
-					set = append(set, "--"+f.Name)
-				}
-			})
+			cmd.Flags().Visit(func(f *pflag.Flag) { set = append(set, "--"+f.Name) })
 			if len(set) > 0 {
 				return usage(fmt.Errorf("check takes no flags, got %s", strings.Join(set, " ")))
 			}
@@ -118,18 +124,28 @@ func NewCommand(factory Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths with the intent stage gate (hook mode)")
-	cmd.SetFlagErrorFunc(func(_ *cobra.Command, err error) error {
-		if preWrite {
-			return preWriteUsage(err)
-		}
-		return usage(err)
-	})
 	return cmd
+}
+
+// hasPreWrite reports whether raw sets the hook mode flag before a "--".
+func hasPreWrite(raw []string) bool {
+	for _, a := range raw {
+		if a == "--" {
+			return false
+		}
+		if a == "--"+preWriteFlag || strings.HasPrefix(a, "--"+preWriteFlag+"=") {
+			return true
+		}
+	}
+	return false
 }
 
 // judgePreWrite runs the hook mode: silent exit 0 when every write passes,
 // the blocked lines and exit 1 otherwise, exit 2 on a usage error.
 func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
+	if err := checkPreWritePaths(paths); err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
 	uc, err := factory(cmd.Context())
 	if err != nil {
 		return &ExitError{Code: ExitUsage, Err: err}

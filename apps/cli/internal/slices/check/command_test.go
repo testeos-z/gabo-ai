@@ -121,3 +121,35 @@ func TestCommandHelpNamesThePreWriteFlag(t *testing.T) {
 		}
 	}
 }
+
+// Usage errors of the hook mode never depend on the project: the factory
+// is not called and the flag may come anywhere.
+func TestCommandPreWriteUsageBeforeTheFactory(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{{"--pre-write"}, {"--pre-write", ""}, {"--bogus", "--pre-write", prePlan}, {prePlan, "--pre-write", "--bogus"}} {
+		cmd := NewCommand(func(context.Context) (*UseCase, error) {
+			t.Fatalf("%q: factory called", args)
+			return nil, nil
+		})
+		cmd.SilenceUsage, cmd.SilenceErrors = true, true
+		cmd.SetOut(&bytes.Buffer{})
+		cmd.SetErr(&bytes.Buffer{})
+		cmd.SetArgs(args)
+		err := cmd.ExecuteContext(context.Background())
+		var ee *ExitError
+		if !errors.As(err, &ee) || ee.Code != ExitUsage || !strings.Contains(err.Error(), "usage: gabo check --pre-write <path>...") {
+			t.Fatalf("%q: err = %v, want the pre-write usage and exit %d", args, err, ExitUsage)
+		}
+	}
+}
+
+// --pre-write=false is not the plain check: it is a usage error, as any
+// flag of the plain mode.
+func TestCommandPreWriteFalseIsAUsageError(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--pre-write=false")
+	var ee *ExitError
+	if !errors.As(err, &ee) || ee.Code != ExitUsage || out != "" || !strings.Contains(err.Error(), "usage: gabo check") {
+		t.Fatalf("err = %v, stdout = %q, want exit %d", err, out, ExitUsage)
+	}
+}

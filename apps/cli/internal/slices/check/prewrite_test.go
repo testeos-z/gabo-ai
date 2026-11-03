@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"slices"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -76,6 +77,8 @@ func TestPreWriteStageGate(t *testing.T) {
 		},
 		{name: "absolute path inside the root equals the relative one", proj: intentWith(unfilledMD), paths: []string{preRoot + "/" + prePlan}, want: []string{notAccepted}},
 		{name: "unclean relative path is cleaned", proj: intentWith(unfilledMD), paths: []string{"./docs/product/../product/intents/0009-x/plan.md"}, want: []string{notAccepted}},
+		{name: "case-insensitive file name is gated", proj: intentWith(unfilledMD), paths: []string{"docs/product/intents/0009-x/Plan.md"}, want: []string{"✗ docs/product/intents/0009-x/Plan.md: spec.md is not accepted; a human fills a row (accepted by, date) of its Acceptance table before the plan"}},
+		{name: "case-insensitive intents dir is gated", proj: intentWith(""), paths: []string{"Docs/Product/Intents/0009-x/plan.md"}, want: []string{"✗ Docs/Product/Intents/0009-x/plan.md: no spec.md; a plan starts only after a human accepts the spec"}},
 		{name: "spec.md itself is not gated", proj: intentWith(""), paths: []string{preSpec}},
 		{name: "other files are not gated", proj: intentWith(""), paths: []string{"README.md", "docs/product/intents/0009-x/intent.md", "docs/product/intents/0009-x/sub/plan.md", "docs/product/intents/plan.md", "plan.md"}},
 		{name: "relative path outside the root passes", proj: intentWith(""), paths: []string{"../other/" + prePlan}},
@@ -131,6 +134,59 @@ func TestPreWriteUsageErrors(t *testing.T) {
 			}
 			if !errors.Is(err, ErrPreWriteUsage) {
 				t.Fatalf("err = %v, want ErrPreWriteUsage", err)
+			}
+		})
+	}
+}
+
+// fakeResolve resolves symlinks like filepath.EvalSymlinks on a fake tree:
+// links maps a link path to its target, exists lists the real directories
+// and files.
+func fakeResolve(links map[string]string, exists ...string) func(string) (string, error) {
+	return func(p string) (string, error) {
+		for link, target := range links {
+			if p == link || strings.HasPrefix(p, link+"/") {
+				p = target + strings.TrimPrefix(p, link)
+			}
+		}
+		if !slices.Contains(exists, p) {
+			return "", &fs.PathError{Op: "lstat", Path: p, Err: fs.ErrNotExist}
+		}
+		return p, nil
+	}
+}
+
+// The hook sends absolute paths that may keep a symlink the project root
+// (git's resolved top level) does not, or the reverse: both sides are
+// resolved, so the gate cannot be skipped through a symlink.
+func TestPreWriteResolvesSymlinks(t *testing.T) {
+	t.Parallel()
+	exists := []string{"/real/proj", "/real/proj/docs", "/real/proj/docs/product", "/real/proj/docs/product/intents", "/real/proj/docs/product/intents/0009-x", "/real/proj/notes.md"}
+	tests := []struct {
+		name, root, path string
+		links            map[string]string
+		want             []string
+	}{
+		{name: "path through a symlinked parent", root: "/real/proj", path: "/link/proj/" + prePlan, links: map[string]string{"/link": "/real"}, want: []string{notAccepted}},
+		{name: "symlinked root, resolved path", root: "/link/proj", path: "/real/proj/" + prePlan, links: map[string]string{"/link": "/real"}, want: []string{notAccepted}},
+		{name: "new intent folder through a symlink", root: "/real/proj", path: "/link/proj/docs/product/intents/0010-y/plan.md", links: map[string]string{"/link": "/real"}, want: []string{"✗ docs/product/intents/0010-y/plan.md: no spec.md; a plan starts only after a human accepts the spec"}},
+		{name: "relative link to the plan", root: "/real/proj", path: "notes.md", links: map[string]string{"/real/proj/notes.md": "/real/proj/" + prePlan}, want: []string{notAccepted}},
+		{name: "resolved outside the root passes", root: "/real/proj", path: "/link/other/" + prePlan, links: map[string]string{"/link": "/real"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ex := exists
+			if tt.name == "relative link to the plan" {
+				ex = append(slices.Clone(exists), "/real/proj/"+prePlan)
+			}
+			s := Settings{Root: tt.root, Resolve: fakeResolve(tt.links, ex...)}
+			rep, err := NewUseCase(intentWith(unfilledMD), nil, nil, s).PreWrite([]string{tt.path})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(rep.Lines, tt.want) {
+				t.Fatalf("lines = %q, want %q", rep.Lines, tt.want)
 			}
 		})
 	}

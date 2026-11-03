@@ -104,6 +104,7 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 			Getenv:      getenv,
 			ReviewerDir: reviewerDir,
 			Root:        project,
+			Resolve:     filepath.EvalSymlinks,
 			CI:          getenv("CI") != "",
 		}), nil
 	}
