@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
+Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-codex`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
 
 ## Hard Rules
 

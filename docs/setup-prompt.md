@@ -45,6 +45,7 @@ The prompt names no engine; the agent loads the runtime skill of the engine it r
 |---|---|---|---|
 | Claude Code | `gabo-runtime-claude` | `.claude/agents/` | none |
 | Pi | `gabo-runtime-pi` | `.pi/agents/` | a subagent package (below) |
+| Codex | `gabo-runtime-codex` | `.codex/agents/` (TOML) | none |
 | another engine | written first with `gabo-runtime-builder` | the engine's own agent folder | subagents and skills; the builder refuses an engine without them and says why |
 
 **Pi needs a subagent package.** Pi core has no subagents, so `gabo-runtime-pi` builds nothing until one is present; there is no fallback, and the agent refuses and tells you what to install. Recommended for subagents: gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); it needs Pi >= 1.2.0 and Node >= 22.19.0. Another subagent package you already use is acceptable once the agent confirms it discovers project agents in `.pi/agents/`. As the recommended setup, the refusal also points to the full [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) (its methodology with RDD and the Engram memory stack), set up for Pi with `gentle-ai install --agent pi`. The agent explains why the package is needed and installs it only after you accept; gabo-ai never edits Pi's or gentle-pi's own configuration.
