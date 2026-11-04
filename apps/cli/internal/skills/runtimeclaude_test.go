@@ -163,12 +163,18 @@ func TestRuntimeClaudeProbesEveryLink(t *testing.T) {
 }
 
 // The Claude Code skill carries the narrowed engine-config rule (intent 0004
-// S8, D7): it needs no engine key today, so it writes no settings file.
+// S8, D7): `gabo init` writes the project-level gabo integration keys
+// (intent 0006 S13), so the skill itself writes no settings file.
 func TestRuntimeClaudeNarrowsTheEngineConfigRule(t *testing.T) {
 	t.Parallel()
 	doc := runtimeClaudeDoc(t)
-	assertEngineConfigRule(t, runtimeClaude, doc)
-	for _, s := range []string{"Never install or upgrade Claude Code", "`~/.claude/settings.json`"} {
+	assertEngineConfigRule(t, runtimeClaude, doc,
+		"Claude Code needs no engine key today, so this skill writes no settings file",
+	)
+	for _, s := range []string{
+		"Never install or upgrade Claude Code", "`~/.claude/settings.json`",
+		"`gabo init` writes the project-level gabo integration keys (intent 0006); this skill writes no settings file.",
+	} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("%s: missing %q", runtimeClaude, s)
 		}

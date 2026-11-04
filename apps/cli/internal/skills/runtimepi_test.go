@@ -72,8 +72,8 @@ func TestRuntimePiSkill(t *testing.T) {
 	}
 }
 
-// The Pi skill carries the narrowed engine-config rule (intent 0004 S8, D7)
-// and keeps its no-install rule and the subagent package's own config off
+// The Pi skill carries the narrowed engine-config rule (intent 0004 S8, D7),
+// says `gabo init` writes the project-level keys (intent 0006 S13) and keeps its no-install rule and the subagent package's own config off
 // limits.
 func TestRuntimePiNarrowsTheEngineConfigRule(t *testing.T) {
 	t.Parallel()
@@ -84,8 +84,10 @@ func TestRuntimePiNarrowsTheEngineConfigRule(t *testing.T) {
 	doc := string(b)
 	assertEngineConfigRule(t, "gabo-runtime-pi/SKILL.md", doc,
 		"Never edit Pi's or the subagent package's own configuration",
+		"Pi needs no engine key today, so this skill writes no Pi config",
 	)
 	for _, s := range []string{
+		"`gabo init` writes the project-level gabo integration keys (intent 0006); this skill writes no Pi config, and never runs `pi install`.",
 		"Never run `pi install`, `pi config` or `npm i` yourself; the user installs.",
 		"`subagents.json`",
 	} {
