@@ -28,6 +28,16 @@ Each change is one **intent**. There is no big upfront plan: the tracker is the 
 
 The three documents live together in [`docs/product/intents/<NNNN-slug>/`](docs/product/intents/README.md). When a wave closes, `wave.after` decides what happens: `wait` (the default) stops until you ask, `next` starts the next accepted intent. Changes to scope mid-project go through a **plan change**: a proposal you debate, or that a clean-context plan reviewer debates when you are away.
 
+## Philosophy: let questions float
+
+You don't need to plan everything from zero before you start. Start with an idea, leave loose ends, and let the agents help you close them.
+
+- **Doubts are welcome.** An open question is not a failure of planning; it is work the team can do. Write down what you don't know yet, and keep going.
+- **Questions float up to whoever can answer them.** A coder that gets stuck asks the dev lead. A technical question stops there; a product question goes up to the PM, and only the decisions that are truly yours reach you, one at a time.
+- **Agents research before they ask.** When a spec or a plan has a gap, the agents look into it (code, docs, the web) and bring a proposed answer with its reasoning, so you choose instead of starting from a blank page.
+- **The plan grows with what you learn.** Each intent is small, so a surprise changes one spec or one plan, not a big upfront design. A finding that changes scope becomes a plan change you debate, or that a plan reviewer debates when you are away.
+- **Nothing blocks on you by default.** In `auto` mode the agents decide what they can and record every decision with its reason, so you can review it later. In `manual` mode they ask you first.
+
 ## Quick start
 
 1. **Install the CLI.** Go needs your git credentials while the repository is private:
