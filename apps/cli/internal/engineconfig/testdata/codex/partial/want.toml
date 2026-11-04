@@ -1,0 +1,9 @@
+[marketplaces.gabo-ai] # added by hand
+source = "https://github.com/testeos-z/gabo-ai.git"
+source_type = "git"
+
+[agents]
+max_threads = 4
+
+[plugins."gabo@gabo-ai"]
+enabled = true

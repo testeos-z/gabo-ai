@@ -58,7 +58,9 @@ type Result struct {
 type Rule func(Input) Result
 
 // rules holds one entry per engine with a gabo integration.
-var rules = map[string]Rule{}
+var rules = map[string]Rule{
+	Codex: codexRule,
+}
 
 // Integrate runs the rule of each engine in set, in set order, and returns
 // the report and the new bytes of every changed file. An engine without a
