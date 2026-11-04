@@ -69,8 +69,8 @@ const packed = (): string[] => {
 };
 
 describe("package.json manifest (S1, D5, D6)", () => {
-  test("is published as @testeos-z/gabo-pi", () => {
-    expect(pkg.name).toBe("@testeos-z/gabo-pi");
+  test("is published as @gabo-ai/pi", () => {
+    expect(pkg.name).toBe("@gabo-ai/pi");
     expect(pkg.private).toBeUndefined();
   });
 

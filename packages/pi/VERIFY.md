@@ -1,6 +1,6 @@
 # Verifying the gabo Pi package
 
-The manual verification of `@testeos-z/gabo-pi` (spec [S9](../../docs/product/intents/0003-pi-package/spec.md), D8), run by the owner on a local Pi 1.4.0 before each release. Pi has no headless test harness for packages; `bun test` covers the extension against a fake Pi, and this procedure covers the real one. Record each step's observed output in the intent's review findings.
+The manual verification of `@gabo-ai/pi` (spec [S9](../../docs/product/intents/0003-pi-package/spec.md), D8), run by the owner on a local Pi 1.4.0 before each release. Pi has no headless test harness for packages; `bun test` covers the extension against a fake Pi, and this procedure covers the real one. Record each step's observed output in the intent's review findings.
 
 ## Before you start
 

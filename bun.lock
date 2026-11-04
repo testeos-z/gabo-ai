@@ -14,7 +14,7 @@
       "name": "@gabo-ai/cli",
     },
     "packages/pi": {
-      "name": "@testeos-z/gabo-pi",
+      "name": "@gabo-ai/pi",
       "version": "0.2.2",
       "peerDependencies": {
         "@earendil-works/pi-coding-agent": "*",
@@ -27,7 +27,7 @@
   "packages": {
     "@gabo-ai/cli": ["@gabo-ai/cli@workspace:apps/cli"],
 
-    "@testeos-z/gabo-pi": ["@testeos-z/gabo-pi@workspace:packages/pi"],
+    "@gabo-ai/pi": ["@gabo-ai/pi@workspace:packages/pi"],
 
     "@turbo/darwin-64": ["@turbo/darwin-64@2.11.9", "", { "os": "darwin", "cpu": "x64" }, "sha512-OkW+EESJjo248CThWe9DfuUqzGcRwHe1DXKWRw9DSZ0lMkocKbbwNMjWVCiO+WNBcARDM0ibu0c9SbuIe4mw6w=="],
 
