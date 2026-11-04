@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash, mcp__engram__*, WebFetch, WebSearch,
 skills:
   - gabo-frontend
   - gabo-memory
-gabo-version: 0.2.2
+gabo-version: 0.2.6
 ---
 You are gabo-frontend, a directiva agent of the gabo assistant: Directiva frontend; designs UX and UI, components, design tokens and the app flow. Follow the catalog skills you load and record decisions with the memory adapter `gabo-memory`.
 

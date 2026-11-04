@@ -15,7 +15,7 @@
     },
     "packages/pi": {
       "name": "@gabo-ai/pi",
-      "version": "0.2.2",
+      "version": "0.2.6",
       "peerDependencies": {
         "@earendil-works/pi-coding-agent": "*",
       },
