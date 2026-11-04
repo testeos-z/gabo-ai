@@ -49,6 +49,16 @@ The extension is a thin connection layer. It collects the session facts (the nam
 
 The package version equals the gabo CLI release version: one version, one release tag `apps/cli/v<x.y.z>`. A package release follows every CLI release, even with no package change. The release steps are in the [release checklist](../../plugins/claude-code/README.md#release-checklist).
 
+## Release pipeline
+
+Publishing to npm is automated:
+
+1. A merge to `main` runs [`sync-pi-pkg-up.yml`](../../.github/workflows/sync-pi-pkg-up.yml): it merges `main` into the `pi/pkg-up` branch (fast-forward when possible, a merge commit otherwise; it fails on a conflict) and pushes it.
+2. It then dispatches [`publish-pi.yml`](../../.github/workflows/publish-pi.yml) on `pi/pkg-up` (a push made with the workflow token starts no workflow by itself). A direct push to `pi/pkg-up` that touches `packages/pi/` starts it too.
+3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `npm publish --access public` only when `@gaboai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
+
+It needs the repository secret `NPM_TOKEN`: an npm granular access token with read and write on the `@gaboai` scope and 2FA bypass for publishing. npm deprecates direct-publish granular tokens in January 2027 and they expire after at most 90 days, so rotate it until the follow-up lands: move to npm trusted publishing (OIDC from GitHub Actions), which needs no stored token.
+
 ## Development
 
 ```sh
