@@ -65,7 +65,7 @@ func pi(in Input) Result {
 	if err := checkJSON(data); err != nil {
 		return fail("invalid JSON (" + err.Error() + ")")
 	}
-	obj, ok := scanObject(data)
+	obj, ok := scanTopObject(data)
 	if !ok {
 		return fail("not a JSON object")
 	}
@@ -135,8 +135,9 @@ func checkJSON(data []byte) error {
 }
 
 // The scanner below locates values in JSON already checked by checkJSON, so
-// it only tracks positions and never re-validates. Inserting at those
-// positions keeps every existing byte (D5).
+// it only tracks positions and never re-validates; it uses skipWS and
+// skipValue of the claude rule. Inserting at those positions keeps every
+// existing byte (D5).
 
 // item is one array element or object member: its key (objects only), the
 // byte range of its value, and the whitespace before it (before the key for
@@ -153,9 +154,9 @@ type container struct {
 	items []item
 }
 
-// scanObject and scanArray require data to be valid JSON (checkJSON
+// scanTopObject and scanArray require data to be valid JSON (checkJSON
 // passed): the scanner does no bounds or syntax checks of its own.
-func scanObject(data []byte) (container, bool) {
+func scanTopObject(data []byte) (container, bool) {
 	i := skipWS(data, 0)
 	if data[i] != '{' {
 		return container{}, false
@@ -226,50 +227,4 @@ func (c container) insert(data []byte, text string) []byte {
 	out = append(out, data[:at]...)
 	out = append(out, add...)
 	return append(out, data[at:]...)
-}
-
-func skipWS(data []byte, i int) int {
-	for i < len(data) && strings.IndexByte(" \t\r\n", data[i]) >= 0 {
-		i++
-	}
-	return i
-}
-
-// skipValue returns the end of the valid JSON value starting at i.
-func skipValue(data []byte, i int) int {
-	switch data[i] {
-	case '"':
-		return skipString(data, i)
-	case '{', '[':
-		depth := 0
-		for {
-			switch data[i] {
-			case '"':
-				i = skipString(data, i)
-				continue
-			case '{', '[':
-				depth++
-			case '}', ']':
-				depth--
-				if depth == 0 {
-					return i + 1
-				}
-			}
-			i++
-		}
-	default:
-		for i < len(data) && strings.IndexByte(",]} \t\r\n", data[i]) < 0 {
-			i++
-		}
-		return i
-	}
-}
-
-func skipString(data []byte, i int) int {
-	for i++; data[i] != '"'; i++ {
-		if data[i] == '\\' {
-			i++
-		}
-	}
-	return i + 1
 }

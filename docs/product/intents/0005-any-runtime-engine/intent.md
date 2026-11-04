@@ -21,6 +21,8 @@ Owners and teams who run gabo on an engine that gabo-ai does not ship a runtime 
 - An engine that has a valid runtime skill (shipped in the catalog or written by `gabo-runtime-builder`) is accepted in `runtimes.*` without a Go change or a gabo-ai release.
 - `gabo check` still rejects an engine name that has no valid runtime skill, with a next step that names `gabo-runtime-builder`.
 
+Note (2026-11-04, gabo-pm; owner decision on compatibility tiers, PRD section 6, TRD D28; no change to this intent's acceptance state): an engine this intent lets `gabo.yaml` accept is in the **flexible** compatibility tier: it gets only the gabo skills and configuration (no plugin, no hooks), `gabo init` writes nothing engine-specific for it and reports it in one flexible-tier line (intent 0006 S8), and `gabo check` stays engine-neutral for it (intent 0006 S11). Today `apps/cli/internal/config` rejects any `runtimes.*` value outside `claude`, `codex`, `pi`, `opencode`, so the flexible tier is usable only once this intent lands. The four named engines are the **full** tier and stay outside this intent.
+
 ## Constraints
 
 - The reviewer scripts run only the engines they support (`REVIEWER_ENGINE` `claude` or `pi` today, `gabo-reviewer/scripts/common.sh`; TRD D27); intents 0002 (S12) and 0004 (S15) add `codex` and `opencode` engines, so the four known engines are accepted as reviewer (owner decision 2026-11-03: all four engines in all roles). `runtimes.reviewer` must not accept an engine the scripts cannot run.
