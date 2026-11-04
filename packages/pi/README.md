@@ -57,6 +57,8 @@ Publishing to npm is automated:
 2. It then dispatches [`publish-pi.yml`](../../.github/workflows/publish-pi.yml) on `pi/pkg-up` (a push made with the workflow token starts no workflow by itself). A direct push to `pi/pkg-up` that touches `packages/pi/` starts it too.
 3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `npm publish --access public` only when `@gabo-ai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
 
+The owner's gate is the merge into `main`, which only the owner performs. Before merging a release to `main`, the owner runs the [verification procedure](VERIFY.md) on a real Pi.
+
 It needs the repository secret `NPM_TOKEN`: an npm granular access token with read and write on the `@gabo-ai` scope and 2FA bypass for publishing. npm deprecates direct-publish granular tokens in January 2027 and they expire after at most 90 days, so rotate it until the follow-up lands: move to npm trusted publishing (OIDC from GitHub Actions), which needs no stored token.
 
 ## Development
