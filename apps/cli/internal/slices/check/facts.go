@@ -9,6 +9,8 @@ import (
 	"io/fs"
 	"slices"
 	"strings"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
 // FactsKey is the top-level stdin key that marks a session-facts object
@@ -38,10 +40,9 @@ var factsEngines = []string{"pi"}
 // Adding a package is a CLI release.
 var SubagentTools = []string{"subagent_run"}
 
-// SubagentRefusal is the one source of the refusal text (intent 0003 D7):
-// the quoted block of gabo-runtime-pi Prerequisite step 4, kept equal to
-// the catalog skill by a test.
-const SubagentRefusal = "Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild."
+// SubagentRefusal is the refusal text; its one source is
+// engineconfig.SubagentRefusal, which the init report prints too.
+const SubagentRefusal = engineconfig.SubagentRefusal
 
 // piAgentsDir is the project directory Pi's subagent packages read agents
 // from; gabo writes them only with a subagent package loaded.

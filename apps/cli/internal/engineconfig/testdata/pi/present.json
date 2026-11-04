@@ -1,0 +1,4 @@
+{
+  "theme": "dark",
+  "packages": ["npm:gentle-pi", "npm:@gabo-ai/pi@0.2.6"]
+}

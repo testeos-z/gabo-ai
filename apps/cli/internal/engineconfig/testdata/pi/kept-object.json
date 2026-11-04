@@ -1,0 +1,5 @@
+{
+  "packages": [
+    {"source": "npm:@gabo-ai/pi@0.2.5", "extensions": []}
+  ]
+}
