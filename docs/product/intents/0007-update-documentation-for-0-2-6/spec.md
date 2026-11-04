@@ -44,7 +44,7 @@ Not applicable: no stored data changes.
 
 | policy | conflict | resolution |
 |---|---|---|
-| `review.human_only_paths` (`plugins/`) | S4 edits `plugins/claude-code/README.md` and `plugins/codex/README.md`. | The coder opens the PR; the coordinator merges it (owner authorization 2026-11-04 to merge PRs into `dev` including human-only paths). |
+| `review.human_only_paths` (`plugins/`) | S4 edits `plugins/claude-code/README.md` and `plugins/codex/README.md`. | The coder opens the PR; the coordinator merges it ([owner authorization, 2026-11-04](https://github.com/testeos-z/gabo-ai/issues/261#issuecomment-6633243675): merge PRs into `dev` including human-only paths). |
 | TRD 9.4, D25 (setup prompt single source) | none: S2 edits only the prose outside the marked block. | — |
 
 ## 6. Open questions

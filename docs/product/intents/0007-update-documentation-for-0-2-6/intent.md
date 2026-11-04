@@ -28,7 +28,7 @@ Every new user who installs gabo from the README or the setup page, and every ow
 - Documentation only: no behavior change; every documented behavior is the merged behavior of intent 0006 or earlier, so each doc task waits for the task it documents.
 - The marked prompt block of `docs/setup-prompt.md` stays byte-equal to the embedded setup prompt (TRD 9.4, D25); only intent 0006 S15 changes it.
 - English, written for a reader new to gabo (`gabo-doc-guide`).
-- `plugins/` is a `review.human_only_paths` entry in `gabo.yaml`, so the plugin README changes need a human-only merge, which the owner delegated to the coordinator on 2026-11-04.
+- `plugins/` is a `review.human_only_paths` entry in `gabo.yaml`, so the plugin README changes need a human-only merge, which the owner delegated to the coordinator on 2026-11-04 ([owner authorization, 2026-11-04](https://github.com/testeos-z/gabo-ai/issues/261#issuecomment-6633243675)).
 
 ## Open questions
 
