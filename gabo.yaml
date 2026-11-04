@@ -50,7 +50,7 @@ review:
   # heads into dev, never into main (TRD D13). The hand-installed reviewer scripts
   # also need REVIEWER_AUTO_MERGE=true in the user-level skill config.env.
   auto_merge: true
-  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/]
+  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/, .codex/, .agents/, plugins/]
 
 # Git email -> alias (TRD D10). OWNER: change "Leo" if you prefer another alias.
 # The local git user.email is dimasmerida15@gmail.com; both emails map to the owner.

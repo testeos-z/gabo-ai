@@ -25,7 +25,7 @@ The result is `.gabo/runtimes/gabo-runtime-<engine>/SKILL.md`: a runtime skill l
   next: use Claude Code, Pi or another engine with subagents and skills
   ```
 
-- Never install, upgrade or configure the engine: run only commands that write nothing (version, help, list, debug). Never edit the engine's own config files, project or global (for example `opencode.json`, `settings.json`). Outside the project write only the user-level reviewer link; scratch work goes in `mktemp -d`.
+- Never install or upgrade the engine: run only commands that write nothing (version, help, list, debug). Engine config (intent 0004 S8, D7): gabo writes only the engine keys it needs to operate, at project level only, merged with the existing project config (every unrelated key kept), reports what it wrote, and has the value verified by `gabo check`; never the user's global engine config (for example `~/.config/opencode/opencode.json`, `~/.claude/settings.json`). A key the engine needs that has no `gabo check` verification yet: ask the owner before writing it. Outside the project write only the user-level reviewer link; scratch work goes in `mktemp -d`.
 - The build rules of the shipped runtime skills hold here too: read the spec, templates and `.gabo/VERSION` from the project; fill only the template slots and invent nothing; build every spec agent in the one agent directory. Never place `gabo-reviewer` in the project: only link the user-level copy (D20). Overwrite only what this skill writes, and leave and report any other entry; write no secret (R21).
 - Order is fixed: probe agent, spec agents, `gabo check`, and only then the runtime skill. A runtime skill is never written from research alone.
 

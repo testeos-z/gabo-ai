@@ -217,3 +217,47 @@ func TestPluginPostWriteHookScript(t *testing.T) {
 		t.Fatalf("post-write hook shell tests: %v\n%s", err, out)
 	}
 }
+
+// hooks.json wires the pre-write hook: PreToolUse on Write|Edit runs
+// scripts/gabo-pre-write.sh from the plugin root (intent 0001 S12, D8).
+func TestPluginHooksWirePreWriteCheck(t *testing.T) {
+	t.Parallel()
+	h := readJSON(t, pluginDir+"/hooks/hooks.json")
+	hooks, _ := h["hooks"].(map[string]any)
+	pre, _ := hooks["PreToolUse"].([]any)
+	if len(pre) != 1 {
+		t.Fatalf("hooks.json PreToolUse %v, want exactly one matcher group", hooks["PreToolUse"])
+	}
+	group, _ := pre[0].(map[string]any)
+	if group["matcher"] != "Write|Edit" {
+		t.Fatalf("PreToolUse matcher %v, want Write|Edit", group["matcher"])
+	}
+	cmds, _ := group["hooks"].([]any)
+	if len(cmds) != 1 {
+		t.Fatalf("PreToolUse hooks %v, want exactly one command", group["hooks"])
+	}
+	cmd, _ := cmds[0].(map[string]any)
+	want := `bash "${CLAUDE_PLUGIN_ROOT}/scripts/gabo-pre-write.sh"`
+	if cmd["type"] != "command" || cmd["command"] != want {
+		t.Fatalf("PreToolUse hook %v, want command %s", cmd, want)
+	}
+	if _, err := os.Stat(filepath.Join(repoRoot, pluginDir, "scripts", "gabo-pre-write.sh")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// The pre-write hook script passes its shell tests with a fake gabo on PATH
+// that records its argv and stdin (intent 0001 S7, S12).
+func TestPluginPreWriteHookScript(t *testing.T) {
+	if testing.Short() {
+		t.Skip("shell tests skipped in -short mode")
+	}
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skipf("bash not found: %v", err)
+	}
+	test := filepath.Join(repoRoot, pluginDir, "scripts", "tests", "gabo-pre-write.test.sh")
+	out, err := exec.Command("bash", test).CombinedOutput()
+	if err != nil {
+		t.Fatalf("pre-write hook shell tests: %v\n%s", err, out)
+	}
+}

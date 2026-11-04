@@ -161,3 +161,16 @@ func TestRuntimeClaudeProbesEveryLink(t *testing.T) {
 		}
 	}
 }
+
+// The Claude Code skill carries the narrowed engine-config rule (intent 0004
+// S8, D7): it needs no engine key today, so it writes no settings file.
+func TestRuntimeClaudeNarrowsTheEngineConfigRule(t *testing.T) {
+	t.Parallel()
+	doc := runtimeClaudeDoc(t)
+	assertEngineConfigRule(t, runtimeClaude, doc)
+	for _, s := range []string{"Never install or upgrade Claude Code", "`~/.claude/settings.json`"} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", runtimeClaude, s)
+		}
+	}
+}

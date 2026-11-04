@@ -3,7 +3,8 @@
 # run it. Follows the vulcam pr-reviewer pattern in single-user mode (TRD D20).
 # External binaries are injectable so tests run offline with stubs:
 #   REVIEWER_GH (default gh), REVIEWER_CLAUDE (default claude),
-#   REVIEWER_PI (default pi), REVIEWER_GABO_BIN (default gabo).
+#   REVIEWER_PI (default pi), REVIEWER_CODEX (default codex),
+#   REVIEWER_OPENCODE (default opencode), REVIEWER_GABO_BIN (default gabo).
 #
 # Settings, highest first: the environment, the private env file, the
 # skill's config.env, gabo.yaml on the integration branch (read from the
@@ -112,6 +113,8 @@ fi
 GH="${REVIEWER_GH:-gh}"
 CLAUDE="${REVIEWER_CLAUDE:-claude}"
 PI="${REVIEWER_PI:-pi}"
+CODEX="${REVIEWER_CODEX:-codex}"
+OPENCODE="${REVIEWER_OPENCODE:-opencode}"
 GABO_BIN="${REVIEWER_GABO_BIN:-gabo}"
 GABO_INSTALL="${REVIEWER_GABO_INSTALL:-github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo}"
 REPO="${REVIEWER_REPO:-$(caller_yaml repo.name | head -n 1)}"
@@ -130,6 +133,10 @@ CLAUDE_MODEL="${REVIEWER_CLAUDE_MODEL:-}"
 CLAUDE_MAX_TURNS="${REVIEWER_CLAUDE_MAX_TURNS:-40}"
 # Empty: the owner's default Pi model (settings.json in the Pi agent dir).
 PI_MODEL="${REVIEWER_PI_MODEL:-}"
+# Empty: the owner's default Codex model.
+CODEX_MODEL="${REVIEWER_CODEX_MODEL:-}"
+# Empty: the owner's default OpenCode model (provider/model[#variant]).
+OPENCODE_MODEL="${REVIEWER_OPENCODE_MODEL:-}"
 DIFF_MAX_BYTES="${REVIEWER_DIFF_MAX_BYTES:-200000}"
 MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
 MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
@@ -317,8 +324,8 @@ validate_static() {
   [[ "$MODE" != isolated ]] ||
     { echo "REVIEWER_MODE=isolated belongs to the reviewer_placement adapter; these scripts run single-user mode only"; return; }
   [[ "$MODE" == single-user ]] || { echo "REVIEWER_MODE must be single-user"; return; }
-  [[ "$ENGINE" == claude || "$ENGINE" == pi ]] ||
-    { echo "REVIEWER_ENGINE must be claude or pi (runtimes.reviewer), got '$ENGINE'"; return; }
+  [[ "$ENGINE" =~ ^(claude|codex|pi|opencode)$ ]] ||
+    { echo "REVIEWER_ENGINE must be claude, codex, pi or opencode (runtimes.reviewer), got '$ENGINE'"; return; }
   [[ "$PI_CREDENTIAL_ENV" =~ ^([A-Z_][A-Z0-9_]*)?$ ]] ||
     { echo "review.pi_credential_env must be an environment variable name (got '$PI_CREDENTIAL_ENV')"; return; }
   [[ ! "$PI_CREDENTIAL_ENV" =~ ^(PATH|HOME|TERM|NO_COLOR|PI_CODING_AGENT_DIR)$ ]] ||
@@ -331,7 +338,9 @@ validate_static() {
   done
   [[ "$MERGE_DELAY" =~ ^[0-9]+$ ]] || { echo "REVIEWER_MERGE_DELAY must be a whole number of seconds"; return; }
   [[ "$CLAUDE_MODEL" =~ ^[][A-Za-z0-9._:@-]*$ ]] || { echo "REVIEWER_CLAUDE_MODEL has unexpected characters"; return; }
-  [[ "$PI_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || echo "REVIEWER_PI_MODEL has unexpected characters"
+  [[ "$PI_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || { echo "REVIEWER_PI_MODEL has unexpected characters"; return; }
+  [[ "$CODEX_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || { echo "REVIEWER_CODEX_MODEL has unexpected characters"; return; }
+  [[ "$OPENCODE_MODEL" =~ ^[A-Za-z0-9._:@/#-]*$ ]] || echo "REVIEWER_OPENCODE_MODEL has unexpected characters"
 }
 
 # check_env_reserved <name>: true for a name review.check_env may not list:
@@ -469,15 +478,73 @@ minimum_problem() {
     echo "$name ${have:-unknown} is older than the minimum $MINIMUM in $BASE_BRANCH:$BUILTIN_STAMP; upgrade it with: go install $GABO_INSTALL@v$MINIMUM"
 }
 
+# engine_bin: "<binary> <variable that sets it>" for the review engine.
+engine_bin() {
+  case "$ENGINE" in
+    pi) echo "$PI REVIEWER_PI" ;;
+    codex) echo "$CODEX REVIEWER_CODEX" ;;
+    opencode) echo "$OPENCODE REVIEWER_OPENCODE" ;;
+    *) echo "$CLAUDE REVIEWER_CLAUDE" ;;
+  esac
+}
+
+# The reviewer-owned homes of an engine run: HOME (also the Claude and Pi
+# homes with a credential of their own) and the Codex CODEX_HOME; the
+# OpenCode run directory, outside every checkout.
+REVIEW_HOME="$WORKDIR/review-home"
+CODEX_REVIEW_HOME="$WORKDIR/codex-home"
+OPENCODE_RUN_DIR="$WORKDIR/opencode-run"
+
+# engine_env: the scrubbed `env -i` prefix of a codex or opencode run: PATH,
+# the reviewer-owned HOME, XDG dirs and CODEX_HOME, and nothing else, so no
+# GitHub token and none of the owner's config reach the engine.
+engine_env() {
+  mkdir -p "$REVIEW_HOME/.config" "$REVIEW_HOME/.local/share" "$REVIEW_HOME/.local/state" "$REVIEW_HOME/.cache" \
+    "$CODEX_REVIEW_HOME" || return 1
+  ENGINE_ENV=(env -i "PATH=$PATH" "HOME=$REVIEW_HOME" NO_COLOR=1 TERM=dumb)
+  if [[ "$ENGINE" == codex ]]; then
+    ENGINE_ENV+=("CODEX_HOME=$CODEX_REVIEW_HOME")
+  else
+    ENGINE_ENV+=("XDG_CONFIG_HOME=$REVIEW_HOME/.config" "XDG_DATA_HOME=$REVIEW_HOME/.local/share"
+      "XDG_STATE_HOME=$REVIEW_HOME/.local/state" "XDG_CACHE_HOME=$REVIEW_HOME/.cache")
+  fi
+}
+
 # engine_problem: prints why the review engine cannot run, or nothing: its
-# binary is missing, or review.pi_credential_env names an empty env var.
+# binary is missing, review.pi_credential_env names an empty env var, or a
+# codex or opencode engine has no isolation test pass for its version.
 engine_problem() {
-  local bin="$CLAUDE" var="REVIEWER_CLAUDE"
-  [[ "$ENGINE" != pi ]] || { bin="$PI"; var="REVIEWER_PI"; }
+  local bin var
+  read -r bin var <<<"$(engine_bin)"
   command -v "$bin" >/dev/null 2>&1 ||
     { echo "no $ENGINE binary ($var=$bin) for runtimes.reviewer $ENGINE"; return; }
   [[ "$ENGINE" != pi || -z "$PI_CREDENTIAL_ENV" || -n "${!PI_CREDENTIAL_ENV:-}" ]] ||
-    echo "review.pi_credential_env names $PI_CREDENTIAL_ENV, which is empty: set it for the reviewer, or remove the key to reuse the owner's Pi login"
+    { echo "review.pi_credential_env names $PI_CREDENTIAL_ENV, which is empty: set it for the reviewer, or remove the key to reuse the owner's Pi login"; return; }
+  isolation_problem "$bin"
+}
+
+# isolation_problem <bin>: for codex and opencode, prints why the engine has
+# no isolation test pass, or nothing. The gabo-reviewer-config skill writes
+# the marker ${XDG_CONFIG_HOME:-$HOME/.config}/gabo/reviewer-isolation/<engine>
+# holding the `<engine> --version` line it tested (intent 0001 S10); a
+# missing marker or another version refuses the engine. claude and pi need
+# no marker. The version runs in the engine's own scrubbed home, as the
+# isolation test runs it.
+isolation_problem() {
+  local marker have want
+  [[ "$ENGINE" == codex || "$ENGINE" == opencode ]] || return 0
+  marker="${XDG_CONFIG_HOME:-$HOME/.config}/gabo/reviewer-isolation/$ENGINE"
+  engine_env || { echo "cannot create the reviewer-owned home $REVIEW_HOME"; return; }
+  have="$(cd "$REVIEW_HOME" && timeout 60 "${ENGINE_ENV[@]}" "$(command -v "$1")" --version 2>/dev/null </dev/null | head -n 1)"
+  [[ -n "$have" ]] || { echo "could not read the $ENGINE version ($1 --version)"; return; }
+  if [[ ! -f "$marker" ]]; then
+    want="no marker $marker"
+  else
+    want="$(head -n 1 "$marker")"
+    [[ "$want" != "$have" ]] || return 0
+    want="$marker records $want"
+  fi
+  echo "runtimes.reviewer $ENGINE has no isolation test pass for $have: $want; run the gabo-reviewer-config isolation test (isolation-test.sh $ENGINE)"
 }
 
 # resolve_bot_login: sets BOT_LOGIN to the active gh login when it is empty.
