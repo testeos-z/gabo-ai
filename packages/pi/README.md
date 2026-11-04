@@ -42,7 +42,7 @@ The extension is a thin connection layer. It collects the session facts (the nam
 
 ## Coexistence with `gabo init` and `gabo-runtime-pi`
 
-- **`gabo init` stays required.** The package does not configure a project. Per-project config (`gabo.yaml`), the `.gabo/skills/` catalog, slots and adapters still come from `gabo init` and the setup prompt (see the [Quick start](../../README.md#quick-start)).
+- **`gabo init` stays required.** The package does not configure a project. Per-project config (`gabo.yaml`), the `.gabo/skills/` catalog, slots and adapters still come from `gabo init` and the setup prompt (see the [Install and set up](../../README.md#install-and-set-up)).
 - **`gabo-runtime-pi` stays required.** It builds the agents in `.pi/agents/` and the skill links in `.pi/skills/`. The package replaces none of them.
 - **It writes no project file.** Installing the package or running a Pi session with it changes nothing in the project: `git status` stays clean.
 - **It is not a subagent package.** gabo on Pi needs a subagent package such as gentle-pi (`pi install npm:gentle-pi`). The `gabo-runtime-pi` Prerequisite still refuses when the gabo package is the only one installed.
