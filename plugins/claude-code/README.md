@@ -4,6 +4,10 @@ The `gabo` plugin of the `gabo-ai` marketplace (this repository, [`.claude-plugi
 
 ## Install
 
+**With `gabo init`.** When `gabo.yaml` names `claude` in `runtimes.*`, `gabo init` writes the plugin's project keys `extraKnownMarketplaces."gabo-ai"` (the GitHub source `testeos-z/gabo-ai`) and `enabledPlugins."gabo@gabo-ai": true` to the project's `.claude/settings.json`, never to your global Claude Code settings. It only adds missing keys and keeps every value you set. What you still do, as its `engine integration:` report says: trust the project folder in Claude Code, so the marketplace and the plugin apply, and, while `testeos-z/gabo-ai` is private, give git credentials that can read it. Commit `.claude/settings.json`.
+
+**By hand.** As the alternative, install the plugin at user level:
+
 ```sh
 claude plugin marketplace add testeos-z/gabo-ai
 claude plugin install gabo@gabo-ai
@@ -39,7 +43,7 @@ These questions from the [spec](../../docs/product/intents/0001-claude-code-plug
 
 ## Release checklist
 
-The plugin `version` equals the gabo CLI release version `x.y.z`. It lives in the two plugin manifests, this plugin's and the [Codex plugin](../codex/README.md)'s, and in the [Pi package](../../packages/pi/README.md)'s `package.json`; all three always carry the same version, and the marketplace entries have no `version`. These are the steps of every CLI release `apps/cli/v<x.y.z>`, covering both plugins and the Pi package. The Pi package is published to npm by the [release pipeline](../../packages/pi/README.md#release-pipeline); the rest is manual:
+The plugin `version` equals the gabo CLI release version `x.y.z`, currently `0.2.6`. It lives in the two plugin manifests, this plugin's and the [Codex plugin](../codex/README.md)'s, and in the [Pi package](../../packages/pi/README.md) `@gabo-ai/pi`'s `package.json`; all three always carry the same version, and the marketplace entries have no `version`. These are the steps of every CLI release `apps/cli/v<x.y.z>`, covering both plugins and the Pi package. The Pi package is published to npm by the [release pipeline](../../packages/pi/README.md#release-pipeline); the rest is manual:
 
 1. In the release commit, set `version` to `x.y.z`, the same version as the CLI tag `apps/cli/v<x.y.z>`, in `plugins/claude-code/.claude-plugin/plugin.json`, `plugins/codex/.codex-plugin/plugin.json` and `packages/pi/package.json`. Check the Pi package with `test "$(jq -r .version packages/pi/package.json)" = "<x.y.z>"`; it must exit 0.
 2. Run `claude plugin validate .` and `claude plugin validate plugins/claude-code`; both must pass.
