@@ -1,0 +1,6 @@
+{
+  "extraKnownMarketplaces": {
+    "gabo-ai": {"source": {"source": "github", "repo": "testeos-z/gabo-ai"}}
+  },
+  "enabledPlugins": {"gabo@gabo-ai": false}
+}

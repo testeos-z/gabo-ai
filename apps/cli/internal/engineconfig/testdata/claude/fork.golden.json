@@ -1,0 +1,8 @@
+{
+  "extraKnownMarketplaces": {
+    "gabo-ai": {"source": {"source": "github", "repo": "me/gabo-ai-fork"}}
+  },
+  "enabledPlugins": {
+    "gabo@gabo-ai": true
+  }
+}
