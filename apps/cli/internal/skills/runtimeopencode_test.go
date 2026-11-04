@@ -240,3 +240,67 @@ func TestRuntimeOpenCodeFillsEverySlot(t *testing.T) {
 		}
 	}
 }
+
+// The link rules: each spec skill and each SKILL.md slot adapter is a
+// relative symlink in .opencode/skills, the reviewer-configuration skill is
+// linked like a spec skill and survives every rebuild, any other gabo-* link
+// is removed, and gabo-reviewer is never linked (S5, S14, D11, D12).
+func TestRuntimeOpenCodeLinkRules(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	steps := openCodeSection(t, doc, "Build Steps")
+	for _, want := range []string{
+		"make `.opencode/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`",
+		"make `.opencode/skills/gabo-reviewer-config` a relative symlink to `../../.gabo/skills/gabo-reviewer-config`",
+		"on every build, also when it already exists",
+		"remove each `.opencode/skills/gabo-*` symlink that no spec skill or slot asks for any more, except `.opencode/skills/gabo-reviewer-config`",
+		"never create `.opencode/skills/gabo-reviewer`",
+	} {
+		if !strings.Contains(steps, want) {
+			t.Errorf("## Build Steps: missing %q", want)
+		}
+	}
+	fixed := openCodeSection(t, doc, "Fixed-Name Links")
+	for _, want := range []string{
+		"whose adapter is a `<folder>/SKILL.md` gets one link `.opencode/skills/gabo-<slot>` (`_` written `-`)",
+		"as a relative symlink",
+	} {
+		if !strings.Contains(fixed, want) {
+			t.Errorf("## Fixed-Name Links: missing %q", want)
+		}
+	}
+	for _, want := range []string{
+		"Make every link of steps 2, 3 and 4 on every build",
+		"`gabo-reviewer-config` link",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("%s: missing %q", runtimeOpenCode, want)
+		}
+	}
+	if out := openCodeSection(t, doc, "Output Contract"); !strings.Contains(out, "the `gabo-reviewer-config` link") {
+		t.Errorf("## Output Contract does not report the gabo-reviewer-config link")
+	}
+}
+
+// Each agent names its skills by path in one line (S5, D4).
+func TestRuntimeOpenCodeSkillsLine(t *testing.T) {
+	t.Parallel()
+	const want = "Skills: before work read .opencode/skills/<name>/SKILL.md for each of <spec skills, then the fixed-name links the body names>."
+	doc := runtimeOpenCodeDoc(t)
+	m := markdownFence.FindStringSubmatch(doc)
+	if m == nil {
+		t.Fatalf("%s: no ```markdown agent block", runtimeOpenCode)
+	}
+	var got string
+	for _, l := range strings.Split(m[2], "\n") {
+		if l = strings.TrimPrefix(l, m[1]); strings.HasPrefix(l, "Skills: ") {
+			got = l
+		}
+	}
+	if got != want {
+		t.Errorf("Skills: line = %q, want %q", got, want)
+	}
+	if strings.Contains(doc, "gabo-reviewer-config/SKILL.md") {
+		t.Errorf("%s: an agent's Skills: line names gabo-reviewer-config; it is for the main session (S14)", runtimeOpenCode)
+	}
+}

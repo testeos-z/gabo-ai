@@ -20,10 +20,10 @@ Load when any of `runtimes.coder`, `runtimes.reviewer` or `runtimes.assistant` i
 - Read the spec, the templates and `.gabo/VERSION` from the project; never build from memory. A missing or empty `.gabo/VERSION` or catalog: stop and tell the user to run `gabo init`.
 - Fill only the template slots, as below, and invent nothing: no frontmatter key, permission, skill, model or rule the spec and template do not give. OpenCode passes unknown agent options to the provider as model options, so the frontmatter holds `description`, `mode` and `permission` and no other key; the version goes in a body comment (D2).
 - Permissions only restrict (D3): a capability the spec lists is left at the owner's setting, a capability it lacks is set to `deny`. Never loosen the owner's own rules.
-- Never place `gabo-reviewer` in the project (D5, TRD D20): never create `.opencode/skills/gabo-reviewer`, no copy of its scripts, and never in an agent's `Skills:` line. OpenCode gets no reviewer link at all, neither in the project nor under `~/.config/opencode/skills`: the reviewer agent runs the user-level script by path, and every agent but `gabo-reviewer` sets `permission.skill` `gabo-reviewer: deny`, so a `gabo-reviewer` skill OpenCode finds elsewhere (for example in `~/.claude/skills`) cannot start a second review.
+- Never place `gabo-reviewer` in the project (D5, TRD D20): never create `.opencode/skills/gabo-reviewer`, no copy of its scripts, and never in an agent's `Skills:` line. OpenCode gets no reviewer link at all, neither in the project nor under `~/.config/opencode/skills`: the reviewer agent runs the user-level script by path, and every agent but `gabo-reviewer` sets `permission.skill` `gabo-reviewer: deny`, so a `gabo-reviewer` skill OpenCode finds elsewhere (for example in `~/.claude/skills`) cannot start a second review. The `gabo-reviewer-config` link of build step 4 is not a reviewer link: that skill configures the reviewer engine and never runs a review (intent 0004 S14).
 - Never write under `~/.config/opencode` (no global config, agents, skills or plugins) and never write `.opencode/package.json` (D8). Name nothing outside the spec ids, all `gabo-*`, so no gabo agent collides with gentle-ai's or the owner's agents.
 - Overwrite only the agent files named after a spec id and the links this skill makes. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
-- Make every link of steps 2 and 3 on every build, also when the agent files are already current; a build that skips one is not finished.
+- Make every link of steps 2, 3 and 4 on every build, also when the agent files are already current; a build that skips one is not finished.
 - Write no secret into any file (R21).
 
 ## Sources
@@ -60,14 +60,14 @@ The spec's engine-neutral capabilities map to OpenCode permission keys. A capabi
 
 ## Fixed-Name Links
 
-Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/SKILL.md` gets one link `.opencode/skills/gabo-<name>` (underscores become hyphens) to `<folder>`, as a relative symlink: `gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory` and so on. An adapter that is not a skill folder (for example the reviewer agent file) gets no link: report it. Agents read the linked skills by path (`Skills:` line of build step 6), so a link whose folder name differs from the adapter's frontmatter `name` still works (D4).
+Each slot of `gabo.yaml` (`slots.<slot>.adapter`) whose adapter is a `<folder>/SKILL.md` gets one link `.opencode/skills/gabo-<slot>` (`_` written `-`) to `<folder>`, as a relative symlink: `gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory` and so on. An adapter that is not a skill folder (for example the reviewer agent file) gets no link: report it. Agents read the linked skills by path (`Skills:` line of build step 6), so a link whose folder name differs from the adapter's frontmatter `name` still works (D4).
 
 ## Build Steps
 
 1. Recheck the sources. Read `gabo.yaml`, `.gabo/VERSION` and the spec.
 2. Catalog skills: for each skill in any agent's spec `skills`, make `.opencode/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`. An entry that already resolves to that folder is kept; a real folder or file is left and reported.
-3. Fixed-name links as above. Then remove each `.opencode/skills/gabo-*` symlink that no spec skill or slot asks for any more; never remove a real folder or file.
-4. No reviewer link: skip it, there is no reviewer link on OpenCode (Hard Rules).
+3. Fixed-name links as above. Then remove each `.opencode/skills/gabo-*` symlink that no spec skill or slot asks for any more, except `.opencode/skills/gabo-reviewer-config` (step 4); never remove a real folder or file.
+4. Reviewer configuration (intent 0004 S14, D12): make `.opencode/skills/gabo-reviewer-config` a relative symlink to `../../.gabo/skills/gabo-reviewer-config`, as in step 2, on every build, also when it already exists, so the main OpenCode session finds it; no agent's `Skills:` line names it. No reviewer link: never create `.opencode/skills/gabo-reviewer` (Hard Rules).
 5. For each spec agent, fill its template:
 
    | slot | value |
@@ -105,4 +105,4 @@ Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/S
 
 ## Output Contract
 
-Report the OpenCode version and whether the sources were rechecked; each agent file written with its id, `gabo-version` and denied permission keys; each link made (catalog and fixed-name); that no reviewer link was made; each entry left or slot not filled, with why; and the `gabo check` result.
+Report the OpenCode version and whether the sources were rechecked; each agent file written with its id, `gabo-version` and denied permission keys; each link made (catalog, fixed-name and the `gabo-reviewer-config` link); each link removed; that no reviewer link was made; each entry left or slot not filled, with why; and the `gabo check` result.
