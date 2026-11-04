@@ -1,4 +1,6 @@
-# gabo-ai
+<h1 align="center">
+  <img src="docs/assets/gabo-ai-logo.png" alt="gabo-ai, made by Gobern.AI" width="640">
+</h1>
 
 **A team of coding agents for your project that follows the AI-Native SDLC: every change goes from intent to spec to plan to reviewed PRs, and you only decide.**
 
