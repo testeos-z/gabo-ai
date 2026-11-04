@@ -6,6 +6,23 @@
 - **The agents** write the intent, spec and plan, open the tasks, implement them in parallel, review every PR and merge into your integration branch.
 - **gabo** is the CLI that installs and checks that team in your repository. It works with your tracker, your methodology and your coding engine: Claude Code, Codex, Pi or OpenCode.
 
+## Install and set up
+
+You need Go (the version in [`apps/cli/go.mod`](apps/cli/go.mod)), git, and one coding engine: Claude Code, Codex, Pi or OpenCode.
+
+1. **Install the CLI.** Go needs your git credentials while the repository is private:
+
+   ```sh
+   GOPRIVATE=github.com/testeos-z/* go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
+   ```
+
+2. **Run `gabo init`** in your project root. It copies the skill catalog to `.gabo/` and prints a setup prompt.
+3. **Paste the prompt into your coding agent** and answer its questions, one at a time. It writes `gabo.yaml` and builds the agents for your engine.
+4. **Run `gabo init` again.** Now that `gabo.yaml` exists, it configures your engine's integration (plugin or package) at project level and tells you what is left, such as trusting the project folder.
+5. **Run `gabo check`**, then commit the changed files.
+
+From then on, open your agent and talk to the assistant: describe a change, accept its spec, and ask it to run the wave. See [Running a wave](#running-a-wave).
+
 ## The flow
 
 Each change is one **intent**. There is no big upfront plan: the tracker is the global view, and each intent moves through the same lifecycle.
@@ -37,21 +54,6 @@ You don't need to plan everything from zero before you start. Start with an idea
 - **Agents research before they ask.** When a spec or a plan has a gap, the agents look into it (code, docs, the web) and bring a proposed answer with its reasoning, so you choose instead of starting from a blank page.
 - **The plan grows with what you learn.** Each intent is small, so a surprise changes one spec or one plan, not a big upfront design. A finding that changes scope becomes a plan change you debate, or that a plan reviewer debates when you are away.
 - **Nothing blocks on you by default.** In `auto` mode the agents decide what they can and record every decision with its reason, so you can review it later. In `manual` mode they ask you first.
-
-## Quick start
-
-1. **Install the CLI.** Go needs your git credentials while the repository is private:
-
-   ```sh
-   GOPRIVATE=github.com/testeos-z/* go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
-   ```
-
-2. **Run `gabo init`** in your project root. It copies the skill catalog to `.gabo/` and prints a setup prompt.
-3. **Paste the prompt into your coding agent** and answer its questions, one at a time. It writes `gabo.yaml` and builds the agents for your engine.
-4. **Run `gabo init` again.** Now that `gabo.yaml` exists, it configures your engine's integration (plugin or package) at project level and tells you what is left, such as trusting the project folder.
-5. **Run `gabo check`**, then commit the changed files.
-
-From then on, open your agent and talk to the assistant: describe a change, accept its spec, and ask it to run the wave. See [Running a wave](#running-a-wave).
 
 ## Compatibility
 
