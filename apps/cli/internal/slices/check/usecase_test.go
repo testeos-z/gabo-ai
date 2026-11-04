@@ -65,7 +65,8 @@ func (failingReader) ReadFile(string) ([]byte, error) { return nil, errors.New("
 func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 
 // project is a passing project at catalog version 1.2.3: stamp, spec,
-// Claude Code runtime skill and both agents built with 1.2.3.
+// Claude Code runtime skill, both agents built with 1.2.3 and the Claude
+// Code keys gabo init writes.
 func project() fstest.MapFS {
 	return fstest.MapFS{
 		".gabo/VERSION": file("1.2.3\n"),
@@ -75,6 +76,7 @@ func project() fstest.MapFS {
 		".gabo/skills/gabo-runtime-claude/SKILL.md":         file(claudeSkill),
 		".claude/agents/alpha.md":                           file("---\nname: alpha\ngabo-version: 1.2.3\n---\nbody\n"),
 		".claude/agents/beta.md":                            file("---\nname: beta\ngabo-version: 1.2.3\n---\nbody\n"),
+		".claude/settings.json":                             file(claudeKeysJSON),
 	}
 }
 
