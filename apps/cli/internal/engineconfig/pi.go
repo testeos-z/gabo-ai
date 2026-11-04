@@ -38,13 +38,16 @@ func piRule(in Input) Result {
 }
 
 func pi(in Input) Result {
-	if !isRelease(in.Version) {
+	// `go install …@v<x.y.z>` stamps the binary v<x.y.z>; like the other
+	// slices, the rule pins the plain x.y.z.
+	version := strings.TrimPrefix(in.Version, "v")
+	if !isRelease(version) {
 		return Result{Section: Section{
 			Lines: []string{"pi: development build " + in.Version + "; no published " + PiPackage + " to pin; nothing written"},
 			Steps: []string{`add "` + piSource("<version>") + `" to ` + PiSettings + ` packages by hand, with <version> a released gabo version`},
 		}}
 	}
-	want := piSource(in.Version)
+	want := piSource(version)
 	fail := func(reason string) Result {
 		return Result{Section: Section{Lines: []string{FailurePrefix + " " + PiSettings + ": " + reason + "; fix it and run gabo init again"}}}
 	}
@@ -82,7 +85,7 @@ func pi(in Input) Result {
 		if src == want {
 			return Result{Section: Section{Lines: []string{"unchanged " + PiSettings + ": packages entry " + want + " present"}}}
 		}
-		return Result{Section: Section{Lines: []string{"kept " + PiSettings + " packages entry " + src + " by the user's choice (this gabo is " + in.Version + ")"}}}
+		return Result{Section: Section{Lines: []string{"kept " + PiSettings + " packages entry " + src + " by the user's choice (this gabo is " + version + ")"}}}
 	}
 	return wrote(arr.insert(data, `"`+want+`"`))
 }
@@ -150,6 +153,8 @@ type container struct {
 	items []item
 }
 
+// scanObject and scanArray require data to be valid JSON (checkJSON
+// passed): the scanner does no bounds or syntax checks of its own.
 func scanObject(data []byte) (container, bool) {
 	i := skipWS(data, 0)
 	if data[i] != '{' {

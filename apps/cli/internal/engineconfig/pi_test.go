@@ -41,6 +41,8 @@ func TestPiRule(t *testing.T) {
 	}{
 		{name: "missing file", version: "0.2.6", want: "missing.want.json",
 			line: "wrote .pi/settings.json: added packages entry npm:@gabo-ai/pi@0.2.6"},
+		{name: "go install version with a v prefix pins the plain version", version: "v0.2.6", want: "missing.want.json",
+			line: "wrote .pi/settings.json: added packages entry npm:@gabo-ai/pi@0.2.6"},
 		{name: "other keys and entries kept in order, entry appended", in: "merge.json", version: "0.2.6", want: "merge.want.json",
 			line: "wrote .pi/settings.json: added packages entry npm:@gabo-ai/pi@0.2.6"},
 		{name: "missing packages key added", in: "nopackages.json", version: "0.2.6", want: "nopackages.want.json",
