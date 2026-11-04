@@ -80,7 +80,7 @@ func TestRuntimeOpenCodeSections(t *testing.T) {
 			got = append(got, h)
 		}
 	}
-	want := []string{"Activation Contract", "Hard Rules", "Sources", "Tool Map", "Fixed-Name Links", "Build Steps", "Output Contract"}
+	want := []string{"Activation Contract", "Hard Rules", "Prerequisites", "Sources", "Tool Map", "Fixed-Name Links", "Build Steps", "Output Contract"}
 	if !slices.Equal(got, want) {
 		t.Errorf("sections = %v, want %v", got, want)
 	}
@@ -302,5 +302,127 @@ func TestRuntimeOpenCodeSkillsLine(t *testing.T) {
 	}
 	if strings.Contains(doc, "gabo-reviewer-config/SKILL.md") {
 		t.Errorf("%s: an agent's Skills: line names gabo-reviewer-config; it is for the main session (S14)", runtimeOpenCode)
+	}
+}
+
+// numberedItems returns the top-level "N. " items of a section, in order.
+func numberedItems(s string) []string {
+	var items []string
+	for _, l := range strings.Split(s, "\n") {
+		if len(l) > 2 && l[0] >= '1' && l[0] <= '9' && strings.HasPrefix(l[1:], ". ") {
+			items = append(items, l)
+		}
+	}
+	return items
+}
+
+// The build first checks opencode --version, before anything is built or
+// written; build step 1 runs the prerequisites (S8).
+func TestRuntimeOpenCodeChecksOpenCodeFirst(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	pre := numberedItems(openCodeSection(t, doc, "Prerequisites"))
+	if len(pre) == 0 || !strings.Contains(pre[0], "`opencode --version` must succeed") {
+		t.Fatalf("## Prerequisites: first item does not check `opencode --version`: %v", pre)
+	}
+	steps := numberedItems(openCodeSection(t, doc, "Build Steps"))
+	if len(steps) == 0 || !strings.HasPrefix(steps[0], "1. Run the Prerequisites") {
+		t.Errorf("## Build Steps: step 1 does not run the Prerequisites first: %v", steps)
+	}
+}
+
+// The depth rule writes only experimental.subagent_depth: 3, at project level,
+// into the first existing config of OpenCode's lookup order (the order gabo
+// check reads), else a new .opencode/opencode.json; it merges, keeps 3 or
+// more, reports the change, and refuses on a missing opencode or an
+// unmergeable file (S8, D7).
+func TestRuntimeOpenCodeSubagentDepthRule(t *testing.T) {
+	t.Parallel()
+	pre := openCodeSection(t, runtimeOpenCodeDoc(t), "Prerequisites")
+	for _, want := range []string{
+		"the first existing of `opencode.json`, `opencode.jsonc`, `.opencode/opencode.json`, `.opencode/opencode.jsonc` (OpenCode's own lookup order, the same one `gabo check` reads), else a new `.opencode/opencode.json`",
+		"Write only the key `experimental.subagent_depth`, with the value `3`",
+		"`{\"experimental\": {\"subagent_depth\": 3}}`",
+		"keeping every other key and value",
+		"the comments of a `.jsonc` file",
+		"a whole number of 3 or more: leave the file unchanged",
+		"Never write `~/.config/opencode/` or `.opencode/package.json`",
+		"Report the file, the key, the old value (or `unset`) and the new value",
+		"build nothing, write nothing and print `set experimental.subagent_depth to 3 in <file>`",
+		"`opencode` is missing",
+		"cannot be parsed and merged without loss",
+	} {
+		if !strings.Contains(pre, want) {
+			t.Errorf("## Prerequisites: missing %q", want)
+		}
+	}
+}
+
+// The write list of S9 is the only one: the skill lists what it writes once,
+// never changes another project config key and collides with no agent (S9, D8).
+func TestRuntimeOpenCodeWriteList(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	const list = "Write only `.opencode/agents/<id>.md` for spec ids, `.opencode/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete, and the project-level key `experimental.subagent_depth` of the Prerequisites, merged into one project config file."
+	rules := openCodeSection(t, doc, "Hard Rules")
+	if !strings.Contains(rules, list) {
+		t.Errorf("## Hard Rules: missing the write list %q", list)
+	}
+	if n := strings.Count(doc, "Write only `"); n != 1 {
+		t.Errorf("%s: %d write lists, want exactly the one of S9", runtimeOpenCode, n)
+	}
+	for _, want := range []string{
+		"never change any other key of a project config",
+		"`gentle-orchestrator`",
+	} {
+		if !strings.Contains(rules, want) {
+			t.Errorf("## Hard Rules: missing %q", want)
+		}
+	}
+}
+
+var textFence = regexp.MustCompile("(?ms)^( *)```text\n(.*?)\n *```$")
+
+// The built gabo-coder body gains an OpenCode-only first step that moves the
+// session to the launch-prompt worktree, else uses shell workdir and
+// absolute paths (S7, D6).
+func TestRuntimeOpenCodeCoderWorktreeStep(t *testing.T) {
+	t.Parallel()
+	steps := openCodeSection(t, runtimeOpenCodeDoc(t), "Build Steps")
+	if !strings.Contains(steps, "For `gabo-coder` only, write this paragraph between the `Skills:` line and `<filled body>`") {
+		t.Errorf("## Build Steps: does not place the coder worktree step in the gabo-coder body")
+	}
+	m := textFence.FindStringSubmatch(steps)
+	if m == nil {
+		t.Fatalf("## Build Steps: no ```text coder worktree step")
+	}
+	for _, want := range []string{
+		"First step, before any other tool call",
+		"`opencode.session_move` with the worktree path from your launch prompt",
+		"not callable",
+		"pass that worktree path as `workdir` on every `shell` call",
+		"absolute paths",
+		"`git rev-parse --show-toplevel`",
+	} {
+		if !strings.Contains(m[2], want) {
+			t.Errorf("coder worktree step: missing %q:\n%s", want, m[2])
+		}
+	}
+}
+
+// The binary facts behind the depth rule and the worktree step are cited (S2).
+func TestRuntimeOpenCodeCitesPrerequisiteFacts(t *testing.T) {
+	t.Parallel()
+	s := openCodeSection(t, runtimeOpenCodeDoc(t), "Sources")
+	for _, want := range []string{"`experimental.subagent_depth`", "`opencode.session_move`", "`workdir`"} {
+		found := false
+		for _, l := range strings.Split(s, "\n") {
+			if strings.Contains(l, want) && strings.Contains(l, "(binary)") {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("## Sources: no (binary) row for %s", want)
+		}
 	}
 }
