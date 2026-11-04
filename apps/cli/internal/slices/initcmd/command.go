@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
 // Factory builds the init run lazily, so help never touches the filesystem.
@@ -28,6 +30,10 @@ func NewCommand(factory Factory) *cobra.Command {
 			"pinned in gabo and match the asset's SHA-256, then gabo replaces itself and reruns init.\n" +
 			"On a fresh project (no stamp, no " + ConfigFile + ") it prints the setup prompt to paste\n" +
 			"into your agent; it writes the prompt nowhere.\n" +
+			"With a valid " + ConfigFile + ", it writes the project-level gabo integration keys of each\n" +
+			"engine in runtimes, merged with the existing project config (unrelated keys kept):\n" +
+			engineconfig.ClaudeSettings + ", " + engineconfig.CodexConfigPath + " and " + engineconfig.PiSettings + " are the only engine\n" +
+			"files it writes; it never writes user-level engine config.\n" +
 			"init never creates or edits " + ConfigFile + " or the user config.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

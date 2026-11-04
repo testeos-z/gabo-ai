@@ -53,7 +53,7 @@ func tomlEscape(s string, multi bool) string {
 // the fixed-name links of codexConfig's skill adapters.
 func codexBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
-	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n")}
+	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n"), ".codex/config.toml": file(codexKeysTOML)}
 	files, err := skills.Files()
 	if err != nil {
 		t.Fatal(err)

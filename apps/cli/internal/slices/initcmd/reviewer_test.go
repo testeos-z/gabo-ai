@@ -86,7 +86,9 @@ func TestFreshProjectInstallsReviewerAtUserLevel(t *testing.T) {
 // user copy, so it is installed while the catalog stays untouched.
 func TestMatchingStampWithoutUserCopyInstallsReviewer(t *testing.T) {
 	t.Parallel()
-	s := newStore(map[string]string{config: cfgYAML, stamp: "1.2.3\n", setup: "edited"})
+	files := map[string]string{config: cfgYAML, stamp: "1.2.3\n", setup: "edited", claudeFile: claudeIntegrated()}
+	block := strings.Join(claudeBlock(files), "\n")
+	s := newStore(files)
 	out, err := runInit(t, s, "1.2.3")
 	if err != nil {
 		t.Fatal(err)
@@ -100,7 +102,7 @@ func TestMatchingStampWithoutUserCopyInstallsReviewer(t *testing.T) {
 			t.Fatalf("write outside the user copy: %s", w)
 		}
 	}
-	want := "reviewer skill installed to " + userDir + " (1.2.3)\ncatalog is current (1.2.3); nothing changed"
+	want := "reviewer skill installed to " + userDir + " (1.2.3)\ncatalog is current (1.2.3); nothing changed\n" + block
 	if joined(out) != want {
 		t.Fatalf("output:\n%s", joined(out))
 	}

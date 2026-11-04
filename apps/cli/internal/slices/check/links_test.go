@@ -345,6 +345,7 @@ func TestReviewerLinkOnlyForTheReviewerRuntime(t *testing.T) {
 	t.Parallel()
 	p := linkedProject()
 	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  reviewer_link: $HOME/.pi/skills/gabo-reviewer\n---\n")
+	p[".pi/settings.json"] = file(piKeysJSON)
 	cfg := strings.Replace(linkedConfig, "  coder: claude", "  coder: pi", 1)
 	rep, err := NewUseCase(p, configFiles{projectFile: cfg}, goodUser(), Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
 	if err != nil {
@@ -360,6 +361,7 @@ func TestPiReviewerRuntimePassesCheck(t *testing.T) {
 	t.Parallel()
 	p := linkedProject()
 	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n---\n")
+	p[".pi/settings.json"] = file(piKeysJSON)
 	cfg := strings.Replace(linkedConfig, "  reviewer: claude", "  reviewer: pi", 1)
 	u := goodUser().clone()
 	delete(u.links, userLink)

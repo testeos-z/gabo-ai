@@ -49,7 +49,9 @@ func TestPublishedFindsTheBlockBetweenMarkers(t *testing.T) {
 	}
 }
 
-// TestPromptTellsTheStepsInOrder checks the ordered steps of TRD 9.4.
+// TestPromptTellsTheStepsInOrder checks the ordered steps of TRD 9.4; the
+// second `gabo init` comes after the `gabo.yaml` write and before the agents
+// are built, so the engine step of init runs (S15, D8).
 func TestPromptTellsTheStepsInOrder(t *testing.T) {
 	t.Parallel()
 	steps := []string{
@@ -61,6 +63,7 @@ func TestPromptTellsTheStepsInOrder(t *testing.T) {
 		"`gabo-runtime-builder`",
 		"global user file",
 		"`gabo.yaml`",
+		"run `gabo init` again",
 		"build every agent",
 		"run `gabo check`",
 		"smoke test",

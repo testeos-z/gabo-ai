@@ -16,6 +16,7 @@ Read `docs/cloud-agent-flow.md` before any change: it defines the agent flow, th
 - `cmd/gabo/main.go` is the only composition root: it builds driven adapters, injects them into slice use cases and registers the driving adapters (cobra commands, MCP tools).
 - `internal/kernel/`: ports shared by several slices (our own types), with driven adapters in subpackages and hand-written fakes in `internal/kernel/kerneltest`.
 - `internal/config/`: loads and validates `gabo.yaml`.
+- `internal/engineconfig/`: pure engine integration domain (engine set, keys, merge rules, report) shared by `initcmd` and `check`; no ports, no I/O.
 - `internal/slices/<name>/`: `usecase.go` (core logic and domain types), `ports.go` (slice-specific ports), `command.go` (driving adapter), `adapters/` (slice-specific driven adapters). The core never imports cobra, `os/exec` or adapters; use-case tests use hand-written in-memory fakes.
 
 ## Conventions

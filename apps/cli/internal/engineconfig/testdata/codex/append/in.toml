@@ -1,0 +1,6 @@
+# Project Codex settings, kept by the team.
+model = "gpt-5.5"
+
+[agents]
+# reviewer runs read-only
+max_threads = 4
