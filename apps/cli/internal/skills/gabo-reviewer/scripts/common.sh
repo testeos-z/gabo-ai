@@ -135,6 +135,8 @@ CLAUDE_MAX_TURNS="${REVIEWER_CLAUDE_MAX_TURNS:-40}"
 PI_MODEL="${REVIEWER_PI_MODEL:-}"
 # Empty: the owner's default Codex model.
 CODEX_MODEL="${REVIEWER_CODEX_MODEL:-}"
+# Empty: the owner's default OpenCode model (provider/model[#variant]).
+OPENCODE_MODEL="${REVIEWER_OPENCODE_MODEL:-}"
 DIFF_MAX_BYTES="${REVIEWER_DIFF_MAX_BYTES:-200000}"
 MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
 MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
@@ -337,7 +339,8 @@ validate_static() {
   [[ "$MERGE_DELAY" =~ ^[0-9]+$ ]] || { echo "REVIEWER_MERGE_DELAY must be a whole number of seconds"; return; }
   [[ "$CLAUDE_MODEL" =~ ^[][A-Za-z0-9._:@-]*$ ]] || { echo "REVIEWER_CLAUDE_MODEL has unexpected characters"; return; }
   [[ "$PI_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || { echo "REVIEWER_PI_MODEL has unexpected characters"; return; }
-  [[ "$CODEX_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || echo "REVIEWER_CODEX_MODEL has unexpected characters"
+  [[ "$CODEX_MODEL" =~ ^[A-Za-z0-9._:@/-]*$ ]] || { echo "REVIEWER_CODEX_MODEL has unexpected characters"; return; }
+  [[ "$OPENCODE_MODEL" =~ ^[A-Za-z0-9._:@/#-]*$ ]] || echo "REVIEWER_OPENCODE_MODEL has unexpected characters"
 }
 
 # check_env_reserved <name>: true for a name review.check_env may not list:
@@ -486,9 +489,11 @@ engine_bin() {
 }
 
 # The reviewer-owned homes of an engine run: HOME (also the Claude and Pi
-# homes with a credential of their own) and the Codex CODEX_HOME.
+# homes with a credential of their own) and the Codex CODEX_HOME; the
+# OpenCode run directory, outside every checkout.
 REVIEW_HOME="$WORKDIR/review-home"
 CODEX_REVIEW_HOME="$WORKDIR/codex-home"
+OPENCODE_RUN_DIR="$WORKDIR/opencode-run"
 
 # engine_env: the scrubbed `env -i` prefix of a codex or opencode run: PATH,
 # the reviewer-owned HOME, XDG dirs and CODEX_HOME, and nothing else, so no
