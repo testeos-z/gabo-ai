@@ -97,10 +97,10 @@ See [`plugins/codex/README.md`](plugins/codex/README.md) for the plugin layout, 
 
 ### Pi package
 
-The Pi package `@gaboai/pi` ([`packages/pi/`](packages/pi/)) ships the `gabo-pi` and `gabo-reviewer-config` skills and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` calls in a gabo project.
+The Pi package `@gabo-ai/pi` ([`packages/pi/`](packages/pi/)) ships the `gabo-pi` and `gabo-reviewer-config` skills and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` calls in a gabo project.
 
 ```sh
-pi install npm:@gaboai/pi@<version>
+pi install npm:@gabo-ai/pi@<version>
 ```
 
 Use the gabo CLI version as `<version>`. Before the package is on npm, install it from a checkout with `pi install /path/to/gabo-ai/packages/pi`. Check it with `pi list`.

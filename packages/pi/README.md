@@ -1,13 +1,13 @@
 # gabo package for Pi
 
-`@gaboai/pi` is the gabo package for [Pi](https://github.com/earendil-works/pi). It brings two gabo skills into Pi and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` tool calls in a gabo project. Spec: [intent 0003](../../docs/product/intents/0003-pi-package/spec.md).
+`@gabo-ai/pi` is the gabo package for [Pi](https://github.com/earendil-works/pi). It brings two gabo skills into Pi and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` tool calls in a gabo project. Spec: [intent 0003](../../docs/product/intents/0003-pi-package/spec.md).
 
 ## Install
 
 From npm, pinned to a release version (the gabo CLI version you use):
 
 ```sh
-pi install npm:@gaboai/pi@<version>
+pi install npm:@gabo-ai/pi@<version>
 ```
 
 During development, or before the package is on npm, install it from a local checkout. Pi loads a local package from its path without copying it:
@@ -24,7 +24,7 @@ The extension calls the `gabo` CLI, so install the CLI too (see [Install](../../
 
 | path | what it is |
 |---|---|
-| `package.json` | Manifest: name `@gaboai/pi`, `version`, keyword `pi-package`, `pi.skills` and `pi.extensions`. The Pi host package `@earendil-works/pi-coding-agent` is an optional peer dependency only. |
+| `package.json` | Manifest: name `@gabo-ai/pi`, `version`, keyword `pi-package`, `pi.skills` and `pi.extensions`. The Pi host package `@earendil-works/pi-coding-agent` is an optional peer dependency only. |
 | `skills/gabo-pi/` | Bootstrap skill: how to install the CLI, run `gabo init` and print the setup prompt with `gabo prompt`. |
 | `skills/gabo-reviewer-config/` | A byte-for-byte copy of the catalog skill `apps/cli/internal/skills/gabo-reviewer-config/`: it configures the reviewer engine. No skill in the package runs reviews. |
 | `extensions/gabo.ts` | The `gabo` extension (below). |
@@ -55,9 +55,9 @@ Publishing to npm is automated:
 
 1. A merge to `main` runs [`sync-pi-pkg-up.yml`](../../.github/workflows/sync-pi-pkg-up.yml): it merges `main` into the `pi/pkg-up` branch (fast-forward when possible, a merge commit otherwise; it fails on a conflict) and pushes it.
 2. It then dispatches [`publish-pi.yml`](../../.github/workflows/publish-pi.yml) on `pi/pkg-up` (a push made with the workflow token starts no workflow by itself). A direct push to `pi/pkg-up` that touches `packages/pi/` starts it too.
-3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `npm publish --access public` only when `@gaboai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
+3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `npm publish --access public` only when `@gabo-ai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
 
-It needs the repository secret `NPM_TOKEN`: an npm granular access token with read and write on the `@gaboai` scope and 2FA bypass for publishing. npm deprecates direct-publish granular tokens in January 2027 and they expire after at most 90 days, so rotate it until the follow-up lands: move to npm trusted publishing (OIDC from GitHub Actions), which needs no stored token.
+It needs the repository secret `NPM_TOKEN`: an npm granular access token with read and write on the `@gabo-ai` scope and 2FA bypass for publishing. npm deprecates direct-publish granular tokens in January 2027 and they expire after at most 90 days, so rotate it until the follow-up lands: move to npm trusted publishing (OIDC from GitHub Actions), which needs no stored token.
 
 ## Development
 

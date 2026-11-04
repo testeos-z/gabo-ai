@@ -1,5 +1,5 @@
 {
-  "name": "@gaboai/pi",
+  "name": "@gabo-ai/pi",
   "version": "0.2.2",
   "description": "gabo for Pi: the gabo-pi bootstrap skill, the gabo-reviewer-config skill and the gabo extension.",
   "keywords": ["pi-package"],
