@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
 // Project-relative locations (TRD 9.4).
@@ -55,7 +57,8 @@ func NewUseCase(store Store, files []File, s Settings) *UseCase {
 
 // Run copies the catalog on a fresh project and refreshes it when the stamp
 // is older or missing; it never touches the config and never moves the
-// catalog to an older version.
+// catalog to an older version. Every successful path then runs the engine
+// step (intent 0006 S10).
 func (u *UseCase) Run(context.Context) (Output, error) {
 	bin, ok := parseVersion(strings.TrimPrefix(u.s.Version, "v"))
 	if !ok {
@@ -76,6 +79,7 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 		}
 		lines := []string{
 			"catalog copied to " + CatalogDir + " (" + bin.String() + ")",
+			noConfigLine,
 			"next: open your agent in this project and paste this prompt",
 		}
 		if u.s.SetupPrompt != "" {
@@ -84,7 +88,7 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 		}
 		return Output{Lines: lines}, nil
 	case hasStamp && cur.compare(bin) == 0:
-		return Output{Lines: []string{"catalog is current (" + bin.String() + "); nothing changed"}}, nil
+		return u.withEngines([]string{"catalog is current (" + bin.String() + "); nothing changed"}, hasConfig, bin)
 	case hasStamp && cur.compare(bin) > 0:
 		return Output{}, fmt.Errorf("catalog version %s is newer than gabo %s; upgrade with: go install %s@v%s",
 			cur, bin, installPath, cur)
@@ -96,10 +100,36 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 	if err := u.copyCatalog(bin); err != nil {
 		return Output{}, err
 	}
-	return Output{Lines: []string{
+	return u.withEngines([]string{
 		"catalog updated " + old + " → " + bin.String(),
 		"next: ask your agent to rebuild the agents, then run gabo check",
-	}}, nil
+	}, hasConfig, bin)
+}
+
+// withEngines ends a successful catalog step with the engine step (intent
+// 0006 S10): with a gabo.yaml the engine set from it is integrated and its
+// report closes the output; without one (only the fresh project prints the
+// no-gabo.yaml line) nothing is added. gabo.yaml is only read. A ✗ line
+// returns ErrEngineFailures after the report.
+func (u *UseCase) withEngines(lines []string, hasConfig bool, bin version) (Output, error) {
+	if !hasConfig {
+		return Output{Lines: lines}, nil
+	}
+	b, err := u.store.ReadFile(u.path(ConfigFile))
+	if err != nil {
+		return Output{Lines: lines}, fmt.Errorf("read %s: %w", ConfigFile, err)
+	}
+	set, err := engineSet(b)
+	if err != nil {
+		line := engineconfig.FailurePrefix + " " + ConfigFile + ": " + err.Error() + "; fix it and run gabo init again"
+		return Output{Lines: append(lines, line)}, ErrEngineFailures
+	}
+	report := u.engineStep(set, bin.String())
+	lines = append(lines, strings.Split(strings.TrimSuffix(report.Render(), "\n"), "\n")...)
+	if report.Failed() {
+		return Output{Lines: lines}, ErrEngineFailures
+	}
+	return Output{Lines: lines}, nil
 }
 
 // newerStamp reports the stamp and binary versions when a readable stamp is

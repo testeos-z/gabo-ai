@@ -52,7 +52,7 @@ func newUpdateCase(t *testing.T) *updateCase {
 	t.Helper()
 	signer := selfupdatetest.NewSigner(t)
 	project := t.TempDir()
-	cfg := []byte("repo:\n  name: o/r\n")
+	cfg := []byte("repo:\n  name: o/r\nruntimes:\n  coder: opencode\n  reviewer: opencode\n  assistant: opencode\n")
 	if err := os.WriteFile(filepath.Join(project, "gabo.yaml"), cfg, 0o644); err != nil {
 		t.Fatal(err)
 	}
