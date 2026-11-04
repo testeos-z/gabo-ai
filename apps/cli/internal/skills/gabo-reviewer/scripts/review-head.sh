@@ -15,9 +15,10 @@
 #    variable named in review.check_env (base gabo.yaml) is passed from the
 #    reviewer's own environment; one unset or empty fails the checks before
 #    any runs. The worktree is removed when the run ends.
-# 4. Reviews the PR diff with the runtimes.reviewer engine (Claude Code, Pi
-#    or Codex), read-only, in the head checkout. A codex or opencode engine
-#    needs its isolation test pass marker; opencode has no review step yet.
+# 4. Reviews the PR diff with the runtimes.reviewer engine (Claude Code, Pi,
+#    Codex or OpenCode), read-only: in the head checkout, or for OpenCode from
+#    a reviewer-owned directory outside it. A codex or opencode engine needs
+#    its isolation test pass marker.
 # 5. Posts one comment (first line: the verdict; last lines: the marker that
 #    signs the head and the footer), sets reviewer/tests and reviewer/review,
 #    and on a clean head runs merge-head.sh.
@@ -33,8 +34,6 @@ if ! is_number "$pr"; then
 fi
 problem="$(validate_config)"
 [[ -n "$problem" ]] || problem="$(engine_problem)"
-[[ -n "$problem" || "$ENGINE" != opencode ]] ||
-  problem="runtimes.reviewer opencode has no review step in these scripts yet (intent 0004); pick claude, codex or pi"
 if [[ -n "$problem" ]]; then
   echo "PREFLIGHT-FAILED $problem" >&2
   exit 2
@@ -370,8 +369,85 @@ review_log="$logs/review.log"
 prompt_file="$logs/prompt.md"
 agent_prompt >"$prompt_file"
 review_env=(env -i "PATH=$PATH" NO_COLOR=1 TERM=dumb)
+review_cwd="$wt"
+review_stdin="$prompt_file"
 codex_last="$logs/codex-last-message.md"
-if [[ "$ENGINE" == codex ]]; then
+if [[ "$ENGINE" == opencode ]]; then
+  # The flags of the isolation test the engine passed (gabo-reviewer-config,
+  # intent 0001 S10): `opencode run --standalone` with a HOME of the
+  # reviewer's own and XDG_* dirs of its own per PR (env -i), so no GitHub
+  # token and none of the owner's OpenCode config, agents or plugins reach it,
+  # and parallel reviews of other PRs share no config, data, state or cache;
+  # the data dir holds only a link to the owner's login. OpenCode loads
+  # opencode.json and .opencode/ from its working directory and every
+  # directory above it up to the git worktree root, so the run starts in an
+  # empty reviewer-owned directory outside the checkout that is a git
+  # repository of its own with one empty commit: neither the PR's
+  # opencode.json, .opencode/agents and .opencode/plugins nor any
+  # opencode.json or .opencode/ above the state dir (by default in the
+  # owner's home) is loaded. The reviewer-owned config holds one read-only
+  # agent: edit denied, shell (key `bash` in the documented schema, `shell`
+  # in v2; both are written) limited to git diff/log/show/status, plain or as
+  # `git -C <checkout>`, without --output, --ext-diff, --textconv or
+  # `diff --no-index`, and only the checkout readable outside the run
+  # directory. The prompt and the diff come by --file, nothing on stdin; the
+  # final assistant text is the review.
+  engine_name="OpenCode"
+  engine_model="$OPENCODE_MODEL"
+  engine_env || { log_event "RETRY" "#$pr $sha cannot create $REVIEW_HOME"; exit 1; }
+  oc_home="$REVIEW_HOME/opencode/pr-$pr"
+  review_env=()
+  for e in "${ENGINE_ENV[@]}"; do
+    case "$e" in
+      XDG_CONFIG_HOME=*) e="XDG_CONFIG_HOME=$oc_home/config" ;;
+      XDG_DATA_HOME=*) e="XDG_DATA_HOME=$oc_home/data" ;;
+      XDG_STATE_HOME=*) e="XDG_STATE_HOME=$oc_home/state" ;;
+      XDG_CACHE_HOME=*) e="XDG_CACHE_HOME=$oc_home/cache" ;;
+    esac
+    review_env+=("$e")
+  done
+  review_cwd="$OPENCODE_RUN_DIR/pr-$pr"
+  review_stdin=/dev/null
+  opencode_auth="${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json"
+  if ! rm -rf -- "$review_cwd" "$oc_home" ||
+    ! mkdir -p "$review_cwd" "$oc_home/config/opencode" "$oc_home/data/opencode" "$oc_home/state" "$oc_home/cache" ||
+    ! env -i "PATH=$PATH" "HOME=$REVIEW_HOME" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      git -C "$review_cwd" init -q ||
+    ! env -i "PATH=$PATH" "HOME=$REVIEW_HOME" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      git -C "$review_cwd" -c user.name=gabo-reviewer -c user.email=gabo-reviewer@localhost -c commit.gpgsign=false \
+      -c core.hooksPath=/dev/null commit -q --allow-empty --no-verify -m "gabo-reviewer run root"; then
+    log_event "RETRY" "#$pr $sha cannot create the OpenCode run directory $review_cwd"
+    exit 1
+  fi
+  if [[ -f "$opencode_auth" ]]; then
+    ln -sfn -- "$opencode_auth" "$oc_home/data/opencode/auth.json"
+  fi
+  jq -n --arg wt "$wt" '
+    (["git diff", "git log", "git show", "git status"]
+      | [.[], (.[] | sub("^git "; "git -C \($wt) "))]) as $git
+    | ({"*": "deny"} + ([$git[] | {(.): "allow", (. + " *"): "allow"}] | add)
+      + ([$git[] as $c | ("--output", "--ext-diff", "--textconv") | {("\($c) *\(.)*"): "deny"}] | add)
+      + ([$git[] | select(endswith(" diff")) | {(. + " *--no-index*"): "deny"}] | add)) as $shell
+    | { edit: "deny", write: "deny", patch: "deny", webfetch: "deny", websearch: "deny", task: "deny", skill: "deny",
+      shell: $shell, bash: $shell,
+      external_directory: {"*": "deny", ($wt + "/**"): "allow"} } as $p
+    | { "$schema": "https://opencode.ai/config.json", autoupdate: false, share: "disabled", plugin: [], mcp: {},
+        permission: $p,
+        agent: { "gabo-review": { mode: "primary", description: "gabo-reviewer: read-only review of one pull request", permission: $p } } }' \
+    >"$oc_home/config/opencode/opencode.json" ||
+    { log_event "RETRY" "#$pr $sha cannot write the OpenCode reviewer config"; exit 1; }
+  cat >>"$prompt_file" <<CHECKOUT
+
+The checkout of head $sha is at $wt. Your shell starts outside it, in an
+empty directory. Read files in the checkout for context, and run only
+git diff, git log, git show or git status there, as \`git -C $wt diff ...\`
+(or with the checkout as the shell tool's working directory); no other
+command is allowed, git diff --no-index is denied and you cannot change files.
+CHECKOUT
+  engine_cmd=("$OPENCODE" run --standalone --format json --agent gabo-review --file "$prompt_file")
+  [[ -z "$OPENCODE_MODEL" ]] || engine_cmd+=(-m "$OPENCODE_MODEL")
+  engine_cmd+=("Follow the gabo-reviewer instructions in the attached file and answer with the review comment only.")
+elif [[ "$ENGINE" == codex ]]; then
   # The flags of the isolation test the engine passed (gabo-reviewer-config,
   # intent 0001 S10): --ignore-user-config skips config.toml in CODEX_HOME,
   # --ignore-rules the user and project execpolicy rules, -s read-only keeps
@@ -454,13 +530,21 @@ else
 fi
 before="$(git -C "$wt" status --porcelain 2>/dev/null)"
 code=0
-(cd "$wt" && RUN_STDIN="$prompt_file" run_bounded $((REVIEW_TIMEOUT + 5)) "$review_log" \
+(cd "$review_cwd" && RUN_STDIN="$review_stdin" run_bounded $((REVIEW_TIMEOUT + 5)) "$review_log" \
   "${review_env[@]}" "${engine_cmd[@]}") || code=$?
 after="$(git -C "$wt" status --porcelain 2>/dev/null)"
 # One result object for every engine: Claude's final "result" record, a
 # result built from Pi's last assistant message (stopReason "stop" is
-# success), or Codex's final message (its exit code tells success).
-if [[ "$ENGINE" == codex ]]; then
+# success), Codex's final message (its exit code tells success), or the text
+# of OpenCode's last assistant message with text (an "error" event fails it).
+if [[ "$ENGINE" == opencode ]]; then
+  result="$(jq -Rn '[inputs | fromjson? | select(type == "object")] as $e
+    | [$e[] | select(.type == "text" and (.part.text? | type) == "string")] as $t
+    | ($t | last | .part.messageID?) as $m
+    | ([$e[] | select(.type == "error")] | length > 0) as $err
+    | {type: "result", is_error: $err, subtype: (if $err then "error" else "success" end),
+      result: ([$t[] | select(.part.messageID? == $m) | .part.text] | join(""))}' "$review_log" 2>/dev/null)"
+elif [[ "$ENGINE" == codex ]]; then
   result=""
   if [[ -s "$codex_last" ]]; then
     result="$(jq -Rsc --argjson e "$([[ $code == 0 ]] && echo false || echo true)" \
@@ -526,7 +610,7 @@ body="$logs/comment.md"
     echo "$VERDICT_BLOCKING"
   fi
   echo
-  echo "Independent review of head \`$sha\` by gabo-reviewer: checks on the merge result \`$merge_sha\` (\`$BASE_BRANCH\` at \`$base_sha\`), then a $engine_name review${engine_model:+ (\`$engine_model\`)}."
+  echo "Independent review of head \`$sha\` by gabo-reviewer: checks on the merge result \`$merge_sha\` (\`$BASE_BRANCH\` at \`$base_sha\`), then $([[ "$engine_name" == OpenCode ]] && echo an || echo a) $engine_name review${engine_model:+ (\`$engine_model\`)}."
   echo
   echo "### Checks ($TESTS_CONTEXT: $tests_state)"
   echo

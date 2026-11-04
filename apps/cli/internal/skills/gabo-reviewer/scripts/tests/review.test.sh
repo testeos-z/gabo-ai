@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # End-to-end tests of one review: reviewer.sh head -> review-head.sh ->
-# merge-head.sh, offline with fake gh, claude, pi, codex, go and gabo, and a local bare
+# merge-head.sh, offline with fake gh, claude, pi, codex, opencode, go and gabo, and a local bare
 # repository standing in for GitHub.
 # Run: bash tests/review.test.sh
 set -uo pipefail
@@ -294,13 +294,121 @@ expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario co
 check "the refusal names the missing isolation test" grep -qF 'isolation-test.sh codex' "$work/codex_unmarked/out.log"
 check "nothing runs without the isolation pass" bash -c "! grep -qE '^(codex|go-argc)' '$work/codex_unmarked/calls.log'"
 
-echo "# opencode reviewer has no review step yet"
-origin opencode O_REVIEWER=opencode
+echo "# opencode reviewer (runtimes.reviewer: opencode)"
+origin opencode O_REVIEWER=opencode O_AUTO_MERGE=true O_PR=opencode
 echo "1.0.0" >"$fake_home/.config/gabo/reviewer-isolation/opencode"
-expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario opencode REVIEWER_OPENCODE="$work/bin/opencode")" \
-  "an opencode reviewer is refused before any review"
-check "the refusal says opencode has no review step" grep -qF 'runtimes.reviewer opencode has no review step' "$work/opencode/out.log"
-check "neither checks nor an engine run for opencode" bash -c "! grep -qE '^(claude|codex|opencode|go-argc)' '$work/opencode/calls.log'"
+# The owner's OpenCode login, linked into the reviewer-owned home.
+mkdir -p "$fake_home/.local/share/opencode"
+echo '{"openai": {"type": "oauth"}}' >"$fake_home/.local/share/opencode/auth.json"
+oc() { scenario "$1" REVIEWER_OPENCODE="$work/bin/opencode" "${@:2}"; }
+v="$(oc opencode_clean)"
+ox="$work/opencode_clean"
+owt="$ox/state/worktrees/pr-7"
+oxh="$ox/state/review-home/opencode/pr-7"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" \
+  "a clean OpenCode review ends with the same VERDICT line and merges"
+expect_eq "No blocking issues found." "$(first_line opencode_clean)" "the OpenCode comment opens with the clean verdict"
+expect_eq "<!-- gbai-reviewer-bot sha=$HEAD_SHA -->|🤖 gabo reviewer" "$(footer opencode_clean)" "the OpenCode comment ends with the marker and the footer"
+check "the final assistant text is the review" grep -qF 'All files comply.' "$ox/posted_7.md"
+check "earlier assistant text is not the review" bash -c "! grep -qF 'Reading the diff.' '$ox/posted_7.md'"
+check "the OpenCode comment names the engine" grep -qF 'then an OpenCode review' "$ox/posted_7.md"
+expect_match '^reviewer/review success opencode: no blocking issues found' "$(status_line opencode_clean reviewer/review)" \
+  "the review status names the opencode engine"
+check "claude never runs for an OpenCode reviewer" bash -c "! grep -q '^claude ' '$ox/calls.log'"
+run_line="$(grep -E '^opencode run ' "$ox/calls.log" | head -n 1)"
+expect_match '^opencode run --standalone --format json --agent gabo-review --file [^ ]+/prompt\.md ' "$run_line" \
+  "the agent review runs opencode run --standalone --format json with the prompt and diff by --file"
+check "the run is outside the checkout" bash -c "! grep -qE ' cwd=$owt(/|$)' <<<\"\$1\"" _ "$run_line"
+check "the attached file is outside the checkout" bash -c "! grep -qE -- '--file $owt/' <<<\"\$1\"" _ "$run_line"
+expect_eq "opencode-project=none" "$(grep '^opencode-project=' "$ox/calls.log")" \
+  "the PR's opencode.json, .opencode/agents/ and .opencode/plugins/x.js are not passed to the run"
+check "the OpenCode prompt carries the PR diff" grep -q 'func main' "$ox/prompt_seen.txt"
+check "the OpenCode prompt names the checkout to read" grep -qF "$owt" "$ox/prompt_seen.txt"
+check "the OpenCode prompt names git -C <checkout>" grep -qF "git -C $owt diff" "$ox/prompt_seen.txt"
+expect_eq "" "$(cat "$ox/stdin_seen.txt")" "nothing is passed on stdin"
+check "the OpenCode review gets no GitHub or Claude token and reviewer-owned HOME and XDG dirs" grep -qxF \
+  "opencode-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset HOME=$ox/state/review-home XDG_CONFIG_HOME=$oxh/config XDG_DATA_HOME=$oxh/data XDG_STATE_HOME=$oxh/state XDG_CACHE_HOME=$oxh/cache" \
+  "$ox/calls.log"
+expect_eq "opencode-vars HOME,NO_COLOR,PATH,TERM,XDG_CACHE_HOME,XDG_CONFIG_HOME,XDG_DATA_HOME,XDG_STATE_HOME" \
+  "$(grep '^opencode-vars ' "$ox/calls.log")" "the OpenCode review runs in an env -i environment"
+expect_eq "opencode-files auth=yes" "$(grep '^opencode-files ' "$ox/calls.log")" "the reviewer-owned home holds the owner's OpenCode login"
+check "the login is linked, never copied" test -L "$oxh/data/opencode/auth.json"
+cfg="$ox/opencode_config.json"
+for scope in '.permission' '.agent["gabo-review"].permission'; do
+  expect_eq "deny deny deny" "$(jq -r "$scope | \"\(.edit) \(.write) \(.patch)\"" "$cfg" 2>/dev/null)" \
+    "the reviewer-owned config denies edit, write and patch ($scope)"
+  for key in shell bash; do
+    rules="$(jq -r "$scope.$key | to_entries | map(\"\(.key)=\(.value)\") | sort | join(\",\")" "$cfg" 2>/dev/null)"
+    allowed=""
+    for g in git "git -C $owt"; do
+      for c in diff log show status; do allowed+=",$g $c *=allow,$g $c=allow"; done
+    done
+    expect_eq "*=deny$(tr ',' '\n' <<<"${allowed#,}" | LC_ALL=C sort | sed 's/^/,/' | tr -d '\n')" \
+      "$(tr ',' '\n' <<<"$rules" | grep -v '=deny$' | sed '1i *=deny' | paste -sd, -)" \
+      "$key is limited to git diff, git log, git show and git status, also as git -C <checkout> ($scope)"
+    for g in git "git -C $owt"; do
+      for c in diff log show status; do
+        for o in --output --ext-diff --textconv; do
+          check "$key denies $g $c $o ($scope)" grep -qxF "$g $c *$o*=deny" <<<"$(tr ',' '\n' <<<"$rules")"
+        done
+      done
+      check "$key denies $g diff --no-index ($scope)" grep -qxF "$g diff *--no-index*=deny" <<<"$(tr ',' '\n' <<<"$rules")"
+    done
+    expect_eq true "$(jq "$scope.$key | [to_entries[1:][] | .value] | to_entries
+      | ([.[] | select(.value == \"allow\") | .key] | max) < ([.[] | select(.value == \"deny\") | .key] | min)" "$cfg")" \
+      "the $key denies come after the allows ($scope)"
+  done
+  expect_eq "*=deny,$owt/**=allow" \
+    "$(jq -r "$scope.external_directory | to_entries | map(\"\(.key)=\(.value)\") | sort | join(\",\")" "$cfg" 2>/dev/null)" \
+    "only the checkout is readable outside the run directory ($scope)"
+done
+expect_eq primary "$(jq -r '.agent["gabo-review"].mode' "$cfg" 2>/dev/null)" "the config holds one read-only primary agent"
+expect_eq '["gabo-review"]' "$(jq -c '.agent | keys' "$cfg" 2>/dev/null)" "the config holds exactly one agent"
+expect_eq "" "$(git -C "$owt" status --porcelain)" "git status of the checkout is unchanged"
+gates="$(grep -nE '^go-argc=' "$ox/calls.log" | tail -n 1 | cut -d: -f1)"
+review="$(grep -nE '^opencode run ' "$ox/calls.log" | head -n 1 | cut -d: -f1)"
+check "the deterministic gates run before the agent review" test "${gates:-999999}" -lt "${review:-0}"
+expect_eq 3 "$(grep -c '^go-argc=' "$ox/calls.log")" "the OpenCode review still runs the three checks"
+expect_eq 1 "$(grep -c 'gbai-reviewer-bot sha=' "$ox/all_posted_7.md")" "one OpenCode verdict comment per head"
+# The owner's opencode.json and .opencode/ in a parent of the state dir (the
+# default state dir sits in the owner's home) stay out: the run directory is
+# a git repository of its own, where OpenCode's upward config search stops.
+op="$work/opencode_parent_config"
+mkdir -p "$op/.opencode/agents"
+echo '{"permission": {"bash": "allow"}}' >"$op/opencode.json"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$(oc opencode_parent_config)" \
+  "an OpenCode review with OpenCode config above the state dir still runs"
+expect_eq "opencode-project=none" "$(grep '^opencode-project=' "$op/calls.log")" \
+  "opencode.json and .opencode/ above the state dir are not loaded"
+check "the run directory is the root of a git repository with a commit" \
+  git -C "$op/state/opencode-run/pr-7" rev-parse --verify -q HEAD
+expect_eq "$op/state/opencode-run/pr-7" "$(git -C "$op/state/opencode-run/pr-7" rev-parse --show-toplevel)" \
+  "the git root of the run is the run directory"
+check "without REVIEWER_OPENCODE_MODEL the owner's default model is used" bash -c "! grep -qE '^opencode run .* -m ' '$ox/calls.log'"
+oc opencode_model REVIEWER_OPENCODE_MODEL=openai/gpt-5.5 >/dev/null
+check "REVIEWER_OPENCODE_MODEL picks the OpenCode model" grep -qE '^opencode run .* -m openai/gpt-5.5 ' "$work/opencode_model/calls.log"
+check "the comment names the OpenCode model" grep -qF 'then an OpenCode review (`openai/gpt-5.5`).' "$work/opencode_model/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(oc opencode_fail OPENCODE_MODE=fail)" "blocking OpenCode findings are blocking"
+check "the OpenCode findings are posted" grep -qF 'nil dereference' "$work/opencode_fail/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_error OPENCODE_MODE=error)" "an OpenCode run that fails is an error"
+expect_match 'opencode exit 1' "$(status_line opencode_error reviewer/review)" "the error status names the opencode engine"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_silent OPENCODE_MODE=silent)" \
+  "an OpenCode run without assistant text is an error"
+expect_match 'no verdict line in the opencode output' "$(status_line opencode_silent reviewer/review)" "the missing review text is reported"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_error0 OPENCODE_MODE=error0)" \
+  "an OpenCode error event with exit 0 is an error"
+expect_match 'the opencode run reported an error' "$(status_line opencode_error0 reviewer/review)" "the error event is reported"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_crash OPENCODE_MODE=crash)" \
+  "an OpenCode exit 1 without an error event is an error, even with a verdict line"
+expect_match 'opencode exit 1' "$(status_line opencode_crash reviewer/review)" "the exit code is reported"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario opencode_missing REVIEWER_OPENCODE=gabo-test-no-opencode)" \
+  "opencode missing from PATH is an error"
+check "the refusal names REVIEWER_OPENCODE" grep -qF 'no opencode binary (REVIEWER_OPENCODE=gabo-test-no-opencode)' "$work/opencode_missing/out.log"
+check "nothing runs without opencode" bash -c "! grep -qE '^(opencode|go-argc)' '$work/opencode_missing/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_unmarked XDG_CONFIG_HOME="$work/no-marker")" \
+  "an OpenCode reviewer without an isolation pass marker never reviews"
+check "the refusal names the missing isolation test" grep -qF 'isolation-test.sh opencode' "$work/opencode_unmarked/out.log"
+check "nothing runs without the isolation pass" bash -c "! grep -qE '^(opencode run|go-argc)' '$work/opencode_unmarked/calls.log'"
 rm -f "$fake_home/.config/gabo/reviewer-isolation/opencode"
 
 echo "# base version minimum"
