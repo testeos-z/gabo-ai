@@ -64,6 +64,52 @@ go -C apps/cli install -ldflags "-X main.buildVersion=<x.y.z>" ./cmd/gabo
 
 Check the install with `gabo version`.
 
+### Claude Code plugin
+
+The repository is its own Claude Code marketplace, `gabo-ai`, with one plugin, `gabo`. The plugin adds the gabo catalog skills (except the skills that run reviews) and two hooks that run `gabo check` around Claude's writes in a gabo project.
+
+```sh
+claude plugin marketplace add testeos-z/gabo-ai
+claude plugin install gabo@gabo-ai
+```
+
+- **Private repository.** While `testeos-z/gabo-ai` is private, Claude Code clones it with your own git credentials. Set them up first: run `gh auth setup-git`, or add an SSH key that can read the repository.
+- **The `checks` option.** On by default. Before Claude writes or edits a gabo file (`gabo.yaml`, `.gabo/`, `.claude/agents/`, `.claude/skills/`, `docs/product/`), `gabo check --pre-write` blocks a write that breaks the stage gate; after it, `gabo check` runs and reports failures to Claude. Both hooks do nothing outside a gabo project (no `.gabo/VERSION`) or when `gabo` is not on `PATH`. Turn them off with the plugin's `checks` row in `/config`.
+- **`gabo init` stays required.** The plugin does not configure a project. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see [Quick start](#quick-start)).
+
+See [`plugins/claude-code/README.md`](plugins/claude-code/README.md) for the plugin layout, the open owner decisions and the release checklist.
+
+### Codex plugin
+
+The repository is also a Codex marketplace, `gabo-ai` ([`.agents/plugins/marketplace.json`](.agents/plugins/marketplace.json)), with one plugin, `gabo`. It ships the same skills as the Claude Code plugin and two hooks that run `gabo check` around Codex's `apply_patch` edits in a gabo project. These steps are for the Codex CLI.
+
+```sh
+codex plugin marketplace add testeos-z/gabo-ai
+codex plugin add gabo@gabo-ai
+```
+
+- **Private repository.** While `testeos-z/gabo-ai` is private, Codex clones it with your own git credentials. Set them up first: run `gh auth setup-git`, or add an SSH key that can read the repository.
+- **Trust the hooks.** Codex runs a plugin hook only after you trust it. In a Codex session, open `/hooks` and trust both gabo hooks: the `PreToolUse` hook denies a patch to a gabo file that breaks the stage gate (`gabo check --pre-write`), and the `PostToolUse` hook runs `gabo check` after the patch and returns its failures to Codex. A hook that changes in an update stays off until you trust it again. Both hooks do nothing outside a gabo project (no `.gabo/VERSION`) or when `gabo` is not on `PATH`. To turn them off, leave them untrusted.
+- **Update.** Run `codex plugin marketplace upgrade gabo-ai`. Codex caches the plugin per version, so you get a new plugin when a CLI release bumps its version; then check `/hooks` again.
+- **`gabo init` stays required.** The plugin does not configure a project and builds no agents. Run `gabo init` and the setup prompt (see [Quick start](#quick-start)) with `runtimes.coder: codex`: the `gabo-runtime-codex` skill builds the agents as `.codex/agents/<id>.toml` and links the skills under `.agents/skills/`.
+
+See [`plugins/codex/README.md`](plugins/codex/README.md) for the plugin layout, how its skill and script copies stay equal to their sources, and the release checklist.
+
+### Pi package
+
+The Pi package `@testeos-z/gabo-pi` ([`packages/pi/`](packages/pi/)) ships the `gabo-pi` and `gabo-reviewer-config` skills and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` calls in a gabo project.
+
+```sh
+pi install npm:@testeos-z/gabo-pi@<version>
+```
+
+Use the gabo CLI version as `<version>`. Before the package is on npm, install it from a checkout with `pi install /path/to/gabo-ai/packages/pi`. Check it with `pi list`.
+
+- **`gabo init` and `gabo-runtime-pi` stay required.** The package writes no project file and builds no agents; with `runtimes.coder: pi`, `gabo-runtime-pi` builds them in `.pi/agents/`.
+- **It is not a subagent package.** gabo on Pi still needs one, such as gentle-pi; without it the extension warns at session start and blocks writes under `.pi/agents/`.
+
+See [`packages/pi/README.md`](packages/pi/README.md) for the package layout and coexistence rules, and [`packages/pi/VERIFY.md`](packages/pi/VERIFY.md) for the manual verification run before each release.
+
 ### Install with curl (planned)
 
 > **Not available yet.** A one-line install script is planned but does not exist. Use one of the methods above.

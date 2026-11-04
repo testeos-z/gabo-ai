@@ -8,7 +8,7 @@ src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 failures=0
 passes=0
 export REVIEWER_ENV_FILE="/nonexistent/gabo-reviewer-test-env"
-unset GH_TOKEN REVIEWER_GH_TOKEN CLAUDE_CODE_OAUTH_TOKEN GABO_REVIEWER_STATE_DIR XDG_DATA_HOME XDG_STATE_HOME SUDO_USER \
+unset GH_TOKEN REVIEWER_GH_TOKEN CLAUDE_CODE_OAUTH_TOKEN GABO_REVIEWER_STATE_DIR XDG_DATA_HOME XDG_STATE_HOME XDG_CONFIG_HOME CODEX_HOME CODEX_API_KEY OPENAI_API_KEY SUDO_USER \
   GABO_UPGRADE_PR
 # Repository-level settings come from the fixture's gabo.yaml, never from the
 # environment of whoever runs the tests.

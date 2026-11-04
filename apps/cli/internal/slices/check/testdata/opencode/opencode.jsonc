@@ -1,0 +1,9 @@
+// Project OpenCode config: other keys stay as the owner wrote them.
+{
+  "$schema": "https://opencode.ai/config.json",
+  /* gabo writes only this key (spec 0004 S8) */
+  "experimental": {
+    "subagent_depth": 3, // assistant -> cycle -> coder -> test runner
+  },
+  "theme": "a // not a comment /* nor this */",
+}

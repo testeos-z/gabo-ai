@@ -101,6 +101,13 @@ func link(t *testing.T, target, name string) {
 // runCheck runs `gabo check` in project with a temporary user config dir.
 func runCheck(t *testing.T, project, version string, args ...string) (string, error) {
 	t.Helper()
+	return runCheckStdin(t, project, version, "", args...)
+}
+
+// runCheckStdin runs `gabo check args...` like runCheck with stdin as its
+// standard input.
+func runCheckStdin(t *testing.T, project, version, stdin string, args ...string) (string, error) {
+	t.Helper()
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 	t.Setenv("GABO_UPGRADE_PR", "")
 	t.Chdir(project)
@@ -108,6 +115,7 @@ func runCheck(t *testing.T, project, version string, args ...string) (string, er
 	root := newRootCommand(deps{version: version})
 	root.SetOut(&out)
 	root.SetErr(&out)
+	root.SetIn(strings.NewReader(stdin))
 	root.SetArgs(append([]string{"check"}, args...))
 	err := root.Execute()
 	return out.String(), err

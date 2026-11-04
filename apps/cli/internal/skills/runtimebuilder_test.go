@@ -40,14 +40,14 @@ func TestRuntimeBuilderResearchesVerifiedSources(t *testing.T) {
 }
 
 // An engine without subagents and skills, or an equivalent, is refused with
-// the UX_UI section 4 message, and the engine is never installed or configured.
+// the UX_UI section 4 message, and the engine is never installed or upgraded.
 func TestRuntimeBuilderRefusesUnsupportedEngines(t *testing.T) {
 	t.Parallel()
 	mustContain(t, runtimeBuilderDoc(t),
 		"✗ cannot add a runtime for <engine>",
 		"why: it has no subagent and skill support, or an equivalent",
 		"next: use Claude Code, Pi or another engine with subagents and skills",
-		"Never install, upgrade or configure the engine",
+		"Never install or upgrade the engine",
 	)
 }
 
@@ -111,4 +111,45 @@ func TestRuntimeBuilderNamesTheRuntimeSkillShape(t *testing.T) {
 			t.Errorf("## Runtime Skill Shape: does not say how to fill {{%s}}", s)
 		}
 	}
+}
+
+// engineConfigRule is the narrowed engine-config rule every runtime skill
+// carries (intent 0004 S8, D7, section 5): gabo writes only the engine keys it
+// needs to operate, at project level only, merged, reported and verified by
+// gabo check, and never the user's global engine config.
+var engineConfigRule = []string{
+	"gabo writes only the engine keys it needs to operate",
+	"at project level only",
+	"merged with the existing project config",
+	"reports what it wrote",
+	"verified by `gabo check`",
+	"never the user's global engine config",
+}
+
+// assertEngineConfigRule checks that doc carries the narrowed rule and none
+// of the retired blanket bans.
+func assertEngineConfigRule(t *testing.T, name, doc string, retired ...string) {
+	t.Helper()
+	for _, s := range engineConfigRule {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", name, s)
+		}
+	}
+	for _, s := range retired {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: still carries the retired rule %q", name, s)
+		}
+	}
+}
+
+// The builder's engine-config rule is narrowed (intent 0004 S8, D7): no
+// install or upgrade, only the project-level keys gabo needs to operate.
+func TestRuntimeBuilderNarrowsTheEngineConfigRule(t *testing.T) {
+	t.Parallel()
+	doc := runtimeBuilderDoc(t)
+	assertEngineConfigRule(t, runtimeBuilder, doc,
+		"Never edit the engine's own config files, project or global",
+		"Never install, upgrade or configure the engine",
+	)
+	mustContain(t, doc, "Never install or upgrade the engine")
 }

@@ -6,6 +6,8 @@
 // (agents.yaml) with one body template per agent under agents/ (TRD D24).
 // gabo-reviewer-config holds the codex and opencode isolation-test script and
 // its shell test under scripts/ (intent 0001 plan T5).
+// gabo-runtime-opencode holds the OpenCode stage-gate plugin under plugins/
+// (intent 0004 plan T6).
 package skills
 
 import (
@@ -21,6 +23,7 @@ import (
 
 //go:embed */SKILL.md */examples/*.md */templates/*.md
 //go:embed gabo-agent-templates/agents.yaml gabo-agent-templates/agents/*.md
+//go:embed gabo-runtime-opencode/plugins/*.js
 //go:embed gabo-reviewer-config/scripts/*.sh gabo-reviewer-config/scripts/tests/*.sh
 //go:embed gabo-reviewer/README.md gabo-reviewer/scripts/*.sh gabo-reviewer/scripts/config.env gabo-reviewer/scripts/tests/*.sh
 var content embed.FS

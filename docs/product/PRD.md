@@ -94,11 +94,11 @@ The global flows live in the [app flow](APP_FLOW.md) and `docs/product/diagrams/
 
 ## 5. Appetite
 
-The first release is scoped to one supported tracker (GitHub issues), the local reviewer, the Claude Code and Pi runtimes, and manual and auto modes. There is no fixed wave budget: the release takes as many waves as its scope needs. Claude Code and Pi are shipped and tested as runtime skills (R34); the user's agent can add another engine through the runtime builder (R35) without a gabo-ai release.
+The first release is scoped to one supported tracker (GitHub issues), the local reviewer, the Claude Code, Pi and OpenCode runtimes (OpenCode amended (owner 2026-11-03, [intent 0004](intents/0004-opencode-runtime/spec.md) S12)), and manual and auto modes. There is no fixed wave budget: the release takes as many waves as its scope needs. Claude Code, Pi and OpenCode are shipped and tested as runtime skills (R34; OpenCode per intent 0004); the user's agent can add another engine through the runtime builder (R35) without a gabo-ai release.
 
 ## 6. Assumptions and dependencies
 
-- **Agent runtimes.** Agents run on Claude Code and Pi. Pi core has no subagents, so a Pi target needs a subagent package; gentle-pi is recommended and setup offers to install it. Any engine is usable only when it supports subagents and skills, or an equivalent.
+- **Agent runtimes.** Agents run on Claude Code, Pi and OpenCode (OpenCode amended (owner 2026-11-03, [intent 0004](intents/0004-opencode-runtime/spec.md) S12)). Pi core has no subagents, so a Pi target needs a subagent package; gentle-pi is recommended and setup offers to install it. Any engine is usable only when it supports subagents and skills, or an equivalent.
 - **Runtime builder access.** The runtime builder needs web access or a documentation MCP; without them it asks the user for documentation links (R35).
 - **Direct sessions.** Direct sessions and the single assistant terminal depend on Orca in the first release (R14, R18).
 - **Tracker.** The team's tracker is reachable through an adapter; GitHub issues in the first release (R11). It holds the product cards, their intents' tasks and the dependencies between them.
@@ -166,7 +166,7 @@ Conceptual only. Type: F functional, Q quality, C constraint. The ids are stable
 | R28 | Q | A new team reaches its first wave quickly after install; the time is measured (initial target: one working session). | Setup pays off fast. | should |
 | R29 | Q | Every wave produces a report: interactions and reasons, decisions, questions with resolver, cleanup leftovers. | The owner sees what happened without asking. | should |
 | R30 | Q | Every auto-mode decision is queryable with its reason, wave and task. | Full accountability for auto mode. | should |
-| R31 | C | The gabo CLI offers only `gabo init`, `gabo check`, `gabo version` and `gabo prompt`; agents do everything else with skills. | A small, universal tool with little to learn. | must |
+| R31 | C | The gabo CLI offers only `gabo init`, `gabo check`, `gabo version` and `gabo prompt`; agents do everything else with skills. `gabo check` has one additive hook mode, `gabo check --pre-write <path>...` (intent 0001 S11), that the engines' pre-write hooks call to block writing an intent's `plan.md` before its spec is accepted: exit 0 silent when every write passes, 1 with one `✗ <path>: <reason>` line per blocked path (fail closed), 2 on a usage error; `gabo check` without the flag keeps its output and exit codes (TRD 9.4). | A small, universal tool with little to learn. | must |
 | R32 | F | `gabo init` sets up or refreshes the copied skill catalog and its version stamp, installs the user-level reviewer skill and prints the setup prompt; it never touches the config. | One safe command to start or upgrade a project. | must |
 | R33 | F | `gabo check` validates the project read-only and independent of the engine: config schemas, agents of the neutral spec, slot coverage, catalog stamp and agent version lines. Amended (owner 2026-11-03, per-change-sdlc): it also validates the intent folders, including that no plan exists before a human accepted its spec. | One check that agents, the reviewer and CI all trust. | must |
 | R34 | F | The user's agent builds the configuration and the agents from gabo-ai skills and fixed templates, without inventing content, then runs `gabo check`. | Any supported engine gets a working team without hand-written agent files. | must |
