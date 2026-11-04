@@ -71,3 +71,26 @@ func TestRuntimePiSkill(t *testing.T) {
 		t.Errorf("gabo-runtime-pi/SKILL.md: still calls a location unverified")
 	}
 }
+
+// The Pi skill carries the narrowed engine-config rule (intent 0004 S8, D7)
+// and keeps its no-install rule and the subagent package's own config off
+// limits.
+func TestRuntimePiNarrowsTheEngineConfigRule(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(Catalog(), "gabo-runtime-pi/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(b)
+	assertEngineConfigRule(t, "gabo-runtime-pi/SKILL.md", doc,
+		"Never edit Pi's or the subagent package's own configuration",
+	)
+	for _, s := range []string{
+		"Never run `pi install`, `pi config` or `npm i` yourself; the user installs.",
+		"`subagents.json`",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-runtime-pi/SKILL.md: missing %q", s)
+		}
+	}
+}
