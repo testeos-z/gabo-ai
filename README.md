@@ -14,8 +14,8 @@ gabo-ai gives that coordination to the agents. You keep what only you can do: va
 |---|---|
 | **Agents** | The **assistant** is your single point of contact. **Directiva** plans: the PM (PRD, each intent and its spec), the dev lead (TRD, each intent's plan and its task issues with dependencies), the DB master (data changes and the migrations log) and the frontend agent (UX and flow in the spec). **gabo-cycle** runs waves. **Coders** implement one task each in their own worktree. The **reviewer** is an independent process and the merge gate. |
 | **Slots and adapters** | Each configurable part of the system is a slot: `tasks`, `repository_host`, `memory`, `methodology`, `reviewer_placement`, `agent_host`, and optionally `notifications` and `direct_sessions`. gabo-ai ships a **contract** for each slot (what the agents must be able to do). An **adapter** is a Markdown skill or document that explains how to do it with your tool. Tool-specific behavior is never compiled code. |
-| **Runtimes** | The engine each agent role runs in (`runtimes.coder`, `runtimes.reviewer`, `runtimes.assistant`). Claude Code and Pi have shipped runtime skills. Other engines can be added with `gabo-runtime-builder` if they support subagents and skills. |
-| **Intents** | Each change is an intent in `docs/product/intents/<NNNN-slug>/`: `intent.md` states the problem, `spec.md` the requirements and acceptance criteria, and `plan.md` the tasks. A human accepts each spec before its plan is written. There is no global plan written upfront; the tracker is the global view. |
+| **Runtimes** | The engine each agent role runs in (`runtimes.coder`, `runtimes.reviewer`, `runtimes.assistant`). gabo accepts `claude` (Claude Code), `codex` (Codex), `pi` (Pi) and `opencode` (OpenCode), each with a shipped runtime skill; see [Compatibility](#compatibility). |
+| **Intents** | Each change is an intent in [`docs/product/intents/<NNNN-slug>/`](docs/product/intents/README.md) (the per-change model): `intent.md` states the problem, `spec.md` the requirements and acceptance criteria, and `plan.md` the tasks. A human accepts each spec before its plan is written. There is no global plan written upfront; the tracker is the global view. |
 | **Waves** | A wave is one intent: its unblocked tasks. The assistant starts it, gabo-cycle launches coders, each coder opens a PR, the reviewer posts a verdict, and the cycle reports back to the assistant. When the wave closes, `wave.after` decides: `next` starts the next accepted intent, `wait` (the default) stops until you ask. |
 | **Reviewer** | Runs the checks in `review.checks` on a credential-free copy of the merged tree and posts a `VERDICT` line on the PR. It never reads or writes the shared memory. Paths in `review.human_only_paths`, the catalog and the version stamp always need a human merge. |
 | **Plan change** | Mid-project changes to scope or the plan go through a plan-change proposal in its own issue and PR, touching only `docs/product` and tasks. You debate it if you are present. If you are absent, a clean-context `gabo-plan-reviewer` debates it, within the limits of `plan_change.*`: the scope is one task of an intent's plan, one whole intent, or several intents and the PRD/TRD conventions. |
@@ -37,20 +37,57 @@ For details, see the diagrams [team-flow.html](docs/product/diagrams/team-flow.h
 
 - Go, at the version named in [`apps/cli/go.mod`](apps/cli/go.mod), to install the CLI.
 - git, and a git repository for your project.
-- A coding agent engine: Claude Code or Pi. Pi has no subagents, so gabo refuses to build on Pi without a subagent package; [gentle-pi](https://www.npmjs.com/package/gentle-pi) is recommended for subagents, and the full [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) (methodology, RDD and Engram memory) is the recommended setup. See [Your engine](docs/setup-prompt.md#your-engine).
+- A coding agent engine: Claude Code, Codex, Pi or OpenCode (see [Compatibility](#compatibility)). Pi has no subagents, so gabo refuses to build on Pi without a subagent package; [gentle-pi](https://www.npmjs.com/package/gentle-pi) is recommended for subagents, and the full [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) (methodology, RDD and Engram memory) is the recommended setup. See [Your engine](docs/setup-prompt.md#your-engine).
 - Whatever tools your adapters use. For example, the GitHub adapters use the `gh` CLI.
+
+## Compatibility
+
+Status for gabo 0.2.2 (tag `apps/cli/v0.2.2`), checked against the code. **Yes** means it ships in 0.2.2; **planned** means it is designed or tracked but does not work yet.
+
+| engine | coder | assistant | reviewer | runtime skill | plugin or package | subagents | post-write hook (`gabo check`) | pre-write hook (`gabo check --pre-write`) |
+|---|---|---|---|---|---|---|---|---|
+| Claude Code | yes | yes | yes | `gabo-runtime-claude` | yes: plugin `gabo@gabo-ai` ([Claude Code plugin](#claude-code-plugin)) | built in | yes, in the plugin | yes, in the plugin |
+| Codex | yes | yes | yes, after the one-time isolation test | `gabo-runtime-codex` | yes: plugin `gabo@gabo-ai` ([Codex plugin](#codex-plugin)) | built in | yes, in the plugin | yes, in the plugin |
+| Pi | yes | yes | yes | `gabo-runtime-pi` | yes: package `@testeos-z/gabo-pi` ([Pi package](#pi-package)) | **required**: a subagent package such as gentle-pi; gabo refuses without one | no | yes, in the package extension |
+| OpenCode | yes | yes | yes, after the one-time isolation test | `gabo-runtime-opencode` | no plugin to install: the runtime skill copies the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js` into the project | built in; `gabo check` requires `experimental.subagent_depth` of 3 or more | no | yes, in the stage-gate plugin |
+| any other engine | planned | planned | planned | written by `gabo-runtime-builder` | — | required (the builder refuses an engine without subagents and skills) | — | — |
+
+- **Accepted engine names.** `gabo.yaml` and `gabo check` accept `claude`, `codex`, `pi` and `opencode` in `runtimes.coder`, `runtimes.assistant` and `runtimes.reviewer`. Any other value fails `gabo check`, so a runtime skill that `gabo-runtime-builder` writes for another engine cannot be used until [I0005 (#176)](https://github.com/testeos-z/gabo-ai/issues/176) ships.
+- **Reviewer configuration.** The catalog skill `gabo-reviewer-config` configures any of the four engines as reviewer. For `codex` and `opencode` it runs a one-time isolation test first; the reviewer runs those engines only while its pass marker matches the installed engine version.
+- **Pi needs a subagent package.** Pi core has no subagents. `gabo-runtime-pi` builds nothing until a subagent package is present. It recommends [gentle-pi](https://www.npmjs.com/package/gentle-pi) and, as the full setup, the [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) installed with `gentle-ai install --agent pi`. The gabo Pi package is not a subagent package. See [Your engine](docs/setup-prompt.md#your-engine).
+- **Tracking.** All engine work is tracked under the product card [#171 Runtime integrations](https://github.com/testeos-z/gabo-ai/issues/171).
+
+Engine versions the runtime skills were checked against (each skill rechecks its sources when the installed version differs):
+
+| engine | version | checked on | where it is recorded |
+|---|---|---|---|
+| Claude Code | 2.1.302 | 2026-10-28 | `gabo-runtime-claude` skill, Sources |
+| Codex (`codex-cli`) | 0.163.0 | 2026-11-03 | `gabo-runtime-codex` skill, Sources |
+| Pi | 1.4.0 | 2026-11-03 | `gabo-runtime-pi` skill, Sources |
+| gentle-pi | 4.5.1 | 2026-11-03 | `gabo-runtime-pi` skill, Sources |
+| OpenCode | 2.0.32 | 2026-11-03 | `gabo-runtime-opencode` skill, Sources |
 
 ## Install
 
 ### Go install
 
+Install the newest release tag. Go needs your own git credentials while the repository is private:
+
 ```sh
-go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
+GOPRIVATE=github.com/testeos-z/* go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
 ```
 
-> **Note:** `gabo init` accepts only a release version (`x.y.z`). `@latest` resolves to the newest release tag. Because the module lives in `apps/cli`, release tags are named `apps/cli/vX.Y.Z`. While the repository has no release tag, Go installs a pseudo-version and `gabo init` refuses it. In that case, build from source (below).
->
-> While the repository is private, set `GOPRIVATE=github.com/testeos-z/*` so Go fetches it with your own git credentials and skips the public module proxy.
+To pin a release, use `@vX.Y.Z` instead of `@latest`. `gabo version` prints the installed release, for example `gabo v0.2.2`. Then, in your project root:
+
+```sh
+gabo version
+gabo init
+gabo check
+```
+
+See [Quick start](#quick-start) for the setup between `gabo init` and `gabo check`.
+
+> **Install from a tag.** `gabo init` accepts only a release version (`x.y.z`) and refuses a pseudo-version, such as the one Go installs from a branch or a commit. Because the module lives in `apps/cli`, release tags are named `apps/cli/vX.Y.Z`.
 
 ### Build from source
 
@@ -75,7 +112,8 @@ claude plugin install gabo@gabo-ai
 
 - **Private repository.** While `testeos-z/gabo-ai` is private, Claude Code clones it with your own git credentials. Set them up first: run `gh auth setup-git`, or add an SSH key that can read the repository.
 - **The `checks` option.** On by default. Before Claude writes or edits a gabo file (`gabo.yaml`, `.gabo/`, `.claude/agents/`, `.claude/skills/`, `docs/product/`), `gabo check --pre-write` blocks a write that breaks the stage gate; after it, `gabo check` runs and reports failures to Claude. Both hooks do nothing outside a gabo project (no `.gabo/VERSION`) or when `gabo` is not on `PATH`. Turn them off with the plugin's `checks` row in `/config`.
-- **`gabo init` stays required.** The plugin does not configure a project. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see [Quick start](#quick-start)).
+- **`gabo init` stays required.** The plugin does not configure a project and ships no agents. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see [Quick start](#quick-start)). Inside a project, the copy in `.gabo/skills/` stays the source of truth: the agents preload it and `gabo check` checks it.
+- **Skill names.** Plugin skills appear namespaced as `gabo:<name>`, for example `gabo:gabo-pm`, so they never clash with the project copy. To use only the project copy in one project, disable the plugin there with `"enabledPlugins": { "gabo@gabo-ai": false }` in that project's `.claude/settings.json`.
 
 See [`plugins/claude-code/README.md`](plugins/claude-code/README.md) for the plugin layout, the open owner decisions and the release checklist.
 
@@ -113,6 +151,8 @@ See [`packages/pi/README.md`](packages/pi/README.md) for the package layout and 
 ### Install with curl (planned)
 
 > **Not available yet.** A one-line install script is planned but does not exist. Use one of the methods above.
+
+> **Self-update does not work yet.** When a project's `.gabo/VERSION` is newer than the installed CLI, `gabo init` is designed to update itself from a signed GitHub release. No release with signed assets exists yet and gabo pins no signing key, so `gabo init` prints the upgrade command instead. Install the newer version with `go install` as above.
 
 ## Quick start
 
