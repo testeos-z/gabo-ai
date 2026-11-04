@@ -66,6 +66,9 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for the reviewer runtime's metadata.reviewer_link, a user-level link to\n" +
 			"    ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer holding\n" +
 			"    scripts/reviewer.sh (not checked with CI set);\n" +
+			"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in\n" +
+			"    the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json\n" +
+			"    and .opencode/opencode.jsonc (never ~/.config/opencode);\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +
