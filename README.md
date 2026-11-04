@@ -142,6 +142,20 @@ The project file overrides the user file key by key; unknown keys fail. Secrets 
 - [Cloud agent flow](docs/cloud-agent-flow.md)
 - [Archived planning documents](docs/product/archive/README.md)
 
+## Made with gabo-ai
+
+<img src="docs/assets/made-with-gabo-ai.png" alt="Made with GaboAI sticker" width="140" align="right">
+
+Built something with gabo-ai? You can show it, if you want: it is optional and never required by the license. Add the "Made with GaboAI" sticker to your project's README:
+
+```html
+<a href="https://github.com/testeos-z/gabo-ai">
+  <img src="https://raw.githubusercontent.com/testeos-z/gabo-ai/main/docs/assets/made-with-gabo-ai.png" alt="Made with GaboAI" width="120">
+</a>
+```
+
+While `testeos-z/gabo-ai` is private, that image URL only loads for people with access to it. Until then, copy [`docs/assets/made-with-gabo-ai.png`](docs/assets/made-with-gabo-ai.png) into your repository and point `src` at your copy.
+
 ## License
 
 [MIT](LICENSE)
