@@ -14,7 +14,7 @@ Load when a value of `runtimes.*` in `gabo.yaml` is `pi` and the gabo agents mus
 ## Hard Rules
 
 - Pi core has no subagents. Build nothing until a subagent package is present (Prerequisite); then refuse and say what to install.
-- Never edit Pi's or the subagent package's own configuration: no write to `settings.json`, `subagents.json`, `models.json`, `mcp.json` or anything under the agent home except the one `skills/gabo-reviewer` link. Never run `pi install`, `pi config` or `npm i` yourself; the user installs.
+- Engine config (intent 0004 S8, D7): gabo writes only the engine keys it needs to operate, at project level only, merged with the existing project config (every unrelated key kept), reports what it wrote, and has the value verified by `gabo check`; never the user's global engine config: no write to `settings.json`, `models.json`, `mcp.json` or anything under the agent home except the one `skills/gabo-reviewer` link. Pi needs no engine key today, so this skill writes no Pi config. Never edit `subagents.json`: the subagent package owns it. Never run `pi install`, `pi config` or `npm i` yourself; the user installs.
 - Never place `gabo-reviewer` in the project, not as a copy and not as a link (D20): PR code must not reach the scripts that review it.
 - Read the spec, templates and version from the project copy (`.gabo/`), never from memory or the binary. Fill only the template slots (`gabo-agent-templates`); invent no rule, tool or skill.
 - Write only `.pi/agents/<id>.md` for spec ids, `.pi/skills/` links, and the user-level reviewer link. Leave every other file in `.pi/` untouched.

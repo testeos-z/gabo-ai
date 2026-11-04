@@ -24,6 +24,7 @@ Load when any of `runtimes.coder`, `runtimes.reviewer` or `runtimes.assistant` i
 - Overwrite only the agent files named after a spec id, the links this skill makes and the probe file it writes. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
 - Make every link of steps 2 to 4 on every build, also when the agent files are already current, and run the probe of step 8; a build that skips one is not finished.
 - Write no secret into any file (R21).
+- Never install or upgrade Claude Code. Engine config (intent 0004 S8, D7): gabo writes only the engine keys it needs to operate, at project level only, merged with the existing project config (every unrelated key kept), reports what it wrote, and has the value verified by `gabo check`; never the user's global engine config (`~/.claude/settings.json` or `$CLAUDE_CONFIG_DIR/settings.json`). Claude Code needs no engine key today, so this skill writes no settings file.
 
 ## Sources
 
