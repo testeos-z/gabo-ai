@@ -381,18 +381,26 @@ if [[ "$ENGINE" == opencode ]]; then
   # from its working directory and every directory above it, so the run
   # starts in an empty reviewer-owned directory outside the checkout: the
   # PR's opencode.json, .opencode/agents and .opencode/plugins are never
-  # loaded. The reviewer-owned config holds one read-only agent: edit
-  # denied, shell limited to git diff/log/show/status, and only the checkout
-  # readable outside the run directory. The prompt and the diff come by
-  # --file, nothing on stdin; the final assistant text is the review.
+  # loaded. The reviewer-owned config, one per PR (parallel reviews of other
+  # PRs never share it), holds one read-only agent: edit denied, shell (key
+  # `bash` in the documented schema, `shell` in v2; both are written) limited
+  # to git diff/log/show/status without --output, --ext-diff or --textconv,
+  # and only the checkout readable outside the run directory. The prompt and
+  # the diff come by --file, nothing on stdin; the final assistant text is the
+  # review.
   engine_name="OpenCode"
   engine_model="$OPENCODE_MODEL"
   engine_env || { log_event "RETRY" "#$pr $sha cannot create $REVIEW_HOME"; exit 1; }
-  review_env=("${ENGINE_ENV[@]}")
+  oc_config="$REVIEW_HOME/opencode-config/pr-$pr"
+  review_env=()
+  for e in "${ENGINE_ENV[@]}"; do
+    [[ "$e" == XDG_CONFIG_HOME=* ]] && e="XDG_CONFIG_HOME=$oc_config"
+    review_env+=("$e")
+  done
   review_cwd="$OPENCODE_RUN_DIR/pr-$pr"
   review_stdin=/dev/null
   opencode_auth="${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json"
-  if ! rm -rf -- "$review_cwd" || ! mkdir -p "$review_cwd" "$REVIEW_HOME/.config/opencode" "$REVIEW_HOME/.local/share/opencode"; then
+  if ! rm -rf -- "$review_cwd" || ! mkdir -p "$review_cwd" "$oc_config/opencode" "$REVIEW_HOME/.local/share/opencode"; then
     log_event "RETRY" "#$pr $sha cannot create the OpenCode run directory $review_cwd"
     exit 1
   fi
@@ -402,13 +410,16 @@ if [[ "$ENGINE" == opencode ]]; then
     rm -f -- "$REVIEW_HOME/.local/share/opencode/auth.json"
   fi
   jq -n --arg wt "$wt/**" '
-    { edit: "deny", write: "deny", patch: "deny", webfetch: "deny", websearch: "deny", task: "deny", skill: "deny",
-      shell: ({"*": "deny"} + ([("git diff", "git log", "git show", "git status") | {(.): "allow", (. + " *"): "allow"}] | add)),
+    (["git diff", "git log", "git show", "git status"]) as $git
+    | ({"*": "deny"} + ([$git[] | {(.): "allow", (. + " *"): "allow"}] | add)
+      + ([$git[] as $c | ("--output", "--ext-diff", "--textconv") | {("\($c) *\(.)*"): "deny"}] | add)) as $shell
+    | { edit: "deny", write: "deny", patch: "deny", webfetch: "deny", websearch: "deny", task: "deny", skill: "deny",
+      shell: $shell, bash: $shell,
       external_directory: {"*": "deny", ($wt): "allow"} } as $p
     | { "$schema": "https://opencode.ai/config.json", autoupdate: false, share: "disabled", plugin: [], mcp: {},
         permission: $p,
         agent: { "gabo-review": { mode: "primary", description: "gabo-reviewer: read-only review of one pull request", permission: $p } } }' \
-    >"$REVIEW_HOME/.config/opencode/opencode.json" ||
+    >"$oc_config/opencode/opencode.json" ||
     { log_event "RETRY" "#$pr $sha cannot write the OpenCode reviewer config"; exit 1; }
   cat >>"$prompt_file" <<CHECKOUT
 

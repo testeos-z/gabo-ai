@@ -31,7 +31,8 @@
 # its XDG_CONFIG_HOME, whether that home holds the owner's auth.json, the
 # attached --file and whether a project opencode.json or .opencode/ exists in
 # its cwd or above (which real opencode would load), then prints a JSON event
-# stream per $OPENCODE_MODE (pass | fail | error | silent).
+# stream per $OPENCODE_MODE (pass | fail | error | silent | error0, an error
+# event with exit 0 | crash, a verdict with exit 1 and no error event).
 # Fake go and gabo: fail when their args match $FAIL_CHECK and record their
 # argv, cwd and whether a credential leaked into their environment. `gabo
 # version` prints "gabo $GABO_VERSION" (default 0.4.0).
@@ -195,6 +196,9 @@ case "${OPENCODE_MODE:-pass}" in
   error) event "No blocking issues found." m1
     jq -nc '{type:"error", timestamp:2, sessionID:"s1", error:{type:"unknown", message:"usage limit reached"}}'; exit 1 ;;
   silent) jq -nc '{type:"step_finish", timestamp:2, sessionID:"s1", part:{type:"step-finish", messageID:"m1", reason:"stop"}}' ;;
+  error0) event "No blocking issues found." m1
+    jq -nc '{type:"error", timestamp:2, sessionID:"s1", error:{type:"unknown", message:"provider error"}}' ;;
+  crash) final "No blocking issues found."; echo "opencode: crashed" >&2; exit 1 ;;
 esac
 OPENCODE
   cat >"$dir/go" <<'GO'

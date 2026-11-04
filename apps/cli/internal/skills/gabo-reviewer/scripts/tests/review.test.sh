@@ -325,7 +325,7 @@ check "the OpenCode prompt carries the PR diff" grep -q 'func main' "$ox/prompt_
 check "the OpenCode prompt names the checkout to read" grep -qF "$owt" "$ox/prompt_seen.txt"
 expect_eq "" "$(cat "$ox/stdin_seen.txt")" "nothing is passed on stdin"
 check "the OpenCode review gets no GitHub or Claude token and reviewer-owned HOME and XDG dirs" grep -qxF \
-  "opencode-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset HOME=$ox/state/review-home XDG_CONFIG_HOME=$ox/state/review-home/.config XDG_DATA_HOME=$ox/state/review-home/.local/share XDG_STATE_HOME=$ox/state/review-home/.local/state XDG_CACHE_HOME=$ox/state/review-home/.cache" \
+  "opencode-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset HOME=$ox/state/review-home XDG_CONFIG_HOME=$ox/state/review-home/opencode-config/pr-7 XDG_DATA_HOME=$ox/state/review-home/.local/share XDG_STATE_HOME=$ox/state/review-home/.local/state XDG_CACHE_HOME=$ox/state/review-home/.cache" \
   "$ox/calls.log"
 expect_eq "opencode-vars HOME,NO_COLOR,PATH,TERM,XDG_CACHE_HOME,XDG_CONFIG_HOME,XDG_DATA_HOME,XDG_STATE_HOME" \
   "$(grep '^opencode-vars ' "$ox/calls.log")" "the OpenCode review runs in an env -i environment"
@@ -335,9 +335,18 @@ cfg="$ox/opencode_config.json"
 for scope in '.permission' '.agent["gabo-review"].permission'; do
   expect_eq "deny deny deny" "$(jq -r "$scope | \"\(.edit) \(.write) \(.patch)\"" "$cfg" 2>/dev/null)" \
     "the reviewer-owned config denies edit, write and patch ($scope)"
-  expect_eq '*=deny,git diff *=allow,git diff=allow,git log *=allow,git log=allow,git show *=allow,git show=allow,git status *=allow,git status=allow' \
-    "$(jq -r "$scope.shell | to_entries | map(\"\(.key)=\(.value)\") | sort | join(\",\")" "$cfg" 2>/dev/null)" \
-    "shell is limited to git diff, git log, git show and git status ($scope)"
+  for key in shell bash; do
+    rules="$(jq -r "$scope.$key | to_entries | map(\"\(.key)=\(.value)\") | sort | join(\",\")" "$cfg" 2>/dev/null)"
+    expect_eq '*=deny,git diff *=allow,git diff=allow,git log *=allow,git log=allow,git show *=allow,git show=allow,git status *=allow,git status=allow' \
+      "$(tr ',' '\n' <<<"$rules" | grep -v '=deny$' | sed '1i *=deny' | paste -sd, -)" \
+      "$key is limited to git diff, git log, git show and git status ($scope)"
+    for c in diff log show status; do
+      for o in --output --ext-diff --textconv; do
+        expect_match "(^|,)git $c \\*$o\\*=deny(,|$)" "$rules" "$key denies git $c $o ($scope)"
+      done
+    done
+    expect_eq "$(jq -r "$scope.$key | keys_unsorted | last" "$cfg")" "git status *--textconv*" "the $key denies come after the allows ($scope)"
+  done
   expect_eq "*=deny,$owt/**=allow" \
     "$(jq -r "$scope.external_directory | to_entries | map(\"\(.key)=\(.value)\") | sort | join(\",\")" "$cfg" 2>/dev/null)" \
     "only the checkout is readable outside the run directory ($scope)"
@@ -361,6 +370,12 @@ expect_match 'opencode exit 1' "$(status_line opencode_error reviewer/review)" "
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_silent OPENCODE_MODE=silent)" \
   "an OpenCode run without assistant text is an error"
 expect_match 'no verdict line in the opencode output' "$(status_line opencode_silent reviewer/review)" "the missing review text is reported"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_error0 OPENCODE_MODE=error0)" \
+  "an OpenCode error event with exit 0 is an error"
+expect_match 'the opencode run reported an error' "$(status_line opencode_error0 reviewer/review)" "the error event is reported"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(oc opencode_crash OPENCODE_MODE=crash)" \
+  "an OpenCode exit 1 without an error event is an error, even with a verdict line"
+expect_match 'opencode exit 1' "$(status_line opencode_crash reviewer/review)" "the exit code is reported"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario opencode_missing REVIEWER_OPENCODE=gabo-test-no-opencode)" \
   "opencode missing from PATH is an error"
 check "the refusal names REVIEWER_OPENCODE" grep -qF 'no opencode binary (REVIEWER_OPENCODE=gabo-test-no-opencode)' "$work/opencode_missing/out.log"
