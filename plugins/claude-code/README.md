@@ -39,9 +39,11 @@ These questions from the [spec](../../docs/product/intents/0001-claude-code-plug
 
 ## Release checklist
 
-The plugin `version` equals the gabo CLI release version `x.y.z`. It lives in the two plugin manifests only, this plugin's and the [Codex plugin](../codex/README.md)'s, and both always carry the same version; the marketplace entries have no `version`. There is no release pipeline yet, so these are manual steps of every CLI release `apps/cli/v<x.y.z>`:
+The plugin `version` equals the gabo CLI release version `x.y.z`. It lives in the two plugin manifests, this plugin's and the [Codex plugin](../codex/README.md)'s, and in the [Pi package](../../packages/pi/README.md)'s `package.json`; all three always carry the same version, and the marketplace entries have no `version`. There is no release pipeline yet, so these are manual steps of every CLI release `apps/cli/v<x.y.z>`, covering both plugins and the Pi package:
 
-1. In the release commit, set `version` to `x.y.z`, the same version as the CLI tag `apps/cli/v<x.y.z>`, in both `plugins/claude-code/.claude-plugin/plugin.json` and `plugins/codex/.codex-plugin/plugin.json`.
+1. In the release commit, set `version` to `x.y.z`, the same version as the CLI tag `apps/cli/v<x.y.z>`, in `plugins/claude-code/.claude-plugin/plugin.json`, `plugins/codex/.codex-plugin/plugin.json` and `packages/pi/package.json`. Check the Pi package with `test "$(jq -r .version packages/pi/package.json)" = "<x.y.z>"`; it must exit 0.
 2. Run `claude plugin validate .` and `claude plugin validate plugins/claude-code`; both must pass.
 3. Run `go -C apps/cli test ./...`; it asserts both manifests carry the same version, the marketplace entries carry no `version`, and the Codex plugin's skill and script copies equal their sources.
 4. After the release commit is on the release branch, run `claude plugin tag plugins/claude-code` (`--dry-run` first). It must succeed and create `gabo--v<x.y.z>`, matching `apps/cli/v<x.y.z>`; push it with `--push`.
+5. Run `bun test` in `packages/pi`; it must pass. Then run the [Pi package verification procedure](../../packages/pi/VERIFY.md) on a local Pi 1.4.0 at the release commit and record each step's observed output and result in the intent's review findings ([intent 0003](../../docs/product/intents/0003-pi-package/)). Every step must pass.
+6. After `apps/cli/v<x.y.z>` is pushed, the owner runs `npm publish` from `packages/pi` with their own npm account. Agents never publish: they have no npm account or token.
