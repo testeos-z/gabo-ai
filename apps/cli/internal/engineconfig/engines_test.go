@@ -30,15 +30,17 @@ func TestSetTakesEachEngineOnceInFixedOrder(t *testing.T) {
 	}
 }
 
-func TestIntegrateUnknownEngineWritesNothingAndDoesNotFail(t *testing.T) {
+// A name outside the full tier is in the flexible tier (S8, amended
+// 2026-11-04): one line, no step, no write, no failure.
+func TestIntegrateFlexibleTierEngineWritesNothingAndDoesNotFail(t *testing.T) {
 	report, writes := Integrate(Set("acme"), Input{Version: "0.2.6"})
 	if len(writes) != 0 {
 		t.Errorf("writes = %v, want none", writes)
 	}
 	if report.Failed() {
-		t.Error("Failed() = true, want false for an unknown engine")
+		t.Error("Failed() = true, want false for a flexible-tier engine")
 	}
-	want := []Section{{Engine: "acme", Lines: []string{"acme: no gabo integration known; nothing written"}}}
+	want := []Section{{Engine: "acme", Lines: []string{"acme: flexible tier: skills and configuration only; nothing written"}}}
 	if len(report.Sections) != 1 || report.Sections[0].Engine != want[0].Engine || !slices.Equal(report.Sections[0].Lines, want[0].Lines) || len(report.Sections[0].Steps) != 0 {
 		t.Errorf("Sections = %+v, want %+v", report.Sections, want)
 	}

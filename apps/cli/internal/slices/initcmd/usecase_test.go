@@ -2,11 +2,14 @@ package initcmd
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"maps"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/kernel/kerneltest"
 )
 
@@ -18,8 +21,27 @@ const (
 	coder   = root + "/.gabo/skills/gabo-coder/SKILL.md"
 	stale   = root + "/.gabo/skills/old-skill/SKILL.md"
 	userCfg = "/home/u/.config/gabo/config.yaml"
-	cfgYAML = "repo:\n  name: o/r\n"
+	cfgYAML = "repo:\n  name: o/r\nruntimes:\n  coder: claude\n  reviewer: claude\n  assistant: claude\n"
 )
+
+// claudeBlock is the engine integration block a run with cfgYAML prints
+// for the given project files, as lines.
+func claudeBlock(files map[string]string) []string {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: "1.2.3"}
+	for path, data := range files {
+		if rel, ok := strings.CutPrefix(path, root+"/"); ok {
+			in.Files[rel] = []byte(data)
+		}
+	}
+	r, _ := engineconfig.Integrate(engineconfig.Set("claude"), in)
+	return strings.Split(strings.TrimSuffix(r.Render(), "\n"), "\n")
+}
+
+// claudeIntegrated is the .claude/settings.json a first run writes.
+func claudeIntegrated() string {
+	_, w := engineconfig.Integrate(engineconfig.Set("claude"), engineconfig.Input{Files: map[string][]byte{}})
+	return string(w[engineconfig.ClaudeSettings])
+}
 
 var catalog = []File{{Path: "gabo-coder/SKILL.md", Data: []byte("coder")}, {Path: "gabo-setup/SKILL.md", Data: []byte("setup")}}
 
@@ -136,7 +158,7 @@ func TestOlderOrMissingStampRefreshesCatalog(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			s := newStore(tt.files)
+			s := newStore(maps.Clone(tt.files))
 			_, hadConfig := tt.files[config]
 			out, err := run(t, s, "1.2.3")
 			if err != nil {
@@ -150,6 +172,9 @@ func TestOlderOrMissingStampRefreshesCatalog(t *testing.T) {
 				"catalog updated " + tt.before + " → 1.2.3",
 				"next: ask your agent to rebuild the agents, then run gabo check",
 			}
+			if hadConfig {
+				want = append(want, claudeBlock(tt.files)...)
+			}
 			if joined(out) != strings.Join(want, "\n") {
 				t.Fatalf("output:\n%s", joined(out))
 			}
@@ -159,11 +184,15 @@ func TestOlderOrMissingStampRefreshesCatalog(t *testing.T) {
 
 func TestMatchingStampChangesNothing(t *testing.T) {
 	t.Parallel()
-	for _, files := range []map[string]string{
-		{config: cfgYAML, stamp: "1.2.3\n", setup: "edited"},
-		{stamp: "1.2.3\n"},
+	integrated := map[string]string{config: cfgYAML, stamp: "1.2.3\n", setup: "edited", claudeFile: claudeIntegrated()}
+	for _, tt := range []struct {
+		files map[string]string
+		after []string
+	}{
+		{integrated, claudeBlock(integrated)},
+		{map[string]string{stamp: "1.2.3\n"}, nil},
 	} {
-		s := newStore(files)
+		s := newStore(tt.files)
 		before := maps.Clone(s.Files)
 		out, err := run(t, s, "v1.2.3")
 		if err != nil {
@@ -172,7 +201,8 @@ func TestMatchingStampChangesNothing(t *testing.T) {
 		if len(s.Writes) != 0 || len(s.Removed) != 0 || !maps.Equal(s.Files, before) {
 			t.Fatalf("writes %v removed %v", s.Writes, s.Removed)
 		}
-		if joined(out) != "catalog is current (1.2.3); nothing changed" {
+		want := append([]string{"catalog is current (1.2.3); nothing changed"}, tt.after...)
+		if joined(out) != strings.Join(want, "\n") {
 			t.Fatalf("output:\n%s", joined(out))
 		}
 	}
@@ -289,6 +319,7 @@ func TestSetupPromptPrintedOnlyOnFreshProject(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "catalog copied to .gabo/skills (1.2.3)\n" +
+		noConfigLine + "\n" +
 		"next: open your agent in this project and paste this prompt\n" + prompt
 	if got := joined(out) + "\n"; got != want {
 		t.Fatalf("output:\n%q\nwant:\n%q", got, want)
@@ -311,5 +342,128 @@ func TestSetupPromptPrintedOnlyOnFreshProject(t *testing.T) {
 		if strings.Contains(joined(out), "Set up gabo-ai") {
 			t.Fatalf("%s: prompt printed:\n%s", name, joined(out))
 		}
+	}
+}
+
+// S10: the engine step runs on every path with a gabo.yaml (missing,
+// older and current stamp) and its block ends the output; gabo.yaml is
+// never changed.
+func TestEngineStepRunsOnEveryPathWithConfig(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		files   map[string]string
+		catalog []string
+	}{
+		{"missing stamp", map[string]string{config: cfgYAML}, []string{"catalog updated none → 1.2.3", "next: ask your agent to rebuild the agents, then run gabo check"}},
+		{"older stamp", map[string]string{config: cfgYAML, stamp: "1.2.2\n"}, []string{"catalog updated 1.2.2 → 1.2.3", "next: ask your agent to rebuild the agents, then run gabo check"}},
+		{"current stamp", map[string]string{config: cfgYAML, stamp: "1.2.3\n"}, []string{"catalog is current (1.2.3); nothing changed"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(maps.Clone(tt.files))
+			out, err := run(t, s, "1.2.3")
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := append(append([]string(nil), tt.catalog...), claudeBlock(tt.files)...)
+			if joined(out) != strings.Join(want, "\n") {
+				t.Fatalf("output:\n%s\nwant:\n%s", joined(out), strings.Join(want, "\n"))
+			}
+			if s.Files[claudeFile] != claudeIntegrated() {
+				t.Fatalf("%s = %q", claudeFile, s.Files[claudeFile])
+			}
+			if s.Files[config] != cfgYAML || s.Files[stamp] != "1.2.3\n" {
+				t.Fatalf("config %q stamp %q", s.Files[config], s.Files[stamp])
+			}
+		})
+	}
+}
+
+// S10: a fresh project writes no engine file and says why right before the
+// setup prompt.
+func TestFreshProjectWritesNoEngineFile(t *testing.T) {
+	t.Parallel()
+	s := newStore(map[string]string{})
+	out, err := NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "1.2.3", SetupPrompt: "PROMPT\n"}).Run(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range s.Writes {
+		if !strings.HasPrefix(w, root+"/.gabo/") {
+			t.Fatalf("write outside .gabo/: %s", w)
+		}
+	}
+	i := slices.Index(out.Lines, "next: open your agent in this project and paste this prompt")
+	if i < 1 || out.Lines[i-1] != "engine integration: no gabo.yaml yet; after your agent writes it, run gabo init again" {
+		t.Fatalf("output:\n%s", joined(out))
+	}
+}
+
+// S10: a gabo.yaml that is not YAML or has no runtimes mapping gets one
+// ✗ gabo.yaml: line, no engine file and an error, after the catalog step.
+func TestUnreadableConfigFailsWithoutEngineFiles(t *testing.T) {
+	t.Parallel()
+	for name, cfg := range map[string]string{
+		"not yaml":         "runtimes: [\n",
+		"no runtimes":      "repo:\n  name: o/r\n",
+		"runtimes scalar":  "runtimes: claude\n",
+		"runtimes list":    "runtimes:\n  - claude\n",
+		"empty":            "",
+		"runtime not text": "runtimes:\n  coder: {a: b}\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(map[string]string{config: cfg, stamp: "1.2.2\n"})
+			out, err := run(t, s, "1.2.3")
+			if !errors.Is(err, ErrEngineFailures) {
+				t.Fatalf("err = %v, want ErrEngineFailures", err)
+			}
+			var bad []string
+			for _, l := range out.Lines {
+				if strings.Contains(l, "✗") {
+					bad = append(bad, l)
+				}
+			}
+			if len(bad) != 1 || !strings.HasPrefix(bad[0], "✗ gabo.yaml: ") {
+				t.Fatalf("✗ lines = %q\n%s", bad, joined(out))
+			}
+			for _, w := range s.Writes {
+				if !strings.HasPrefix(w, root+"/.gabo/") {
+					t.Fatalf("write outside .gabo/: %s", w)
+				}
+			}
+			if s.Files[config] != cfg || s.Files[stamp] != "1.2.3\n" {
+				t.Fatalf("config %q stamp %q", s.Files[config], s.Files[stamp])
+			}
+		})
+	}
+}
+
+// S5 through Run: a symlinked .claude is refused with one ✗ line, codex is
+// still written, the stamp is still written and the run fails after the
+// report.
+func TestSymlinkedEngineDirFailsAfterTheReport(t *testing.T) {
+	t.Parallel()
+	cfg := "runtimes:\n  coder: codex\n  reviewer: claude\n  assistant: claude\n"
+	s := newStore(map[string]string{config: cfg, stamp: "1.2.2\n"})
+	s.Modes = map[string]fs.FileMode{root + "/.claude": fs.ModeSymlink}
+	out, err := run(t, s, "1.2.3")
+	if !errors.Is(err, ErrEngineFailures) {
+		t.Fatalf("err = %v", err)
+	}
+	if s.Files[stamp] != "1.2.3\n" || s.Files[config] != cfg {
+		t.Fatalf("stamp %q config %q", s.Files[stamp], s.Files[config])
+	}
+	if _, ok := s.Files[claudeFile]; ok || !slices.Contains(s.Writes, codexFile) {
+		t.Fatalf("writes = %v", s.Writes)
+	}
+	text := joined(out)
+	if strings.Count(text, "✗") != 1 || !strings.Contains(text, "✗ .claude/settings.json: .claude is a symlink") {
+		t.Fatalf("output:\n%s", text)
+	}
+	if !strings.Contains(text, "engine integration:\n  claude:") || !strings.Contains(text, "\n  codex:\n") {
+		t.Fatalf("report missing sections:\n%s", text)
 	}
 }

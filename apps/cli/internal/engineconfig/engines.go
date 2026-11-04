@@ -67,15 +67,15 @@ var rules = map[string]Rule{
 
 // Integrate runs the rule of each engine in set, in set order, and returns
 // the report and the new bytes of every changed file. An engine without a
-// rule writes nothing and gets the unknown-engine line (S8), which is not a
-// failure.
+// rule is in the flexible tier: it writes nothing and gets the flexible-tier
+// line (S8), with no step and no failure.
 func Integrate(set []string, in Input) (Report, map[string][]byte) {
 	var report Report
 	writes := map[string][]byte{}
 	for _, engine := range set {
 		rule, ok := rules[engine]
 		if !ok {
-			report.Sections = append(report.Sections, Section{Engine: engine, Lines: []string{engine + ": no gabo integration known; nothing written"}})
+			report.Sections = append(report.Sections, Section{Engine: engine, Lines: []string{engine + ": flexible tier: skills and configuration only; nothing written"}})
 			continue
 		}
 		res := rule(in)
