@@ -15,7 +15,7 @@ claude plugin install gabo@gabo-ai
 
 While the repository is private, Claude Code clones it with your own git credentials: run `gh auth setup-git` or add an SSH key that can read it.
 
-The plugin does not replace `gabo init`. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see the [Quick start](../../README.md#quick-start)).
+The plugin does not replace `gabo init`. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see the [Install and set up](../../README.md#install-and-set-up)).
 
 ## What it ships
 

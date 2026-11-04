@@ -19,7 +19,7 @@ Then trust the two hooks: in a Codex session, open `/hooks` and trust the gabo `
 
 Update with `codex plugin marketplace upgrade gabo-ai`. Codex caches the plugin per version (`~/.codex/plugins/cache/gabo-ai/gabo/<version>/`), so an update arrives when a release bumps `version`. Check `/hooks` again after an update.
 
-The plugin does not replace `gabo init` and builds no agents. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see the [Quick start](../../README.md#quick-start)); with `runtimes.coder: codex`, the `gabo-runtime-codex` skill builds the agents as `.codex/agents/<id>.toml` and links the skills under `.agents/skills/`.
+The plugin does not replace `gabo init` and builds no agents. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see the [Install and set up](../../README.md#install-and-set-up)); with `runtimes.coder: codex`, the `gabo-runtime-codex` skill builds the agents as `.codex/agents/<id>.toml` and links the skills under `.agents/skills/`.
 
 ## What it ships
 
