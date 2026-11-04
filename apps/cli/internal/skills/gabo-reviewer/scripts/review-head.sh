@@ -374,58 +374,75 @@ review_stdin="$prompt_file"
 codex_last="$logs/codex-last-message.md"
 if [[ "$ENGINE" == opencode ]]; then
   # The flags of the isolation test the engine passed (gabo-reviewer-config,
-  # intent 0001 S10): `opencode run --standalone` with a HOME and XDG_* dirs
-  # of the reviewer's own (env -i), so no GitHub token and none of the owner's
-  # OpenCode config, agents or plugins reach it; the data dir holds only a
-  # link to the owner's login. OpenCode loads opencode.json and .opencode/
-  # from its working directory and every directory above it, so the run
-  # starts in an empty reviewer-owned directory outside the checkout: the
-  # PR's opencode.json, .opencode/agents and .opencode/plugins are never
-  # loaded. The reviewer-owned config, one per PR (parallel reviews of other
-  # PRs never share it), holds one read-only agent: edit denied, shell (key
-  # `bash` in the documented schema, `shell` in v2; both are written) limited
-  # to git diff/log/show/status without --output, --ext-diff or --textconv,
-  # and only the checkout readable outside the run directory. The prompt and
-  # the diff come by --file, nothing on stdin; the final assistant text is the
-  # review.
+  # intent 0001 S10): `opencode run --standalone` with a HOME of the
+  # reviewer's own and XDG_* dirs of its own per PR (env -i), so no GitHub
+  # token and none of the owner's OpenCode config, agents or plugins reach it,
+  # and parallel reviews of other PRs share no config, data, state or cache;
+  # the data dir holds only a link to the owner's login. OpenCode loads
+  # opencode.json and .opencode/ from its working directory and every
+  # directory above it up to the git worktree root, so the run starts in an
+  # empty reviewer-owned directory outside the checkout that is a git
+  # repository of its own with one empty commit: neither the PR's
+  # opencode.json, .opencode/agents and .opencode/plugins nor any
+  # opencode.json or .opencode/ above the state dir (by default in the
+  # owner's home) is loaded. The reviewer-owned config holds one read-only
+  # agent: edit denied, shell (key `bash` in the documented schema, `shell`
+  # in v2; both are written) limited to git diff/log/show/status, plain or as
+  # `git -C <checkout>`, without --output, --ext-diff, --textconv or
+  # `diff --no-index`, and only the checkout readable outside the run
+  # directory. The prompt and the diff come by --file, nothing on stdin; the
+  # final assistant text is the review.
   engine_name="OpenCode"
   engine_model="$OPENCODE_MODEL"
   engine_env || { log_event "RETRY" "#$pr $sha cannot create $REVIEW_HOME"; exit 1; }
-  oc_config="$REVIEW_HOME/opencode-config/pr-$pr"
+  oc_home="$REVIEW_HOME/opencode/pr-$pr"
   review_env=()
   for e in "${ENGINE_ENV[@]}"; do
-    [[ "$e" == XDG_CONFIG_HOME=* ]] && e="XDG_CONFIG_HOME=$oc_config"
+    case "$e" in
+      XDG_CONFIG_HOME=*) e="XDG_CONFIG_HOME=$oc_home/config" ;;
+      XDG_DATA_HOME=*) e="XDG_DATA_HOME=$oc_home/data" ;;
+      XDG_STATE_HOME=*) e="XDG_STATE_HOME=$oc_home/state" ;;
+      XDG_CACHE_HOME=*) e="XDG_CACHE_HOME=$oc_home/cache" ;;
+    esac
     review_env+=("$e")
   done
   review_cwd="$OPENCODE_RUN_DIR/pr-$pr"
   review_stdin=/dev/null
   opencode_auth="${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json"
-  if ! rm -rf -- "$review_cwd" || ! mkdir -p "$review_cwd" "$oc_config/opencode" "$REVIEW_HOME/.local/share/opencode"; then
+  if ! rm -rf -- "$review_cwd" "$oc_home" ||
+    ! mkdir -p "$review_cwd" "$oc_home/config/opencode" "$oc_home/data/opencode" "$oc_home/state" "$oc_home/cache" ||
+    ! env -i "PATH=$PATH" "HOME=$REVIEW_HOME" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      git -C "$review_cwd" init -q ||
+    ! env -i "PATH=$PATH" "HOME=$REVIEW_HOME" GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null \
+      git -C "$review_cwd" -c user.name=gabo-reviewer -c user.email=gabo-reviewer@localhost -c commit.gpgsign=false \
+      -c core.hooksPath=/dev/null commit -q --allow-empty --no-verify -m "gabo-reviewer run root"; then
     log_event "RETRY" "#$pr $sha cannot create the OpenCode run directory $review_cwd"
     exit 1
   fi
   if [[ -f "$opencode_auth" ]]; then
-    ln -sfn -- "$opencode_auth" "$REVIEW_HOME/.local/share/opencode/auth.json"
-  else
-    rm -f -- "$REVIEW_HOME/.local/share/opencode/auth.json"
+    ln -sfn -- "$opencode_auth" "$oc_home/data/opencode/auth.json"
   fi
-  jq -n --arg wt "$wt/**" '
-    (["git diff", "git log", "git show", "git status"]) as $git
+  jq -n --arg wt "$wt" '
+    (["git diff", "git log", "git show", "git status"]
+      | [.[], (.[] | sub("^git "; "git -C \($wt) "))]) as $git
     | ({"*": "deny"} + ([$git[] | {(.): "allow", (. + " *"): "allow"}] | add)
-      + ([$git[] as $c | ("--output", "--ext-diff", "--textconv") | {("\($c) *\(.)*"): "deny"}] | add)) as $shell
+      + ([$git[] as $c | ("--output", "--ext-diff", "--textconv") | {("\($c) *\(.)*"): "deny"}] | add)
+      + ([$git[] | select(endswith(" diff")) | {(. + " *--no-index*"): "deny"}] | add)) as $shell
     | { edit: "deny", write: "deny", patch: "deny", webfetch: "deny", websearch: "deny", task: "deny", skill: "deny",
       shell: $shell, bash: $shell,
-      external_directory: {"*": "deny", ($wt): "allow"} } as $p
+      external_directory: {"*": "deny", ($wt + "/**"): "allow"} } as $p
     | { "$schema": "https://opencode.ai/config.json", autoupdate: false, share: "disabled", plugin: [], mcp: {},
         permission: $p,
         agent: { "gabo-review": { mode: "primary", description: "gabo-reviewer: read-only review of one pull request", permission: $p } } }' \
-    >"$oc_config/opencode/opencode.json" ||
+    >"$oc_home/config/opencode/opencode.json" ||
     { log_event "RETRY" "#$pr $sha cannot write the OpenCode reviewer config"; exit 1; }
   cat >>"$prompt_file" <<CHECKOUT
 
-The checkout of head $sha is at $wt. Read files there for context, and run
-git diff, git log, git show or git status only with that directory as the
-working directory; no other command is allowed and you cannot change files.
+The checkout of head $sha is at $wt. Your shell starts outside it, in an
+empty directory. Read files in the checkout for context, and run only
+git diff, git log, git show or git status there, as \`git -C $wt diff ...\`
+(or with the checkout as the shell tool's working directory); no other
+command is allowed, git diff --no-index is denied and you cannot change files.
 CHECKOUT
   engine_cmd=("$OPENCODE" run --standalone --format json --agent gabo-review --file "$prompt_file")
   [[ -z "$OPENCODE_MODEL" ]] || engine_cmd+=(-m "$OPENCODE_MODEL")

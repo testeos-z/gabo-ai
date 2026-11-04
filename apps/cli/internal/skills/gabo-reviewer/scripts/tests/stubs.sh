@@ -171,7 +171,7 @@ cp "${XDG_CONFIG_HOME:-/nonexistent}/opencode/opencode.json" "$FIXTURE/opencode_
 project=none d="$PWD"
 while :; do
   [[ -e "$d/opencode.json" || -e "$d/.opencode" ]] && project="loaded $d"
-  [[ "$d" == / ]] && break
+  [[ "$d" == / || -e "$d/.git" ]] && break
   d="$(dirname "$d")"
 done
 echo "opencode-project=$project" >>"$STUB_LOG"

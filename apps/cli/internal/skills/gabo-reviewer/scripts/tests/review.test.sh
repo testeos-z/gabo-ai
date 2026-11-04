@@ -304,6 +304,7 @@ oc() { scenario "$1" REVIEWER_OPENCODE="$work/bin/opencode" "${@:2}"; }
 v="$(oc opencode_clean)"
 ox="$work/opencode_clean"
 owt="$ox/state/worktrees/pr-7"
+oxh="$ox/state/review-home/opencode/pr-7"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" \
   "a clean OpenCode review ends with the same VERDICT line and merges"
 expect_eq "No blocking issues found." "$(first_line opencode_clean)" "the OpenCode comment opens with the clean verdict"
@@ -323,29 +324,39 @@ expect_eq "opencode-project=none" "$(grep '^opencode-project=' "$ox/calls.log")"
   "the PR's opencode.json, .opencode/agents/ and .opencode/plugins/x.js are not passed to the run"
 check "the OpenCode prompt carries the PR diff" grep -q 'func main' "$ox/prompt_seen.txt"
 check "the OpenCode prompt names the checkout to read" grep -qF "$owt" "$ox/prompt_seen.txt"
+check "the OpenCode prompt names git -C <checkout>" grep -qF "git -C $owt diff" "$ox/prompt_seen.txt"
 expect_eq "" "$(cat "$ox/stdin_seen.txt")" "nothing is passed on stdin"
 check "the OpenCode review gets no GitHub or Claude token and reviewer-owned HOME and XDG dirs" grep -qxF \
-  "opencode-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset HOME=$ox/state/review-home XDG_CONFIG_HOME=$ox/state/review-home/opencode-config/pr-7 XDG_DATA_HOME=$ox/state/review-home/.local/share XDG_STATE_HOME=$ox/state/review-home/.local/state XDG_CACHE_HOME=$ox/state/review-home/.cache" \
+  "opencode-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=unset HOME=$ox/state/review-home XDG_CONFIG_HOME=$oxh/config XDG_DATA_HOME=$oxh/data XDG_STATE_HOME=$oxh/state XDG_CACHE_HOME=$oxh/cache" \
   "$ox/calls.log"
 expect_eq "opencode-vars HOME,NO_COLOR,PATH,TERM,XDG_CACHE_HOME,XDG_CONFIG_HOME,XDG_DATA_HOME,XDG_STATE_HOME" \
   "$(grep '^opencode-vars ' "$ox/calls.log")" "the OpenCode review runs in an env -i environment"
 expect_eq "opencode-files auth=yes" "$(grep '^opencode-files ' "$ox/calls.log")" "the reviewer-owned home holds the owner's OpenCode login"
-check "the login is linked, never copied" test -L "$ox/state/review-home/.local/share/opencode/auth.json"
+check "the login is linked, never copied" test -L "$oxh/data/opencode/auth.json"
 cfg="$ox/opencode_config.json"
 for scope in '.permission' '.agent["gabo-review"].permission'; do
   expect_eq "deny deny deny" "$(jq -r "$scope | \"\(.edit) \(.write) \(.patch)\"" "$cfg" 2>/dev/null)" \
     "the reviewer-owned config denies edit, write and patch ($scope)"
   for key in shell bash; do
     rules="$(jq -r "$scope.$key | to_entries | map(\"\(.key)=\(.value)\") | sort | join(\",\")" "$cfg" 2>/dev/null)"
-    expect_eq '*=deny,git diff *=allow,git diff=allow,git log *=allow,git log=allow,git show *=allow,git show=allow,git status *=allow,git status=allow' \
-      "$(tr ',' '\n' <<<"$rules" | grep -v '=deny$' | sed '1i *=deny' | paste -sd, -)" \
-      "$key is limited to git diff, git log, git show and git status ($scope)"
-    for c in diff log show status; do
-      for o in --output --ext-diff --textconv; do
-        expect_match "(^|,)git $c \\*$o\\*=deny(,|$)" "$rules" "$key denies git $c $o ($scope)"
-      done
+    allowed=""
+    for g in git "git -C $owt"; do
+      for c in diff log show status; do allowed+=",$g $c *=allow,$g $c=allow"; done
     done
-    expect_eq "$(jq -r "$scope.$key | keys_unsorted | last" "$cfg")" "git status *--textconv*" "the $key denies come after the allows ($scope)"
+    expect_eq "*=deny$(tr ',' '\n' <<<"${allowed#,}" | LC_ALL=C sort | sed 's/^/,/' | tr -d '\n')" \
+      "$(tr ',' '\n' <<<"$rules" | grep -v '=deny$' | sed '1i *=deny' | paste -sd, -)" \
+      "$key is limited to git diff, git log, git show and git status, also as git -C <checkout> ($scope)"
+    for g in git "git -C $owt"; do
+      for c in diff log show status; do
+        for o in --output --ext-diff --textconv; do
+          check "$key denies $g $c $o ($scope)" grep -qxF "$g $c *$o*=deny" <<<"$(tr ',' '\n' <<<"$rules")"
+        done
+      done
+      check "$key denies $g diff --no-index ($scope)" grep -qxF "$g diff *--no-index*=deny" <<<"$(tr ',' '\n' <<<"$rules")"
+    done
+    expect_eq true "$(jq "$scope.$key | [to_entries[1:][] | .value] | to_entries
+      | ([.[] | select(.value == \"allow\") | .key] | max) < ([.[] | select(.value == \"deny\") | .key] | min)" "$cfg")" \
+      "the $key denies come after the allows ($scope)"
   done
   expect_eq "*=deny,$owt/**=allow" \
     "$(jq -r "$scope.external_directory | to_entries | map(\"\(.key)=\(.value)\") | sort | join(\",\")" "$cfg" 2>/dev/null)" \
@@ -359,6 +370,20 @@ review="$(grep -nE '^opencode run ' "$ox/calls.log" | head -n 1 | cut -d: -f1)"
 check "the deterministic gates run before the agent review" test "${gates:-999999}" -lt "${review:-0}"
 expect_eq 3 "$(grep -c '^go-argc=' "$ox/calls.log")" "the OpenCode review still runs the three checks"
 expect_eq 1 "$(grep -c 'gbai-reviewer-bot sha=' "$ox/all_posted_7.md")" "one OpenCode verdict comment per head"
+# The owner's opencode.json and .opencode/ in a parent of the state dir (the
+# default state dir sits in the owner's home) stay out: the run directory is
+# a git repository of its own, where OpenCode's upward config search stops.
+op="$work/opencode_parent_config"
+mkdir -p "$op/.opencode/agents"
+echo '{"permission": {"bash": "allow"}}' >"$op/opencode.json"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$(oc opencode_parent_config)" \
+  "an OpenCode review with OpenCode config above the state dir still runs"
+expect_eq "opencode-project=none" "$(grep '^opencode-project=' "$op/calls.log")" \
+  "opencode.json and .opencode/ above the state dir are not loaded"
+check "the run directory is the root of a git repository with a commit" \
+  git -C "$op/state/opencode-run/pr-7" rev-parse --verify -q HEAD
+expect_eq "$op/state/opencode-run/pr-7" "$(git -C "$op/state/opencode-run/pr-7" rev-parse --show-toplevel)" \
+  "the git root of the run is the run directory"
 check "without REVIEWER_OPENCODE_MODEL the owner's default model is used" bash -c "! grep -qE '^opencode run .* -m ' '$ox/calls.log'"
 oc opencode_model REVIEWER_OPENCODE_MODEL=openai/gpt-5.5 >/dev/null
 check "REVIEWER_OPENCODE_MODEL picks the OpenCode model" grep -qE '^opencode run .* -m openai/gpt-5.5 ' "$work/opencode_model/calls.log"
