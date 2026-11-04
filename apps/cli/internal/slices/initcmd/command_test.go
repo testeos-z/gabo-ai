@@ -26,6 +26,29 @@ func TestCommandHasNoFlagsAndNoArgs(t *testing.T) {
 	}
 }
 
+// `gabo init --help` names the only engine files init writes and repeats
+// that it never writes user-level engine config (intent 0006 S13).
+func TestCommandHelpNamesTheEngineFiles(t *testing.T) {
+	t.Parallel()
+	called := false
+	cmd := NewCommand(func(context.Context) (*Init, error) { called = true; return nil, nil })
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetArgs([]string{"--help"})
+	if err := cmd.Execute(); err != nil || called {
+		t.Fatalf("err %v, factory called %v", err, called)
+	}
+	help := strings.Join(strings.Fields(out.String()), " ")
+	for _, s := range []string{
+		".claude/settings.json, .codex/config.toml and .pi/settings.json are the only engine files it writes",
+		"it never writes user-level engine config",
+	} {
+		if !strings.Contains(help, s) {
+			t.Errorf("help is missing %q:\n%s", s, out.String())
+		}
+	}
+}
+
 // userEngineDirs points HOME and every user-level engine directory at an
 // empty temporary directory and returns them, so a test can prove init
 // writes nothing there (intent 0006 S2, S3, S7).
