@@ -59,9 +59,10 @@ type Rule func(Input) Result
 
 // rules holds one entry per engine with a gabo integration.
 var rules = map[string]Rule{
-	Claude: claudeRule,
-	Codex:  codexRule,
-	Pi:     piRule,
+	Claude:   claudeRule,
+	Codex:    codexRule,
+	Opencode: opencodeRule,
+	Pi:       piRule,
 }
 
 // Integrate runs the rule of each engine in set, in set order, and returns
