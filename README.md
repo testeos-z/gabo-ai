@@ -10,19 +10,9 @@
 
 Each change is one **intent**. There is no big upfront plan: the tracker is the global view, and each intent moves through the same lifecycle.
 
-```mermaid
-flowchart LR
-  I["1 Intent<br/>what and why"] --> S["2 Spec<br/>requirements and acceptance"]
-  S --> A{"3 You accept<br/>the spec"}
-  A --> P["4 Plan and tasks<br/>issues with dependencies"]
-  P --> W["5 Wave<br/>one intent, tasks in parallel"]
-  W --> C["6 Coders<br/>one worktree and PR per task"]
-  C --> R{"7 Reviewer<br/>checks and verdict"}
-  R -->|clean| D["dev<br/>integration branch"]
-  R -->|blocking| C
-  D --> M{"8 You merge<br/>dev into main"}
-  M --> T["9 Release<br/>version tag"]
-```
+![gabo-ai per-change SDLC flow: owner, memory, assistant, development wave, repository, directiva and team tasks, from intent and spec to reviewed PRs, merge and release](docs/product/diagrams/sdlc-flow.png)
+
+*Per-change SDLC flow, exported from the [archify diagram](docs/product/diagrams/sdlc-flow.html) (labels in Spanish). Open it for the legend, the floating-questions path and the plan-change loop.*
 
 | step | who | produces | gate |
 |---|---|---|---|
