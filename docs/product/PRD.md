@@ -94,11 +94,11 @@ The global flows live in the [app flow](APP_FLOW.md) and `docs/product/diagrams/
 
 ## 5. Appetite
 
-The first release is scoped to one supported tracker (GitHub issues), the local reviewer, the Claude Code and Pi runtimes, and manual and auto modes. There is no fixed wave budget: the release takes as many waves as its scope needs. Claude Code and Pi are shipped and tested as runtime skills (R34); the user's agent can add another engine through the runtime builder (R35) without a gabo-ai release.
+The first release is scoped to one supported tracker (GitHub issues), the local reviewer, the Claude Code, Pi and OpenCode runtimes (OpenCode amended (owner 2026-11-03, [intent 0004](intents/0004-opencode-runtime/spec.md) S12)), and manual and auto modes. There is no fixed wave budget: the release takes as many waves as its scope needs. Claude Code, Pi and OpenCode are shipped and tested as runtime skills (R34; OpenCode per intent 0004); the user's agent can add another engine through the runtime builder (R35) without a gabo-ai release.
 
 ## 6. Assumptions and dependencies
 
-- **Agent runtimes.** Agents run on Claude Code and Pi. Pi core has no subagents, so a Pi target needs a subagent package; gentle-pi is recommended and setup offers to install it. Any engine is usable only when it supports subagents and skills, or an equivalent.
+- **Agent runtimes.** Agents run on Claude Code, Pi and OpenCode (OpenCode amended (owner 2026-11-03, [intent 0004](intents/0004-opencode-runtime/spec.md) S12)). Pi core has no subagents, so a Pi target needs a subagent package; gentle-pi is recommended and setup offers to install it. Any engine is usable only when it supports subagents and skills, or an equivalent.
 - **Runtime builder access.** The runtime builder needs web access or a documentation MCP; without them it asks the user for documentation links (R35).
 - **Direct sessions.** Direct sessions and the single assistant terminal depend on Orca in the first release (R14, R18).
 - **Tracker.** The team's tracker is reachable through an adapter; GitHub issues in the first release (R11). It holds the product cards, their intents' tasks and the dependencies between them.
