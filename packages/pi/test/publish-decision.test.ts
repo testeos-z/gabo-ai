@@ -15,7 +15,7 @@ let caseNo = 0;
 
 // fakeNpm is the body of a bash `npm` that may print and exit; every call
 // appends its arguments to calls.log.
-function run(fakeNpm: string) {
+function run(fakeNpm: string, args = ["@gabo-ai/pi", "1.2.3"]) {
   const dir = join(scratch, `case-${++caseNo}`);
   const bin = join(dir, "bin");
   Bun.spawnSync(["mkdir", "-p", bin]);
@@ -25,12 +25,13 @@ function run(fakeNpm: string) {
   const npm = join(bin, "npm");
   writeFileSync(npm, `#!/usr/bin/env bash\necho "$*" >> "${calls}"\n${fakeNpm}\n`);
   chmodSync(npm, 0o755);
-  const proc = Bun.spawnSync(["bash", script, "@gabo-ai/pi", "1.2.3"], {
+  const proc = Bun.spawnSync(["bash", script, ...args], {
     env: { PATH: `${bin}:${process.env.PATH}`, GITHUB_OUTPUT: output },
   });
   return {
     code: proc.exitCode,
     stdout: proc.stdout.toString(),
+    stderr: proc.stderr.toString(),
     output: readFileSync(output, "utf8"),
     calls: existsSync(calls) ? readFileSync(calls, "utf8").trim().split("\n") : [],
   };
@@ -68,8 +69,24 @@ describe("publish decision", () => {
     expect(r.output).toBe("");
   });
 
-  test("missing arguments fail without calling npm", () => {
-    const proc = Bun.spawnSync(["bash", script], { env: { PATH: process.env.PATH, GITHUB_OUTPUT: "/dev/null" } });
-    expect(proc.exitCode).not.toBe(0);
+  test("a warning on stderr with empty stdout takes the publish path", () => {
+    const r = run('echo "npm warn config some deprecated setting" >&2; exit 0');
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain("not on npm yet");
+    expect(r.output).toBe("published=false\n");
+  });
+
+  test("a different version on stdout takes the publish path", () => {
+    const r = run('echo "1.2.2"');
+    expect(r.code).toBe(0);
+    expect(r.output).toBe("published=false\n");
+  });
+
+  test("missing arguments exit 2 with the usage line and never call npm", () => {
+    const r = run('echo "1.2.3"', []);
+    expect(r.code).toBe(2);
+    expect(r.stderr).toContain("usage: publish-decision.sh <name> <version>");
+    expect(r.calls).toEqual([]);
+    expect(r.output).toBe("");
   });
 });

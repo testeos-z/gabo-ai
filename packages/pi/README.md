@@ -53,7 +53,7 @@ The package version equals the gabo CLI release version: one version, one releas
 
 Publishing to npm is automated:
 
-1. A merge to `main` runs [`sync-pi-pkg-up.yml`](../../.github/workflows/sync-pi-pkg-up.yml): it merges `main` into the `pi/pkg-up` branch (fast-forward when possible, a merge commit otherwise; it fails on a conflict) and pushes it.
+1. A merge to `main` runs [`sync-pi-pkg-up.yml`](../../.github/workflows/sync-pi-pkg-up.yml): it runs [`scripts/sync-pkg-up.sh`](scripts/sync-pkg-up.sh), which merges `main` into the `pi/pkg-up` branch (fast-forward when possible, a merge commit otherwise; it fails on a conflict outside `.github/workflows/`) and pushes it. The push uses `GITHUB_TOKEN`, which GitHub refuses for any change under `.github/workflows/`, so the merge always keeps `pi/pkg-up`'s own `.github/workflows/`: workflow changes on `main` do not reach `pi/pkg-up` automatically (see [Updating workflows on `pi/pkg-up`](#updating-workflows-on-pipkg-up)). `test/sync-pkg-up.test.ts` covers it against a temporary git repository.
 2. It then dispatches [`publish-pi.yml`](../../.github/workflows/publish-pi.yml) on `pi/pkg-up` (a push made with the workflow token starts no workflow by itself). A direct push to `pi/pkg-up` that touches `packages/pi/` starts it too.
 3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `npm publish --access public` only when `@gabo-ai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
 
@@ -65,6 +65,18 @@ It needs the repository secret `NPM_TOKEN`: an npm granular access token with re
 - npm removes direct publishing with granular tokens in January 2027 ([npm docs, About access tokens](https://docs.npmjs.com/about-access-tokens): "The ability to publish new package versions directly with a granular access token will be removed in January 2027"). After that this workflow can no longer publish with `NPM_TOKEN`; the follow-up is npm trusted publishing (OIDC from GitHub Actions), which needs no stored token.
 
 The publish decision lives in [`scripts/publish-decision.sh`](scripts/publish-decision.sh) (already published: exit 0, no publish; `npm view` E404 or empty: publish; any other `npm view` error: the job fails). `test/publish-decision.test.ts` runs it against a fake `npm`.
+
+### Updating workflows on `pi/pkg-up`
+
+To change `publish-pi.yml` (or any workflow) on `pi/pkg-up`, the owner first merges the change to `main`, then pushes it to `pi/pkg-up` by hand with their own credentials:
+
+```sh
+git fetch origin
+git switch -C pi/pkg-up origin/pi/pkg-up
+git checkout origin/main -- .github/workflows
+git commit -m "ci: update pi/pkg-up workflows from main"
+git push origin pi/pkg-up
+```
 
 ### Accepted risk: who can publish
 
