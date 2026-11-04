@@ -1,0 +1,4 @@
+{
+  "theme": "dark",
+  "extensions": ["./ext/a.ts"]
+}
