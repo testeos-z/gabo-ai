@@ -55,11 +55,22 @@ jobs:
           NAME: ${{ steps.pkg.outputs.name }}
           VERSION: ${{ steps.pkg.outputs.version }}
         run: |
-          if npm view "${NAME}@${VERSION}" version >/dev/null 2>&1; then
-            echo "${NAME}@${VERSION} already published; nothing to do."
-            echo "published=true" >> "$GITHUB_OUTPUT"
-          else
+          set -uo pipefail
+          if out=$(npm view "${NAME}@${VERSION}" version 2>&1); then
+            if [ -n "$out" ]; then
+              echo "${NAME}@${VERSION} already published; nothing to do."
+              echo "published=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "${NAME}@${VERSION} not on npm yet."
+              echo "published=false" >> "$GITHUB_OUTPUT"
+            fi
+          elif printf '%s\n' "$out" | grep -q 'E404'; then
+            echo "${NAME}@${VERSION} not on npm yet (E404)."
             echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::npm view ${NAME}@${VERSION} failed:"
+            printf '%s\n' "$out"
+            exit 1
           fi
 
       - name: Publish to npm
