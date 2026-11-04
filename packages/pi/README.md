@@ -1,0 +1,59 @@
+# gabo package for Pi
+
+`@testeos-z/gabo-pi` is the gabo package for [Pi](https://github.com/earendil-works/pi). It brings two gabo skills into Pi and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` tool calls in a gabo project. Spec: [intent 0003](../../docs/product/intents/0003-pi-package/spec.md).
+
+## Install
+
+From npm, pinned to a release version (the gabo CLI version you use):
+
+```sh
+pi install npm:@testeos-z/gabo-pi@<version>
+```
+
+During development, or before the package is on npm, install it from a local checkout. Pi loads a local package from its path without copying it:
+
+```sh
+pi install /path/to/gabo-ai/packages/pi
+```
+
+Check it with `pi list`: the package appears under `User packages:`. Pi loads its skills and its extension at the next start. Remove it with `pi remove <source>`, using the same source you installed.
+
+The extension calls the `gabo` CLI, so install the CLI too (see [Install](../../README.md#install)) and keep `gabo` on `PATH`.
+
+## What it ships
+
+| path | what it is |
+|---|---|
+| `package.json` | Manifest: name `@testeos-z/gabo-pi`, `version`, keyword `pi-package`, `pi.skills` and `pi.extensions`. The Pi host package `@earendil-works/pi-coding-agent` is an optional peer dependency only. |
+| `skills/gabo-pi/` | Bootstrap skill: how to install the CLI, run `gabo init` and print the setup prompt with `gabo prompt`. |
+| `skills/gabo-reviewer-config/` | A byte-for-byte copy of the catalog skill `apps/cli/internal/skills/gabo-reviewer-config/`: it configures the reviewer engine. No skill in the package runs reviews. |
+| `extensions/gabo.ts` | The `gabo` extension (below). |
+| `test/` | `bun test` suites: the manifest and tarball rules, and both extension handlers against a fake Pi API and a fake `gabo`. Not shipped. |
+
+## The extension
+
+The extension is a thin connection layer. It collects the session facts (the names of every registered tool and the package version), pipes them as JSON to `gabo check --pre-write` and shows or applies what gabo returns. Every rule, comparison and message text lives in the gabo CLI (`gabo check --help` describes the input and output). Outside a gabo project (no `gabo.yaml` in the working directory) it does nothing.
+
+- **`session_start`.** Runs `gabo` once and shows each notification it returns, level and text unchanged. gabo warns when no subagent package is loaded (no `subagent_run` tool), with the same refusal text as `gabo-runtime-pi`, and adds one info notification when the package version differs from the project's `.gabo/VERSION`.
+- **`tool_call`.** For `write` and `edit` only, runs `gabo` once with the call's `path` as the target. When gabo blocks, the call is blocked with gabo's reason: a write under `.pi/agents/` while no subagent package is loaded, or a `plan.md` whose intent `spec.md` is not accepted (the stage gate).
+- **gabo unavailable.** When `gabo` is not on `PATH`, exits 2, times out (30 s) or prints unreadable output, the extension blocks nothing and shows one warning that gabo's checks were skipped.
+
+## Coexistence with `gabo init` and `gabo-runtime-pi`
+
+- **`gabo init` stays required.** The package does not configure a project. Per-project config (`gabo.yaml`), the `.gabo/skills/` catalog, slots and adapters still come from `gabo init` and the setup prompt (see the [Quick start](../../README.md#quick-start)).
+- **`gabo-runtime-pi` stays required.** It builds the agents in `.pi/agents/` and the skill links in `.pi/skills/`. The package replaces none of them.
+- **It writes no project file.** Installing the package or running a Pi session with it changes nothing in the project: `git status` stays clean.
+- **It is not a subagent package.** gabo on Pi needs a subagent package such as gentle-pi (`pi install npm:gentle-pi`). The `gabo-runtime-pi` Prerequisite still refuses when the gabo package is the only one installed.
+
+## Versioning
+
+The package version equals the gabo CLI release version: one version, one release tag `apps/cli/v<x.y.z>`. A package release follows every CLI release, even with no package change. The release steps are in the [release checklist](../../plugins/claude-code/README.md#release-checklist).
+
+## Development
+
+```sh
+cd packages/pi
+bun test
+```
+
+Before each release, the owner runs the manual [verification procedure](VERIFY.md) on a local Pi.

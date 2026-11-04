@@ -95,6 +95,21 @@ codex plugin add gabo@gabo-ai
 
 See [`plugins/codex/README.md`](plugins/codex/README.md) for the plugin layout, how its skill and script copies stay equal to their sources, and the release checklist.
 
+### Pi package
+
+The Pi package `@testeos-z/gabo-pi` ([`packages/pi/`](packages/pi/)) ships the `gabo-pi` and `gabo-reviewer-config` skills and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` calls in a gabo project.
+
+```sh
+pi install npm:@testeos-z/gabo-pi@<version>
+```
+
+Use the gabo CLI version as `<version>`. Before the package is on npm, install it from a checkout with `pi install /path/to/gabo-ai/packages/pi`. Check it with `pi list`.
+
+- **`gabo init` and `gabo-runtime-pi` stay required.** The package writes no project file and builds no agents; with `runtimes.coder: pi`, `gabo-runtime-pi` builds them in `.pi/agents/`.
+- **It is not a subagent package.** gabo on Pi still needs one, such as gentle-pi; without it the extension warns at session start and blocks writes under `.pi/agents/`.
+
+See [`packages/pi/README.md`](packages/pi/README.md) for the package layout and coexistence rules, and [`packages/pi/VERIFY.md`](packages/pi/VERIFY.md) for the manual verification run before each release.
+
 ### Install with curl (planned)
 
 > **Not available yet.** A one-line install script is planned but does not exist. Use one of the methods above.
