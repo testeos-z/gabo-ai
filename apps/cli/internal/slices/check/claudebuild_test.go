@@ -21,7 +21,7 @@ import (
 // (build step 2).
 func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
-	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n")}
+	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n"), ".claude/settings.json": file(claudeKeysJSON)}
 	files, err := skills.Files()
 	if err != nil {
 		t.Fatal(err)

@@ -60,6 +60,11 @@ func checkProject(t *testing.T, version string) string {
 		}
 	}
 	write("gabo.yaml", checkConfig)
+	// With gabo.yaml in place, gabo init again writes the engine keys gabo
+	// check verifies (intent 0006 S11).
+	if out, err := runInit(t, project, version); err != nil {
+		t.Fatalf("init after gabo.yaml: %v\n%s", err, out)
+	}
 	write(".gabo/runtimes/gabo-runtime-claude/SKILL.md", "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\n")
 	// The catalog copy's gabo-runtime-claude wins over .gabo/runtimes: its
 	// skill links and reviewer link are made below.
