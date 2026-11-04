@@ -1,0 +1,8 @@
+model = "gpt-5.5"
+
+[marketplaces.gabo-ai]
+source_type = "git"
+source = "https://github.com/testeos-z/gabo-ai.git"
+
+[plugins."gabo@gabo-ai"]
+enabled = true

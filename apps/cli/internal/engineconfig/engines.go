@@ -60,6 +60,7 @@ type Rule func(Input) Result
 // rules holds one entry per engine with a gabo integration.
 var rules = map[string]Rule{
 	Claude:   claudeRule,
+	Codex:    codexRule,
 	Opencode: opencodeRule,
 	Pi:       piRule,
 }
