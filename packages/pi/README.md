@@ -1,13 +1,13 @@
 # gabo package for Pi
 
-`@testeos-z/gabo-pi` is the gabo package for [Pi](https://github.com/earendil-works/pi). It brings two gabo skills into Pi and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` tool calls in a gabo project. Spec: [intent 0003](../../docs/product/intents/0003-pi-package/spec.md).
+`@gaboai/pi` is the gabo package for [Pi](https://github.com/earendil-works/pi). It brings two gabo skills into Pi and an extension that runs `gabo check --pre-write` at session start and before Pi's `write` and `edit` tool calls in a gabo project. Spec: [intent 0003](../../docs/product/intents/0003-pi-package/spec.md).
 
 ## Install
 
 From npm, pinned to a release version (the gabo CLI version you use):
 
 ```sh
-pi install npm:@testeos-z/gabo-pi@<version>
+pi install npm:@gaboai/pi@<version>
 ```
 
 During development, or before the package is on npm, install it from a local checkout. Pi loads a local package from its path without copying it:
@@ -24,7 +24,7 @@ The extension calls the `gabo` CLI, so install the CLI too (see [Install](../../
 
 | path | what it is |
 |---|---|
-| `package.json` | Manifest: name `@testeos-z/gabo-pi`, `version`, keyword `pi-package`, `pi.skills` and `pi.extensions`. The Pi host package `@earendil-works/pi-coding-agent` is an optional peer dependency only. |
+| `package.json` | Manifest: name `@gaboai/pi`, `version`, keyword `pi-package`, `pi.skills` and `pi.extensions`. The Pi host package `@earendil-works/pi-coding-agent` is an optional peer dependency only. |
 | `skills/gabo-pi/` | Bootstrap skill: how to install the CLI, run `gabo init` and print the setup prompt with `gabo prompt`. |
 | `skills/gabo-reviewer-config/` | A byte-for-byte copy of the catalog skill `apps/cli/internal/skills/gabo-reviewer-config/`: it configures the reviewer engine. No skill in the package runs reviews. |
 | `extensions/gabo.ts` | The `gabo` extension (below). |
