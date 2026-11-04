@@ -37,6 +37,8 @@ func TestCodexWritesTablesAppendOnly(t *testing.T) {
 		{"append", "wrote .codex/config.toml: added " + codexAll},
 		{"nonewline", "wrote .codex/config.toml: added " + codexAll},
 		{"partial", `wrote .codex/config.toml: added marketplaces.gabo-ai.source, plugins."gabo@gabo-ai".enabled`},
+		{"partial-crlf", `wrote .codex/config.toml: added marketplaces.gabo-ai.source, plugins."gabo@gabo-ai".enabled`},
+		{"header-eof", "wrote .codex/config.toml: added " + codexAll},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -49,7 +51,7 @@ func TestCodexWritesTablesAppendOnly(t *testing.T) {
 			if want := codexGolden(t, c.name, "want.toml"); !bytes.Equal(got, want) {
 				t.Errorf("new file =\n%s\nwant\n%s", got, want)
 			}
-			if old, ok := in.Files[CodexConfigPath]; ok && c.name != "partial" && !bytes.HasPrefix(got, old) {
+			if old, ok := in.Files[CodexConfigPath]; ok && !strings.HasPrefix(c.name, "partial") && c.name != "header-eof" && !bytes.HasPrefix(got, old) {
 				t.Errorf("existing bytes are not a prefix of the new file")
 			}
 			if !slices.Equal(res.Section.Lines, []string{c.line}) {
@@ -162,5 +164,44 @@ func TestIntegrateRunsTheCodexRule(t *testing.T) {
 	}
 	if want := codexGolden(t, "missing", "want.toml"); !bytes.Equal(writes[CodexConfigPath], want) || len(writes) != 1 {
 		t.Errorf("writes = %q, want only %s", writes, CodexConfigPath)
+	}
+}
+
+// A kept value of any TOML type never breaks the rule (S4), and the kept
+// line names it as TOML.
+func TestCodexKeepsArrayAndTableValues(t *testing.T) {
+	cases := []struct {
+		name, in string
+		lines    []string
+		suffix   string
+	}{
+		{
+			"array", "[marketplaces.gabo-ai]\nsource_type = \"git\"\nsource = [\"x\"]\n",
+			[]string{`kept marketplaces.gabo-ai.source = ['x'] in .codex/config.toml (your choice)`, `wrote .codex/config.toml: added plugins."gabo@gabo-ai".enabled`},
+			"\n\n[plugins.\"gabo@gabo-ai\"]\nenabled = true\n",
+		},
+		{
+			"table", "plugins.\"gabo@gabo-ai\".enabled.x = 1\n",
+			[]string{`kept plugins."gabo@gabo-ai".enabled = {x = 1} in .codex/config.toml (your choice)`, `wrote .codex/config.toml: added marketplaces.gabo-ai.source_type, marketplaces.gabo-ai.source`},
+			"\n\n[marketplaces.gabo-ai]\nsource_type = \"git\"\nsource = \"https://github.com/testeos-z/gabo-ai.git\"\n",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			res := codexRule(Input{Files: map[string][]byte{CodexConfigPath: []byte(c.in)}})
+			if !slices.Equal(res.Section.Lines, c.lines) {
+				t.Errorf("Lines = %q, want %q", res.Section.Lines, c.lines)
+			}
+			got, wrote := res.Writes[CodexConfigPath]
+			if c.suffix == "" {
+				if wrote {
+					t.Errorf("wrote %q, want no write", got)
+				}
+				return
+			}
+			if string(got) != c.in+strings.TrimPrefix(c.suffix, "\n") {
+				t.Errorf("new file = %q, want %q", got, c.in+strings.TrimPrefix(c.suffix, "\n"))
+			}
+		})
 	}
 }

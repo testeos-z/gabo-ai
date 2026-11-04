@@ -1,0 +1,5 @@
+[agents]
+max_threads = 4
+
+[marketplaces.gabo-ai]
+source_type = "git"

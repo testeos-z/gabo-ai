@@ -3,6 +3,7 @@ package engineconfig
 import (
 	"bytes"
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 
@@ -97,7 +98,7 @@ func codexRule(in Input) Result {
 			case !ok:
 				missing = append(missing, k)
 				added = append(added, t.header+"."+k.name)
-			case v != k.value:
+			case !reflect.DeepEqual(v, k.value):
 				res.Section.Lines = append(res.Section.Lines, fmt.Sprintf("kept %s.%s = %s in %s (your choice)", t.header, k.name, codexLiteral(v), CodexConfigPath))
 			}
 		}
@@ -165,7 +166,7 @@ func codexHolds(text []byte, old map[string]any) bool {
 			if !had {
 				want = k.value
 			}
-			if got, ok := table[k.name]; !ok || got != want {
+			if got, ok := table[k.name]; !ok || !reflect.DeepEqual(got, want) {
 				return false
 			}
 		}
@@ -186,9 +187,18 @@ func codexLookup(doc map[string]any, path []string) (map[string]any, bool) {
 	return cur, true
 }
 
+// codexLiteral names a kept value as TOML: a quoted string, a scalar as
+// written, an array or a table inline.
 func codexLiteral(v any) string {
-	if s, ok := v.(string); ok {
-		return fmt.Sprintf("%q", s)
+	switch v := v.(type) {
+	case string:
+		return fmt.Sprintf("%q", v)
+	case []any, map[string]any:
+		var b bytes.Buffer
+		enc := toml.NewEncoder(&b).SetTablesInline(true).SetIndentTables(false)
+		if err := enc.Encode(map[string]any{"v": v}); err == nil {
+			return strings.TrimSpace(strings.TrimPrefix(b.String(), "v = "))
+		}
 	}
 	return fmt.Sprintf("%v", v)
 }
