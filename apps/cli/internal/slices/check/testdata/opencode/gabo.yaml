@@ -1,0 +1,16 @@
+repo:
+  name: o/r
+  integration_branch: dev
+runtimes:
+  coder: opencode
+  reviewer: opencode
+  assistant: opencode
+parallelism: 3
+review:
+  checks: [go test ./...]
+  human_only_paths: [.github/]
+slots:
+  reviewer_placement:
+    adapter: .gabo/skills/gabo-reviewer-placement-local/SKILL.md
+  agent_host:
+    adapter: .gabo/skills/gabo-agent-host-local/SKILL.md
