@@ -1,0 +1,40 @@
+name: Sync pi/pkg-up
+
+# Every push to main is merged into pi/pkg-up, then the Pi package publish
+# workflow is dispatched on pi/pkg-up. Pushes made with GITHUB_TOKEN do not
+# trigger other workflows, so the publish run is started explicitly.
+# GITHUB_TOKEN may not push workflow changes, so the merge keeps pi/pkg-up's
+# own .github/workflows/ (see packages/pi/scripts/sync-pkg-up.sh).
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: sync-pi-pkg-up
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Merge main into pi/pkg-up
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          bash packages/pi/scripts/sync-pkg-up.sh
+
+      - name: Dispatch the Pi package publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run publish-pi.yml --ref pi/pkg-up --repo "$GITHUB_REPOSITORY"

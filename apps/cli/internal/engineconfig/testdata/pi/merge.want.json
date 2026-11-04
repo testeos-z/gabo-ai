@@ -1,0 +1,8 @@
+{
+  "theme": "dark",
+  "extensions": ["./ext/a.ts"],
+  "packages": [
+    "npm:gentle-pi",
+    "npm:@gabo-ai/pi@0.2.6"
+  ]
+}

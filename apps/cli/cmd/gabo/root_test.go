@@ -194,7 +194,7 @@ func TestInitCopiesEmbeddedCatalogWithoutReviewer(t *testing.T) {
 
 func TestInitNewerStampExitsWithUpgradeCommand(t *testing.T) {
 	project := t.TempDir()
-	cfg := []byte("repo:\n  name: o/r\n")
+	cfg := []byte("repo:\n  name: o/r\nruntimes:\n  coder: opencode\n  reviewer: opencode\n  assistant: opencode\n")
 	if err := os.WriteFile(filepath.Join(project, "gabo.yaml"), cfg, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -327,7 +327,7 @@ func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
 		t.Setenv("HOME", home)
 		t.Setenv("XDG_DATA_HOME", xdg)
 		t.Chdir(project)
-		cfg := []byte("repo:\n  name: o/r\n")
+		cfg := []byte("repo:\n  name: o/r\nruntimes:\n  coder: opencode\n  reviewer: opencode\n  assistant: opencode\n")
 		if err := os.WriteFile(filepath.Join(project, "gabo.yaml"), cfg, 0o644); err != nil {
 			t.Fatal(err)
 		}

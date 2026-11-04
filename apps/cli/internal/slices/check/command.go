@@ -51,7 +51,7 @@ func NewCommand(factory Factory) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check [--pre-write [<path>...]]",
 		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
-		Long: "Validate the project read-only and engine-neutral (PRD R33):\n" +
+		Long: "Validate the project read-only, engine-neutral except for the keys below (PRD R33):\n" +
 			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
 			"    against the embedded JSON Schemas;\n" +
 			"  - no config left under its name from before the gabo-ai rename (a project\n" +
@@ -69,6 +69,12 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in\n" +
 			"    the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json\n" +
 			"    and .opencode/opencode.jsonc (never ~/.config/opencode);\n" +
+			"  - for each of claude, codex and pi a role runs on, the keys gabo init writes:\n" +
+			"    .claude/settings.json extraKnownMarketplaces.\"gabo-ai\" and\n" +
+			"    enabledPlugins.\"gabo@gabo-ai\", the .codex/config.toml tables\n" +
+			"    [marketplaces.gabo-ai] and [plugins.\"gabo@gabo-ai\"], and a .pi/settings.json\n" +
+			"    packages entry for npm:@gabo-ai/pi (any version); a key set to another\n" +
+			"    value passes, and other engines' files are never read;\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +

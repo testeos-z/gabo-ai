@@ -15,6 +15,8 @@ Both entries reach the same setup; pick the one that fits you.
 
 `gabo init` copies the skill catalog to `.gabo/skills/`, writes the version stamp `.gabo/VERSION`, installs the `gabo-reviewer` skill at user level (never in the project) and, on a fresh project, prints the prompt after its `next:` line. It never touches an existing config, so rerunning it, or the prompt, is safe.
 
+`gabo init` also configures the engines declared in `gabo.yaml` (`runtimes.coder`, `runtimes.reviewer` and `runtimes.assistant`): it merges the gabo plugin or package keys into the project settings of Claude Code (`.claude/settings.json`), Codex (`.codex/config.toml`) and Pi (`.pi/settings.json`), keeping every other key, writes nothing for OpenCode (it reports whether the stage-gate plugin that `gabo-runtime-opencode` installs is in place), and ends with an `engine integration:` report that lists what it wrote and what you still need to do. On a fresh project there is no `gabo.yaml` yet, so it writes no engine file and says so; once your agent has written `gabo.yaml`, `gabo init` runs again (step 5 of the prompt does it) and configures the declared engines. It never creates or edits `gabo.yaml`.
+
 `gabo prompt` prints the same prompt, byte for byte and nothing else, at any time, with or without a project; it reads no config and writes nothing.
 
 You answer every question; the agent applies no value you did not accept and asks one question at a time. Config files hold only the names of environment variables, never a secret value.
@@ -46,6 +48,7 @@ The prompt names no engine; the agent loads the runtime skill of the engine it r
 | Claude Code | `gabo-runtime-claude` | `.claude/agents/` | none |
 | Pi | `gabo-runtime-pi` | `.pi/agents/` | a subagent package (below) |
 | Codex | `gabo-runtime-codex` | `.codex/agents/` (TOML) | none |
+| OpenCode | `gabo-runtime-opencode` | `.opencode/agents/` | none beyond OpenCode itself |
 | another engine | written first with `gabo-runtime-builder` | the engine's own agent folder | subagents and skills; the builder refuses an engine without them and says why |
 
 **Pi needs a subagent package.** Pi core has no subagents, so `gabo-runtime-pi` builds nothing until one is present; there is no fallback, and the agent refuses and tells you what to install. Recommended for subagents: gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); it needs Pi >= 1.2.0 and Node >= 22.19.0. Another subagent package you already use is acceptable once the agent confirms it discovers project agents in `.pi/agents/`. As the recommended setup, the refusal also points to the full [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) (its methodology with RDD and the Engram memory stack), set up for Pi with `gentle-ai install --agent pi`. The agent explains why the package is needed and installs it only after you accept; gabo-ai never edits Pi's or gentle-pi's own configuration.
@@ -78,10 +81,11 @@ Set up gabo-ai in this project. Work in this project's root directory, follow th
 2. If `.gabo/skills/` is missing, run `gabo init` here.
 3. Load these skills from `.gabo/skills/`: `gabo-setup`, `gabo-config-writer`, `gabo-agent-templates`, and the runtime skill for the engine you are running in; if `.gabo/skills/` holds none for your engine, load `gabo-runtime-builder` and write that runtime skill first.
 4. Following `gabo-setup` and `gabo-config-writer`, ask me the setup questions one at a time, then write the global user file and the project config `gabo.yaml`.
-5. With `gabo-agent-templates` and the runtime skill, build every agent of the neutral agent spec in this engine's format.
-6. Run `gabo check`, fix every failure it reports and rerun it until it passes.
-7. Run the per-slot smoke test from `gabo-setup` and report each slot as verified or unverified with the reason.
-8. Following `gabo-setup`, guide this project into the per-change model. Ask me which technologies to use (language, framework, database and hosting): I choose, you only propose options and help configure them, and the choice goes into the TRD. Scaffold a short global context: a conceptual PRD, a conventions-only TRD, a `DESIGN.md` only if the app has a UI, a `MIGRATIONS.md` only if it has a database, and an empty `docs/product/intents/`, with no upfront schema, plan or stories. Ask me about `wave.after`: `next` chains to the next accepted intent when a wave ends, `wait` stops after the wave and is the default; I accept each spec one at a time. Then point me to creating the first intent.
+5. Run `gabo init` again here, so it writes this engine's project integration now that `gabo.yaml` exists.
+6. With `gabo-agent-templates` and the runtime skill, build every agent of the neutral agent spec in this engine's format.
+7. Run `gabo check`, fix every failure it reports and rerun it until it passes.
+8. Run the per-slot smoke test from `gabo-setup` and report each slot as verified or unverified with the reason.
+9. Following `gabo-setup`, guide this project into the per-change model. Ask me which technologies to use (language, framework, database and hosting): I choose, you only propose options and help configure them, and the choice goes into the TRD. Scaffold a short global context: a conceptual PRD, a conventions-only TRD, a `DESIGN.md` only if the app has a UI, a `MIGRATIONS.md` only if it has a database, and an empty `docs/product/intents/`, with no upfront schema, plan or stories. Ask me about `wave.after`: `next` chains to the next accepted intent when a wave ends, `wait` stops after the wave and is the default; I accept each spec one at a time. Then point me to creating the first intent.
 
 About memory: before you configure the memory slot, explain that one memory backend and one memory project name should be shared by every agent of this project, local and cloud, for every developer, except the reviewer, which never reads or writes it; a local-only memory is fine, for example for a solo developer. Offer Engram with Engram Cloud sync first as the recommendation, list the other backends `gabo-setup` names, record only the memory adapter and the memory project name, and never set up the backend or its credentials. The memory smoke test writes only under a scratch topic and deletes the probe afterwards, or writes nothing when the backend cannot delete.
 <!-- gabo-setup-prompt:end -->

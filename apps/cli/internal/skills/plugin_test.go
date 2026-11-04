@@ -261,3 +261,25 @@ func TestPluginPreWriteHookScript(t *testing.T) {
 		t.Fatalf("pre-write hook shell tests: %v\n%s", err, out)
 	}
 }
+
+// releaseVersion is the gabo release the plugin manifests and the Pi package
+// carry (intent 0006 S14).
+const releaseVersion = "0.2.6"
+
+// The Claude Code and Codex plugin manifests and the @gabo-ai/pi package all
+// read the current release version (intent 0006 S14).
+func TestManifestsCarryReleaseVersion(t *testing.T) {
+	t.Parallel()
+	for _, rel := range []string{
+		"plugins/claude-code/.claude-plugin/plugin.json",
+		"plugins/codex/.codex-plugin/plugin.json",
+		"packages/pi/package.json",
+	} {
+		if v := readJSON(t, rel)["version"]; v != releaseVersion {
+			t.Errorf("%s version %v, want %s", rel, v, releaseVersion)
+		}
+	}
+	if n := readJSON(t, "packages/pi/package.json")["name"]; n != "@gabo-ai/pi" {
+		t.Errorf("packages/pi/package.json name %v, want @gabo-ai/pi", n)
+	}
+}

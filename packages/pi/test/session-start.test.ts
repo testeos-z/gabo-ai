@@ -149,8 +149,8 @@ describe("extension source holds no rule (S4, S7, D7, D9)", () => {
   });
   const sources = sourceFiles.map((f) => ({ f, text: readFileSync(f, "utf8") }));
 
-  const factsGo = readFileSync(join(repoRoot, "apps", "cli", "internal", "slices", "check", "facts.go"), "utf8");
-  const refusal = JSON.parse(factsGo.match(/const SubagentRefusal = ("(?:[^"\\]|\\.)*")/)?.[1] ?? '""') as string;
+  const piGo = readFileSync(join(repoRoot, "apps", "cli", "internal", "engineconfig", "pi.go"), "utf8");
+  const refusal = JSON.parse(piGo.match(/const SubagentRefusal = ("(?:[^"\\]|\\.)*")/)?.[1] ?? '""') as string;
   const refusalSentences = refusal
     .split(/(?<=\.)\s+/)
     .map((s) => s.trim())
