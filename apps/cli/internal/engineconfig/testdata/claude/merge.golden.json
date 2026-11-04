@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": ["Bash(go test:*)"],
+    "deny": []
+  },
+  "hooks": {
+    "PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "echo hi"}]}]
+  },
+  "enabledPlugins": {
+    "other@market": true,
+    "gabo@gabo-ai": true
+  },
+  "extraKnownMarketplaces": {
+    "gabo-ai": {
+      "source": {
+        "source": "github",
+        "repo": "testeos-z/gabo-ai"
+      }
+    }
+  }
+}
