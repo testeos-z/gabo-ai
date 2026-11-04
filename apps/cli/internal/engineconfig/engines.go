@@ -61,6 +61,7 @@ type Rule func(Input) Result
 var rules = map[string]Rule{
 	Claude: claudeRule,
 	Codex:  codexRule,
+	Pi:     piRule,
 }
 
 // Integrate runs the rule of each engine in set, in set order, and returns
