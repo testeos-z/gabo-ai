@@ -4,6 +4,10 @@ The `gabo` plugin of the `gabo-ai` Codex marketplace (this repository, [`.agents
 
 ## Install
 
+**With `gabo init`.** When `gabo.yaml` names `codex` in `runtimes.*`, `gabo init` writes the plugin's project keys `[marketplaces.gabo-ai]` (`source_type = "git"`, `source = "https://github.com/testeos-z/gabo-ai.git"`) and `[plugins."gabo@gabo-ai"]` (`enabled = true`) to the project's `.codex/config.toml`, never to your global Codex config or anything under `CODEX_HOME`. It only adds missing keys and keeps every value you set. What you still do, as its `engine integration:` report says: trust the project in Codex, so it loads `.codex/config.toml`; trust both gabo hooks in `/hooks` (see below); and, while `testeos-z/gabo-ai` is private, set up git credentials that can read it. While the fallback is printed, the report also says: if Codex does not list the gabo plugin after trust, run the two manual commands below. Commit `.codex/config.toml`.
+
+**By hand.** As the alternative, install the plugin by hand:
+
 ```sh
 codex plugin marketplace add testeos-z/gabo-ai
 codex plugin add gabo@gabo-ai
@@ -46,4 +50,4 @@ A catalog skill added or removed needs the same change in `plugins/codex/skills/
 
 ## Release checklist
 
-Both plugins share one version: the gabo CLI release version `x.y.z` (spec S11, D8). Follow the [release checklist](../claude-code/README.md#release-checklist) of the Claude Code plugin; it sets `version` in both `plugins/claude-code/.claude-plugin/plugin.json` and `plugins/codex/.codex-plugin/plugin.json` in the same release commit as the CLI tag `apps/cli/v<x.y.z>`. The marketplace entries carry no `version`. `go -C apps/cli test ./...` fails when the two manifests differ or a copy has drifted.
+Both plugins share one version: the gabo CLI release version `x.y.z` (spec S11, D8), currently `0.2.6`; the [Pi package](../../packages/pi/README.md) `@gabo-ai/pi` carries the same version. Follow the [release checklist](../claude-code/README.md#release-checklist) of the Claude Code plugin; it sets `version` in both `plugins/claude-code/.claude-plugin/plugin.json` and `plugins/codex/.codex-plugin/plugin.json` in the same release commit as the CLI tag `apps/cli/v<x.y.z>`. The marketplace entries carry no `version`. `go -C apps/cli test ./...` fails when the two manifests differ or a copy has drifted.
