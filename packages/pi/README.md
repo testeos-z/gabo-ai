@@ -10,7 +10,9 @@ From npm, pinned to a release version (the gabo CLI version you use):
 pi install npm:@gabo-ai/pi@<version>
 ```
 
-During development, or before the package is on npm, install it from a local checkout. Pi loads a local package from its path without copying it:
+In a gabo project you can skip that command: when `gabo.yaml` declares `pi` in `runtimes`, `gabo init` writes the `packages` entry `npm:@gabo-ai/pi@<gabo version>` to the project's `.pi/settings.json` (pinned to the version of the `gabo` binary that ran it; a development build writes nothing and prints the entry to add by hand). Pi reads that file, and installs and loads the package, only after you trust the project.
+
+During development, or to try unreleased changes, install it from a local checkout. Pi loads a local package from its path without copying it:
 
 ```sh
 pi install /path/to/gabo-ai/packages/pi
@@ -47,7 +49,7 @@ The extension is a thin connection layer. It collects the session facts (the nam
 
 ## Versioning
 
-The package version equals the gabo CLI release version: one version, one release tag `apps/cli/v<x.y.z>`. A package release follows every CLI release, even with no package change. The release steps are in the [release checklist](../../plugins/claude-code/README.md#release-checklist).
+The package version follows the gabo release and equals the gabo CLI release version (today 0.2.6): one version, one release tag `apps/cli/v<x.y.z>`. A package release follows every CLI release, even with no package change. The release steps are in the [release checklist](../../plugins/claude-code/README.md#release-checklist).
 
 ## Release pipeline
 
