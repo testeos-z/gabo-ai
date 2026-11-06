@@ -153,7 +153,13 @@ func TestRemoveMainSessionOfEnginesNotInTheSet(t *testing.T) {
 			}
 		})
 	}
-	if !Removable(Claude) || Removable(Codex) || Removable("acme") {
-		t.Error("Removable: want only claude in this task")
+	if !Removable(Claude) || !Removable(Opencode) || Removable(Codex) || Removable(Pi) || Removable("acme") {
+		t.Error("Removable: want claude and opencode")
+	}
+	if !slices.Equal(RemovalFiles(Claude), []string{ClaudeSettings}) || !slices.Equal(RemovalFiles(Opencode), OpencodeConfigs) || RemovalFiles(Codex) != nil {
+		t.Errorf("RemovalFiles: claude %q opencode %q codex %q", RemovalFiles(Claude), RemovalFiles(Opencode), RemovalFiles(Codex))
+	}
+	if !slices.Equal(OpencodeConfigs, []string{"opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"}) {
+		t.Errorf("OpencodeConfigs = %q", OpencodeConfigs)
 	}
 }

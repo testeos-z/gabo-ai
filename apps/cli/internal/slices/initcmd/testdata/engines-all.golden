@@ -15,6 +15,6 @@ you still need to:
   - codex: trust both gabo hooks in /hooks
   - codex: if Codex does not list the gabo plugin after trust, run: codex plugin marketplace add testeos-z/gabo-ai
   - codex: if Codex does not list the gabo plugin after trust, run: codex plugin add gabo@gabo-ai
-  - opencode: ask your agent to build the agents with gabo-runtime-opencode (it installs .opencode/plugins/gabo-stage-gate.js and the project-level experimental.subagent_depth key)
+  - opencode: ask your agent to build the agents with gabo-runtime-opencode (it installs .opencode/plugins/gabo-stage-gate.js)
   - pi: trust the project in Pi so it installs and loads @gabo-ai/pi from .pi/settings.json
   - pi: install a subagent package (see the refusal above)

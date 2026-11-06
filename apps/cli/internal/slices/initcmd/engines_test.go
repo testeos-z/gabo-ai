@@ -379,3 +379,147 @@ func TestEngineStepRemovesTheGaboAgent(t *testing.T) {
 		})
 	}
 }
+
+const (
+	opencodeAgent   = root + "/" + engineconfig.OpencodeAgentFile
+	opencodeNew     = root + "/.opencode/opencode.json"
+	opencodeRootCfg = root + "/opencode.json"
+	opencodeJSONC   = root + "/opencode.jsonc"
+	gaboDefault     = "{\n  \"model\": \"x\", // pinned\n  \"default_agent\": \"gabo-assistant\"\n}\n"
+	noDefault       = "{\n  \"model\": \"x\" // pinned\n}\n"
+)
+
+// Intent 0010 S2, S8: with OpenCode as the assistant a fresh project gets a
+// new .opencode/opencode.json with default_agent, and the report names
+// default_agent and the build step while the agent file is missing.
+func TestEngineStepOpencodeAssistantGolden(t *testing.T) {
+	t.Parallel()
+	s := newStore(map[string]string{})
+	r := engineStepAs(s, "opencode", engineconfig.Set("claude", "opencode")...)
+	if r.Failed() {
+		t.Fatalf("failed:\n%s", r.Render())
+	}
+	golden(t, "engines-opencode-assistant.golden", r.Render())
+	if got := s.Files[opencodeNew]; got != "{\n  \"default_agent\": \"gabo-assistant\"\n}\n" {
+		t.Fatalf("%s =\n%s", opencodeNew, got)
+	}
+	s.Files[opencodeAgent] = "---\nname: gabo-assistant\n---\n"
+	s.Writes = nil
+	again := engineStepAs(s, "opencode", engineconfig.Set("claude", "opencode")...)
+	if len(s.Writes) != 0 || strings.Contains(again.Render(), "main session needs") {
+		t.Fatalf("second run wrote %v:\n%s", s.Writes, again.Render())
+	}
+}
+
+// Intent 0010 S2: initcmd reads the OpenCode configs: the first existing one
+// gains only the key, comments kept; the user's own value is kept; a
+// symlinked target or .opencode directory writes nothing and prints one ✗.
+func TestEngineStepOpencodeDefaultAgent(t *testing.T) {
+	t.Parallel()
+	jsonc := "{\n  // mine\n  \"model\": \"x\" /* pinned */\n}\n"
+	tests := []struct {
+		name   string
+		files  map[string]string
+		modes  map[string]fs.FileMode
+		target string
+		want   string
+		lines  []string
+		failed bool
+	}{
+		{"jsonc with comments", map[string]string{opencodeJSONC: jsonc, opencodeNew: "{}\n"}, nil, opencodeJSONC,
+			"{\n  // mine\n  \"model\": \"x\", /* pinned */\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			[]string{"wrote opencode.jsonc: added default_agent", "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
+		{"user's value", map[string]string{opencodeRootCfg: `{"default_agent": "gentle-orchestrator"}`}, nil, opencodeRootCfg,
+			`{"default_agent": "gentle-orchestrator"}`,
+			[]string{`kept opencode.json default_agent: "gentle-orchestrator" (your setting; gabo leaves it)`, "no .opencode/plugins/gabo-stage-gate.js yet; nothing written"}, false},
+		{"symlinked target", map[string]string{opencodeRootCfg: "{}"}, map[string]fs.FileMode{opencodeRootCfg: fs.ModeSymlink}, opencodeRootCfg, "{}",
+			[]string{"✗ opencode.json: it is a symlink; gabo init writes only inside the project, so replace it with a real file and run gabo init again"}, true},
+		{"symlinked .opencode", nil, map[string]fs.FileMode{root + "/.opencode": fs.ModeSymlink | fs.ModeDir}, opencodeNew, "",
+			[]string{"✗ .opencode/opencode.json: .opencode is a symlink; gabo init writes only inside the project, so replace it with a real directory and run gabo init again"}, true},
+		{"unparsable", map[string]string{opencodeRootCfg: "{,}"}, nil, opencodeRootCfg, "{,}",
+			[]string{"✗ opencode.json: invalid JSONC (invalid character ',' looking for beginning of object key string); fix it and run gabo init again", "no .opencode/plugins/gabo-stage-gate.js yet"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			files := maps.Clone(tt.files)
+			if files == nil {
+				files = map[string]string{}
+			}
+			s := newStore(files)
+			s.Modes = tt.modes
+			r := engineStepAs(s, "opencode", "opencode")
+			if got := s.Files[tt.target]; got != tt.want {
+				t.Fatalf("%s =\n%s\nwant\n%s", tt.target, got, tt.want)
+			}
+			for _, w := range s.Writes {
+				if w != tt.target || tt.failed {
+					t.Fatalf("writes = %v", s.Writes)
+				}
+			}
+			if got := sectionOf(t, r, "opencode").Lines; !slices.Equal(got, tt.lines) {
+				t.Fatalf("lines =\n%q\nwant\n%q", got, tt.lines)
+			}
+			if r.Failed() != tt.failed {
+				t.Fatalf("Failed() = %v", r.Failed())
+			}
+		})
+	}
+}
+
+// Intent 0010 S4, D2: with another assistant engine each of the four OpenCode
+// configs holding the gabo default_agent loses only that member, reported,
+// also when opencode is no longer in runtimes.*; a symlinked file of an
+// engine outside the set is left alone without a line.
+func TestEngineStepRemovesTheGaboDefaultAgent(t *testing.T) {
+	t.Parallel()
+	all := func() map[string]string {
+		files := map[string]string{}
+		for _, p := range engineconfig.OpencodeConfigs {
+			files[root+"/"+p] = gaboDefault
+		}
+		return files
+	}
+	t.Run("opencode no longer in runtimes", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(all())
+		r := engineStepAs(s, "claude", "claude")
+		if r.Failed() {
+			t.Fatalf("failed:\n%s", r.Render())
+		}
+		golden(t, "engines-default-agent-removed.golden", r.Render())
+		for _, p := range engineconfig.OpencodeConfigs {
+			if got := s.Files[root+"/"+p]; got != noDefault {
+				t.Fatalf("%s =\n%s", p, got)
+			}
+		}
+		s.Writes = nil
+		again := engineStepAs(s, "claude", "claude")
+		if len(s.Writes) != 0 || strings.Contains(again.Render(), "opencode") {
+			t.Fatalf("second run wrote %v:\n%s", s.Writes, again.Render())
+		}
+	})
+	t.Run("opencode still in runtimes", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(all())
+		r := engineStepAs(s, "claude", engineconfig.Set("claude", "opencode")...)
+		lines := sectionOf(t, r, "opencode").Lines
+		if len(lines) != 5 || lines[0] != `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)` {
+			t.Fatalf("lines = %q", lines)
+		}
+		for _, p := range engineconfig.OpencodeConfigs {
+			if got := s.Files[root+"/"+p]; got != noDefault {
+				t.Fatalf("%s =\n%s", p, got)
+			}
+		}
+	})
+	t.Run("symlink outside the set is not read", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(map[string]string{opencodeRootCfg: gaboDefault})
+		s.Modes = map[string]fs.FileMode{opencodeRootCfg: fs.ModeSymlink}
+		r := engineStepAs(s, "claude", "claude")
+		if s.Files[opencodeRootCfg] != gaboDefault || slices.Contains(s.Writes, opencodeRootCfg) || strings.Contains(r.Render(), "opencode") || r.Failed() {
+			t.Fatalf("writes %v:\n%s", s.Writes, r.Render())
+		}
+	})
+}

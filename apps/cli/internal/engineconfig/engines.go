@@ -95,7 +95,15 @@ func Integrate(set []string, in Input) (Report, map[string][]byte) {
 // from that engine's file when the engine is not in the set (intent 0010
 // S4, D2). The engine's own rule removes it when the engine is in the set.
 var removals = map[string]Rule{
-	Claude: claudeRemoval,
+	Claude:   claudeRemoval,
+	Opencode: opencodeRemoval,
+}
+
+// removalFiles are, per engine with a removal, the files that may hold its
+// main-session key.
+var removalFiles = map[string][]string{
+	Claude:   {ClaudeSettings},
+	Opencode: OpencodeConfigs,
 }
 
 // Removable reports whether engine has a main-session removal, so the
@@ -105,8 +113,14 @@ func Removable(engine string) bool {
 	return ok
 }
 
+// RemovalFiles returns the project files the main-session removal of engine
+// reads and may change, in lookup order; nil for an engine without one.
+func RemovalFiles(engine string) []string {
+	return slices.Clone(removalFiles[engine])
+}
+
 // Remove runs the main-session removal of each engine that is not in set,
-// in the fixed order, and returns a section only for an engine whose file
+// in the fixed order, and returns a section only for an engine whose files
 // changed. A missing or unreadable file changes nothing and reports
 // nothing: gabo init does not own the files of an engine it no longer
 // integrates, it only clears its own value from them.

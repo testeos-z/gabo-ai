@@ -1,0 +1,11 @@
+engine integration:
+  claude:
+    wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai", agent
+  opencode:
+    removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)
+    removed opencode.jsonc default_agent: "gabo-assistant" (runtimes.assistant is claude)
+    removed .opencode/opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)
+    removed .opencode/opencode.jsonc default_agent: "gabo-assistant" (runtimes.assistant is claude)
+you still need to:
+  - claude: trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply
+  - claude: ask your agent to build the agents (the main session needs .claude/agents/gabo-assistant.md)

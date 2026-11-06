@@ -40,11 +40,14 @@ func TestCommandHelpNamesTheEngineFiles(t *testing.T) {
 	}
 	help := strings.Join(strings.Fields(out.String()), " ")
 	for _, s := range []string{
-		".claude/settings.json, .codex/config.toml and .pi/settings.json are the only engine files it writes",
+		".claude/settings.json, .codex/config.toml, .pi/settings.json and the OpenCode configs named below are the only engine files it writes",
 		"it never writes user-level engine config",
 		`With runtimes.assistant: claude it also sets the top-level "agent": "gabo-assistant" key of .claude/settings.json`,
 		`another value of "agent" is yours and kept`,
 		`With another assistant engine it removes that exact "agent" value`,
+		`With runtimes.assistant: opencode it sets "default_agent": "gabo-assistant" in the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json and .opencode/opencode.jsonc, else in a new .opencode/opencode.json, comments kept`,
+		`another value of "default_agent" is yours and kept`,
+		`With another assistant engine it removes that exact "default_agent" value from each of those files, also when opencode is no longer in runtimes`,
 	} {
 		if !strings.Contains(help, s) {
 			t.Errorf("help is missing %q:\n%s", s, out.String())

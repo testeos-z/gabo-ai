@@ -32,12 +32,17 @@ func NewCommand(factory Factory) *cobra.Command {
 			"into your agent; it writes the prompt nowhere.\n" +
 			"With a valid " + ConfigFile + ", it writes the project-level gabo integration keys of each\n" +
 			"engine in runtimes, merged with the existing project config (unrelated keys kept):\n" +
-			engineconfig.ClaudeSettings + ", " + engineconfig.CodexConfigPath + " and " + engineconfig.PiSettings + " are the only engine\n" +
-			"files it writes; it never writes user-level engine config.\n" +
+			engineconfig.ClaudeSettings + ", " + engineconfig.CodexConfigPath + ", " + engineconfig.PiSettings + " and the OpenCode configs\n" +
+			"named below are the only engine files it writes; it never writes user-level engine config.\n" +
 			"With runtimes.assistant: claude it also sets the top-level \"agent\": \"gabo-assistant\" key of\n" +
 			engineconfig.ClaudeSettings + " so Claude Code starts in the gabo assistant; another value of \"agent\" is\n" +
 			"yours and kept. With another assistant engine it removes that exact \"agent\" value,\n" +
 			"also when claude is no longer in runtimes.\n" +
+			"With runtimes.assistant: opencode it sets \"default_agent\": \"gabo-assistant\" in the first existing of\n" +
+			strings.Join(engineconfig.OpencodeConfigs[:3], ", ") + " and " + engineconfig.OpencodeConfigs[3] + ", else in a new\n" +
+			engineconfig.OpencodeNewConfig + ", comments kept; another value of \"default_agent\" is yours and kept.\n" +
+			"With another assistant engine it removes that exact \"default_agent\" value from each of those\n" +
+			"files, also when opencode is no longer in runtimes.\n" +
 			"init never creates or edits " + ConfigFile + " or the user config.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
