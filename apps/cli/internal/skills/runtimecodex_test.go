@@ -208,3 +208,83 @@ func TestRuntimeCodexKeepsSharedLinks(t *testing.T) {
 	t.Parallel()
 	assertSharedRemovalRule(t, runtimeCodex, runtimeCodexDoc(t))
 }
+
+// codexMainSession returns the Main-Session Entry section of the Codex
+// runtime skill (intent 0009 T6).
+func codexMainSession(t *testing.T) string {
+	t.Helper()
+	_, after, ok := strings.Cut(runtimeCodexDoc(t), "\n## Main-Session Entry\n")
+	if !ok {
+		t.Fatalf("%s: no ## Main-Session Entry section", runtimeCodex)
+	}
+	section, _, _ := strings.Cut(after, "\n## ")
+	return section
+}
+
+// intent 0009 S1, S3, D1: with runtimes.assistant codex the skill links the
+// assistant skill and writes the T1 block into the file Codex loads.
+func TestRuntimeCodexWritesTheAssistantEntry(t *testing.T) {
+	t.Parallel()
+	section := codexMainSession(t)
+	for _, s := range []string{
+		"When `runtimes.assistant` is `codex`",
+		"make `.agents/skills/gabo-assistant` a relative symlink to `../../.gabo/skills/gabo-assistant`",
+		"`main_session.block` of `.gabo/skills/gabo-agent-templates/agents.yaml`",
+		"`.gabo/skills/gabo-assistant/SKILL.md`",
+		"into `AGENTS.override.md` when it exists, else `AGENTS.md`, created when neither exists",
+		"at most 2048 bytes",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s Main-Session Entry: missing %q", runtimeCodex, s)
+		}
+	}
+}
+
+// intent 0009 S3: the block write touches only the bytes between the markers
+// and is idempotent; a symlinked file is written through only inside the repo.
+func TestRuntimeCodexWritesTheBlockInPlace(t *testing.T) {
+	t.Parallel()
+	section := codexMainSession(t)
+	for _, s := range []string{
+		"`<!-- GABO_ASSISTANT_START -->`", "`<!-- GABO_ASSISTANT_END -->`",
+		"replace only the bytes between the markers",
+		"append it after one blank line when absent",
+		"keep every other byte",
+		"a second build leaves the file byte-identical",
+		"write through a symlinked file only when its target stays inside the repository",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s Main-Session Entry: missing %q", runtimeCodex, s)
+		}
+	}
+}
+
+// intent 0009 S1, S4: away from codex the skill removes its block and the
+// shared link only when no declared engine using .agents/skills is the
+// assistant; every build removes the other full-tier engines' entries from
+// the one T1 table (D4).
+func TestRuntimeCodexRemovesStaleEntries(t *testing.T) {
+	t.Parallel()
+	section := codexMainSession(t)
+	for _, s := range []string{
+		"When `runtimes.assistant` is not `codex`, remove its block",
+		"removes the shared link only when no declared engine using .agents/skills is runtimes.assistant",
+		"On every build, remove the gabo entry of every other full-tier engine in the Main-Session Entry table of `gabo-agent-templates`",
+		"recognized only by its gabo identity",
+		"a key whose value is exactly `gabo-assistant`",
+		"keep and report",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s Main-Session Entry: missing %q", runtimeCodex, s)
+		}
+	}
+	doc := runtimeCodexDoc(t)
+	for _, s := range []string{
+		"https://learn.chatgpt.com/docs/agent-configuration/agents-md",
+		"the main-session entry written, refreshed or removed",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", runtimeCodex, s)
+		}
+	}
+}
