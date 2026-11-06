@@ -32,10 +32,10 @@ func readTestdata(t *testing.T, name string) string {
 // runtime skill, and every spec agent built in the shape of spec 0004 S3
 // (.opencode/agents/<id>.md: frontmatter description, mode and permission;
 // the body starts with <!-- gabo-version: x.y.z -->, then the Skills: line
-// of build step 6, omitted for an empty list);
-// each spec skill linked as .opencode/skills/<name> ->
-// ../../.gabo/skills/<name>, the fixed-name links of the tree's skill
-// adapters, and the tree's .opencode/opencode.jsonc.
+// of build step 7, omitted for an empty list);
+// each spec skill linked in the shared .agents/skills (intent 0008 S3) as
+// .agents/skills/<name> -> ../../.gabo/skills/<name>, the fixed-name links
+// of the tree's skill adapters, and the tree's .opencode/opencode.jsonc.
 func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
 	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n")}
@@ -60,16 +60,17 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 			"<!-- gabo-version: " + version + " -->\n" +
 			skillsLine(opencodeWhere, list) + rest)
 		for _, name := range a.Skills {
-			proj[".opencode/skills/"+name] = symlink("../../.gabo/skills/" + name)
+			proj[".agents/skills/"+name] = symlink("../../.gabo/skills/" + name)
 		}
 	}
-	proj[".opencode/skills/gabo-reviewer-placement"] = symlink("../../.gabo/skills/gabo-reviewer-placement-local")
-	proj[".opencode/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
+	proj[".agents/skills/gabo-reviewer-placement"] = symlink("../../.gabo/skills/gabo-reviewer-placement-local")
+	proj[".agents/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
 	return proj
 }
 
-// opencodeWhere is the path gabo-runtime-opencode writes in the Skills: line.
-const opencodeWhere = ".opencode/skills/<name>/SKILL.md"
+// opencodeWhere is the path gabo-runtime-opencode writes in the Skills: line:
+// the shared .agents/skills (intent 0008 S3).
+const opencodeWhere = ".agents/skills/<name>/SKILL.md"
 
 func runOpencode(t *testing.T, proj fs.FS, version string) Report {
 	t.Helper()
@@ -100,8 +101,9 @@ func TestOpencodeBuiltSetPassesCheck(t *testing.T) {
 	wantPassed(t, rep, PassedLine)
 	noLineWith(t, rep, "runtimes.")
 	noLineWith(t, rep, "reviewer link")
-	if _, err := fs.Lstat(proj, ".opencode/skills/gabo-reviewer"); err == nil {
-		t.Fatal(".opencode/skills/gabo-reviewer exists in the project")
+	noLineWith(t, rep, "skill link")
+	if _, err := fs.Lstat(proj, ".agents/skills/gabo-reviewer"); err == nil {
+		t.Fatal(".agents/skills/gabo-reviewer exists in the project")
 	}
 }
 
@@ -129,16 +131,73 @@ func TestOpencodeAgentFromAnotherVersionFails(t *testing.T) {
 	}
 }
 
-// S11: a missing link in .opencode/skills fails naming it.
+// S11: a missing link in the shared .agents/skills fails naming it
+// (intent 0008 S3).
 func TestOpencodeMissingLinkFails(t *testing.T) {
 	t.Parallel()
 	proj := opencodeBuilt(t, "1.2.3")
-	delete(proj, ".opencode/skills/gabo-wave-report")
-	delete(proj, ".opencode/skills/gabo-agent-host")
+	delete(proj, ".agents/skills/gabo-wave-report")
+	delete(proj, ".agents/skills/gabo-agent-host")
 	rep := runOpencode(t, proj, "1.2.3")
 	wantFailed(t, rep,
-		"✗ skill link .opencode/skills/gabo-wave-report missing",
-		"✗ skill link .opencode/skills/gabo-agent-host missing")
+		"✗ skill link .agents/skills/gabo-wave-report missing",
+		"✗ skill link .agents/skills/gabo-agent-host missing")
+}
+
+// Intent 0008 S4: a link gabo-runtime-opencode left in .opencode/skills
+// fails with the leftover line; a user's own entry there is not reported.
+func TestOpencodeBuiltLeftoverLinkFails(t *testing.T) {
+	t.Parallel()
+	proj := opencodeBuilt(t, "1.2.3")
+	proj[".opencode/skills/my-skill"] = symlink("../../.gabo/skills/gabo-pm")
+	rep := runOpencode(t, proj, "1.2.3")
+	wantPassed(t, rep, PassedLine)
+	noLineWith(t, rep, ".opencode/skills/my-skill")
+	proj[".opencode/skills/gabo-pm"] = symlink("../../.gabo/skills/gabo-pm")
+	wantFailed(t, runOpencode(t, proj, "1.2.3"),
+		"✗ .opencode/skills/gabo-pm: gabo link left after the move to .agents/skills", NextRebuild)
+}
+
+// codexPiOpencodeConfig declares codex, pi and opencode: all three read the
+// shared .agents/skills.
+var codexPiOpencodeConfig = strings.Replace(strings.Replace(codexConfig,
+	"  reviewer: codex\n", "  reviewer: pi\n", 1),
+	"  assistant: codex\n", "  assistant: opencode\n", 1)
+
+// Intent 0008 S5: with runtimes naming codex, pi and opencode, one set of
+// links in .agents/skills serves all three and gabo check passes; a missing
+// shared link is reported once.
+func TestCodexPiAndOpencodeShareOneSetOfLinks(t *testing.T) {
+	t.Parallel()
+	if !strings.Contains(codexPiOpencodeConfig, "reviewer: pi") || !strings.Contains(codexPiOpencodeConfig, "assistant: opencode") {
+		t.Fatalf("codexConfig lacks the runtime lines to replace:\n%s", codexConfig)
+	}
+	proj := codexBuilt(t, "1.2.3")
+	for _, built := range []fstest.MapFS{piBuilt(t, "1.2.3"), opencodeBuilt(t, "1.2.3")} {
+		for name, f := range built {
+			if prev, ok := proj[name]; ok && strings.HasPrefix(name, ".agents/skills/") && string(prev.Data) != string(f.Data) {
+				t.Fatalf("%s: links %q and %q", name, prev.Data, f.Data)
+			}
+			proj[name] = f
+		}
+	}
+	run := func(p fstest.MapFS) Report {
+		rep, err := NewUseCase(p, configFiles{projectFile: codexPiOpencodeConfig}, codexUser(),
+			Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rep
+	}
+	rep := run(proj)
+	wantPassed(t, rep, PassedLine)
+	noLineWith(t, rep, "skill link")
+	delete(proj, ".agents/skills/gabo-pm")
+	rep = run(proj)
+	wantFailed(t, rep, "✗ skill link .agents/skills/gabo-pm missing")
+	if n := strings.Count(joined(rep), "✗ skill link .agents/skills/gabo-pm missing"); n != 1 {
+		t.Errorf("the shared link is reported %d times, want once:\n%s", n, joined(rep))
+	}
 }
 
 // depthLines returns the ✗ lines naming experimental.subagent_depth.
