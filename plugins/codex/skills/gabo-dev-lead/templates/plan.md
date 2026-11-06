@@ -14,6 +14,7 @@ Scaffold for `docs/product/intents/<NNNN-slug>/plan.md`: the ordered steps and t
 | Q6 | Does every spec requirement have at least one task? | Tasks: spec refs |
 | Q7 | What could derail the plan, and how is it mitigated? | Risks to the plan |
 | Q8 | What is still undecided? | Open questions |
+| Q9 | Does the change need a `gabo check` update, and which task covers it? | Steps |
 
 ## Template
 
@@ -31,6 +32,7 @@ Scaffold for `docs/product/intents/<NNNN-slug>/plan.md`: the ordered steps and t
 ## Steps
 
 1. <Ordered step and the spec requirements it delivers.>
+2. <The task that updates `gabo check`, or why the change needs no update (TRD 8.5).>
 
 ## Tasks
 

@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -73,11 +76,43 @@ func checkProject(t *testing.T, version string) string {
 		t.Fatal(err)
 	}
 	for _, a := range spec.Agents {
-		write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\ngabo-version: "+version+"\n---\n")
+		// The skills list of gabo-runtime-claude: spec skills, then the
+		// fixed-name links the template names (intent 0008 S1).
+		tmpl, err := fs.ReadFile(skills.Catalog(), path.Join(agentspec.Dir, a.Template))
+		if err != nil {
+			t.Fatal(err)
+		}
+		list := slices.Clone(a.Skills)
+		for _, l := range [][2]string{{"{{methodology}}", "gabo-methodology"}, {"{{adapter:tasks}}", "gabo-tasks"}, {"{{adapter:repository_host}}", "gabo-repository-host"}, {"{{adapter:memory}}", "gabo-memory"}} {
+			if strings.Contains(string(tmpl), l[0]) {
+				list = append(list, l[1])
+			}
+		}
+		write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\nskills: ["+strings.Join(list, ", ")+"]\ngabo-version: "+version+"\n---\n")
 		for _, name := range a.Skills {
 			link(t, "../../.gabo/skills/"+name, filepath.Join(project, ".claude", "skills", name))
 		}
 	}
+	// The main-session entry gabo-runtime-claude builds for runtimes.assistant
+	// (spec 0009 S1, S2): link, agent file and the one agent key.
+	m := spec.MainSession
+	for _, name := range m.Skills {
+		link(t, "../../.gabo/skills/"+name, filepath.Join(project, ".claude", "skills", name))
+	}
+	write(".claude/agents/"+m.ID+".md", "---\nname: "+m.ID+"\ngabo-version: "+version+"\n---\n")
+	b, err := os.ReadFile(filepath.Join(project, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := map[string]any{}
+	if err := json.Unmarshal(b, &settings); err != nil {
+		t.Fatal(err)
+	}
+	settings["agent"] = m.ID
+	if b, err = json.MarshalIndent(settings, "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	write(".claude/settings.json", string(b)+"\n")
 	// The user-level reviewer link into the copy runInit installed under the
 	// temporary HOME and XDG_DATA_HOME.
 	t.Setenv("CLAUDE_CONFIG_DIR", "")

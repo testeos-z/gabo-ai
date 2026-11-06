@@ -98,6 +98,9 @@ func codexBuilt(t *testing.T, version string) fstest.MapFS {
 	}
 	proj[".agents/skills/gabo-reviewer-placement"] = symlink("../../.gabo/skills/gabo-reviewer-placement-local")
 	proj[".agents/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
+	// The main-session entry of spec 0009 S1, S3: link and scoped block.
+	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj["AGENTS.md"] = file("# Project\n\n" + assistantBlock(t))
 	return proj
 }
 
@@ -295,4 +298,65 @@ func TestCodexBuiltSetWithMissingLinksFails(t *testing.T) {
 		"✗ skill link .agents/skills/gabo-wave-report missing",
 		"✗ skill link .agents/skills/gabo-agent-host missing",
 		"✗ reviewer link "+codexUserLink+" missing")
+}
+
+// setCodexSkills rewrites the "Load these skills" line of a built agent.
+func setCodexSkills(t *testing.T, proj fstest.MapFS, id string, list []string) {
+	t.Helper()
+	name := ".codex/agents/" + id + ".toml"
+	var out []string
+	found := false
+	for line := range strings.SplitSeq(string(proj[name].Data), "\n") {
+		if strings.HasPrefix(line, "Load these skills by name before work: ") {
+			found = true
+			if len(list) == 0 {
+				continue
+			}
+			line = "Load these skills by name before work: " + strings.Join(list, ", ") + "."
+		}
+		out = append(out, line)
+	}
+	if !found {
+		t.Fatalf("%s: no skills line", name)
+	}
+	proj[name] = file(strings.Join(out, "\n"))
+}
+
+// Intent 0008 S1 on the agents gabo-runtime-codex builds: the "Load these
+// skills" line holds exactly the spec skills plus the template's fixed-name
+// links, each once; gabo-dev-lead keeps gabo-plan-reviewer throughout.
+func TestCodexBuiltAgentSkills(t *testing.T) {
+	t.Parallel()
+	for _, tt := range agentSkillsCases("codex") {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			proj := codexBuilt(t, "1.2.3")
+			setCodexSkills(t, proj, "gabo-pm", tt.list)
+			wantSkillLines(t, runCodex(t, proj, codexUser(), "1.2.3"), ".codex/agents/gabo-pm.toml", tt.want)
+		})
+	}
+}
+
+// The adapter's frontmatter name passes in place of its fixed-name link.
+func TestCodexBuiltAgentSkillsAcceptAdapterName(t *testing.T) {
+	t.Parallel()
+	proj := codexBuilt(t, "1.2.3")
+	slots := memoryAdapterSlot(t, proj, ".agents/skills")
+	setCodexSkills(t, proj, "gabo-pm", []string{"gabo-pm", "gabo-plan-reviewer", "gabo-tasks", "gabo-repository-host", "gabo-memory-engram"})
+	rep, err := NewUseCase(proj, configFiles{projectFile: codexConfig + slots}, codexUser(),
+		Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantSkillLines(t, rep, ".codex/agents/gabo-pm.toml", nil)
+	wantPassed(t, rep, PassedLine)
+}
+
+// The fixed-name links come from the template in the project catalog copy:
+// a gabo-pm template without {{adapter:memory}} makes gabo-memory extra.
+func TestCodexBuiltAgentSkillsFollowTheProjectTemplate(t *testing.T) {
+	t.Parallel()
+	proj := withoutMemorySlot(t, codexBuilt(t, "1.2.3"))
+	wantSkillLines(t, runCodex(t, proj, codexUser(), "1.2.3"), ".codex/agents/gabo-pm.toml",
+		[]string{"✗ agent gabo-pm (codex): skill gabo-memory not in the agent spec"})
 }

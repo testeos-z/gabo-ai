@@ -1,0 +1,7 @@
+exit 1
+error: ""
+--- stdout
+✗ .claude/agents/gabo-assistant.md: gabo assistant entry missing for claude
+next: ask your agent to rebuild the agents, then rerun gabo check
+✗ .claude/settings.json: gabo assistant entry missing for claude
+next: ask your agent to rebuild the agents, then rerun gabo check

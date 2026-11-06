@@ -45,7 +45,7 @@ const spec = `agents:
     template: agents/beta.md
 `
 
-const claudeSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\nbody\n"
+const claudeSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n  agent_skills: frontmatter:skills\n---\nbody\n"
 
 // configFiles is an in-memory config.Reader.
 type configFiles map[string]string
@@ -310,7 +310,7 @@ func TestBuilderWrittenRuntimeSkill(t *testing.T) {
 	t.Parallel()
 	pi := strings.ReplaceAll(validConfig, "coder: claude", "coder: pi")
 	proj := with(project(), map[string]string{
-		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n---\n",
+		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n  agent_skills: \"line:Skills:\"\n---\n",
 		".pi/agents/alpha.md":                     "---\ngabo-version: 1.2.3\n---\n",
 	})
 	r := run(t, proj, configFiles{projectFile: pi}, Settings{})
@@ -341,7 +341,6 @@ func TestAgentVersionLine(t *testing.T) {
 	}{
 		{"matching", "---\ngabo-version: 1.2.3\n---\n", ""},
 		{"differing", "---\ngabo-version: 1.2.0\n---\n", "✗ agent beta built with 1.2.0, catalog is 1.2.3: ask your agent to rebuild"},
-		{"missing", "---\nname: beta\n---\n", "✗ agent beta built with none, catalog is 1.2.3: ask your agent to rebuild"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -354,6 +353,101 @@ func TestAgentVersionLine(t *testing.T) {
 			}
 			wantFailed(t, r, tt.want, NextRebuild)
 		})
+	}
+}
+
+// S7, D3: an agent file without a gabo-version line, or with a value that
+// is not x.y.z, fails naming the agent and its runtime, with and without a
+// valid stamp; it is never reported as built with another version.
+func TestAgentWithoutVersionLineFails(t *testing.T) {
+	t.Parallel()
+	contents := map[string]string{
+		"no line":       "---\nname: beta\n---\n",
+		"empty value":   "---\nname: beta\ngabo-version:\n---\n",
+		"not x.y.z":     "---\nname: beta\ngabo-version: latest\n---\n",
+		"pre-release":   "---\nname: beta\ngabo-version: 1.2.3-rc1\n---\n",
+		"two parts":     "---\nname: beta\ngabo-version: 1.2\n---\n",
+		"leading zeros": "---\nname: beta\ngabo-version: 01.2.3\n---\n",
+	}
+	stamps := map[string]string{"valid stamp": "1.2.3\n", "no stamp": "", "invalid stamp": "latest\n"}
+	for cname, content := range contents {
+		for sname, stamp := range stamps {
+			t.Run(cname+"/"+sname, func(t *testing.T) {
+				t.Parallel()
+				proj := with(project(), map[string]string{".claude/agents/beta.md": content, ".gabo/VERSION": stamp})
+				r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+				wantFailed(t, r, "✗ agent beta (claude): no gabo-version line", "why: .claude/agents/beta.md", NextRebuild)
+				if n := strings.Count(joined(r), "✗ agent beta (claude): no gabo-version line"); n != 1 {
+					t.Fatalf("line printed %d times, want 1:\n%s", n, joined(r))
+				}
+				if strings.Contains(joined(r), "built with") || strings.Contains(joined(r), "✗ agent alpha") {
+					t.Fatalf("unexpected agent line:\n%s", joined(r))
+				}
+			})
+		}
+	}
+}
+
+// S7, D3: without a valid stamp the versions are not compared, and the
+// output says so once, next to the stamp failure.
+func TestAgentVersionsNotComparedWithoutAValidStamp(t *testing.T) {
+	t.Parallel()
+	const notCompared = "✗ agent versions not compared: no valid catalog stamp"
+	const next = "next: run gabo init, then ask your agent to rebuild the agents"
+	tests := []struct {
+		name, stamp, stampLine string
+	}{
+		{"missing", "", "✗ no stamp: run gabo init"},
+		{"not a version", "latest\n", `✗ .gabo/VERSION holds "latest", not a version x.y.z`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			// Two runtimes with their own agent dirs: still one line.
+			cfg := strings.Replace(validConfig, "reviewer: claude", "reviewer: pi", 1)
+			proj := with(project(), map[string]string{
+				".gabo/VERSION": tt.stamp,
+				".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n---\n",
+				".pi/agents/alpha.md":                     "---\ngabo-version: 1.0.0\n---\n",
+				".pi/agents/beta.md":                      "---\ngabo-version: 1.0.0\n---\n",
+			})
+			r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
+			wantFailed(t, r, tt.stampLine, notCompared, next)
+			if n := strings.Count(joined(r), notCompared); n != 1 {
+				t.Fatalf("not-compared line printed %d times, want 1:\n%s", n, joined(r))
+			}
+			if strings.Contains(joined(r), "built with") {
+				t.Fatalf("versions compared without a stamp:\n%s", joined(r))
+			}
+		})
+	}
+}
+
+// S7: a valid stamp with matching agents prints no version line; the
+// existing built-with line for another version is unchanged.
+func TestValidStampPrintsNoVersionLine(t *testing.T) {
+	t.Parallel()
+	r := run(t, project(), configFiles{projectFile: validConfig}, Settings{})
+	wantPassed(t, r, PassedLine)
+	if len(r.Lines) != 1 {
+		t.Fatalf("unexpected lines:\n%s", joined(r))
+	}
+	newer := with(project(), map[string]string{".gabo/VERSION": "2.0.0\n"})
+	r = run(t, newer, configFiles{projectFile: validConfig}, Settings{})
+	if strings.Contains(joined(r), "not compared") {
+		t.Fatalf("a valid newer stamp is compared:\n%s", joined(r))
+	}
+	wantFailed(t, r, "✗ agent alpha built with 1.2.3, catalog is 2.0.0: ask your agent to rebuild", "why: .claude/agents/alpha.md", NextRebuild)
+}
+
+// S9: under GABO_UPGRADE_PR=1 none of the version lines prints.
+func TestUpgradePRSkipsTheVersionLines(t *testing.T) {
+	t.Parallel()
+	proj := with(project(), map[string]string{".gabo/VERSION": "", ".claude/agents/beta.md": "---\nname: beta\n---\n"})
+	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{UpgradePR: true})
+	wantPassed(t, r, UpgradePRLine)
+	if len(r.Lines) != 1 {
+		t.Fatalf("upgrade PR printed more than the config check:\n%s", joined(r))
 	}
 }
 

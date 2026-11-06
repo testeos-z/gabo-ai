@@ -119,6 +119,93 @@ func TestLoadReportsEveryProblem(t *testing.T) {
 	}
 }
 
+const mainSessionSpec = `main_session:
+  id: assistant
+  role: Talks to the owner.
+  skills: [skill-a]
+  template: agents/assistant.md
+  block: agents/assistant-block.md
+`
+
+// mainCatalog is catalog with a main_session entry and its two files.
+func mainCatalog(entry string, drop ...string) fstest.MapFS {
+	fsys := catalog(validSpec + entry)
+	fsys[Dir+"/agents/assistant.md"] = &fstest.MapFile{Data: []byte("assistant")}
+	fsys[Dir+"/agents/assistant-block.md"] = &fstest.MapFile{Data: []byte("block")}
+	for _, p := range drop {
+		delete(fsys, p)
+	}
+	return fsys
+}
+
+// Spec 0009 D4: the main-session entry parses beside the agents and is never
+// one of them.
+func TestLoadMainSessionEntry(t *testing.T) {
+	t.Parallel()
+	spec, err := Load(mainCatalog(mainSessionSpec))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	m := spec.MainSession
+	if m == nil {
+		t.Fatal("MainSession is nil")
+	}
+	if m.ID != "assistant" || m.Role != "Talks to the owner." || !slices.Equal(m.Skills, []string{"skill-a"}) ||
+		m.Template != "agents/assistant.md" || m.Block != "agents/assistant-block.md" {
+		t.Fatalf("MainSession = %+v", *m)
+	}
+	if got := spec.IDs(); !slices.Equal(got, []string{"lead", "worker", "checker"}) {
+		t.Fatalf("IDs() = %v", got)
+	}
+	if len(spec.Agents) != 3 {
+		t.Fatalf("Agents has %d entries, want 3", len(spec.Agents))
+	}
+}
+
+func TestLoadWithoutMainSessionEntry(t *testing.T) {
+	t.Parallel()
+	spec, err := Load(catalog(validSpec))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if spec.MainSession != nil {
+		t.Fatalf("MainSession = %+v, want nil", *spec.MainSession)
+	}
+}
+
+func TestLoadRejectsInvalidMainSessionEntries(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		entry string
+		drop  []string
+		want  string
+	}{
+		{"unknown key", strings.Replace(mainSessionSpec, "  role:", "  model: big\n  role:", 1), nil, "field model not found"},
+		{"missing id", strings.Replace(mainSessionSpec, "id: assistant", "id: ''", 1), nil, "main_session: missing id"},
+		{"id of a spec agent", strings.Replace(mainSessionSpec, "id: assistant", "id: worker", 1), nil, "main_session: id worker is a spec agent"},
+		{"missing role", strings.Replace(mainSessionSpec, "role: Talks to the owner.", "role: ''", 1), nil, "main_session: missing role"},
+		{"skill unknown", strings.Replace(mainSessionSpec, "skills: [skill-a]", "skills: [skill-z]", 1), nil, `main_session: skill "skill-z" not in the catalog`},
+		{"missing template", strings.Replace(mainSessionSpec, "template: agents/assistant.md", "template: ''", 1), nil, "main_session: missing template"},
+		{"template not found", mainSessionSpec, []string{Dir + "/agents/assistant.md"}, `main_session: template "agents/assistant.md" not found`},
+		{"template escapes", strings.Replace(mainSessionSpec, "template: agents/assistant.md", "template: ../skill-a/SKILL.md", 1), nil, `main_session: template "../skill-a/SKILL.md" must be a relative path inside ` + Dir},
+		{"missing block", strings.Replace(mainSessionSpec, "block: agents/assistant-block.md", "block: ''", 1), nil, "main_session: missing block"},
+		{"block not found", mainSessionSpec, []string{Dir + "/agents/assistant-block.md"}, `main_session: block "agents/assistant-block.md" not found`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := Load(mainCatalog(tt.entry, tt.drop...))
+			if err == nil {
+				t.Fatalf("Load succeeded, want error containing %q", tt.want)
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error %q\nwant it to contain %q", err, tt.want)
+			}
+		})
+	}
+}
+
 // The spec shipped in the embedded catalog lists every gabo agent that runs
 // from an agent file (TRD 4.3) and validates against that catalog.
 func TestEmbeddedSpecIsValid(t *testing.T) {
@@ -138,6 +225,14 @@ func TestEmbeddedSpecIsValid(t *testing.T) {
 		if a.Template != "agents/"+a.ID+".md" {
 			t.Errorf("agent %s: template %q, want agents/%s.md", a.ID, a.Template, a.ID)
 		}
+	}
+	m := spec.MainSession
+	if m == nil {
+		t.Fatal("embedded spec has no main_session entry")
+	}
+	if m.ID != "gabo-assistant" || !slices.Equal(m.Skills, []string{"gabo-assistant"}) ||
+		m.Template != "agents/gabo-assistant.md" || m.Block != "agents/gabo-assistant-block.md" {
+		t.Fatalf("main_session = %+v", *m)
 	}
 }
 
