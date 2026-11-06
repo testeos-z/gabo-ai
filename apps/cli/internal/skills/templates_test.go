@@ -375,8 +375,19 @@ func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
 			"templates/MIGRATIONS.md", "## Fixed questions", "config-only", "Persistence inventory",
 			"`## Conventions`",
 		},
+		// Intent 0012 S4, S6: the design norms, their rule shape, the spec
+		// section 3 messages and links, and the conversion rule.
 		"gabo-frontend/SKILL.md": {
 			"templates/DESIGN.md", "## 3. UX and app flow (optional)", "## Fixed questions",
+			"the design norms (from `templates/DESIGN.md`",
+			"one rules table per area", "an RFC 2119 level (MUST, SHOULD or MAY), a rationale, a verification, examples and a source",
+			"exceptions (section 13)", "a changelog (section 14)",
+			"messages table `| case | what happened | why | what to do next |`",
+			"links `DESIGN.md` sections 2-3 (tokens, color), 9 (accessibility) and 10 (wording)",
+			"never rewrite an existing `DESIGN.md` in another shape silently",
+			"the next `DESIGN.md` update proposes the conversion", "to the owner in manual mode",
+			"as **Proposed (auto)** in auto mode", "keeps every existing rule with a new id",
+			"records the conversion as one changelog row",
 		},
 	} {
 		doc, ok := byPath[skill]
@@ -519,12 +530,19 @@ func TestPlanningSkillsOwnTheirIntentArtifacts(t *testing.T) {
 		"gabo-doc-guide/SKILL.md": {
 			"docs/product/PRD.md", "docs/product/TRD.md", "docs/product/DESIGN.md", "docs/product/MIGRATIONS.md",
 			"docs/product/intents/<NNNN-slug>/", "intent.md", "spec.md", "plan.md", "review findings",
+			"Which design norms apply", "How are the design norms",
 		},
 	} {
 		for _, s := range want {
 			if !strings.Contains(byPath[skill], s) {
 				t.Errorf("%s: missing %q", skill, s)
 			}
+		}
+	}
+	// Intent 0012 S4: `DESIGN.md` is the design norms, no longer global styles.
+	for _, skill := range []string{"gabo-frontend/SKILL.md", "gabo-doc-guide/SKILL.md"} {
+		if strings.Contains(strings.ToLower(byPath[skill]), "global styles") {
+			t.Errorf("%s: still describes DESIGN.md as global styles", skill)
 		}
 	}
 }
