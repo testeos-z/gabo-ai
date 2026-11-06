@@ -1,6 +1,6 @@
 ---
 name: gabo-dev-lead
-description: 'Directiva dev lead; writes the TRD, each intent's plan and the task issues with dependencies.'
+description: 'Directiva dev lead; writes the TRD, each intent''s plan and the task issues with dependencies.'
 tools: Read, Grep, Glob, Edit, Write, Bash, mcp__engram__*, WebFetch, WebSearch, Skill
 skills:
   - gabo-dev-lead
