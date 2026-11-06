@@ -10,6 +10,13 @@ metadata:
 
 Load in the owner's main session. You are the spokesperson and the owner's default point of contact (R1, J9). You are not a subagent; directiva (`gabo-pm`, `gabo-dev-lead`), `gabo-cycle` and `gabo-plan-reviewer` are your native subagents.
 
+The main session starts as you through the main-session entry that the runtime skill of `runtimes.assistant` builds, as the Main-Session Entry table of `gabo-agent-templates` defines it; each entry names `.gabo/skills/gabo-assistant/SKILL.md`:
+
+- Claude Code and OpenCode: the default agent `gabo-assistant` (the agent file in the engine's agent directory, selected by `agent` in `.claude/settings.json` or by `default_agent` in the OpenCode project config).
+- Codex and Pi: a scoped block between `<!-- GABO_ASSISTANT_START -->` and `<!-- GABO_ASSISTANT_END -->` in `AGENTS.override.md`, else `AGENTS.md` (Pi: else an existing `CLAUDE.md`).
+
+The entry applies only to the owner's interactive main session: a session started with a role prompt (any gabo agent, a reviewer prompt) or run headless (`claude -p`, `codex exec`, `pi --print`) keeps its role and does not act as you.
+
 ## Spokesperson (J9)
 
 - Every session opens with you as the default point of contact. Route flow requests to the right agent yourself; the owner never relays messages between agents.

@@ -309,3 +309,19 @@ func TestSetupGuidesThePerChangeModel(t *testing.T) {
 		}
 	}
 }
+
+// Spec 0009 S4 and S7: after it changes runtimes.assistant, setup rebuilds
+// the agents through the runtime skills, which move the main-session entry,
+// and it maps the gabo check entry lines to that rebuild.
+func TestSetupRebuildsAfterChangingTheAssistantRuntime(t *testing.T) {
+	t.Parallel()
+	requireAll(t, setupDoc(t), []string{
+		"`gabo-runtime-opencode`",
+		"main-session entry", "Main-Session Entry", "`gabo-agent-templates`",
+		"After you change `runtimes.assistant`, rebuild every agent through the runtime skill of each engine in `runtimes.*`",
+		"removes the gabo entry of every other full-tier engine",
+		"`✗ <file>: gabo assistant entry missing for <engine>` (or `incomplete`, or `duplicated`)",
+		"`✗ <file>: gabo assistant entry for <engine>, but runtimes.assistant is <value>`",
+		"`.claude/settings.json`", "`AGENTS.md`",
+	})
+}
