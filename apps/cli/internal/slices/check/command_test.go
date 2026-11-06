@@ -12,9 +12,15 @@ import (
 
 func runCommand(t *testing.T, proj fs.FS, args ...string) (string, error) {
 	t.Helper()
+	return runCommandConfig(t, proj, validConfig, args...)
+}
+
+// runCommandConfig runs gabo check with cfg as the project gabo.yaml.
+func runCommandConfig(t *testing.T, proj fs.FS, cfg string, args ...string) (string, error) {
+	t.Helper()
 	s := Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}
 	cmd := NewCommand(func(context.Context) (*UseCase, error) {
-		return NewUseCase(proj, configFiles{projectFile: validConfig}, goodUser(), s), nil
+		return NewUseCase(proj, configFiles{projectFile: cfg}, goodUser(), s), nil
 	})
 	// The root command silences cobra's own error and usage output.
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true
@@ -114,6 +120,27 @@ func TestCommandHelpNamesTheGaboInitHints(t *testing.T) {
 		"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";",
 		"    a file gabo init refuses names \"fix <file> (<its reason>)\", and a key gabo",
 		"    init would leave as it is names setting or removing it by hand;",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+// Intent 0013 S5: the help says the main-session entry is checked for every
+// engine listed in runtimes.assistant, and names the stale line with a list.
+func TestCommandHelpNamesEveryListedAssistant(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - the main-session entry of every engine listed in runtimes.assistant, from",
+		"    each runtime skill's metadata.main_session: each listed engine's",
+		"    block; no entry of a full-tier engine that is not listed, named as \"<file>:",
+		"    gabo assistant entry for <engine>, but runtimes.assistant is <the listed",
+		"    engines, joined with \", \">\"",
 	} {
 		if !strings.Contains(out, want+"\n") {
 			t.Fatalf("help lacks %q:\n%s", want, out)

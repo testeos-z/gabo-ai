@@ -85,30 +85,43 @@ func (m *mainSessionMeta) files() []string {
 }
 
 // checkMainSession verifies, read-only, that the main-session entry follows
-// gabo.yaml (spec 0009 S5): the engine in runtimes.assistant has its full
-// entry, and no other full-tier runtime skill of the catalog copy keeps a
-// gabo entry. A catalog without a main_session entry checks nothing.
+// gabo.yaml (spec 0009 S5, intent 0013 S5): every engine listed in
+// runtimes.assistant has its full entry, and no full-tier runtime skill of
+// the catalog copy that is not listed keeps a gabo entry. A catalog without
+// a main_session entry checks nothing.
 func (u *UseCase) checkMainSession(r *Report, cfg config.Config) error {
-	assistant := string(cfg.Runtimes.Assistant.Single()) // "" for a list: its main-session rule is not checked yet
+	var listed []string
+	for _, rt := range assistantsOf(cfg) {
+		if rt = strings.TrimSpace(rt); rt != "" && !slices.Contains(listed, rt) {
+			listed = append(listed, rt)
+		}
+	}
 	catalog, err := fs.Sub(u.project, CatalogDir)
 	if err != nil {
 		return err
 	}
 	spec, err := agentspec.Load(catalog)
-	if assistant == "" || err != nil || spec.MainSession == nil {
+	if len(listed) == 0 || err != nil || spec.MainSession == nil {
 		return nil // a spec error is reported by checkAgents
 	}
-	own, ok := u.runtimeMeta(assistant)
-	if !ok {
-		return nil // reported by checkAgents
-	}
 	set := engineconfig.Set(runtimesOf(cfg)...)
-	if declaresMainSession(r, assistant, own) {
-		if err := u.checkAssistantEntry(r, set, assistant, own, spec); err != nil {
-			return err
+	var own []runtimeMeta
+	for _, rt := range listed {
+		meta, ok := u.runtimeMeta(rt)
+		if !ok {
+			continue // reported by checkAgents
+		}
+		own = append(own, meta)
+		if declaresMainSession(r, rt, meta) {
+			if err := u.checkAssistantEntry(r, set, listed, rt, meta, spec); err != nil {
+				return err
+			}
 		}
 	}
-	return u.checkStaleEntries(r, set, assistant, own, *spec.MainSession)
+	if len(own) < len(listed) {
+		return nil // a listed engine's own files are unknown, so none is called stale
+	}
+	return u.checkStaleEntries(r, set, listed, own, *spec.MainSession)
 }
 
 // declaresMainSession reports whether the runtime skill declares
@@ -151,8 +164,9 @@ type piece struct {
 // the first existing instructions file (kind block). A piece is "missing"
 // when nothing of the entry is there, else "incomplete"; two blocks are
 // "duplicated".
-// set is the engine set of runtimes.*, for the gabo init hints.
-func (u *UseCase) checkAssistantEntry(r *Report, set []string, rt string, meta runtimeMeta, spec agentspec.Spec) error {
+// set is the engine set of runtimes.* and listed the engines of
+// runtimes.assistant, for the gabo init hints.
+func (u *UseCase) checkAssistantEntry(r *Report, set, listed []string, rt string, meta runtimeMeta, spec agentspec.Spec) error {
 	m := spec.MainSession
 	var pieces []piece
 	if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) {
@@ -189,7 +203,7 @@ func (u *UseCase) checkAssistantEntry(r *Report, set []string, rt string, meta r
 			r.fail(fmt.Sprintf("✗ %s: %s is %s, not %s", file, ms.Key, jsonText(v), jsonText(m.ID)),
 				fmt.Sprintf("next: change %s to %s in %s, or remove it and run gabo init, then rerun gabo check", ms.Key, jsonText(m.ID), file))
 		default:
-			next, err := u.initMergeHint(set, rt, ms, m.ID, file)
+			next, err := u.initMergeHint(set, listed, rt, ms, m.ID, file)
 			if err != nil {
 				return err
 			}
@@ -233,8 +247,8 @@ func (u *UseCase) checkAssistantEntry(r *Report, set []string, rt string, meta r
 // gabo init and the one file it writes, a new one when none exists; when
 // gabo init would refuse a file, the hint is its reason, so following it
 // never loops (D7).
-func (u *UseCase) initMergeHint(set []string, rt string, ms *mainSessionMeta, id, file string) (string, error) {
-	run, err := u.initDryRun(set, rt, []string{rt}, ms.Config)
+func (u *UseCase) initMergeHint(set, listed []string, rt string, ms *mainSessionMeta, id, file string) (string, error) {
+	run, err := u.initDryRun(set, rt, listed, ms.Config)
 	if err != nil {
 		return "", err
 	}
@@ -319,8 +333,8 @@ func initRefusalHint(file, reason string) string {
 // gabo init; when gabo init would refuse a file it names gabo init's
 // reason, and when gabo init would leave the key (a file it does not parse
 // and does not own) it names removing the key by hand, so no hint loops (D7).
-func (u *UseCase) initRemoveHint(set []string, rt, assistant string, ms *mainSessionMeta, id, file string) (string, error) {
-	run, err := u.initDryRun(set, rt, []string{assistant}, ms.Config)
+func (u *UseCase) initRemoveHint(set, listed []string, rt string, ms *mainSessionMeta, id, file string) (string, error) {
+	run, err := u.initDryRun(set, rt, listed, ms.Config)
 	if err != nil {
 		return "", err
 	}
@@ -427,22 +441,28 @@ func (u *UseCase) linksTo(link, want string) bool {
 	return err == nil && !path.IsAbs(target) && path.Join(path.Dir(link), target) == want
 }
 
-// checkStaleEntries fails for every gabo main-session entry of another
-// full-tier runtime skill in the catalog copy, read from its
+// checkStaleEntries fails for every gabo main-session entry of a full-tier
+// runtime skill in the catalog copy that runtimes.assistant does not list, read from its
 // metadata.main_session and recognized only by its gabo identity: the link
 // of a main-session skill into the catalog, an agent file <id> carrying a
 // gabo-version line, a key whose value is exactly <id>, or the block
-// markers. A link in the assistant's own skill_dir, an agent file in its
-// agent_dir and a file its own entry uses are the assistant's, never stale
-// (Codex and Pi share AGENTS.md). Each path is reported once, for the first
+// markers. A link in a listed engine's skill_dir, an agent file in its
+// agent_dir and a file its entry uses are that engine's, never stale
+// (Codex and Pi share AGENTS.md). The stale line names the listed engines
+// joined with ", " (intent 0013 S5). Each path is reported once, for the first
 // runtime skill in catalog order that declares it.
-func (u *UseCase) checkStaleEntries(r *Report, set []string, assistant string, own runtimeMeta, m agentspec.MainSessionEntry) error {
+func (u *UseCase) checkStaleEntries(r *Report, set, listed []string, own []runtimeMeta, m agentspec.MainSessionEntry) error {
 	entries, err := fs.ReadDir(u.project, CatalogDir)
 	if err != nil {
 		return nil // reported by checkAgents
 	}
-	ownFiles := own.MainSession.files()
-	ownSkillDir, ownAgentDir := path.Clean(own.SkillDir), path.Clean(own.AgentDir)
+	var ownFiles, ownSkillDirs, ownAgentDirs []string
+	for _, meta := range own {
+		ownFiles = append(ownFiles, meta.MainSession.files()...)
+		ownSkillDirs = append(ownSkillDirs, path.Clean(meta.SkillDir))
+		ownAgentDirs = append(ownAgentDirs, path.Clean(meta.AgentDir))
+	}
+	assistant := strings.Join(listed, ", ")
 	var reported []string
 	stale := func(file, rt, next string) {
 		if slices.Contains(reported, file) {
@@ -453,7 +473,7 @@ func (u *UseCase) checkStaleEntries(r *Report, set []string, assistant string, o
 	}
 	for _, e := range entries {
 		rt, ok := strings.CutPrefix(e.Name(), "gabo-runtime-")
-		if !ok || rt == assistant || !fullTier(rt) {
+		if !ok || slices.Contains(listed, rt) || !fullTier(rt) {
 			continue
 		}
 		b, err := fs.ReadFile(u.project, path.Join(CatalogDir, e.Name(), "SKILL.md"))
@@ -464,7 +484,7 @@ func (u *UseCase) checkStaleEntries(r *Report, set []string, assistant string, o
 		if err != nil || meta.MainSession == nil {
 			continue
 		}
-		if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) && dir != ownSkillDir {
+		if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) && !slices.Contains(ownSkillDirs, dir) {
 			for _, skill := range m.Skills {
 				if link := path.Join(dir, skill); u.linksTo(link, path.Join(CatalogDir, skill)) {
 					stale(link, rt, NextRebuild)
@@ -472,7 +492,7 @@ func (u *UseCase) checkStaleEntries(r *Report, set []string, assistant string, o
 			}
 		}
 		ms := meta.MainSession
-		if dir := path.Clean(meta.AgentDir); ms.Kind == kindAgent && meta.AgentDir != "" && insideRepo(dir) && dir != ownAgentDir {
+		if dir := path.Clean(meta.AgentDir); ms.Kind == kindAgent && meta.AgentDir != "" && insideRepo(dir) && !slices.Contains(ownAgentDirs, dir) {
 			files, err := u.agentFiles(dir)
 			if err != nil {
 				return err
@@ -502,7 +522,7 @@ func (u *UseCase) checkStaleEntries(r *Report, set []string, assistant string, o
 			switch {
 			case ms.Kind == kindAgent && slices.Contains(ms.Config, file) && keyNames(b, ms.Key, m.ID):
 				// Only full-tier engines reach here: gabo init removes the key (intent 0010 S6).
-				next, err := u.initRemoveHint(set, rt, assistant, ms, m.ID, file)
+				next, err := u.initRemoveHint(set, listed, rt, ms, m.ID, file)
 				if err != nil {
 					return err
 				}

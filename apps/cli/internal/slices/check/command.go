@@ -90,9 +90,12 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    [marketplaces.gabo-ai] and [plugins.\"gabo@gabo-ai\"], and a .pi/settings.json\n" +
 			"    packages entry for npm:@gabo-ai/pi (any version); a key set to another\n" +
 			"    value passes, and other engines' files are never read;\n" +
-			"  - the main-session entry against runtimes.assistant, from each runtime skill's\n" +
-			"    metadata.main_session: that engine's gabo-assistant link and its agent file\n" +
-			"    plus key, or exactly one scoped block; no other full-tier engine's entry\n" +
+			"  - the main-session entry of every engine listed in runtimes.assistant, from\n" +
+			"    each runtime skill's metadata.main_session: each listed engine's\n" +
+			"    gabo-assistant link and its agent file plus key, or exactly one scoped\n" +
+			"    block; no entry of a full-tier engine that is not listed, named as \"<file>:\n" +
+			"    gabo assistant entry for <engine>, but runtimes.assistant is <the listed\n" +
+			"    engines, joined with \", \">\"\n" +
 			"    (a full-tier runtime skill without it fails, a flexible-tier one warns).\n" +
 			"    For a full-tier engine the key is gabo init's: a missing key names \"run gabo\n" +
 			"    init (it merges \"<key>\": \"gabo-assistant\" into <file>)\", a key holding\n" +
