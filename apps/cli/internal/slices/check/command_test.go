@@ -64,6 +64,33 @@ func TestCommandHelpNamesTheIntentCheck(t *testing.T) {
 	}
 }
 
+// TestCommandHelpNamesTheStricterRules pins the help lines of the intent
+// 0008 rules (S1, S6, S7, S8, S4; S9 names them in the docs).
+func TestCommandHelpNamesTheStricterRules(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - each agent's gabo-version line, a version x.y.z, against " + StampFile + "; a",
+		"    missing line fails, and without a valid stamp the versions are reported",
+		"    as not compared, never skipped;",
+		"  - for a runtime skill declaring metadata.agent_skills, each agent file lists",
+		"    exactly the skills of its spec agent plus the fixed-name links its template",
+		"    a full-tier runtime skill without it fails, a flexible-tier one warns;",
+		"  - for a runtime skill declaring metadata.agent_name, each agent file's",
+		"    declared name equals its spec id (a file that declares none passes);",
+		"  - no gabo-reviewer in the project: no <skill_dir>/gabo-reviewer entry and no",
+		"    agent file listing it among its skills;",
+		"  - for a runtime skill declaring metadata.former_skill_dir, no gabo-* link left",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 func runPreWrite(t *testing.T, proj fs.FS, args ...string) (string, error) {
 	t.Helper()
 	return runPreWriteStdin(t, proj, "", args...)
