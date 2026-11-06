@@ -9,6 +9,10 @@ metadata:
   skill_dir: .agents/skills
   former_skill_dir: .opencode/skills
   agent_skills: "line:Skills:"
+  main_session:
+    kind: agent
+    config: [opencode.json, opencode.jsonc, .opencode/opencode.json, .opencode/opencode.jsonc]
+    key: default_agent
 ---
 ## Activation Contract
 

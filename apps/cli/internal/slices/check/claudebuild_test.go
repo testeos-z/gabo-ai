@@ -18,10 +18,10 @@ import (
 // agent built in the shape gabo-runtime-claude writes: a frontmatter with
 // name, description and the gabo-version line, then the filled body; and
 // each spec skill linked as .claude/skills/<name> -> ../../.gabo/skills/<name>
-// (build step 2).
+// (build step 2); and the main-session entry (spec 0009 S1, S2).
 func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
-	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n"), ".claude/settings.json": file(claudeKeysJSON)}
+	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n"), ".claude/settings.json": file(withJSONKey(claudeKeysJSON, "agent", assistantID))}
 	files, err := skills.Files()
 	if err != nil {
 		t.Fatal(err)
@@ -44,6 +44,11 @@ func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 			proj[".claude/skills/"+name] = symlink("../../.gabo/skills/" + name)
 		}
 	}
+	// The main-session entry of spec 0009 S1, S2: link, agent file and the
+	// agent key above.
+	proj[".claude/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".claude/agents/"+assistantID+".md"] = file("---\nname: " + assistantID +
+		"\ndescription: 'The gabo assistant'\nskills:\n  - gabo-assistant\ngabo-version: " + version + "\n---\n" + assistantBody(t))
 	return proj
 }
 

@@ -140,6 +140,9 @@ func (u *UseCase) Run() (Report, error) {
 		if err := u.checkEngineKeys(&r, cfg); err != nil {
 			return Report{}, err
 		}
+		if err := u.checkMainSession(&r, cfg); err != nil {
+			return Report{}, err
+		}
 		if err := u.checkSlots(&r, cfg); err != nil {
 			return Report{}, err
 		}

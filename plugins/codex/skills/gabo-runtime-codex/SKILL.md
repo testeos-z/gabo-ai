@@ -10,6 +10,9 @@ metadata:
   agent_skills: "line:Load these skills by name before work:"
   agent_name: toml:name
   reviewer_link: $HOME/.agents/skills/gabo-reviewer
+  main_session:
+    kind: block
+    files: [AGENTS.override.md, AGENTS.md]
 ---
 ## Activation Contract
 

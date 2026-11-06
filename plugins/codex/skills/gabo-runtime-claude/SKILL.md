@@ -10,6 +10,10 @@ metadata:
   agent_skills: frontmatter:skills
   agent_name: frontmatter:name
   reviewer_link: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer
+  main_session:
+    kind: agent
+    config: [.claude/settings.json]
+    key: agent
 ---
 ## Activation Contract
 

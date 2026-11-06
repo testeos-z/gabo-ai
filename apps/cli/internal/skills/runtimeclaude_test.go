@@ -2,6 +2,7 @@ package skills
 
 import (
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
@@ -222,6 +223,57 @@ func TestRuntimeClaudeDeclaresAgentPlaces(t *testing.T) {
 	if skills != "frontmatter:skills" || name != "frontmatter:name" {
 		t.Fatalf("agent_skills, agent_name = %q, %q; want frontmatter:skills, frontmatter:name", skills, name)
 	}
+}
+
+// mainSessionMeta is metadata.main_session of a runtime skill (spec 0009 D5).
+type mainSessionMeta struct {
+	Kind   string   `yaml:"kind"`
+	Config []string `yaml:"config"`
+	Key    string   `yaml:"key"`
+	Files  []string `yaml:"files"`
+}
+
+// runtimeMainSession returns metadata.main_session of a catalog runtime
+// skill, nil when absent.
+func runtimeMainSession(t *testing.T, file string) *mainSessionMeta {
+	t.Helper()
+	b, err := content.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rest, _ := strings.CutPrefix(string(b), "---\n")
+	head, _, ok := strings.Cut(rest, "\n---\n")
+	if !ok {
+		t.Fatalf("%s: no frontmatter", file)
+	}
+	var fm struct {
+		Metadata struct {
+			MainSession *mainSessionMeta `yaml:"main_session"`
+		} `yaml:"metadata"`
+	}
+	if err := yaml.Unmarshal([]byte(head), &fm); err != nil {
+		t.Fatal(err)
+	}
+	return fm.Metadata.MainSession
+}
+
+// wantMainSession fails unless the runtime skill declares exactly want.
+func wantMainSession(t *testing.T, file string, want mainSessionMeta) {
+	t.Helper()
+	got := runtimeMainSession(t, file)
+	if got == nil {
+		t.Fatalf("%s: no metadata.main_session", file)
+	}
+	if got.Kind != want.Kind || got.Key != want.Key || !slices.Equal(got.Config, want.Config) || !slices.Equal(got.Files, want.Files) {
+		t.Fatalf("%s: metadata.main_session = %+v, want %+v", file, *got, want)
+	}
+}
+
+// gabo check reads the main-session entry of Claude Code from its runtime
+// skill (spec 0009 D5): the agent key in .claude/settings.json.
+func TestRuntimeClaudeDeclaresMainSession(t *testing.T) {
+	t.Parallel()
+	wantMainSession(t, runtimeClaude, mainSessionMeta{Kind: "agent", Config: []string{".claude/settings.json"}, Key: "agent"})
 }
 
 // mainSessionSection returns the ## Main-Session Entry section of the Claude

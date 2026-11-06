@@ -28,14 +28,16 @@ func readTestdata(t *testing.T, name string) string {
 	return string(b)
 }
 
-// opencodeBuilt is a project with the real embedded catalog, the stand-in
-// runtime skill, and every spec agent built in the shape of spec 0004 S3
+// opencodeBuilt is a project with the real embedded catalog (its own
+// gabo-runtime-opencode, which declares metadata.main_session), and every
+// spec agent built in the shape of spec 0004 S3
 // (.opencode/agents/<id>.md: frontmatter description, mode and permission;
 // the body starts with <!-- gabo-version: x.y.z -->, then the Skills: line
 // of build step 7, omitted for an empty list);
 // each spec skill linked in the shared .agents/skills (intent 0008 S3) as
 // .agents/skills/<name> -> ../../.gabo/skills/<name>, the fixed-name links
-// of the tree's skill adapters, and the tree's .opencode/opencode.jsonc.
+// of the tree's skill adapters, the tree's .opencode/opencode.jsonc with
+// default_agent, and the main-session entry (spec 0009 S1, S2).
 func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
 	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n")}
@@ -46,8 +48,7 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 	for _, f := range files {
 		proj[path.Join(CatalogDir, f.Path)] = &fstest.MapFile{Data: f.Data}
 	}
-	proj[CatalogDir+"/gabo-runtime-opencode/SKILL.md"] = file(readTestdata(t, "gabo-runtime-opencode/SKILL.md"))
-	proj[".opencode/opencode.jsonc"] = file(readTestdata(t, "opencode.jsonc"))
+	proj[".opencode/opencode.jsonc"] = file(withJSONKey(readTestdata(t, "opencode.jsonc"), "default_agent", assistantID))
 	spec, err := agentspec.Load(skills.Catalog())
 	if err != nil {
 		t.Fatal(err)
@@ -65,6 +66,11 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 	}
 	proj[".agents/skills/gabo-reviewer-placement"] = symlink("../../.gabo/skills/gabo-reviewer-placement-local")
 	proj[".agents/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
+	// The main-session entry of spec 0009 S1, S2: link, primary agent and
+	// the default_agent key above.
+	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".opencode/agents/"+assistantID+".md"] = file("---\ndescription: \"The gabo assistant\"\nmode: primary\n---\n" +
+		"<!-- gabo-version: " + version + " -->\n" + assistantBody(t))
 	return proj
 }
 
@@ -181,6 +187,7 @@ func TestCodexPiAndOpencodeShareOneSetOfLinks(t *testing.T) {
 			proj[name] = f
 		}
 	}
+	delete(proj, "AGENTS.md") // the Codex and Pi entry; the assistant is opencode
 	run := func(p fstest.MapFS) Report {
 		rep, err := NewUseCase(p, configFiles{projectFile: codexPiOpencodeConfig}, codexUser(),
 			Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
@@ -271,7 +278,7 @@ func TestOpencodeSubagentDepthThreeOrMorePasses(t *testing.T) {
 			t.Parallel()
 			proj := opencodeBuilt(t, "1.2.3")
 			delete(proj, ".opencode/opencode.jsonc")
-			proj[c.file] = file(c.doc)
+			proj[c.file] = file(withJSONKey(c.doc, "default_agent", assistantID))
 			rep := runOpencode(t, proj, "1.2.3")
 			wantPassed(t, rep, PassedLine)
 			if got := depthLines(rep); len(got) != 0 {

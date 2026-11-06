@@ -18,7 +18,8 @@ import (
 // skill's link rules (intent 0004 S5, S14; intent 0008 S3): each spec skill
 // as .agents/skills/<name> -> ../../.gabo/skills/<name>, each SKILL.md slot
 // adapter as .agents/skills/gabo-<slot> (_ written -), and the
-// reviewer-configuration skill like a spec skill; no gabo-reviewer link.
+// reviewer-configuration skill like a spec skill, the gabo-assistant link of
+// the main-session entry; no gabo-reviewer link.
 func opencodeLinkedByRules(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
 	proj := opencodeBuilt(t, version)
@@ -57,6 +58,9 @@ func opencodeLinkedByRules(t *testing.T, version string) fstest.MapFS {
 		proj[dir+"gabo-"+strings.ReplaceAll(slot, "_", "-")] = symlink("../../" + path.Dir(s.Adapter))
 	}
 	proj[dir+"gabo-reviewer-config"] = symlink("../../.gabo/skills/gabo-reviewer-config")
+	// The main-session skill, linked while opencode is runtimes.assistant
+	// (spec 0009 S1).
+	proj[dir+"gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
 	return proj
 }
 

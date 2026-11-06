@@ -41,6 +41,9 @@ type runtimeMeta struct {
 	// AgentName is where an agent file declares its name; not declared when
 	// the engine names an agent by its file name (intent 0008 D1).
 	AgentName agentPlace `yaml:"-"`
+	// MainSession is the engine's main-session entry (spec 0009 D5); nil
+	// when not declared.
+	MainSession *mainSessionMeta `yaml:"main_session"`
 }
 
 // parseRuntimeMeta reads metadata from a SKILL.md frontmatter.
@@ -73,6 +76,9 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 		return runtimeMeta{}, err
 	}
 	if m.AgentName, err = parseAgentPlace("agent_name", fm.Metadata.AgentName); err != nil {
+		return runtimeMeta{}, err
+	}
+	if err = m.MainSession.normalize(); err != nil {
 		return runtimeMeta{}, err
 	}
 	return m, nil

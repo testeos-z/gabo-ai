@@ -144,6 +144,9 @@ func piBuilt(t *testing.T, version string) fstest.MapFS {
 	}
 	proj[".agents/skills/gabo-reviewer-placement"] = symlink("../../.gabo/skills/gabo-reviewer-placement-local")
 	proj[".agents/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
+	// The main-session entry of spec 0009 S1, S3: link and scoped block.
+	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj["AGENTS.md"] = file("# Project\n\n" + assistantBlock(t))
 	return proj
 }
 
