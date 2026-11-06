@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"path"
 	"path/filepath"
@@ -144,6 +145,60 @@ func (u *UseCase) checkLinks(r *Report, cfg config.Config) error {
 	if rt := string(cfg.Runtimes.Reviewer); rt != "" {
 		if meta, ok := u.runtimeMeta(rt); ok && meta.ReviewerLink != "" {
 			u.checkReviewerLink(r, rt, meta.ReviewerLink)
+		}
+	}
+	return nil
+}
+
+// reviewerSkill is the reviewer skill's name; it lives only at user level
+// (TRD D20).
+const reviewerSkill = "gabo-reviewer"
+
+// NextRemoveReviewer follows a reviewer skill placed in the project.
+const NextRemoveReviewer = "next: remove it; the reviewer runs from the user-level copy"
+
+// checkReviewerIsolation fails, for each runtime declared in runtimes.*, on
+// an entry <skill_dir>/gabo-reviewer of any kind and on every file in its
+// agent_dir whose skills (metadata.agent_skills) include gabo-reviewer, so
+// no agent can load the reviewer from the project (intent 0008 S8). The
+// user-level reviewer link is checkReviewerLink's.
+func (u *UseCase) checkReviewerIsolation(r *Report, cfg config.Config) error {
+	var dirs, agentDirs []string
+	for _, rt := range runtimesOf(cfg) {
+		meta, ok := u.runtimeMeta(rt)
+		if !ok {
+			continue
+		}
+		if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) && !slices.Contains(dirs, dir) {
+			dirs = append(dirs, dir)
+			entry := path.Join(dir, reviewerSkill)
+			if _, err := fs.Lstat(u.project, entry); err == nil {
+				r.fail("✗ "+entry+": "+reviewerSkill+" must not be in the project", NextRemoveReviewer)
+			}
+		}
+		dir := path.Clean(meta.AgentDir)
+		if meta.AgentDir == "" || !insideRepo(dir) || !meta.AgentSkills.declared() || slices.Contains(agentDirs, dir) {
+			continue
+		}
+		agentDirs = append(agentDirs, dir)
+		files, err := u.agentFiles(dir)
+		if err != nil {
+			return err
+		}
+		var names []string
+		for _, ns := range files {
+			names = append(names, ns...)
+		}
+		slices.Sort(names)
+		for _, name := range names {
+			file := path.Join(dir, name)
+			b, err := fs.ReadFile(u.project, file)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", file, err)
+			}
+			if slices.Contains(meta.AgentSkills.skills(b), reviewerSkill) {
+				r.fail("✗ "+file+": "+reviewerSkill+" must not be in the project", NextRemoveReviewer)
+			}
 		}
 	}
 	return nil
