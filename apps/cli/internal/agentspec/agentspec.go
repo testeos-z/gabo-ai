@@ -41,12 +41,28 @@ type Agent struct {
 	Template string `yaml:"template"`
 }
 
+// MainSessionEntry is the owner's main-session entry (spec 0009 D4): the
+// assistant agent template and the scoped block a runtime skill builds only
+// for runtimes.assistant. It is no spec agent: IDs and Agents never hold it.
+type MainSessionEntry struct {
+	ID   string `yaml:"id"`
+	Role string `yaml:"role"`
+	// Skills are catalog skill names the main session loads.
+	Skills []string `yaml:"skills"`
+	// Template is the agent body template path, relative to Dir.
+	Template string `yaml:"template"`
+	// Block is the scoped instructions-file block path, relative to Dir.
+	Block string `yaml:"block"`
+}
+
 // Spec is the validated content of agents.yaml.
 type Spec struct {
 	Agents []Agent `yaml:"agents"`
+	// MainSession is nil when agents.yaml has no main_session entry.
+	MainSession *MainSessionEntry `yaml:"main_session"`
 }
 
-// IDs lists the agent ids in spec order.
+// IDs lists the agent ids in spec order; the main-session entry is not one.
 func (s Spec) IDs() []string {
 	ids := make([]string, len(s.Agents))
 	for i, a := range s.Agents {
@@ -57,8 +73,9 @@ func (s Spec) IDs() []string {
 
 // Load reads File from the catalog root and validates it: required fields,
 // unique ids, every launched_by and template resolves, every skill exists in
-// the catalog (a directory with a SKILL.md) and launched_by has no cycle. It
-// reports every problem found.
+// the catalog (a directory with a SKILL.md) and launched_by has no cycle; an
+// optional main_session entry needs an id that is no spec agent, a role, and
+// a template and block that resolve. It reports every problem found.
 func Load(root fs.FS) (Spec, error) {
 	b, err := fs.ReadFile(root, File)
 	if err != nil {
@@ -110,24 +127,52 @@ func validate(root fs.FS, spec Spec) error {
 		case a.LaunchedBy != MainSession && !known:
 			fail("agent %s: launched_by %q is not a spec agent or %s", a.ID, a.LaunchedBy, MainSession)
 		}
-		switch {
-		case a.Template == "":
-			fail("agent %s: missing template", a.ID)
-		case !fs.ValidPath(a.Template) || a.Template == ".":
-			fail("agent %s: template %q must be a relative path inside %s", a.ID, a.Template, Dir)
-		case !isFile(root, path.Join(Dir, a.Template)):
-			fail("agent %s: template %q not found", a.ID, a.Template)
-		}
-		for _, s := range a.Skills {
-			if s == "" || strings.Contains(s, "/") || !isFile(root, s+"/SKILL.md") {
-				fail("agent %s: skill %q not in the catalog", a.ID, s)
-			}
-		}
+		checkFile(root, fail, "agent "+a.ID, "template", a.Template)
+		checkSkills(root, fail, "agent "+a.ID, a.Skills)
+	}
+	if m := spec.MainSession; m != nil {
+		validateMainSession(root, fail, *m, byID)
 	}
 	if err := checkCycles(spec, byID); err != nil {
 		errs = append(errs, err)
 	}
 	return errors.Join(errs...)
+}
+
+func validateMainSession(root fs.FS, fail func(string, ...any), m MainSessionEntry, byID map[string]Agent) {
+	const who = "main_session"
+	if m.ID == "" {
+		fail("%s: missing id", who)
+	} else if _, clash := byID[m.ID]; clash {
+		fail("%s: id %s is a spec agent", who, m.ID)
+	}
+	if m.Role == "" {
+		fail("%s: missing role", who)
+	}
+	checkSkills(root, fail, who, m.Skills)
+	checkFile(root, fail, who, "template", m.Template)
+	checkFile(root, fail, who, "block", m.Block)
+}
+
+// checkFile requires field p to name a file inside Dir.
+func checkFile(root fs.FS, fail func(string, ...any), who, field, p string) {
+	switch {
+	case p == "":
+		fail("%s: missing %s", who, field)
+	case !fs.ValidPath(p) || p == ".":
+		fail("%s: %s %q must be a relative path inside %s", who, field, p, Dir)
+	case !isFile(root, path.Join(Dir, p)):
+		fail("%s: %s %q not found", who, field, p)
+	}
+}
+
+// checkSkills requires every name to be a catalog skill folder.
+func checkSkills(root fs.FS, fail func(string, ...any), who string, names []string) {
+	for _, s := range names {
+		if s == "" || strings.Contains(s, "/") || !isFile(root, s+"/SKILL.md") {
+			fail("%s: skill %q not in the catalog", who, s)
+		}
+	}
 }
 
 // checkCycles follows each launched_by chain and reports the first cycle; with

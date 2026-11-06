@@ -12,6 +12,12 @@
 #   launched_by  the spec agent that launches it, or main-session (the
 #                assistant's main session, which has no agent file)
 #   template     body template, relative to this directory
+#
+# main_session is the owner's main-session entry (spec 0009 D4), built only
+# for the engine in runtimes.assistant and never one of the agents above:
+#   id, role, skills, template  as above
+#   block        the scoped block for an instructions file, relative to this
+#                directory, for engines with no project default agent
 agents:
   - id: gabo-pm
     role: Directiva product manager; writes the PRD, each intent and its spec, and opens plan-change proposals.
@@ -61,3 +67,9 @@ agents:
     tools: [shell]
     launched_by: gabo-coder
     template: agents/gabo-reviewer.md
+main_session:
+  id: gabo-assistant
+  role: The owner's single point of contact in the main session; delegates all heavy work to the gabo agents.
+  skills: [gabo-assistant]
+  template: agents/gabo-assistant.md
+  block: agents/gabo-assistant-block.md
