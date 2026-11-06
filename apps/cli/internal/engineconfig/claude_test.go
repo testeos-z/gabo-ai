@@ -312,7 +312,7 @@ func TestClaudeRuleAgentKey(t *testing.T) {
 			if c.built {
 				files[ClaudeAgentFile] = []byte("---\nname: gabo-assistant\n---\n")
 			}
-			res := claudeRule(Input{Files: files, Version: "0.2.6", Assistant: c.assistant})
+			res := claudeRule(Input{Files: files, Version: "0.2.6", Assistants: []string{c.assistant}})
 			if !slices.Equal(res.Section.Lines, c.lines) {
 				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, c.lines)
 			}
@@ -334,7 +334,7 @@ func TestClaudeRuleAgentKey(t *testing.T) {
 			}
 			// A second run on the output is byte-identical: nothing written.
 			files[ClaudeSettings] = got
-			if again := claudeRule(Input{Files: files, Assistant: c.assistant}); len(again.Writes) != 0 {
+			if again := claudeRule(Input{Files: files, Assistants: []string{c.assistant}}); len(again.Writes) != 0 {
 				t.Errorf("second run writes %q, want none", again.Writes)
 			}
 		})
@@ -350,7 +350,7 @@ func TestClaudeRuleAgentRefusesUnreadableFiles(t *testing.T) {
 		`"gabo-assistant"`: "the top level is not a JSON object",
 	} {
 		for _, assistant := range []string{"claude", "codex"} {
-			res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistant: assistant})
+			res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{assistant}})
 			want := []string{"✗ .claude/settings.json: " + reason + "; fix it and run gabo init again"}
 			if len(res.Writes) != 0 || !slices.Equal(res.Section.Lines, want) {
 				t.Errorf("%s %q: writes %q lines %q, want none and %q", assistant, in, res.Writes, res.Section.Lines, want)
@@ -362,7 +362,7 @@ func TestClaudeRuleAgentRefusesUnreadableFiles(t *testing.T) {
 // S1: the added member keeps every earlier byte, in a compact file too.
 func TestClaudeRuleAgentKeepsEarlierBytes(t *testing.T) {
 	in := `{"permissions": {"allow": []}, "enabledPlugins": {"gabo@gabo-ai": true}, "extraKnownMarketplaces": {"gabo-ai": {"source": {"source": "github", "repo": "testeos-z/gabo-ai"}}}}`
-	res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistant: "claude"})
+	res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{"claude"}})
 	want := strings.TrimSuffix(in, "}") + `, "agent": "gabo-assistant"}`
 	if got := string(res.Writes[ClaudeSettings]); got != want {
 		t.Errorf("wrote\n%s\nwant\n%s", got, want)
@@ -370,3 +370,49 @@ func TestClaudeRuleAgentKeepsEarlierBytes(t *testing.T) {
 }
 
 func ptr(s string) *string { return &s }
+
+// Intent 0013 S3, D7: runtimes.assistant may list several engines. Claude
+// Code listed with another engine writes agent like a single claude; Claude
+// Code not listed removes only the gabo value and the line names the list;
+// a listed Claude Code never loses its gabo value.
+func TestClaudeRuleAssistantList(t *testing.T) {
+	withAgent := strings.TrimSuffix(integrationOnly, "}\n") + "  \"agent\": \"gabo-assistant\"\n}\n"
+	withAgent = strings.Replace(withAgent, "    \"gabo@gabo-ai\": true\n  }\n", "    \"gabo@gabo-ai\": true\n  },\n", 1)
+	cases := []struct {
+		name       string
+		assistants []string
+		in, out    string // out "" for no write
+		lines      []string
+	}{
+		{"claude listed first adds agent", []string{Claude, Opencode}, integrationOnly, withAgent,
+			[]string{"wrote .claude/settings.json: added agent"}},
+		{"claude listed second adds agent", []string{Pi, Claude}, integrationOnly, withAgent,
+			[]string{"wrote .claude/settings.json: added agent"}},
+		{"claude listed keeps the gabo value", []string{Opencode, Claude}, withAgent, "",
+			[]string{claudeUnchanged}},
+		{"claude not listed removes the gabo value", []string{Opencode, Pi}, withAgent, integrationOnly,
+			[]string{`removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is opencode, pi)`}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			files := map[string][]byte{ClaudeSettings: []byte(c.in), ClaudeAgentFile: nil}
+			res := claudeRule(Input{Files: files, Version: "0.2.6", Assistants: c.assistants})
+			if !slices.Equal(res.Section.Lines, c.lines) {
+				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, c.lines)
+			}
+			if c.out == "" {
+				if len(res.Writes) != 0 {
+					t.Fatalf("writes = %q, want none", res.Writes)
+				}
+				return
+			}
+			if got := string(res.Writes[ClaudeSettings]); got != c.out || len(res.Writes) != 1 {
+				t.Fatalf("writes = %q, want only %s =\n%s", res.Writes, ClaudeSettings, c.out)
+			}
+			files[ClaudeSettings] = res.Writes[ClaudeSettings]
+			if again := claudeRule(Input{Files: files, Assistants: c.assistants}); len(again.Writes) != 0 {
+				t.Errorf("second run writes %q, want none", again.Writes)
+			}
+		})
+	}
+}

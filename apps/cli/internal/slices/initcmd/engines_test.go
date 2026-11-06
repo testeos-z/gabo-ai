@@ -44,7 +44,7 @@ func golden(t *testing.T, name, got string) {
 }
 
 func engineStep(s *memStore, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, "", "0.2.6")
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, nil, "0.2.6")
 }
 
 func sectionOf(t *testing.T, r engineconfig.Report, engine string) engineconfig.Section {
@@ -242,7 +242,13 @@ func TestInitSourcesRunNoProcess(t *testing.T) {
 }
 
 func engineStepAs(s *memStore, assistant string, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, assistant, "0.2.6")
+	return engineStepList(s, []string{assistant}, set...)
+}
+
+// engineStepList runs the engine step with runtimes.assistant listing
+// assistants (intent 0013 S3).
+func engineStepList(s *memStore, assistants []string, set ...string) engineconfig.Report {
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, assistants, "0.2.6")
 }
 
 const (
@@ -569,33 +575,82 @@ func TestEngineStepOpencodeSubagentDepth(t *testing.T) {
 }
 
 // engineSet reads runtimes.assistant as one engine or a list (intent 0013
-// S2): the set is engineconfig.Engines of the roles, in the fixed order of
-// engineconfig.Set; session adds no engine. A one-engine assistant is still
-// the assistant engine; a list leaves every main-session key alone until
-// the list rule of intent 0013 S3.
+// S2, S3): the set is engineconfig.Engines of the roles, in the fixed order
+// of engineconfig.Set; session adds no engine. Every listed engine is an
+// assistant engine.
 func TestEngineSetReadsTheAssistantList(t *testing.T) {
 	t.Parallel()
 	for _, c := range []struct {
 		name, runtimes string
 		set            []string
-		assistant      string
+		assistants     []string
 	}{
-		{"flow list", "  coder: session\n  reviewer: opencode\n  assistant: [claude, pi]\n", []string{"claude", "opencode", "pi"}, ""},
-		{"block list", "  coder: session\n  reviewer: opencode\n  assistant:\n    - claude\n    - pi\n", []string{"claude", "opencode", "pi"}, ""},
-		{"session reviewer", "  coder: claude\n  reviewer: session\n  assistant: [pi]\n", []string{"claude", "pi"}, "pi"},
-		{"single values", "  coder: pi\n  reviewer: claude\n  assistant: claude\n", []string{"claude", "pi"}, "claude"},
-		{"no assistant", "  coder: codex\n  reviewer: claude\n", []string{"claude", "codex"}, ""},
+		{"flow list", "  coder: session\n  reviewer: opencode\n  assistant: [claude, pi]\n", []string{"claude", "opencode", "pi"}, []string{"claude", "pi"}},
+		{"block list", "  coder: session\n  reviewer: opencode\n  assistant:\n    - claude\n    - pi\n", []string{"claude", "opencode", "pi"}, []string{"claude", "pi"}},
+		{"session reviewer", "  coder: claude\n  reviewer: session\n  assistant: [pi]\n", []string{"claude", "pi"}, []string{"pi"}},
+		{"single values", "  coder: pi\n  reviewer: claude\n  assistant: claude\n", []string{"claude", "pi"}, []string{"claude"}},
+		{"no assistant", "  coder: codex\n  reviewer: claude\n", []string{"claude", "codex"}, nil},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
-			set, assistant, err := engineSet([]byte("runtimes:\n" + c.runtimes))
+			set, assistants, err := engineSet([]byte("runtimes:\n" + c.runtimes))
 			if err != nil {
 				t.Fatalf("engineSet error = %v", err)
 			}
-			if !slices.Equal(set, c.set) || assistant != c.assistant {
-				t.Fatalf("engineSet = %q, %q; want %q, %q", set, assistant, c.set, c.assistant)
+			if !slices.Equal(set, c.set) || !slices.Equal(assistants, c.assistants) {
+				t.Fatalf("engineSet = %q, %q; want %q, %q", set, assistants, c.set, c.assistants)
 			}
 		})
+	}
+}
+
+// Intent 0013 S3: with runtimes.assistant: [claude, opencode] a fresh
+// project gets both main-session keys, agent and default_agent, and once
+// the agents are built a second run is byte-identical.
+func TestEngineStepAssistantListGolden(t *testing.T) {
+	t.Parallel()
+	assistants := []string{"claude", "opencode"}
+	set := engineconfig.Set(engineconfig.Engines("", "", assistants)...)
+	s := newStore(map[string]string{})
+	r := engineStepList(s, assistants, set...)
+	if r.Failed() {
+		t.Fatalf("failed:\n%s", r.Render())
+	}
+	golden(t, "engines-assistant-list.golden", r.Render())
+	if !strings.Contains(s.Files[claudeFile], `"agent": "gabo-assistant"`) || !strings.Contains(s.Files[opencodeNew], `"default_agent": "gabo-assistant"`) {
+		t.Fatalf("%s =\n%s\n%s =\n%s", claudeFile, s.Files[claudeFile], opencodeNew, s.Files[opencodeNew])
+	}
+	s.Files[claudeAgent] = "---\nname: gabo-assistant\n---\n"
+	s.Files[opencodeAgent] = "---\nname: gabo-assistant\n---\n"
+	before := maps.Clone(s.Files)
+	s.Writes = nil
+	again := engineStepList(s, assistants, set...)
+	if len(s.Writes) != 0 || !maps.Equal(s.Files, before) || strings.Contains(again.Render(), "main session needs") {
+		t.Fatalf("second run wrote %v:\n%s", s.Writes, again.Render())
+	}
+}
+
+// Intent 0013 S3, D7: with runtimes.assistant: [claude, pi] an unlisted
+// OpenCode's default_agent: "gabo-assistant" is the only member removed, the
+// line names the list, and the listed Claude Code keeps its gabo agent.
+func TestEngineStepAssistantListRemovesOnlyTheUnlisted(t *testing.T) {
+	t.Parallel()
+	assistants := []string{"claude", "pi"}
+	set := engineconfig.Set(engineconfig.Engines("", "", assistants)...)
+	s := newStore(map[string]string{claudeFile: withGaboAgent, opencodeRootCfg: gaboDefault})
+	r := engineStepList(s, assistants, set...)
+	if r.Failed() {
+		t.Fatalf("failed:\n%s", r.Render())
+	}
+	golden(t, "engines-list-default-agent-removed.golden", r.Render())
+	if got := s.Files[opencodeRootCfg]; got != noDefault {
+		t.Fatalf("%s =\n%s", opencodeRootCfg, got)
+	}
+	if got := s.Files[claudeFile]; got != withGaboAgent {
+		t.Fatalf("%s =\n%s", claudeFile, got)
+	}
+	if want := `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude, pi)`; !slices.Equal(sectionOf(t, r, "opencode").Lines, []string{want}) {
+		t.Fatalf("opencode lines = %q, want %q", sectionOf(t, r, "opencode").Lines, want)
 	}
 }
 
@@ -615,10 +670,14 @@ func TestInitIntegratesEveryListedAssistant(t *testing.T) {
 			t.Fatalf("no %s section:\n%s", e, text)
 		}
 	}
-	if strings.Contains(text, "session") {
+	if strings.Contains(text, "\n  session:") {
 		t.Fatalf("session reported as an engine:\n%s", text)
 	}
 	if !slices.Contains(s.Writes, claudeFile) || !slices.Contains(s.Writes, piFile) || !slices.Contains(s.Writes, opencodeNew) {
 		t.Fatalf("writes = %v", s.Writes)
+	}
+	// claude is listed, so its main-session key is written (intent 0013 S3).
+	if !strings.Contains(s.Files[claudeFile], `"agent": "gabo-assistant"`) {
+		t.Fatalf("%s =\n%s", claudeFile, s.Files[claudeFile])
 	}
 }

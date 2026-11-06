@@ -38,3 +38,19 @@ func TestReportWithoutStepsOrFailures(t *testing.T) {
 		t.Error("Failed() = true, want false without a ✗ line")
 	}
 }
+
+// Intent 0013 S3: the removal line names runtimes.assistant as written: one
+// engine as in intent 0010, a list joined with ", ".
+func TestRemovedMainSessionLine(t *testing.T) {
+	for _, c := range []struct {
+		assistants []string
+		want       string
+	}{
+		{[]string{"codex"}, `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is codex)`},
+		{[]string{"claude", "pi"}, `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude, pi)`},
+	} {
+		if got := removedMainSessionLine("opencode.json", "default_agent", "gabo-assistant", Input{Assistants: c.assistants}); got != c.want {
+			t.Errorf("removedMainSessionLine(%q) = %q, want %q", c.assistants, got, c.want)
+		}
+	}
+}

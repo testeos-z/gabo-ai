@@ -31,22 +31,22 @@ var engineFiles = map[string]string{
 	engineconfig.Pi:     engineconfig.PiSettings,
 }
 
-// engineSet reads the engine set and the assistant engine from the
+// engineSet reads the engine set and the assistant engines from the
 // runtimes mapping of gabo.yaml (S1; intent 0010 D1): the set is
 // engineconfig.Engines of the roles (intent 0013 S2) in the fixed order of
-// engineconfig.Set. runtimes.assistant is one engine or a list; only a
-// one-engine assistant is the assistant engine here, so a list leaves every
-// main-session key alone. It needs only YAML and that mapping, not a fully
-// valid config.
-func engineSet(b []byte) ([]string, string, error) {
+// engineconfig.Set. runtimes.assistant is one engine or a list; every
+// listed engine is an assistant engine whose main-session key gabo writes
+// (intent 0013 S3). It needs only YAML and that mapping, not a fully valid
+// config.
+func engineSet(b []byte) ([]string, []string, error) {
 	var doc struct {
 		Runtimes yaml.Node `yaml:"runtimes"`
 	}
 	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return nil, "", fmt.Errorf("cannot be read as YAML (%v)", err)
+		return nil, nil, fmt.Errorf("cannot be read as YAML (%v)", err)
 	}
 	if doc.Runtimes.Kind != yaml.MappingNode {
-		return nil, "", errors.New("has no runtimes mapping")
+		return nil, nil, errors.New("has no runtimes mapping")
 	}
 	var rt struct {
 		Coder     string                    `yaml:"coder"`
@@ -54,32 +54,32 @@ func engineSet(b []byte) ([]string, string, error) {
 		Assistant projectconfig.RuntimeList `yaml:"assistant"`
 	}
 	if err := doc.Runtimes.Decode(&rt); err != nil {
-		return nil, "", fmt.Errorf("runtimes cannot be read (%v)", err)
+		return nil, nil, fmt.Errorf("runtimes cannot be read (%v)", err)
 	}
-	assistants := make([]string, len(rt.Assistant))
-	for i, a := range rt.Assistant {
-		assistants[i] = string(a)
+	var assistants []string
+	for _, a := range rt.Assistant {
+		assistants = append(assistants, strings.TrimSpace(string(a)))
 	}
-	assistant := strings.TrimSpace(string(rt.Assistant.Single()))
-	return engineconfig.Set(engineconfig.Engines(rt.Coder, rt.Reviewer, assistants)...), assistant, nil
+	return engineconfig.Set(engineconfig.Engines(rt.Coder, rt.Reviewer, assistants)...), assistants, nil
 }
 
 // engineStep runs each engine's rule in set order and writes each changed
 // engine file. A refused or failed engine gets its ✗ line and the next
 // engine still runs (S5, D10). Then it removes the gabo main-session value
-// from the file of each engine outside the set (intent 0010 S4, D2). It
-// reads and writes only project files.
-func (u *UseCase) engineStep(set []string, assistant, version string) engineconfig.Report {
+// from the file of each engine outside the set (intent 0010 S4, D2); a
+// listed assistant engine is always in the set, so its value stays (intent
+// 0013 D7). It reads and writes only project files.
+func (u *UseCase) engineStep(set, assistants []string, version string) engineconfig.Report {
 	var report engineconfig.Report
 	for _, engine := range set {
-		report.Sections = append(report.Sections, u.integrateEngine(engine, assistant, version))
+		report.Sections = append(report.Sections, u.integrateEngine(engine, assistants, version))
 	}
-	report.Sections = append(report.Sections, u.removeMainSession(set, assistant, version)...)
+	report.Sections = append(report.Sections, u.removeMainSession(set, assistants, version)...)
 	return report
 }
 
-func (u *UseCase) integrateEngine(engine, assistant, version string) engineconfig.Section {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistant: assistant}
+func (u *UseCase) integrateEngine(engine string, assistants []string, version string) engineconfig.Section {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistants: assistants}
 	file, owns := engineFiles[engine]
 	fail := func(reason string) engineconfig.Section {
 		return engineconfig.Section{Engine: engine, Lines: []string{engineconfig.FailurePrefix + " " + file + ": " + reason}}
@@ -114,7 +114,7 @@ func (u *UseCase) integrateEngine(engine, assistant, version string) engineconfi
 			in.Files[engineconfig.OpencodeAgentFile] = nil
 		}
 		var reason string
-		if writable, file, reason = u.loadOpencodeConfigs(&in, assistant); reason != "" {
+		if writable, file, reason = u.loadOpencodeConfigs(&in, assistants); reason != "" {
 			return fail(reason)
 		}
 	}
@@ -127,12 +127,13 @@ func (u *UseCase) integrateEngine(engine, assistant, version string) engineconfi
 // loadOpencodeConfigs reads the OpenCode configs the rule may change
 // (intent 0010 S2, S3, S4): always the first existing one (else the new
 // .opencode/opencode.json), which must not be refused, since it gets
-// experimental.subagent_depth and, with OpenCode as the assistant,
-// default_agent; with another assistant also every other existing one that
-// is not refused, for the default_agent removal. It returns the files that
+// experimental.subagent_depth and, with OpenCode a listed assistant engine,
+// default_agent; with OpenCode not listed in a non-empty
+// runtimes.assistant also every other existing one that is not refused,
+// for the default_agent removal (intent 0013 D7). It returns the files that
 // may be written, in lookup order, or the refused or unreadable file and
 // why.
-func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistant string) ([]string, string, string) {
+func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistants []string) ([]string, string, string) {
 	target := engineconfig.OpencodeNewConfig
 	for _, p := range engineconfig.OpencodeConfigs {
 		if _, err := u.store.Lstat(u.path(p)); err == nil || u.refuseEngineFile(p) != "" {
@@ -151,7 +152,7 @@ func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistant string) 
 		return nil, target, fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err)
 	}
 	var read []string
-	if assistant != "" && assistant != engineconfig.Opencode {
+	if engineconfig.Unlisted(assistants, engineconfig.Opencode) {
 		read = u.readRemovable(in, engineconfig.OpencodeConfigs)
 	}
 	var writable []string
@@ -200,8 +201,8 @@ func (u *UseCase) writeEngineFiles(writes map[string][]byte, writable []string) 
 // main-session removal and writes the files the removal changes. gabo init
 // no longer integrates those engines, so a refused, missing or unreadable
 // file is left alone without a line; only a failed write is a ✗ line.
-func (u *UseCase) removeMainSession(set []string, assistant, version string) []engineconfig.Section {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistant: assistant}
+func (u *UseCase) removeMainSession(set, assistants []string, version string) []engineconfig.Section {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistants: assistants}
 	read := map[string][]string{}
 	for _, engine := range engineconfig.Set(engineconfig.Claude, engineconfig.Codex, engineconfig.Opencode, engineconfig.Pi) {
 		if engineconfig.Removable(engine) && !slices.Contains(set, engine) {

@@ -63,13 +63,43 @@ func Set(runtimes ...string) []string {
 
 // Input is what an engine rule reads: the current bytes of the project's
 // engine files by project-relative path (a missing file has no entry), the
-// binary version and the assistant engine (runtimes.assistant), which picks
-// the engine whose main-session key gabo writes (intent 0010 S1, D1). An
-// empty Assistant leaves every main-session key alone.
+// binary version and the assistant engines (runtimes.assistant, one engine
+// or a list), which pick the engines whose main-session key gabo writes
+// (intent 0010 S1, D1; intent 0013 S3). No assistant engine leaves every
+// main-session key alone.
 type Input struct {
-	Files     map[string][]byte
-	Version   string
-	Assistant string
+	Files      map[string][]byte
+	Version    string
+	Assistants []string
+}
+
+// assistants returns the listed assistant engines, trimmed, without empty
+// names.
+func (in Input) assistants() []string {
+	var out []string
+	for _, name := range in.Assistants {
+		if name = strings.TrimSpace(name); name != "" {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// lists reports whether engine is a listed assistant engine, so gabo writes
+// its main-session key (intent 0013 S3).
+func (in Input) lists(engine string) bool { return slices.Contains(in.assistants(), engine) }
+
+// unlists reports whether engine's main-session value is removed; see
+// Unlisted.
+func (in Input) unlists(engine string) bool { return Unlisted(in.Assistants, engine) }
+
+// Unlisted reports whether runtimes.assistant lists some engine but not
+// engine, so gabo removes engine's gabo main-session value (intent 0010 S4,
+// D2; intent 0013 D7): a listed engine's value is never removed, and no
+// assistant engine removes nothing.
+func Unlisted(assistants []string, engine string) bool {
+	in := Input{Assistants: assistants}
+	return len(in.assistants()) > 0 && !in.lists(engine)
 }
 
 // Result is what an engine rule returns: its report section and the new
