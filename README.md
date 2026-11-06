@@ -102,7 +102,7 @@ The CLI has four commands. Everything else is done by your agent through the ski
 
 | command | what it does |
 |---|---|
-| `gabo init` | Copies the skill catalog to `.gabo/skills/`, writes `.gabo/VERSION`, installs the reviewer skill at user level and, with a `gabo.yaml`, configures each declared engine at project level. Never touches an existing config or your global engine config. |
+| `gabo init` | Copies the skill catalog to `.gabo/skills/`, writes `.gabo/VERSION`, installs the reviewer skill at user level and, with a `gabo.yaml`, configures each declared engine at project level, including the main-session key and OpenCode's `experimental.subagent_depth`. Never touches an existing config or your global engine config. |
 | `gabo check` | Validates, read-only, the config, the agents, slot coverage and the catalog version. Exits non-zero on any failure. |
 | `gabo version` | Prints the gabo version. |
 | `gabo prompt` | Prints the setup prompt again. |
@@ -119,9 +119,9 @@ The project file overrides the user file key by key; unknown keys fail. Secrets 
 ## Upgrading
 
 1. Install the newer CLI (the `go install` command above, or `@vX.Y.Z` to pin a release).
-2. Run `gabo init` in the project. It refreshes the catalog and adds any missing engine key, keeping the ones you set.
-3. Ask your agent to rebuild the agents.
-4. Run `gabo check` until it passes.
+2. Run `gabo init` in the project, after every upgrade and after every change of `runtimes.*` in `gabo.yaml`. It refreshes the catalog and adds any missing engine key, keeping the ones you set. It is the writer of the engine config keys: the main-session key of `runtimes.assistant` (`agent` in `.claude/settings.json`, `default_agent` in the OpenCode project config, removed from the engine that is no longer the assistant) and OpenCode's `experimental.subagent_depth` (raised to 3).
+3. Ask your agent to rebuild the agents. The runtime skills build the agent files, the skill links and the Codex and Pi main-session block; they write no engine config key.
+4. Run `gabo check` until it passes. A `next: run gabo init (it merges …)`, `(it removes …)` or `(it sets experimental.subagent_depth to 3 in <file>)` hint means step 2 is the fix.
 
 ## Known limitations
 
