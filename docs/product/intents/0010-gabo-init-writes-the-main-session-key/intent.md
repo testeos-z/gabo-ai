@@ -42,7 +42,7 @@ Rationale to record, owner's brief, verbatim: "Rationale to record: one command 
 
 | # | question | status |
 |---|---|---|
-| 1 | The scoped block that the Codex and Pi runtime skills write into `AGENTS.md` (or `AGENTS.override.md`, `CLAUDE.md`) is an instructions file, not an engine config key. Does it stay with the runtime skills, or does `gabo init` write it too? | open, passed to the owner with a proposed answer (spec D3, open question 1) |
+| 1 | The scoped block that the Codex and Pi runtime skills write into `AGENTS.md` (or `AGENTS.override.md`, `CLAUDE.md`) is an instructions file, not an engine config key. Does it stay with the runtime skills, or does `gabo init` write it too? | answered 2026-11-06: it stays with the runtime skills (spec D3 A) |
 | 2 | A flexible-tier engine's runtime skill (written with `gabo-runtime-builder`) writes its own main-session key today, and `gabo init` writes nothing for a flexible-tier engine (PRD R32, TRD D28). Who writes that key now? | open, passed to the owner with a proposed answer (spec D4, open question 2) |
 
 ## Links
