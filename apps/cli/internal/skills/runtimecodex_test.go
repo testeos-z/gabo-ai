@@ -251,6 +251,7 @@ func TestRuntimeCodexWritesTheBlockInPlace(t *testing.T) {
 		"append it after one blank line when absent",
 		"keep every other byte",
 		"a second build leaves the file byte-identical",
+		"When the file with the block exceeds 32 KiB, report it",
 		"write through a symlinked file only when its target stays inside the repository",
 	} {
 		if !strings.Contains(section, s) {
@@ -271,6 +272,8 @@ func TestRuntimeCodexRemovesStaleEntries(t *testing.T) {
 		"removes the shared link only when no declared engine using .agents/skills is runtimes.assistant",
 		"On every build, remove the gabo entry of every other full-tier engine in the Main-Session Entry table of `gabo-agent-templates`",
 		"recognized only by its gabo identity",
+		"except any link or block the row of the `runtimes.assistant` engine writes",
+		"a file left empty is kept and reported, never deleted",
 		"a key whose value is exactly `gabo-assistant`",
 		"keep and report",
 	} {
