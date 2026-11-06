@@ -31,6 +31,11 @@ type runtimeMeta struct {
 	// ReviewerLink is the user-level link to the reviewer skill, with
 	// ${NAME}, ${NAME:-default} and $NAME expanded; empty means none.
 	ReviewerLink string `yaml:"reviewer_link"`
+	// AgentSkills is where an agent file lists its skills (intent 0008 D1).
+	AgentSkills agentPlace `yaml:"-"`
+	// AgentName is where an agent file declares its name; not declared when
+	// the engine names an agent by its file name (intent 0008 D1).
+	AgentName agentPlace `yaml:"-"`
 }
 
 // parseRuntimeMeta reads metadata from a SKILL.md frontmatter.
@@ -44,15 +49,26 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 		return runtimeMeta{}, errors.New("unterminated frontmatter")
 	}
 	var fm struct {
-		Metadata runtimeMeta `yaml:"metadata"`
+		Metadata struct {
+			runtimeMeta `yaml:",inline"`
+			AgentSkills string `yaml:"agent_skills"`
+			AgentName   string `yaml:"agent_name"`
+		} `yaml:"metadata"`
 	}
-	if err := yaml.Unmarshal(front, &fm); err != nil {
+	err := yaml.Unmarshal(front, &fm)
+	if err != nil {
 		return runtimeMeta{}, err
 	}
-	m := fm.Metadata
+	m := fm.Metadata.runtimeMeta
 	m.AgentDir = strings.TrimSpace(m.AgentDir)
 	m.SkillDir = strings.TrimSpace(m.SkillDir)
 	m.ReviewerLink = strings.TrimSpace(m.ReviewerLink)
+	if m.AgentSkills, err = parseAgentPlace("agent_skills", fm.Metadata.AgentSkills); err != nil {
+		return runtimeMeta{}, err
+	}
+	if m.AgentName, err = parseAgentPlace("agent_name", fm.Metadata.AgentName); err != nil {
+		return runtimeMeta{}, err
+	}
 	return m, nil
 }
 
@@ -79,6 +95,9 @@ func (u *UseCase) checkLinks(r *Report, cfg config.Config) error {
 	var checked []string
 	for _, rt := range runtimesOf(cfg) {
 		meta, ok := u.runtimeMeta(rt)
+		if ok && meta.AgentDir != "" {
+			checkAgentMeta(r, rt, meta)
+		}
 		if !ok || meta.SkillDir == "" {
 			continue
 		}

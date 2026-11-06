@@ -180,3 +180,44 @@ func TestRuntimeClaudeNarrowsTheEngineConfigRule(t *testing.T) {
 		}
 	}
 }
+
+// runtimeAgentPlaces returns metadata.agent_skills and metadata.agent_name
+// of a catalog runtime skill (intent 0008 D1), each "" when absent.
+func runtimeAgentPlaces(t *testing.T, file string) (skills, name string) {
+	t.Helper()
+	b, err := content.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rest, _ := strings.CutPrefix(string(b), "---\n")
+	head, _, ok := strings.Cut(rest, "\n---\n")
+	if !ok {
+		t.Fatalf("%s: no frontmatter", file)
+	}
+	var fm struct {
+		Metadata struct {
+			AgentSkills *string `yaml:"agent_skills"`
+			AgentName   *string `yaml:"agent_name"`
+		} `yaml:"metadata"`
+	}
+	if err := yaml.Unmarshal([]byte(head), &fm); err != nil {
+		t.Fatal(err)
+	}
+	if fm.Metadata.AgentSkills != nil {
+		skills = *fm.Metadata.AgentSkills
+	}
+	if fm.Metadata.AgentName != nil {
+		name = *fm.Metadata.AgentName
+	}
+	return skills, name
+}
+
+// gabo check reads each agent's skill list and declared name where the
+// runtime skill says (intent 0008 S2, D1).
+func TestRuntimeClaudeDeclaresAgentPlaces(t *testing.T) {
+	t.Parallel()
+	skills, name := runtimeAgentPlaces(t, runtimeClaude)
+	if skills != "frontmatter:skills" || name != "frontmatter:name" {
+		t.Fatalf("agent_skills, agent_name = %q, %q; want frontmatter:skills, frontmatter:name", skills, name)
+	}
+}

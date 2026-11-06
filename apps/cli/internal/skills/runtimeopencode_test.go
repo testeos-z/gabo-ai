@@ -426,3 +426,13 @@ func TestRuntimeOpenCodeCitesPrerequisiteFacts(t *testing.T) {
 		}
 	}
 }
+
+// intent 0008 S2, D1: OpenCode names an agent by its file name, so there is
+// no agent_name.
+func TestRuntimeOpenCodeDeclaresAgentPlaces(t *testing.T) {
+	t.Parallel()
+	skills, name := runtimeAgentPlaces(t, "gabo-runtime-opencode/SKILL.md")
+	if skills != "line:Skills:" || name != "" {
+		t.Fatalf("agent_skills, agent_name = %q, %q; want line:Skills: and none", skills, name)
+	}
+}

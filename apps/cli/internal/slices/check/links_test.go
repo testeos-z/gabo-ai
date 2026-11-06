@@ -12,7 +12,7 @@ import (
 
 // linkedSkill is a runtime skill that declares where its project skill links
 // and its user-level reviewer link live, as gabo-runtime-claude does.
-const linkedSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n  skill_dir: .claude/skills\n  reviewer_link: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer\n---\nbody\n"
+const linkedSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n  skill_dir: .claude/skills\n  agent_skills: frontmatter:skills\n  reviewer_link: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer\n---\nbody\n"
 
 // linkedSpec lists catalog skills: sk-b twice, so it is checked once.
 const linkedSpec = `agents:
@@ -344,7 +344,7 @@ func TestReviewerLinkWithoutAHomeFails(t *testing.T) {
 func TestReviewerLinkOnlyForTheReviewerRuntime(t *testing.T) {
 	t.Parallel()
 	p := linkedProject()
-	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  reviewer_link: $HOME/.pi/skills/gabo-reviewer\n---\n")
+	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  agent_skills: \"line:Skills:\"\n  reviewer_link: $HOME/.pi/skills/gabo-reviewer\n---\n")
 	p[".pi/settings.json"] = file(piKeysJSON)
 	cfg := strings.Replace(linkedConfig, "  coder: claude", "  coder: pi", 1)
 	rep, err := NewUseCase(p, configFiles{projectFile: cfg}, goodUser(), Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
@@ -360,7 +360,7 @@ func TestReviewerLinkOnlyForTheReviewerRuntime(t *testing.T) {
 func TestPiReviewerRuntimePassesCheck(t *testing.T) {
 	t.Parallel()
 	p := linkedProject()
-	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n---\n")
+	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  agent_skills: \"line:Skills:\"\n---\n")
 	p[".pi/settings.json"] = file(piKeysJSON)
 	cfg := strings.Replace(linkedConfig, "  reviewer: claude", "  reviewer: pi", 1)
 	u := goodUser().clone()

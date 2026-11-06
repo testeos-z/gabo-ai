@@ -7,6 +7,8 @@ metadata:
   version: "0.1"
   agent_dir: .codex/agents
   skill_dir: .agents/skills
+  agent_skills: "line:Load these skills by name before work:"
+  agent_name: toml:name
   reviewer_link: $HOME/.agents/skills/gabo-reviewer
 ---
 ## Activation Contract

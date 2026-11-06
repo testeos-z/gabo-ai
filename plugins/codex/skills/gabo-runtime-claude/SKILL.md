@@ -7,6 +7,8 @@ metadata:
   version: "0.1"
   agent_dir: .claude/agents
   skill_dir: .claude/skills
+  agent_skills: frontmatter:skills
+  agent_name: frontmatter:name
   reviewer_link: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer
 ---
 ## Activation Contract
