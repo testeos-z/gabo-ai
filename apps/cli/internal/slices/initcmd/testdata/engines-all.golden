@@ -4,7 +4,8 @@ engine integration:
   codex:
     wrote .codex/config.toml: added marketplaces.gabo-ai.source_type, marketplaces.gabo-ai.source, plugins."gabo@gabo-ai".enabled
   opencode:
-    no .opencode/plugins/gabo-stage-gate.js yet; nothing written
+    wrote .opencode/opencode.json: experimental.subagent_depth unset → 3
+    no .opencode/plugins/gabo-stage-gate.js yet
   pi:
     wrote .pi/settings.json: added packages entry npm:@gabo-ai/pi@0.2.6
     gabo refuses to build on Pi without a subagent package:

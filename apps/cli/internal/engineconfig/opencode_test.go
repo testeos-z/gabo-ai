@@ -22,10 +22,10 @@ func TestOpencodeRule(t *testing.T) {
 		lines []string
 		steps []string
 	}{
-		{"plugin present", map[string][]byte{".opencode/plugins/gabo-stage-gate.js": []byte("export default {}\n")}, []string{opencodeInPlace}, nil},
-		{"plugin present and empty", map[string][]byte{".opencode/plugins/gabo-stage-gate.js": nil}, []string{opencodeInPlace}, nil},
-		{"plugin missing", map[string][]byte{}, []string{opencodeMissing}, []string{wantOpencodeStep}},
-		{"other opencode files only", map[string][]byte{"opencode.json": []byte("{}\n"), ".opencode/plugins/other.js": []byte("x")}, []string{opencodeMissing}, []string{wantOpencodeStep}},
+		{"plugin present", map[string][]byte{".opencode/plugins/gabo-stage-gate.js": []byte("export default {}\n"), "opencode.json": []byte(depthOK)}, []string{opencodeInPlace}, nil},
+		{"plugin present and empty", map[string][]byte{".opencode/plugins/gabo-stage-gate.js": nil, "opencode.json": []byte(depthOK)}, []string{opencodeInPlace}, nil},
+		{"plugin missing", map[string][]byte{"opencode.json": []byte(depthOK)}, []string{opencodeMissing}, []string{wantOpencodeStep}},
+		{"other opencode files only", map[string][]byte{"opencode.json": []byte(depthOK), ".opencode/plugins/other.js": []byte("x")}, []string{opencodeMissing}, []string{wantOpencodeStep}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -57,8 +57,8 @@ func TestOpencodeIsInTheRuleTable(t *testing.T) {
 		section  string
 		withStep bool
 	}{
-		{"present", map[string][]byte{OpencodeStageGate: []byte("x")}, "  opencode:\n    " + opencodeInPlace + "\n", false},
-		{"missing", map[string][]byte{}, "  opencode:\n    " + opencodeMissing + "\n", true},
+		{"present", map[string][]byte{OpencodeStageGate: []byte("x"), "opencode.json": []byte(depthOK)}, "  opencode:\n    " + opencodeInPlace + "\n", false},
+		{"missing", map[string][]byte{"opencode.json": []byte(depthOK)}, "  opencode:\n    " + opencodeMissing + "\n", true},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			report, writes := Integrate(Set("opencode"), Input{Files: c.files, Version: "0.2.6"})
@@ -107,39 +107,39 @@ func TestOpencodeRuleDefaultAgent(t *testing.T) {
 	}{
 		{
 			name: "no config creates .opencode/opencode.json", files: stage,
-			target: ".opencode/opencode.json", out: "{\n  \"default_agent\": \"gabo-assistant\"\n}\n",
-			lines: []string{"wrote .opencode/opencode.json: added default_agent", opencodeInPlace},
+			target: ".opencode/opencode.json", out: "{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			lines: []string{"wrote .opencode/opencode.json: experimental.subagent_depth unset → 3; added default_agent", opencodeInPlace},
 			steps: []string{opencodeBuildStep},
 		},
 		{
 			name: "jsonc with comments gains only the key", files: map[string][]byte{"opencode.jsonc": []byte(jsoncWithComments)},
 			target: "opencode.jsonc",
-			out:    strings.TrimSuffix(jsoncWithComments, "}\n") + "  \"default_agent\": \"gabo-assistant\",\n}\n",
-			lines:  []string{"wrote opencode.jsonc: added default_agent", opencodeMissingNow},
+			out:    strings.TrimSuffix(jsoncWithComments, "}\n") + "  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\",\n}\n",
+			lines:  []string{"wrote opencode.jsonc: experimental.subagent_depth unset → 3; added default_agent", opencodeMissingNow},
 			steps:  []string{wantOpencodeStep, opencodeBuildStep},
 		},
 		{
-			name: "built agent has no build step", files: map[string][]byte{"opencode.json": []byte("{\n  \"model\": \"x\"\n}\n"), OpencodeStageGate: nil}, built: true,
-			target: "opencode.json", out: "{\n  \"model\": \"x\",\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			name: "built agent has no build step", files: map[string][]byte{"opencode.json": []byte("{\n  \"model\": \"x\",\n  \"experimental\": {\"subagent_depth\": 3}\n}\n"), OpencodeStageGate: nil}, built: true,
+			target: "opencode.json", out: "{\n  \"model\": \"x\",\n  \"experimental\": {\"subagent_depth\": 3},\n  \"default_agent\": \"gabo-assistant\"\n}\n",
 			lines: []string{"wrote opencode.json: added default_agent", opencodeInPlace},
 		},
 		{
 			name: "first existing file wins", files: map[string][]byte{
 				".opencode/opencode.jsonc": []byte("{}\n"),
-				".opencode/opencode.json":  []byte("{\"model\": \"x\"}\n"),
+				".opencode/opencode.json":  []byte("{\"model\": \"x\", \"experimental\": {\"subagent_depth\": 3}}\n"),
 				OpencodeStageGate:          nil,
 			},
-			target: ".opencode/opencode.json", out: "{\"model\": \"x\", \"default_agent\": \"gabo-assistant\"}\n",
+			target: ".opencode/opencode.json", out: "{\"model\": \"x\", \"experimental\": {\"subagent_depth\": 3}, \"default_agent\": \"gabo-assistant\"}\n",
 			lines: []string{"wrote .opencode/opencode.json: added default_agent", opencodeInPlace},
 			steps: []string{opencodeBuildStep},
 		},
 		{
-			name: "already set is unchanged", files: map[string][]byte{"opencode.json": []byte("{\"default_agent\": \"gabo-assistant\"}\n"), OpencodeStageGate: nil},
+			name: "already set is unchanged", files: map[string][]byte{"opencode.json": []byte("{\"default_agent\": \"gabo-assistant\", \"experimental\": {\"subagent_depth\": 3}}\n"), OpencodeStageGate: nil},
 			lines: []string{"unchanged opencode.json", opencodeInPlace},
 			steps: []string{opencodeBuildStep},
 		},
 		{
-			name: "the user's own value is kept", files: map[string][]byte{"opencode.json": []byte("{\"default_agent\": \"gentle-orchestrator\"}\n"), OpencodeStageGate: nil},
+			name: "the user's own value is kept", files: map[string][]byte{"opencode.json": []byte("{\"default_agent\": \"gentle-orchestrator\", \"experimental\": {\"subagent_depth\": 3}}\n"), OpencodeStageGate: nil},
 			lines: []string{`kept opencode.json default_agent: "gentle-orchestrator" (your setting; gabo leaves it)`, opencodeInPlace},
 		},
 		{
@@ -186,8 +186,8 @@ func TestOpencodeRuleDefaultAgent(t *testing.T) {
 // each of the four files that holds exactly the gabo value, only that
 // member, whether or not opencode is still in runtimes.*.
 func TestOpencodeDefaultAgentRemoval(t *testing.T) {
-	gabo := "{\n  \"model\": \"x\", // pinned\n  \"default_agent\": \"gabo-assistant\"\n}\n"
-	clean := "{\n  \"model\": \"x\" // pinned\n}\n"
+	gabo := "{\n  \"experimental\": {\"subagent_depth\": 3},\n  \"model\": \"x\", // pinned\n  \"default_agent\": \"gabo-assistant\"\n}\n"
+	clean := "{\n  \"experimental\": {\"subagent_depth\": 3},\n  \"model\": \"x\" // pinned\n}\n"
 	files := map[string][]byte{}
 	for _, p := range OpencodeConfigs {
 		files[p] = []byte(gabo)
@@ -261,4 +261,162 @@ func failuresOf(lines []string) []string {
 		}
 	}
 	return out
+}
+
+// depthOK is an OpenCode config whose experimental.subagent_depth needs no
+// change, for tests about other keys.
+const depthOK = "{\"experimental\": {\"subagent_depth\": 3}}\n"
+
+// Intent 0010 S3: with opencode in runtimes.* the rule makes
+// experimental.subagent_depth at least 3 in the S2 file: unset or lower
+// becomes 3, reported with the old and new value; 3 or more is left alone;
+// anything it cannot merge without loss writes nothing and gets one ✗.
+func TestOpencodeRuleSubagentDepth(t *testing.T) {
+	stage := []byte("x")
+	cases := []struct {
+		name      string
+		assistant string
+		files     map[string][]byte
+		target    string // the only file written, "" for none
+		out       string
+		lines     []string
+	}{
+		{
+			name: "no config creates .opencode/opencode.json", files: map[string][]byte{},
+			target: ".opencode/opencode.json", out: "{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  }\n}\n",
+			lines: []string{"wrote .opencode/opencode.json: experimental.subagent_depth unset → 3"},
+		},
+		{
+			name: "no config with the opencode assistant holds both keys", assistant: Opencode, files: map[string][]byte{},
+			target: ".opencode/opencode.json", out: "{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			lines: []string{"wrote .opencode/opencode.json: experimental.subagent_depth unset → 3; added default_agent"},
+		},
+		{
+			name: "absent key is merged and comments are kept", files: map[string][]byte{"opencode.jsonc": []byte(jsoncWithComments)},
+			target: "opencode.jsonc",
+			out:    strings.TrimSuffix(jsoncWithComments, "}\n") + "  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n}\n",
+			lines:  []string{"wrote opencode.jsonc: experimental.subagent_depth unset → 3"},
+		},
+		{
+			name: "experimental without the key gains only the key", files: map[string][]byte{"opencode.json": []byte("{\n  \"experimental\": {\n    \"other\": true // mine\n  }\n}\n")},
+			target: "opencode.json", out: "{\n  \"experimental\": {\n    \"other\": true, // mine\n    \"subagent_depth\": 3\n  }\n}\n",
+			lines: []string{"wrote opencode.json: experimental.subagent_depth unset → 3"},
+		},
+		{
+			name: "1 becomes 3 and comments are kept", files: map[string][]byte{"opencode.jsonc": []byte("{\n  // depth\n  \"experimental\": {\"subagent_depth\": 1 /* low */},\n}\n")},
+			target: "opencode.jsonc", out: "{\n  // depth\n  \"experimental\": {\"subagent_depth\": 3 /* low */},\n}\n",
+			lines: []string{"wrote opencode.jsonc: experimental.subagent_depth 1 → 3"},
+		},
+		{
+			name: "a lower whole number in float form becomes 3", files: map[string][]byte{"opencode.json": []byte(`{"experimental": {"subagent_depth": 2.0}}`)},
+			target: "opencode.json", out: `{"experimental": {"subagent_depth": 3}}`,
+			lines: []string{"wrote opencode.json: experimental.subagent_depth 2.0 → 3"},
+		},
+		{
+			name: "raised together with default_agent", assistant: Opencode, files: map[string][]byte{"opencode.json": []byte("{\n  \"experimental\": {\"subagent_depth\": 1}\n}\n")},
+			target: "opencode.json", out: "{\n  \"experimental\": {\"subagent_depth\": 3},\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			lines: []string{"wrote opencode.json: experimental.subagent_depth 1 → 3; added default_agent"},
+		},
+		{
+			name: "raised next to the user's default_agent", assistant: Opencode, files: map[string][]byte{"opencode.json": []byte(`{"default_agent": "mine", "experimental": {"subagent_depth": 0}}`)},
+			target: "opencode.json", out: `{"default_agent": "mine", "experimental": {"subagent_depth": 3}}`,
+			lines: []string{"wrote opencode.json: experimental.subagent_depth 0 → 3", `kept opencode.json default_agent: "mine" (your setting; gabo leaves it)`},
+		},
+		{
+			name: "raised in the file the gabo default_agent leaves", assistant: Claude, files: map[string][]byte{"opencode.json": []byte("{\n  \"model\": \"x\",\n  \"default_agent\": \"gabo-assistant\"\n}\n")},
+			target: "opencode.json", out: "{\n  \"model\": \"x\",\n  \"experimental\": {\n    \"subagent_depth\": 3\n  }\n}\n",
+			lines: []string{"wrote opencode.json: experimental.subagent_depth unset → 3", `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)`},
+		},
+		{
+			name: "5 leaves the file byte-identical", files: map[string][]byte{"opencode.json": []byte("{\"experimental\": {\"subagent_depth\": 5}} // x\n")},
+		},
+		{
+			name: "3.0 is a whole number of 3", files: map[string][]byte{"opencode.json": []byte(`{"experimental": {"subagent_depth": 3.0}}`)},
+		},
+		{
+			name: "3 with gabo's default_agent is unchanged", assistant: Opencode, files: map[string][]byte{"opencode.json": []byte(`{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 3}}`)},
+			lines: []string{"unchanged opencode.json"},
+		},
+		{
+			name: "only the first existing file is read", files: map[string][]byte{"opencode.json": []byte(depthOK), ".opencode/opencode.json": []byte("{}")},
+		},
+		{
+			name: "experimental not an object writes nothing", assistant: Opencode, files: map[string][]byte{"opencode.json": []byte(`{"experimental": true}`)},
+			lines: []string{"✗ opencode.json: experimental is not a JSON object; fix it and run gabo init again"},
+		},
+		{
+			name: "a string value writes nothing", files: map[string][]byte{"opencode.json": []byte(`{"experimental": {"subagent_depth": "3"}}`)},
+			lines: []string{`✗ opencode.json: experimental.subagent_depth is "3", not a whole number; fix it and run gabo init again`},
+		},
+		{
+			name: "a fraction writes nothing", files: map[string][]byte{"opencode.json": []byte(`{"experimental": {"subagent_depth": 2.5}}`)},
+			lines: []string{"✗ opencode.json: experimental.subagent_depth is 2.5, not a whole number; fix it and run gabo init again"},
+		},
+		{
+			name: "null writes nothing", files: map[string][]byte{"opencode.json": []byte(`{"experimental": {"subagent_depth": null}}`)},
+			lines: []string{"✗ opencode.json: experimental.subagent_depth is null, not a whole number; fix it and run gabo init again"},
+		},
+		{
+			name: "experimental twice writes nothing", files: map[string][]byte{"opencode.json": []byte(`{"experimental": {}, "experimental": {"subagent_depth": 1}}`)},
+			lines: []string{"✗ opencode.json: experimental appears more than once; fix it and run gabo init again"},
+		},
+		{
+			name: "the key twice writes nothing", files: map[string][]byte{"opencode.json": []byte(`{"experimental": {"subagent_depth": 1, "subagent_depth": 4}}`)},
+			lines: []string{"✗ opencode.json: experimental.subagent_depth appears more than once; fix it and run gabo init again"},
+		},
+		{
+			name: "an unparsable file writes nothing", files: map[string][]byte{"opencode.json": []byte(`{"experimental": `)},
+			lines: []string{"✗ opencode.json: invalid JSONC (unexpected end of JSON input); fix it and run gabo init again"},
+		},
+		{
+			name: "a failure also stops the default_agent removal", assistant: Claude, files: map[string][]byte{
+				"opencode.json":           []byte(`{"experimental": [3]}`),
+				".opencode/opencode.json": []byte(`{"default_agent": "gabo-assistant"}`),
+			},
+			lines: []string{"✗ opencode.json: experimental is not a JSON object; fix it and run gabo init again"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			files := maps.Clone(c.files)
+			files[OpencodeStageGate] = stage
+			files[OpencodeAgentFile] = nil
+			res := opencodeRule(Input{Files: files, Version: "0.2.6", Assistant: c.assistant})
+			want := append(slices.Clone(c.lines), opencodeInPlace)
+			if !slices.Equal(res.Section.Lines, want) {
+				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, want)
+			}
+			if len(res.Section.Steps) != 0 {
+				t.Errorf("steps = %q, want none", res.Section.Steps)
+			}
+			if c.target == "" {
+				if len(res.Writes) != 0 {
+					t.Fatalf("writes = %q, want none", res.Writes)
+				}
+				return
+			}
+			if got, ok := res.Writes[c.target]; !ok || len(res.Writes) != 1 || string(got) != c.out {
+				t.Fatalf("writes = %q, want only %s =\n%s", res.Writes, c.target, c.out)
+			}
+			files[c.target] = res.Writes[c.target]
+			again := opencodeRule(Input{Files: files, Version: "0.2.6", Assistant: c.assistant})
+			if len(again.Writes) != 0 {
+				t.Errorf("second run writes %q, want none", again.Writes)
+			}
+		})
+	}
+}
+
+// Intent 0010 S3, S8: through Integrate, the raise is reported in the
+// opencode section and is not a step.
+func TestOpencodeDepthThroughIntegrate(t *testing.T) {
+	files := map[string][]byte{"opencode.json": []byte(`{"experimental": {"subagent_depth": 1}}`), OpencodeStageGate: nil}
+	report, writes := Integrate(Set("claude", "opencode"), Input{Files: files, Version: "0.2.6"})
+	if string(writes["opencode.json"]) != `{"experimental": {"subagent_depth": 3}}` {
+		t.Errorf("writes = %q", writes)
+	}
+	out := report.Render()
+	if !strings.Contains(out, "  opencode:\n    wrote opencode.json: experimental.subagent_depth 1 → 3\n") || strings.Contains(out, "you still need to:\n  - opencode") {
+		t.Errorf("Render() =\n%s", out)
+	}
 }

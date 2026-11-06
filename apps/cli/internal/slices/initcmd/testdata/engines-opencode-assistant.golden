@@ -2,7 +2,7 @@ engine integration:
   claude:
     wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai"
   opencode:
-    wrote .opencode/opencode.json: added default_agent
+    wrote .opencode/opencode.json: experimental.subagent_depth unset → 3; added default_agent
     no .opencode/plugins/gabo-stage-gate.js yet
 you still need to:
   - claude: trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply

@@ -26,7 +26,7 @@ func sameJSON(raw []byte, want any) bool {
 }
 
 // jsonObj is a JSON object with its members in order; jsonKV is one member.
-// Values are jsonObj, string or bool.
+// Values are jsonObj, string, bool or int.
 type jsonObj []jsonKV
 
 type jsonKV struct {
@@ -166,6 +166,18 @@ func (o spanObject) member(src []byte, key string) (spanMember, bool) {
 		}
 	}
 	return spanMember{}, false
+}
+
+// count returns how many members of o have key; a key that appears more
+// than once cannot be merged without loss.
+func (o spanObject) count(key string) int {
+	n := 0
+	for _, m := range o.members {
+		if m.key == key {
+			n++
+		}
+	}
+	return n
 }
 
 // scanObject reads the object starting at src[i] == '{'. src must be a
@@ -414,6 +426,12 @@ func hasComment(b []byte) bool {
 		}
 	}
 	return false
+}
+
+// replaceValue returns src with the value of m replaced by v; every other
+// byte, comments around the value included, is kept.
+func replaceValue(src []byte, m spanMember, v any) []byte {
+	return splice(src, m.valStart, m.valEnd, renderJSON(v, "", "", false))
 }
 
 // splice returns src with src[from:to] replaced by text.

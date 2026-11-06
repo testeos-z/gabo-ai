@@ -78,7 +78,7 @@ func TestEngineStepAllFourEnginesGolden(t *testing.T) {
 		t.Fatalf("failed:\n%s", r.Render())
 	}
 	golden(t, "engines-all.golden", r.Render())
-	if want := []string{claudeFile, codexFile, piFile}; !slices.Equal(slices.Sorted(slices.Values(s.Writes)), want) {
+	if want := slices.Sorted(slices.Values([]string{claudeFile, codexFile, opencodeNew, piFile})); !slices.Equal(slices.Sorted(slices.Values(s.Writes)), want) {
 		t.Fatalf("writes = %v, want %v", s.Writes, want)
 	}
 	if _, ok := s.Files[stageGate]; ok {
@@ -137,7 +137,7 @@ func TestEngineStepFlexibleTierEngine(t *testing.T) {
 // The opencode rule sees the stage-gate plugin when it is in the project.
 func TestEngineStepLoadsOpencodeStageGate(t *testing.T) {
 	t.Parallel()
-	s := newStore(map[string]string{stageGate: "export default {}\n"})
+	s := newStore(map[string]string{stageGate: "export default {}\n", opencodeRootCfg: depthOK})
 	r := engineStep(s, "opencode")
 	if got := sectionOf(t, r, "opencode").Lines; !slices.Equal(got, []string{"stage-gate plugin in place (built by gabo-runtime-opencode)"}) {
 		t.Fatalf("opencode lines = %q", got)
@@ -385,8 +385,9 @@ const (
 	opencodeNew     = root + "/.opencode/opencode.json"
 	opencodeRootCfg = root + "/opencode.json"
 	opencodeJSONC   = root + "/opencode.jsonc"
-	gaboDefault     = "{\n  \"model\": \"x\", // pinned\n  \"default_agent\": \"gabo-assistant\"\n}\n"
-	noDefault       = "{\n  \"model\": \"x\" // pinned\n}\n"
+	gaboDefault     = "{\n  \"experimental\": {\"subagent_depth\": 3},\n  \"model\": \"x\", // pinned\n  \"default_agent\": \"gabo-assistant\"\n}\n"
+	noDefault       = "{\n  \"experimental\": {\"subagent_depth\": 3},\n  \"model\": \"x\" // pinned\n}\n"
+	depthOK         = "{\"experimental\": {\"subagent_depth\": 3}}\n"
 )
 
 // Intent 0010 S2, S8: with OpenCode as the assistant a fresh project gets a
@@ -400,7 +401,7 @@ func TestEngineStepOpencodeAssistantGolden(t *testing.T) {
 		t.Fatalf("failed:\n%s", r.Render())
 	}
 	golden(t, "engines-opencode-assistant.golden", r.Render())
-	if got := s.Files[opencodeNew]; got != "{\n  \"default_agent\": \"gabo-assistant\"\n}\n" {
+	if got := s.Files[opencodeNew]; got != "{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n" {
 		t.Fatalf("%s =\n%s", opencodeNew, got)
 	}
 	s.Files[opencodeAgent] = "---\nname: gabo-assistant\n---\n"
@@ -427,10 +428,10 @@ func TestEngineStepOpencodeDefaultAgent(t *testing.T) {
 		failed bool
 	}{
 		{"jsonc with comments", map[string]string{opencodeJSONC: jsonc, opencodeNew: "{}\n"}, nil, opencodeJSONC,
-			"{\n  // mine\n  \"model\": \"x\", /* pinned */\n  \"default_agent\": \"gabo-assistant\"\n}\n",
-			[]string{"wrote opencode.jsonc: added default_agent", "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
-		{"user's value", map[string]string{opencodeRootCfg: `{"default_agent": "gentle-orchestrator"}`}, nil, opencodeRootCfg,
-			`{"default_agent": "gentle-orchestrator"}`,
+			"{\n  // mine\n  \"model\": \"x\", /* pinned */\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			[]string{"wrote opencode.jsonc: experimental.subagent_depth unset → 3; added default_agent", "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
+		{"user's value", map[string]string{opencodeRootCfg: `{"default_agent": "gentle-orchestrator", "experimental": {"subagent_depth": 3}}`}, nil, opencodeRootCfg,
+			`{"default_agent": "gentle-orchestrator", "experimental": {"subagent_depth": 3}}`,
 			[]string{`kept opencode.json default_agent: "gentle-orchestrator" (your setting; gabo leaves it)`, "no .opencode/plugins/gabo-stage-gate.js yet; nothing written"}, false},
 		{"symlinked target", map[string]string{opencodeRootCfg: "{}"}, map[string]fs.FileMode{opencodeRootCfg: fs.ModeSymlink}, opencodeRootCfg, "{}",
 			[]string{"✗ opencode.json: it is a symlink; gabo init writes only inside the project, so replace it with a real file and run gabo init again"}, true},
@@ -504,7 +505,7 @@ func TestEngineStepRemovesTheGaboDefaultAgent(t *testing.T) {
 		s := newStore(all())
 		r := engineStepAs(s, "claude", engineconfig.Set("claude", "opencode")...)
 		lines := sectionOf(t, r, "opencode").Lines
-		if len(lines) != 5 || lines[0] != `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)` {
+		if len(lines) != 5 || lines[0] != `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)` || len(failures(lines)) != 0 {
 			t.Fatalf("lines = %q", lines)
 		}
 		for _, p := range engineconfig.OpencodeConfigs {
@@ -522,4 +523,47 @@ func TestEngineStepRemovesTheGaboDefaultAgent(t *testing.T) {
 			t.Fatalf("writes %v:\n%s", s.Writes, r.Render())
 		}
 	})
+}
+
+// Intent 0010 S3, S8: with opencode in runtimes.* initcmd raises
+// experimental.subagent_depth in the first existing OpenCode config, keeps
+// its comments, reports the old and new value, and no step names the key.
+func TestEngineStepOpencodeSubagentDepth(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		files  map[string]string
+		target string
+		want   string
+		line   string
+		failed bool
+	}{
+		{"absent key in a new file", map[string]string{}, opencodeNew,
+			"{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  }\n}\n", "wrote .opencode/opencode.json: experimental.subagent_depth unset → 3", false},
+		{"1 becomes 3", map[string]string{opencodeJSONC: "{\n  // mine\n  \"experimental\": {\"subagent_depth\": 1}\n}\n", opencodeNew: "{}\n"}, opencodeJSONC,
+			"{\n  // mine\n  \"experimental\": {\"subagent_depth\": 3}\n}\n", "wrote opencode.jsonc: experimental.subagent_depth 1 → 3", false},
+		{"5 is kept", map[string]string{opencodeRootCfg: `{"experimental": {"subagent_depth": 5}}`}, opencodeRootCfg,
+			`{"experimental": {"subagent_depth": 5}}`, "no .opencode/plugins/gabo-stage-gate.js yet; nothing written", false},
+		{"experimental not an object", map[string]string{opencodeRootCfg: `{"experimental": 3}`}, opencodeRootCfg,
+			`{"experimental": 3}`, "✗ opencode.json: experimental is not a JSON object; fix it and run gabo init again", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(maps.Clone(tt.files))
+			r := engineStep(s, engineconfig.Set("claude", "opencode")...)
+			if got := s.Files[tt.target]; got != tt.want {
+				t.Fatalf("%s =\n%s\nwant\n%s", tt.target, got, tt.want)
+			}
+			if got := sectionOf(t, r, "opencode").Lines; got[0] != tt.line {
+				t.Fatalf("lines = %q, want %q first", got, tt.line)
+			}
+			if r.Failed() != tt.failed || (tt.failed && slices.Contains(s.Writes, tt.target)) {
+				t.Fatalf("Failed() = %v, writes %v", r.Failed(), s.Writes)
+			}
+			if _, steps, _ := strings.Cut(r.Render(), "you still need to:"); strings.Contains(steps, "subagent_depth") {
+				t.Fatalf("a step names subagent_depth:\n%s", r.Render())
+			}
+		})
+	}
 }

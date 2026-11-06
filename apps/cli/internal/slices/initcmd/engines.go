@@ -116,37 +116,42 @@ func (u *UseCase) integrateEngine(engine, assistant, version string) engineconfi
 }
 
 // loadOpencodeConfigs reads the OpenCode configs the rule may change
-// (intent 0010 S2, S4): with OpenCode as the assistant, the first existing
-// one (else the new .opencode/opencode.json), which must not be refused;
-// with another assistant, every existing one that is not refused. It
-// returns the files that may be written, or the refused or unreadable file
-// and why.
+// (intent 0010 S2, S3, S4): always the first existing one (else the new
+// .opencode/opencode.json), which must not be refused, since it gets
+// experimental.subagent_depth and, with OpenCode as the assistant,
+// default_agent; with another assistant also every other existing one that
+// is not refused, for the default_agent removal. It returns the files that
+// may be written, in lookup order, or the refused or unreadable file and
+// why.
 func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistant string) ([]string, string, string) {
-	switch assistant {
-	case "":
-		return nil, "", ""
-	case engineconfig.Opencode:
-		target := engineconfig.OpencodeNewConfig
-		for _, p := range engineconfig.OpencodeConfigs {
-			if _, err := u.store.Lstat(u.path(p)); err == nil || u.refuseEngineFile(p) != "" {
-				target = p
-				break
-			}
+	target := engineconfig.OpencodeNewConfig
+	for _, p := range engineconfig.OpencodeConfigs {
+		if _, err := u.store.Lstat(u.path(p)); err == nil || u.refuseEngineFile(p) != "" {
+			target = p
+			break
 		}
-		if reason := u.refuseEngineFile(target); reason != "" {
-			return nil, target, reason
-		}
-		b, err := u.store.ReadFile(u.path(target))
-		switch {
-		case err == nil:
-			in.Files[target] = b
-		case !errors.Is(err, fs.ErrNotExist):
-			return nil, target, fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err)
-		}
-		return []string{target}, "", ""
-	default:
-		return u.readRemovable(in, engineconfig.OpencodeConfigs), "", ""
 	}
+	if reason := u.refuseEngineFile(target); reason != "" {
+		return nil, target, reason
+	}
+	b, err := u.store.ReadFile(u.path(target))
+	switch {
+	case err == nil:
+		in.Files[target] = b
+	case !errors.Is(err, fs.ErrNotExist):
+		return nil, target, fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err)
+	}
+	var read []string
+	if assistant != "" && assistant != engineconfig.Opencode {
+		read = u.readRemovable(in, engineconfig.OpencodeConfigs)
+	}
+	var writable []string
+	for _, p := range engineconfig.OpencodeConfigs {
+		if p == target || slices.Contains(read, p) {
+			writable = append(writable, p)
+		}
+	}
+	return writable, "", ""
 }
 
 // readRemovable reads each of files that is not refused into in and returns
