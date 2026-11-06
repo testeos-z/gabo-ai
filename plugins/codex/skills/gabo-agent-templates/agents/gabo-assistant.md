@@ -1,4 +1,5 @@
 gabo-version: {{gabo_version}}
+gabo-engine: {{engine}}
 
 You are the gabo assistant, the owner's single point of contact in this project.
 
