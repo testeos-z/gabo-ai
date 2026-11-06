@@ -31,7 +31,8 @@ func readTestdata(t *testing.T, name string) string {
 // opencodeBuilt is a project with the real embedded catalog, the stand-in
 // runtime skill, and every spec agent built in the shape of spec 0004 S3
 // (.opencode/agents/<id>.md: frontmatter description, mode and permission;
-// the body starts with <!-- gabo-version: x.y.z -->, then the Skills: line);
+// the body starts with <!-- gabo-version: x.y.z -->, then the Skills: line
+// of build step 6, omitted for an empty list);
 // each spec skill linked as .opencode/skills/<name> ->
 // ../../.gabo/skills/<name>, the fixed-name links of the tree's skill
 // adapters, and the tree's .opencode/opencode.jsonc.
@@ -52,23 +53,12 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 		t.Fatal(err)
 	}
 	for _, a := range spec.Agents {
-		tmpl, err := fs.ReadFile(skills.Catalog(), path.Join(agentspec.Dir, a.Template))
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, rest, _ := strings.Cut(string(tmpl), "\n")
-		list := slices.Clone(a.Skills)
-		for _, l := range [][2]string{{"{{methodology}}", "gabo-methodology"}, {"{{adapter:tasks}}", "gabo-tasks"}, {"{{adapter:repository_host}}", "gabo-repository-host"}, {"{{adapter:memory}}", "gabo-memory"}} {
-			if strings.Contains(string(tmpl), l[0]) {
-				list = append(list, l[1])
-			}
-		}
+		list, rest := agentSkillList(t, a)
 		proj[".opencode/agents/"+a.ID+".md"] = file("---\n" +
 			`description: "` + strings.ReplaceAll(a.Role, `"`, `\"`) + "\"\n" +
 			"mode: subagent\npermission:\n  skill:\n    gabo-reviewer: deny\n---\n" +
 			"<!-- gabo-version: " + version + " -->\n" +
-			"Skills: " + strings.Join(list, ", ") + "\n" +
-			strings.TrimPrefix(rest, "\n"))
+			skillsLine(opencodeWhere, list) + rest)
 		for _, name := range a.Skills {
 			proj[".opencode/skills/"+name] = symlink("../../.gabo/skills/" + name)
 		}
@@ -77,6 +67,9 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 	proj[".opencode/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
 	return proj
 }
+
+// opencodeWhere is the path gabo-runtime-opencode writes in the Skills: line.
+const opencodeWhere = ".opencode/skills/<name>/SKILL.md"
 
 func runOpencode(t *testing.T, proj fs.FS, version string) Report {
 	t.Helper()
@@ -258,5 +251,47 @@ func TestParseJSONC(t *testing.T) {
 	}
 	if keys := slices.Sorted(maps.Keys(v)); !slices.Equal(keys, []string{"$schema", "experimental", "theme"}) {
 		t.Fatalf("keys %v", keys)
+	}
+}
+
+// Intent 0008 S1 on the agents gabo-runtime-opencode builds: the Skills:
+// line holds exactly the spec skills plus the template's fixed-name links,
+// each once; gabo-dev-lead keeps gabo-plan-reviewer throughout.
+func TestOpencodeBuiltAgentSkills(t *testing.T) {
+	t.Parallel()
+	for _, tt := range agentSkillsCases("opencode") {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			proj := opencodeBuilt(t, "1.2.3")
+			setSkillsLine(t, proj, ".opencode/agents/gabo-pm.md", opencodeWhere, tt.list)
+			wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-pm.md", tt.want)
+		})
+	}
+}
+
+// The agent with an empty spec list and no Skills: line passes.
+func TestOpencodeBuiltReviewerHasNoSkillsLine(t *testing.T) {
+	t.Parallel()
+	proj := opencodeBuilt(t, "1.2.3")
+	if strings.Contains(string(proj[".opencode/agents/gabo-reviewer.md"].Data), "\nSkills: ") {
+		t.Fatalf("gabo-reviewer has a Skills: line:\n%s", proj[".opencode/agents/gabo-reviewer.md"].Data)
+	}
+	wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-reviewer.md", nil)
+}
+
+// The directory the Skills: line names does not change the result.
+func TestOpencodeBuiltAgentSkillsIgnoreTheDirectory(t *testing.T) {
+	t.Parallel()
+	missing := slices.DeleteFunc(slices.Clone(pmSkills), func(s string) bool { return s == "gabo-plan-reviewer" })
+	for _, where := range []string{".opencode/skills/<name>/SKILL.md", "`.pi/skills/<name>/SKILL.md`", ".agents/skills/<name>/SKILL.md"} {
+		t.Run(where, func(t *testing.T) {
+			t.Parallel()
+			proj := opencodeBuilt(t, "1.2.3")
+			setSkillsLine(t, proj, ".opencode/agents/gabo-pm.md", where, pmSkills)
+			wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-pm.md", nil)
+			setSkillsLine(t, proj, ".opencode/agents/gabo-pm.md", where, missing)
+			wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-pm.md",
+				[]string{"✗ agent gabo-pm (opencode): skill gabo-plan-reviewer missing"})
+		})
 	}
 }
