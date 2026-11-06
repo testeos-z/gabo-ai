@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"maps"
@@ -92,6 +93,26 @@ func checkProject(t *testing.T, version string) string {
 			link(t, "../../.gabo/skills/"+name, filepath.Join(project, ".claude", "skills", name))
 		}
 	}
+	// The main-session entry gabo-runtime-claude builds for runtimes.assistant
+	// (spec 0009 S1, S2): link, agent file and the one agent key.
+	m := spec.MainSession
+	for _, name := range m.Skills {
+		link(t, "../../.gabo/skills/"+name, filepath.Join(project, ".claude", "skills", name))
+	}
+	write(".claude/agents/"+m.ID+".md", "---\nname: "+m.ID+"\ngabo-version: "+version+"\n---\n")
+	b, err := os.ReadFile(filepath.Join(project, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	settings := map[string]any{}
+	if err := json.Unmarshal(b, &settings); err != nil {
+		t.Fatal(err)
+	}
+	settings["agent"] = m.ID
+	if b, err = json.MarshalIndent(settings, "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	write(".claude/settings.json", string(b)+"\n")
 	// The user-level reviewer link into the copy runInit installed under the
 	// temporary HOME and XDG_DATA_HOME.
 	t.Setenv("CLAUDE_CONFIG_DIR", "")

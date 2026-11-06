@@ -87,6 +87,10 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    [marketplaces.gabo-ai] and [plugins.\"gabo@gabo-ai\"], and a .pi/settings.json\n" +
 			"    packages entry for npm:@gabo-ai/pi (any version); a key set to another\n" +
 			"    value passes, and other engines' files are never read;\n" +
+			"  - the main-session entry against runtimes.assistant, from each runtime skill's\n" +
+			"    metadata.main_session: that engine's gabo-assistant link and its agent file\n" +
+			"    plus key, or exactly one scoped block; no other full-tier engine's entry\n" +
+			"    (a full-tier runtime skill without it fails, a flexible-tier one warns);\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +

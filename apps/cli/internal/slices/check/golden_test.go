@@ -4,8 +4,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path"
+	"strings"
 	"testing"
 )
 
@@ -35,6 +37,17 @@ func TestCommandGolden(t *testing.T) {
 		{name: "versions-no-version-line", edit: map[string]string{".claude/agents/beta.md": "---\nname: beta\n---\nbody\n"}},
 		{name: "agent-skills-extra", edit: map[string]string{".claude/agents/alpha.md": "---\nname: alpha\nskills:\n  - sk-x\ngabo-version: 1.2.3\n---\nbody\n"}},
 	}
+	// Spec 0009 S5 on the plain project with a main_session entry: nothing of
+	// the claude entry built, then a correct entry beside a Codex block.
+	cases = append(cases,
+		tc{name: "main-session-missing", edit: mainSessionEdit(nil)},
+		tc{name: "main-session-stale", edit: mainSessionEdit(map[string]string{
+			".claude/agents/gabo-assistant.md":         "---\nname: gabo-assistant\ngabo-version: 1.2.3\n---\nbody\n",
+			".claude/settings.json":                    withJSONKey(claudeKeysJSON, "agent", "gabo-assistant"),
+			".gabo/skills/gabo-runtime-codex/SKILL.md": "---\nname: gabo-runtime-codex\nmetadata:\n  main_session:\n    kind: block\n    files: [AGENTS.override.md, AGENTS.md]\n---\n",
+			"AGENTS.md": "# Project\n\n" + assistantStart + "\nYou are the gabo assistant.\n" + assistantEnd + "\n",
+		})},
+	)
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
 	}
@@ -80,4 +93,21 @@ func TestCommandGolden(t *testing.T) {
 			}
 		})
 	}
+}
+
+// mainSessionEdit gives the plain project a main_session entry in its spec,
+// its templates and skill, and metadata.main_session in its Claude Code
+// runtime skill, plus extra.
+func mainSessionEdit(extra map[string]string) map[string]string {
+	edit := map[string]string{
+		".gabo/skills/gabo-agent-templates/agents.yaml": spec + "main_session:\n  id: gabo-assistant\n  role: assistant\n" +
+			"  skills: [gabo-assistant]\n  template: agents/gabo-assistant.md\n  block: agents/gabo-assistant-block.md\n",
+		".gabo/skills/gabo-agent-templates/agents/gabo-assistant.md":       "gabo-version: {{gabo_version}}\n",
+		".gabo/skills/gabo-agent-templates/agents/gabo-assistant-block.md": assistantStart + "\n" + assistantEnd + "\n",
+		".gabo/skills/gabo-assistant/SKILL.md":                             "---\nname: gabo-assistant\n---\n",
+		".gabo/skills/gabo-runtime-claude/SKILL.md": strings.Replace(claudeSkill, "  agent_skills: frontmatter:skills\n",
+			"  agent_skills: frontmatter:skills\n  main_session:\n    kind: agent\n    config: [.claude/settings.json]\n    key: agent\n", 1),
+	}
+	maps.Copy(edit, extra)
+	return edit
 }
