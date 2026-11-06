@@ -89,6 +89,9 @@ func TestCommandGolden(t *testing.T) {
 			"opencode.json": `{"default_agent": "gabo-assistant"}`,
 		}))},
 	)
+	// Intent 0013 S6: a Claude Code agent copied into .pi/agents.
+	builtFor, builtForCfg := piCoder("---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: claude\n---\nbody\n")
+	cases = append(cases, tc{name: "agent-built-for-other-engine", cfg: builtForCfg, edit: mapFSEdit(builtFor)})
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
 	}
