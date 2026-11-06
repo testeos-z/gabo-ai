@@ -138,7 +138,6 @@ func TestCodexStepsWithTheFallbackFlag(t *testing.T) {
 		"trust both gabo hooks in /hooks",
 		"if Codex does not list the gabo plugin after trust, run: codex plugin marketplace add testeos-z/gabo-ai",
 		"if Codex does not list the gabo plugin after trust, run: codex plugin add gabo@gabo-ai",
-		"while testeos-z/gabo-ai is private, set up git credentials that can read it",
 	}
 	if !codexFallback {
 		t.Fatal("the fallback flag is set until the S12 smoke confirms Codex installs from the project tables (D4)")
@@ -152,7 +151,7 @@ func TestCodexStepsWithTheFallbackFlag(t *testing.T) {
 	codexFallback = false
 	t.Cleanup(func() { codexFallback = true })
 	got := codexRule(codexIn(t, "missing")).Section.Steps
-	if want := []string{steps[0], steps[1], steps[4]}; !slices.Equal(got, want) {
+	if want := steps[:2]; !slices.Equal(got, want) {
 		t.Errorf("without the flag Steps = %q, want %q", got, want)
 	}
 }
