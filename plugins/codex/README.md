@@ -4,7 +4,7 @@ The `gabo` plugin of the `gabo-ai` Codex marketplace (this repository, [`.agents
 
 ## Install
 
-**With `gabo init`.** When `gabo.yaml` names `codex` in `runtimes.*`, `gabo init` writes the plugin's project keys `[marketplaces.gabo-ai]` (`source_type = "git"`, `source = "https://github.com/testeos-z/gabo-ai.git"`) and `[plugins."gabo@gabo-ai"]` (`enabled = true`) to the project's `.codex/config.toml`, never to your global Codex config or anything under `CODEX_HOME`. It only adds missing keys and keeps every value you set. What you still do, as its `engine integration:` report says: trust the project in Codex, so it loads `.codex/config.toml`; trust both gabo hooks in `/hooks` (see below); and, while `testeos-z/gabo-ai` is private, set up git credentials that can read it. While the fallback is printed, the report also says: if Codex does not list the gabo plugin after trust, run the two manual commands below. Commit `.codex/config.toml`.
+**With `gabo init`.** When `gabo.yaml` names `codex` in `runtimes.*`, `gabo init` writes the plugin's project keys `[marketplaces.gabo-ai]` (`source_type = "git"`, `source = "https://github.com/testeos-z/gabo-ai.git"`) and `[plugins."gabo@gabo-ai"]` (`enabled = true`) to the project's `.codex/config.toml`, never to your global Codex config or anything under `CODEX_HOME`. It only adds missing keys and keeps every value you set. What you still do, as its `engine integration:` report says: trust the project in Codex, so it loads `.codex/config.toml`, and trust both gabo hooks in `/hooks` (see below). While the fallback is printed, the report also says: if Codex does not list the gabo plugin after trust, run the two manual commands below. Commit `.codex/config.toml`.
 
 **By hand.** As the alternative, install the plugin by hand:
 
@@ -12,8 +12,6 @@ The `gabo` plugin of the `gabo-ai` Codex marketplace (this repository, [`.agents
 codex plugin marketplace add testeos-z/gabo-ai
 codex plugin add gabo@gabo-ai
 ```
-
-While the repository is private, Codex clones it with your own git credentials: run `gh auth setup-git` or add an SSH key that can read it.
 
 Then trust the two hooks: in a Codex session, open `/hooks` and trust the gabo `PreToolUse` and `PostToolUse` hooks. Codex runs a plugin hook only after you trust it, and skips a hook that changed until you trust it again. Hook trust is your own approval in `~/.codex/config.toml`; neither the plugin nor gabo writes it.
 
