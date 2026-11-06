@@ -46,7 +46,7 @@ Owners who pay for more than one engine subscription and want to use them at the
 | # | question | status |
 |---|---|---|
 | 1 | How is an intent claim released when its session ends without closing its wave (crash, closed terminal)? | carried to spec open question 1, owner question with a proposal |
-| 2 | What runs the coders when `runtimes.coder` is a fixed engine other than the engine of the session running the wave? | carried to spec open question 2, owner question with a proposal |
+| 2 | What runs the coders when `runtimes.coder` is a fixed engine other than the engine of the session running the wave? | answered by the owner on 2026-11-06 ("si"): in-process coders on the session engine, with a wave-report line (spec open question 2) |
 | 3 | Does `parallelism` bound the coders of each wave or of the whole project when several waves run at once? | carried to spec open question 3, owner question with a proposal |
 
 ## Links
