@@ -12,10 +12,10 @@
 
 You need Go (the version in [`apps/cli/go.mod`](apps/cli/go.mod)), git, and one coding engine: Claude Code, Codex, Pi or OpenCode.
 
-1. **Install the CLI.** Go needs your git credentials while the repository is private:
+1. **Install the CLI:**
 
    ```sh
-   GOPRIVATE=github.com/testeos-z/* go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
+   go install github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo@latest
    ```
 
 2. **Run `gabo init`** in your project root. It copies the skill catalog to `.gabo/` and prints a setup prompt.
@@ -125,7 +125,6 @@ The project file overrides the user file key by key; unknown keys fail. Secrets 
 
 ## Known limitations
 
-- **Private repository.** Installing the CLI and every engine plugin needs git credentials that can read `testeos-z/gabo-ai`: run `gh auth setup-git` or add an SSH key.
 - **Install from a tag.** `gabo init` refuses a pseudo-version, such as the one Go installs from a branch. Release tags are named `apps/cli/vX.Y.Z` because the module lives in `apps/cli`. To build from source, pass the version yourself: `go -C apps/cli install -ldflags "-X main.buildVersion=<x.y.z>" ./cmd/gabo`.
 - **No self-update and no curl installer yet.** Without signed releases, `gabo init` prints the upgrade command instead of updating itself.
 - **Pi needs a subagent package.** Pi has no subagents of its own; gabo refuses to build agents without one. The recommended setup is the [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) (`gentle-ai install --agent pi`).
@@ -153,8 +152,6 @@ Built something with gabo-ai? You can show it, if you want: it is optional and n
   <img src="https://raw.githubusercontent.com/testeos-z/gabo-ai/main/docs/assets/made-with-gabo-ai.png" alt="Made with GaboAI" width="120">
 </a>
 ```
-
-While `testeos-z/gabo-ai` is private, that image URL only loads for people with access to it. Until then, copy [`docs/assets/made-with-gabo-ai.png`](docs/assets/made-with-gabo-ai.png) into your repository and point `src` at your copy.
 
 ## License
 
