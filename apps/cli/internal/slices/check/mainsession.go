@@ -12,6 +12,7 @@ import (
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
 // The markers around the scoped main-session block (spec 0009 S3).
@@ -186,7 +187,11 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 			r.fail(fmt.Sprintf("✗ %s: %s is %s, not %s", file, ms.Key, jsonText(v), jsonText(m.ID)),
 				fmt.Sprintf("next: change %s to %s in %s, or remove it and run gabo init, then rerun gabo check", ms.Key, jsonText(m.ID), file))
 		default:
-			pieces = append(pieces, piece{file: file, state: pieceAbsent, next: initMergesHint(ms.Key, m.ID, file)})
+			next, err := u.initMergeHint(rt, ms, m.ID, file, found)
+			if err != nil {
+				return err
+			}
+			pieces = append(pieces, piece{file: file, state: pieceAbsent, next: next})
 		}
 	case kindBlock:
 		file, b, found, err := u.firstExisting(ms.Files)
@@ -221,10 +226,61 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 	return nil
 }
 
-// initMergesHint is the step that clears a full-tier engine's missing
-// main-session key: gabo init writes it (intent 0010 S6).
-func initMergesHint(key, id, file string) string {
-	return fmt.Sprintf("next: run gabo init (it merges %s: %s into %s), then rerun gabo check", jsonText(key), jsonText(id), file)
+// initMergeHint is the step that clears a full-tier engine's missing
+// main-session key (intent 0010 S6): gabo init writes it, so the hint names
+// gabo init; when gabo init would refuse the file, the hint is its reason,
+// so following it never loops (D7). A missing file is one gabo init creates.
+func (u *UseCase) initMergeHint(rt string, ms *mainSessionMeta, id, file string, found bool) (string, error) {
+	merges := fmt.Sprintf("next: run gabo init (it merges %s: %s into %s), then rerun gabo check", jsonText(ms.Key), jsonText(id), file)
+	if !found {
+		return merges, nil
+	}
+	after, refusal, err := u.initDryRun(rt, rt, ms.Config, file)
+	switch {
+	case err != nil:
+		return "", err
+	case refusal != "":
+		return initRefusalHint(file, refusal), nil
+	case keyNames(after, ms.Key, id):
+		return merges, nil
+	}
+	return NextRebuild, nil
+}
+
+// initDryRun runs gabo init's pure rule for engine on the project's files,
+// in memory, and returns the bytes it would leave in file or the reason it
+// refuses file. It writes nothing.
+func (u *UseCase) initDryRun(engine, assistant string, files []string, file string) ([]byte, string, error) {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: u.s.Version, Assistant: assistant}
+	for _, name := range files {
+		b, err := fs.ReadFile(u.project, name)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, "", fmt.Errorf("read %s: %w", name, err)
+		}
+		in.Files[name] = b
+	}
+	report, writes := engineconfig.Integrate([]string{engine}, in)
+	prefix := engineconfig.FailurePrefix + " " + file + ": "
+	for _, s := range report.Sections {
+		for _, l := range s.Lines {
+			if reason, ok := strings.CutPrefix(l, prefix); ok {
+				reason, _, _ = strings.Cut(reason, "; fix it and run gabo init again")
+				return nil, reason, nil
+			}
+		}
+	}
+	if b, ok := writes[file]; ok {
+		return b, "", nil
+	}
+	return in.Files[file], "", nil
+}
+
+// initRefusalHint is the step for a file gabo init refuses to merge.
+func initRefusalHint(file, reason string) string {
+	return "next: fix " + file + " (" + reason + "), then run gabo init and rerun gabo check"
 }
 
 // initRemovesHint is the step that clears another full-tier engine's gabo

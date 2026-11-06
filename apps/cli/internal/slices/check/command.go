@@ -83,7 +83,7 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    and .opencode/opencode.jsonc (never ~/.config/opencode);\n" +
 			"    a missing or lower whole value names \"run gabo init (it sets\n" +
 			"    experimental.subagent_depth to 3 in <file>)\", any other value names setting\n" +
-			"    it by hand;\n" +
+			"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";\n" +
 			"  - for each of claude, codex and pi a role runs on, the keys gabo init writes:\n" +
 			"    .claude/settings.json extraKnownMarketplaces.\"gabo-ai\" and\n" +
 			"    enabledPlugins.\"gabo@gabo-ai\", the .codex/config.toml tables\n" +
@@ -101,6 +101,7 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    gabo init\", and another engine's key names \"run gabo init (it removes\n" +
 			"    \"<key>\": \"gabo-assistant\" from <file>)\"; every other piece, and a\n" +
 			"    flexible-tier engine's key, names asking your agent to rebuild the agents;\n" +
+			"    a file gabo init refuses to merge names \"fix <file> (<its reason>)\";\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +

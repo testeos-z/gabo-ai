@@ -111,6 +111,8 @@ func TestCommandHelpNamesTheGaboInitHints(t *testing.T) {
 		"    gabo init\", and another engine's key names \"run gabo init (it removes",
 		"    \"<key>\": \"gabo-assistant\" from <file>)\"; every other piece, and a",
 		"    flexible-tier engine's key, names asking your agent to rebuild the agents;",
+		"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";",
+		"    a file gabo init refuses to merge names \"fix <file> (<its reason>)\";",
 	} {
 		if !strings.Contains(out, want+"\n") {
 			t.Fatalf("help lacks %q:\n%s", want, out)

@@ -31,12 +31,13 @@ const (
 // S8 lookup order (spec 0004 S11). It reads only the project, never the
 // user's ~/.config/opencode. A missing key or a whole number below 3 is
 // what gabo init raises, so that line names gabo init (intent 0010 S6); a
-// value gabo init refuses to merge names setting it by hand.
+// value gabo init refuses to merge names setting it by hand, and a file gabo
+// init refuses names its reason, so no hint loops (D7).
 func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 	if !slices.Contains(runtimesOf(cfg), string(config.RuntimeOpencode)) {
 		return nil
 	}
-	file, why, byInit := opencodeNewConfig, "no project config", true
+	file, why, byInit, found := opencodeNewConfig, "no project config", true, false
 	for _, name := range opencodeConfigs {
 		b, err := fs.ReadFile(u.project, name)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -45,7 +46,7 @@ func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
-		file = name
+		file, found = name, true
 		why, byInit = depthProblem(b)
 		break
 	}
@@ -53,6 +54,20 @@ func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 		return nil
 	}
 	next := fmt.Sprintf("next: set %s to %d in %s, then rerun gabo check", subagentDepthKey, minSubagentDepth, file)
+	if byInit && found {
+		// A file gabo init refuses names the reason, so the hint never loops.
+		after, refusal, err := u.initDryRun(string(config.RuntimeOpencode), string(cfg.Runtimes.Assistant), opencodeConfigs, file)
+		switch {
+		case err != nil:
+			return err
+		case refusal != "":
+			next, byInit = initRefusalHint(file, refusal), false
+		default:
+			if p, _ := depthProblem(after); p != "" {
+				byInit = false
+			}
+		}
+	}
 	if byInit {
 		next = fmt.Sprintf("next: run gabo init (it sets %s to %d in %s), then rerun gabo check", subagentDepthKey, minSubagentDepth, file)
 	}

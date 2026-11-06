@@ -113,13 +113,6 @@ func TestCommandGolden(t *testing.T) {
 // mainSessionEdit gives the plain project a main_session entry in its spec,
 // its templates and skill, and metadata.main_session in its Claude Code
 // runtime skill, plus extra.
-// withEdits returns a copy of base with extra added.
-func withEdits(base, extra map[string]string) map[string]string {
-	out := maps.Clone(base)
-	maps.Copy(out, extra)
-	return out
-}
-
 func mainSessionEdit(extra map[string]string) map[string]string {
 	edit := map[string]string{
 		".gabo/skills/gabo-agent-templates/agents.yaml": spec + "main_session:\n  id: gabo-assistant\n  role: assistant\n" +
@@ -132,4 +125,11 @@ func mainSessionEdit(extra map[string]string) map[string]string {
 	}
 	maps.Copy(edit, extra)
 	return edit
+}
+
+// withEdits returns a copy of base with extra added.
+func withEdits(base, extra map[string]string) map[string]string {
+	out := maps.Clone(base)
+	maps.Copy(out, extra)
+	return out
 }

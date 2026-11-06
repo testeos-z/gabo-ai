@@ -223,7 +223,7 @@ func depthLines(r Report) []string {
 // gabo check fails with one ✗ line naming the key, the value 3 and the file.
 // Intent 0010 S6: a missing key or a whole number below 3 is gabo init's fix,
 // so the hint names gabo init; a value gabo init refuses to merge keeps the
-// hint to set it by hand.
+// hint to set it by hand, and a file gabo init refuses names its reason.
 func TestOpencodeSubagentDepthBelowThreeFails(t *testing.T) {
 	t.Parallel()
 	const (
@@ -251,6 +251,9 @@ func TestOpencodeSubagentDepthBelowThreeFails(t *testing.T) {
 		// Only the first existing file counts, as in OpenCode's lookup order.
 		{"first file wins", map[string]string{rootC: `{"experimental": {"subagent_depth": 1}}`, nested: `{"experimental": {"subagent_depth": 3}}`}, rootC, "it is 1", true},
 		{"root before nested", map[string]string{root: `{}`, jsonc: `{"experimental": {"subagent_depth": 5}}`}, root, "not set", true},
+		// gabo init refuses a repeated key, so following its hint would loop.
+		{"repeated key", map[string]string{root: `{"experimental": {"subagent_depth": 1, "subagent_depth": 2}}`}, root, "it is 2", false},
+		{"repeated experimental", map[string]string{root: `{"experimental": {}, "experimental": {"subagent_depth": 1}}`}, root, "it is 1", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -266,6 +269,10 @@ func TestOpencodeSubagentDepthBelowThreeFails(t *testing.T) {
 				t.Fatalf("depth lines %q, want one starting with %q:\n%s", got, want, joined(rep))
 			}
 			next := "next: set experimental.subagent_depth to 3 in " + c.file + ", then rerun gabo check"
+			if strings.HasPrefix(c.name, "repeated") {
+				what := map[bool]string{true: "experimental", false: "experimental.subagent_depth"}[c.name == "repeated experimental"]
+				next = "next: fix " + c.file + " (" + what + " appears more than once), then run gabo init and rerun gabo check"
+			}
 			if c.init {
 				next = "next: run gabo init (it sets experimental.subagent_depth to 3 in " + c.file + "), then rerun gabo check"
 			}
