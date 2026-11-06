@@ -27,7 +27,6 @@ var claudeKeys = []claudeKey{
 // claudeSteps are the S9 steps outside the project for Claude Code.
 var claudeSteps = []string{
 	"trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply",
-	"while testeos-z/gabo-ai is private, give git credentials that can read it (Claude Code clones the marketplace from GitHub)",
 }
 
 func (k claudeKey) name() string { return k.parent + `."` + k.child + `"` }

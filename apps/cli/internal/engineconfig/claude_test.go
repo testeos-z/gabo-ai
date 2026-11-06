@@ -18,7 +18,6 @@ const (
 
 var wantClaudeSteps = []string{
 	"trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply",
-	"while testeos-z/gabo-ai is private, give git credentials that can read it (Claude Code clones the marketplace from GitHub)",
 }
 
 func readTestdata(t *testing.T, name string) []byte {
