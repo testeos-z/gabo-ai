@@ -28,6 +28,10 @@ type runtimeMeta struct {
 	// SkillDir is where each catalog skill and fixed-name slot link lives
 	// (repository-relative); empty means the runtime makes no skill links.
 	SkillDir string `yaml:"skill_dir"`
+	// FormerSkillDir is where the runtime made its skill links before the
+	// move to .agents/skills (repository-relative); empty means none
+	// (intent 0008 S4).
+	FormerSkillDir string `yaml:"former_skill_dir"`
 	// ReviewerLink is the user-level link to the reviewer skill, with
 	// ${NAME}, ${NAME:-default} and $NAME expanded; empty means none.
 	ReviewerLink string `yaml:"reviewer_link"`
@@ -62,6 +66,7 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 	m := fm.Metadata.runtimeMeta
 	m.AgentDir = strings.TrimSpace(m.AgentDir)
 	m.SkillDir = strings.TrimSpace(m.SkillDir)
+	m.FormerSkillDir = strings.TrimSpace(m.FormerSkillDir)
 	m.ReviewerLink = strings.TrimSpace(m.ReviewerLink)
 	if m.AgentSkills, err = parseAgentPlace("agent_skills", fm.Metadata.AgentSkills); err != nil {
 		return runtimeMeta{}, err

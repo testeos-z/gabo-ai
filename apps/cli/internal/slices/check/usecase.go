@@ -130,6 +130,7 @@ func (u *UseCase) Run() (Report, error) {
 		if err := u.checkLinks(&r, cfg); err != nil {
 			return Report{}, err
 		}
+		u.checkLeftovers(&r, cfg)
 		if err := u.checkSubagentDepth(&r, cfg); err != nil {
 			return Report{}, err
 		}
@@ -302,6 +303,7 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 				if err := u.checkAgentSkills(r, cfg, rt, spec, id, path.Join(dir, name)); err != nil {
 					return err
 				}
+				u.checkAgentName(r, id, rt, path.Join(dir, name))
 			}
 		}
 	}
