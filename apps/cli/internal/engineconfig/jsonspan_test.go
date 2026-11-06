@@ -132,3 +132,64 @@ func TestInsertMemberKeepsComments(t *testing.T) {
 		})
 	}
 }
+
+// replaceValue swaps one member's value and keeps every other byte, the
+// comments around the value included (intent 0010 S3).
+func TestReplaceValueKeepsComments(t *testing.T) {
+	cases := []struct {
+		name, in, out string
+	}{
+		{"plain", "{\"a\": 1, \"b\": 2}", "{\"a\": 3, \"b\": 2}"},
+		{"comments around", "{\n  \"a\": /* low */ 1, // keep\n  \"b\": 2\n}\n", "{\n  \"a\": /* low */ 3, // keep\n  \"b\": 2\n}\n"},
+		{"crlf trailing comma", "{\r\n  \"a\": 1,\r\n}\r\n", "{\r\n  \"a\": 3,\r\n}\r\n"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			b := []byte(c.in)
+			m, ok := scanObject(b, skipWS(b, 0)).member(b, "a")
+			if !ok {
+				t.Fatal("no member a")
+			}
+			if got := string(replaceValue(b, m, 3)); got != c.out {
+				t.Fatalf("got\n%q\nwant\n%q", got, c.out)
+			}
+		})
+	}
+}
+
+// count tells a key that appears more than once, which no rule can merge
+// without loss (intent 0010 S3).
+func TestSpanObjectCount(t *testing.T) {
+	b := []byte("{\"a\": 1, // c\n \"b\": 2, \"a\": 3,}")
+	o := scanObject(b, skipWS(b, 0))
+	if got := [3]int{o.count("a"), o.count("b"), o.count("x")}; got != [3]int{2, 1, 0} {
+		t.Errorf("counts = %v, want [2 1 0]", got)
+	}
+}
+
+// insertMember into a nested object, empty or not, keeps the file's layout
+// and comments (intent 0010 S3).
+func TestInsertMemberIntoNestedObject(t *testing.T) {
+	kv := jsonKV{"x", 3}
+	cases := []struct {
+		name, in, out string
+	}{
+		{"empty nested", "{\n  \"e\": {},\n  \"a\": 1\n}\n", "{\n  \"e\": {\n    \"x\": 3\n  },\n  \"a\": 1\n}\n"},
+		{"nested with a comment", "{\n  \"e\": {\n    \"y\": true // keep\n  }\n}\n", "{\n  \"e\": {\n    \"y\": true, // keep\n    \"x\": 3\n  }\n}\n"},
+		{"inline nested", `{"e": {"y": true}}`, `{"e": {"y": true, "x": 3}}`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			b := []byte(c.in)
+			top := scanObject(b, skipWS(b, 0))
+			e, _ := top.member(b, "e")
+			got := string(insertMember(b, scanObject(b, e.valStart), kv, indentUnit(b, top)))
+			if got != c.out {
+				t.Fatalf("got\n%q\nwant\n%q", got, c.out)
+			}
+			if err := checkJSONC([]byte(got)); err != nil {
+				t.Fatalf("result does not parse: %v", err)
+			}
+		})
+	}
+}

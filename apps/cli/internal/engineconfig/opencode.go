@@ -3,6 +3,9 @@ package engineconfig
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
+	"math"
+	"strconv"
 	"strings"
 )
 
@@ -37,22 +40,16 @@ const opencodeStep = "ask your agent to build the agents with gabo-runtime-openc
 // not built.
 const opencodeMainSessionStep = "ask your agent to build the agents (the main session needs " + OpencodeAgentFile + ")"
 
-// opencodeRule keeps default_agent in step with the assistant engine
-// (intent 0010 S2, S4): with OpenCode as the assistant it merges
-// "gabo-assistant" into the first existing config, else a new
-// .opencode/opencode.json, keeping every other byte and comment; with
-// another assistant it removes exactly that value from each config. A
-// config that does not parse writes nothing and gets one ✗ line. Then it
-// reports whether the stage-gate plugin is in the project.
+// opencodeRule writes gabo's OpenCode keys into the S2 file, the first
+// existing config, else a new .opencode/opencode.json, keeping every other
+// byte and comment (intent 0010 S2, S3, S4): it raises
+// experimental.subagent_depth to at least 3; with OpenCode as the assistant
+// it merges "default_agent": "gabo-assistant", with another assistant it
+// removes exactly that value from each config. Anything it cannot merge
+// without loss writes nothing and gets one ✗ line. Then it reports whether
+// the stage-gate plugin is in the project.
 func opencodeRule(in Input) Result {
-	var res Result
-	agentIsGabo := false
-	switch {
-	case in.Assistant == Opencode:
-		res, agentIsGabo = mergeDefaultAgent(in)
-	case in.Assistant != "":
-		res = removeDefaultAgent(in, true)
-	}
+	res, agentIsGabo := opencodeKeys(in)
 	failed := len(res.Section.Lines) > 0 && strings.HasPrefix(res.Section.Lines[0], FailurePrefix)
 	if _, ok := in.Files[OpencodeStageGate]; ok {
 		res.Section.Lines = append(res.Section.Lines, "stage-gate plugin in place (built by gabo-runtime-opencode)")
@@ -70,6 +67,152 @@ func opencodeRule(in Input) Result {
 	return res
 }
 
+// The nested key gabo raises and its floor (intent 0010 S3, D5).
+const (
+	opencodeExperimental = "experimental"
+	opencodeDepthKey     = "subagent_depth"
+	opencodeDepthName    = opencodeExperimental + "." + opencodeDepthKey
+	opencodeMinDepth     = 3
+)
+
+// opencodeKeys decides every key before it writes, so a failure writes
+// nothing, and reports whether the main session runs gabo's agent.
+func opencodeKeys(in Input) (Result, bool) {
+	file := opencodeConfig(in)
+	fail := func(reason string) (Result, bool) {
+		return Result{Section: Section{Lines: []string{opencodeFailure(file, reason)}}}, false
+	}
+	writes := map[string][]byte{}
+	var removed []string
+	if in.Assistant != "" && in.Assistant != Opencode {
+		rem := removeDefaultAgent(in, true)
+		if len(rem.Section.Lines) > 0 && strings.HasPrefix(rem.Section.Lines[0], FailurePrefix) {
+			return rem, false
+		}
+		maps.Copy(writes, rem.Writes)
+		removed = rem.Section.Lines
+	}
+
+	src, exists := writes[file]
+	if !exists {
+		src, exists = in.Files[file]
+	}
+	var parts, kept []string
+	agentIsGabo := false
+	if !exists {
+		obj := jsonObj{{opencodeExperimental, jsonObj{{opencodeDepthKey, opencodeMinDepth}}}}
+		parts = append(parts, opencodeDepthName+" unset → "+strconv.Itoa(opencodeMinDepth))
+		if in.Assistant == Opencode {
+			obj = append(obj, jsonKV{opencodeAgentKey, opencodeAgentValue})
+			parts = append(parts, "added "+opencodeAgentKey)
+			agentIsGabo = true
+		}
+		src = []byte(renderJSON(obj, "", "  ", true) + "\n")
+	} else {
+		top, reason := opencodeTop(src)
+		if reason != "" {
+			return fail(reason)
+		}
+		out, part, reason := raiseDepth(src, top)
+		if reason != "" {
+			return fail(reason)
+		}
+		if part != "" {
+			parts = append(parts, part)
+		}
+		if in.Assistant == Opencode {
+			top = scanObject(out, top.open)
+			switch m, ok := top.member(out, opencodeAgentKey); {
+			case !ok:
+				out = insertMember(out, top, jsonKV{opencodeAgentKey, opencodeAgentValue}, indentUnit(out, top))
+				parts = append(parts, "added "+opencodeAgentKey)
+				agentIsGabo = true
+			case sameJSON(out[m.valStart:m.valEnd], opencodeAgentValue):
+				agentIsGabo = true
+			default:
+				kept = append(kept, "kept "+file+" "+opencodeAgentKey+": "+compactJSON(out[m.valStart:m.valEnd])+" (your setting; gabo leaves it)")
+			}
+		}
+		src = out
+	}
+
+	var res Result
+	if len(parts) > 0 {
+		writes[file] = src
+		res.Section.Lines = append(res.Section.Lines, "wrote "+file+": "+strings.Join(parts, "; "))
+	}
+	res.Section.Lines = append(res.Section.Lines, removed...)
+	res.Section.Lines = append(res.Section.Lines, kept...)
+	if len(res.Section.Lines) == 0 && in.Assistant == Opencode {
+		res.Section.Lines = []string{"unchanged " + file}
+	}
+	if len(writes) > 0 {
+		res.Writes = writes
+	}
+	return res, agentIsGabo
+}
+
+// opencodeConfig is the S2 file: the first existing config, else the new
+// one gabo init creates.
+func opencodeConfig(in Input) string {
+	for _, p := range OpencodeConfigs {
+		if _, ok := in.Files[p]; ok {
+			return p
+		}
+	}
+	return OpencodeNewConfig
+}
+
+// raiseDepth makes experimental.subagent_depth at least 3 in src: it
+// returns the new bytes and the report part ("" when the value is already a
+// whole number of 3 or more), or why it cannot be merged without loss.
+func raiseDepth(src []byte, top spanObject) ([]byte, string, string) {
+	unset := opencodeDepthName + " unset → " + strconv.Itoa(opencodeMinDepth)
+	switch top.count(opencodeExperimental) {
+	case 0:
+		return insertMember(src, top, jsonKV{opencodeExperimental, jsonObj{{opencodeDepthKey, opencodeMinDepth}}}, indentUnit(src, top)), unset, ""
+	case 1: // merged below
+	default:
+		return nil, "", opencodeExperimental + " appears more than once"
+	}
+	exp, _ := top.member(src, opencodeExperimental)
+	if src[exp.valStart] != '{' {
+		return nil, "", opencodeExperimental + " is not a JSON object"
+	}
+	obj := scanObject(src, exp.valStart)
+	switch obj.count(opencodeDepthKey) {
+	case 0:
+		return insertMember(src, obj, jsonKV{opencodeDepthKey, opencodeMinDepth}, indentUnit(src, top)), unset, ""
+	case 1: // checked below
+	default:
+		return nil, "", opencodeDepthName + " appears more than once"
+	}
+	m, _ := obj.member(src, opencodeDepthKey)
+	raw := src[m.valStart:m.valEnd]
+	var v any
+	n, isNum := 0.0, false
+	if json.Unmarshal(raw, &v) == nil {
+		n, isNum = v.(float64)
+	}
+	switch {
+	case !isNum || n != math.Trunc(n):
+		return nil, "", opencodeDepthName + " is " + compactJSON(raw) + ", not a whole number"
+	case n >= opencodeMinDepth:
+		return src, "", ""
+	}
+	return replaceValue(src, m, opencodeMinDepth), opencodeDepthName + " " + compactJSON(raw) + " → " + strconv.Itoa(opencodeMinDepth), ""
+}
+
+// compactJSON renders a raw value on one line, as it is when it does not
+// compact.
+func compactJSON(raw []byte) string {
+	var b bytes.Buffer
+	if json.Compact(&b, raw) != nil {
+		return string(raw)
+	}
+	return b.String()
+}
+
 // opencodeRemoval removes the gabo default_agent from the configs of a
 // project whose engine set no longer holds OpenCode (intent 0010 S4, D2);
 // a config that does not parse is left alone without a line.
@@ -78,47 +221,6 @@ func opencodeRemoval(in Input) Result {
 		return Result{}
 	}
 	return removeDefaultAgent(in, false)
-}
-
-// mergeDefaultAgent writes default_agent into the first existing config and
-// reports whether the main session runs gabo's agent.
-func mergeDefaultAgent(in Input) (Result, bool) {
-	file := OpencodeNewConfig
-	for _, p := range OpencodeConfigs {
-		if _, ok := in.Files[p]; ok {
-			file = p
-			break
-		}
-	}
-	src, exists := in.Files[file]
-	if !exists {
-		out := renderJSON(jsonObj{{opencodeAgentKey, opencodeAgentValue}}, "", "  ", true) + "\n"
-		return Result{
-			Section: Section{Lines: []string{"wrote " + file + ": added " + opencodeAgentKey}},
-			Writes:  map[string][]byte{file: []byte(out)},
-		}, true
-	}
-	top, reason := opencodeTop(src)
-	if reason != "" {
-		return Result{Section: Section{Lines: []string{opencodeFailure(file, reason)}}}, false
-	}
-	m, ok := top.member(src, opencodeAgentKey)
-	switch {
-	case !ok:
-		out := insertMember(src, top, jsonKV{opencodeAgentKey, opencodeAgentValue}, indentUnit(src, top))
-		return Result{
-			Section: Section{Lines: []string{"wrote " + file + ": added " + opencodeAgentKey}},
-			Writes:  map[string][]byte{file: out},
-		}, true
-	case sameJSON(src[m.valStart:m.valEnd], opencodeAgentValue):
-		return Result{Section: Section{Lines: []string{"unchanged " + file}}}, true
-	default:
-		var compact bytes.Buffer
-		if json.Compact(&compact, src[m.valStart:m.valEnd]) != nil {
-			compact.Write(src[m.valStart:m.valEnd])
-		}
-		return Result{Section: Section{Lines: []string{"kept " + file + " " + opencodeAgentKey + ": " + compact.String() + " (your setting; gabo leaves it)"}}}, false
-	}
 }
 
 // removeDefaultAgent deletes default_agent from each config whose value is

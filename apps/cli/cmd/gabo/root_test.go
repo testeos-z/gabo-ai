@@ -338,11 +338,12 @@ func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
 			t.Fatal(err)
 		}
 		// The assistant is OpenCode, so a config already holding gabo's
-		// default_agent keeps init from writing to the project.
+		// default_agent and experimental.subagent_depth keeps init from
+		// writing to the project.
 		if err := os.MkdirAll(filepath.Join(project, ".opencode"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(project, ".opencode", "opencode.json"), []byte("{\"default_agent\": \"gabo-assistant\"}\n"), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(project, ".opencode", "opencode.json"), []byte("{\"default_agent\": \"gabo-assistant\", \"experimental\": {\"subagent_depth\": 3}}\n"), 0o644); err != nil {
 			t.Fatal(err)
 		}
 		before := snapshot(t, project)
