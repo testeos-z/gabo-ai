@@ -335,7 +335,7 @@ func TestSetupRunsGaboInitAfterChangingRuntimes(t *testing.T) {
 	requireAll(t, doc, []string{
 		"After you change `runtimes.*`, run `gabo init`, then rebuild every agent through the runtime skill of each engine in `runtimes.*`",
 		"`gabo init` writes the main-session key",
-		"the runtime skill of `runtimes.assistant` builds the agent file and link",
+		"the runtime skill of each engine listed in `runtimes.assistant` builds the agent file and link",
 	})
 	for _, s := range []string{"also writes the owner's main-session entry", "rewrites the main-session entry", "never touches the config,"} {
 		if strings.Contains(doc, s) {
@@ -343,4 +343,73 @@ func TestSetupRunsGaboInitAfterChangingRuntimes(t *testing.T) {
 		}
 	}
 	assertKeyLinesNameGaboInit(t, setupSkill, doc)
+}
+
+// setupStep returns the numbered step of the setup skill that starts with
+// the bold title, up to the next numbered step.
+func setupStep(t *testing.T, title, next string) string {
+	t.Helper()
+	_, steps, ok := strings.Cut(setupDoc(t), "## Steps")
+	if !ok {
+		t.Fatalf("%s: no ## Steps section", setupSkill)
+	}
+	steps, _, _ = strings.Cut(steps, "\n## ")
+	_, step, ok := strings.Cut(steps, title)
+	if !ok {
+		t.Fatalf("%s: no %s step", setupSkill, title)
+	}
+	step, _, _ = strings.Cut(step, next)
+	return step
+}
+
+// Intent 0013 S12: setup offers a list for runtimes.assistant and session for
+// runtimes.coder and runtimes.reviewer, explains each in one sentence, and the
+// reviewer engine (session included) goes through gabo-reviewer-config.
+func TestSetupOffersTheAssistantListAndSession(t *testing.T) {
+	t.Parallel()
+	ask := setupStep(t, "**Ask.**", "\n2. ")
+	for _, s := range []string{
+		"`runtimes.assistant` takes one engine or a list of engines, for example `[claude, pi]`",
+		"A list lets the owner open the main session on any listed engine, so sessions on different engines work in the same project.",
+		"`runtimes.coder` and `runtimes.reviewer` each take one engine or `session`",
+		"`session` runs that role on the engine of the main session that starts the wave, one of the engines listed in `runtimes.assistant`.",
+		"`claude`, `codex`, `pi` or `opencode`",
+		"`gabo-reviewer-config`",
+		"no default",
+	} {
+		if !strings.Contains(ask, s) {
+			t.Errorf("%s **Ask.**: missing %q", setupSkill, s)
+		}
+	}
+	if stale := "Each accepts `claude` or `pi`"; strings.Contains(ask, stale) {
+		t.Errorf("%s **Ask.**: still says %q", setupSkill, stale)
+	}
+}
+
+// Intent 0013 S12 and S2: after the runtimes are written, setup runs gabo init
+// and rebuilds each engine of the engine set: every listed assistant engine
+// plus a fixed coder or reviewer engine; session adds none.
+func TestSetupRebuildsEachEngineOfTheEngineSet(t *testing.T) {
+	t.Parallel()
+	const set = "the engine set: every engine listed in `runtimes.assistant`, plus `runtimes.coder` and `runtimes.reviewer` when each names an engine (`session` adds none)"
+	build := setupStep(t, "**Build the agents.**", "\n5. ")
+	for _, s := range []string{
+		set,
+		"run `gabo init`, then rebuild every agent through the runtime skill of each engine in `runtimes.*`**, that is each engine of the engine set",
+	} {
+		if !strings.Contains(build, s) {
+			t.Errorf("%s **Build the agents.**: missing %q", setupSkill, s)
+		}
+	}
+	_, rebuild, ok := strings.Cut(setupDoc(t), "## Rebuild")
+	if !ok {
+		t.Fatalf("%s: no ## Rebuild section", setupSkill)
+	}
+	rebuild, _, _ = strings.Cut(rebuild, "\n## ")
+	if !strings.Contains(rebuild, "For each engine of the engine set") {
+		t.Errorf("%s ## Rebuild: missing %q", setupSkill, "For each engine of the engine set")
+	}
+	if strings.Contains(setupDoc(t), "For each engine named in `runtimes.*`") {
+		t.Errorf("%s: still builds each engine named in `runtimes.*` instead of the engine set", setupSkill)
+	}
 }
