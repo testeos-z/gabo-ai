@@ -138,22 +138,34 @@ var templates = map[string]struct {
 			"## Open questions",
 		},
 	},
-	// Global styles only (S5); UX and app flow live in each spec.
+	// Design norms (intent 0012 S1, S3): one rules table per area, the
+	// component inventory, exceptions and a changelog; UX and app flow live in
+	// each spec.
 	"gabo-frontend/templates/DESIGN.md": {
 		columns: []string{
 			"| field | value |",
-			"| token | custom property | value | use |",
+			"| id | rule | level | rationale | verification | examples | source |",
 			"| component | level | states | used by |",
-			"| case | what happened | why | what to do next |",
+			"| rule id | exception | reason | owner | date |",
+			"| date | rule ids | change | decision |",
 		},
 		headings: []string{
-			"# Design",
-			"## 1. Principles",
-			"## 2. Design tokens",
-			"## 3. Component inventory",
-			"## 4. Accessibility",
-			"## 5. Messages and errors",
-			"## 6. Open questions",
+			"# Design norms",
+			"## 1. Principles and sources",
+			"## 2. Tokens",
+			"## 3. Color and themes",
+			"## 4. Typography",
+			"## 5. Layout and responsive behavior",
+			"## 6. Shape and density",
+			"## 7. Motion and state",
+			"## 8. Icons",
+			"## 9. Accessibility",
+			"## 10. Content and writing",
+			"## 11. Forms",
+			"## 12. Components",
+			"## 13. Exceptions",
+			"## 14. Changelog",
+			"## 15. Open questions",
 		},
 	},
 }
@@ -208,6 +220,42 @@ func TestPlanTemplateAsksForGaboCheckImpact(t *testing.T) {
 	want := [3]string{"Q9", "Does the change need a `gabo check` update, and which task covers it?", "Steps"}
 	if !slices.Contains(qs, want) {
 		t.Errorf("gabo-dev-lead/templates/plan.md: fixed questions %v, want row %v", qs, want)
+	}
+}
+
+// Intent 0012 S1, S2, S3: the design norms template states how rules are
+// written and governed, fits the per-change model and keeps no concrete
+// messages table (those live in each spec section 3).
+func TestDesignNormsTemplateRulesAndPerChangeFit(t *testing.T) {
+	t.Parallel()
+	const p = "gabo-frontend/templates/DESIGN.md"
+	doc := embeddedByPath(t)[p]
+	qs, err := fixedQuestions(doc)
+	if err != nil {
+		t.Fatalf("%s: %v", p, err)
+	}
+	if len(qs) != 14 {
+		t.Errorf("%s: %d fixed questions, want 14", p, len(qs))
+	}
+	for _, s := range []string{
+		"A rule that cannot state its verification is a SHOULD at most.",
+		"stable and never reused",
+		"An exception is a row in section 13",
+		"every rule change is a row in section 14",
+		"UX and app flow of each change live in section 3 of that intent's `spec.md`, which cites rule ids instead of repeating rules.",
+		"A product without a GUI marks the visual sections",
+		`"not applicable" with the reason`,
+		"conversation or CLI conventions under sections 1 and 10",
+		"(docs/product/PRD.md)", "(docs/product/TRD.md)", "(docs/product/intents/)",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", p, s)
+		}
+	}
+	for _, s := range []string{"UX_UI", "APP_FLOW", "| case | what happened |"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: has %q", p, s)
+		}
 	}
 }
 
