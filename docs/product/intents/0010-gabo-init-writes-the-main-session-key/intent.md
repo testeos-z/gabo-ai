@@ -42,7 +42,7 @@ Rationale to record, owner's brief, verbatim: "Rationale to record: one command 
 
 | # | question | status |
 |---|---|---|
-| 1 | The scoped block that the Codex and Pi runtime skills write into `AGENTS.md` (or `AGENTS.override.md`, `CLAUDE.md`) is an instructions file, not an engine config key. Does it stay with the runtime skills, or does `gabo init` write it too? | open, passed to the owner with a proposed answer (spec D3, open question 1) |
+| 1 | The scoped block that the Codex and Pi runtime skills write into `AGENTS.md` (or `AGENTS.override.md`, `CLAUDE.md`) is an instructions file, not an engine config key. Does it stay with the runtime skills, or does `gabo init` write it too? | answered 2026-11-06: it stays with the runtime skills (spec D3 A) |
 | 2 | A flexible-tier engine's runtime skill (written with `gabo-runtime-builder`) writes its own main-session key today, and `gabo init` writes nothing for a flexible-tier engine (PRD R32, TRD D28). Who writes that key now? | open, passed to the owner with a proposed answer (spec D4, open question 2) |
 
 ## Links
@@ -53,6 +53,6 @@ Rationale to record, owner's brief, verbatim: "Rationale to record: one command 
 | intent issue | [#354 I0010: gabo init writes the main-session key](https://github.com/testeos-z/gabo-ai/issues/354) |
 | PRD | [PRD](../../PRD.md) R32, R33 |
 | spec | [spec](spec.md) |
-| plan | not written yet (gabo-dev-lead) |
+| plan | [plan](plan.md) |
 | review findings | cappy-lab/vulcam PRs #650 and #652 (the vulcam session's report) |
 | related intent | 0009-main-session-defaults-to-the-gabo-assistant (the main-session entry), 0006-engine-integration-at-init (the `gabo init` engine keys), 0004-opencode-runtime (`experimental.subagent_depth`), 0008-stricter-gabo-check (TRD 8.5) |

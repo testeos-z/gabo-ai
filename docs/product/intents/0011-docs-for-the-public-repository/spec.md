@@ -43,7 +43,7 @@ Text-only change in the docs, two plugin READMEs, one package README and two rep
 | id | decision | options considered | choice | consequences |
 |---|---|---|---|---|
 | D1 | Private-repository texts | A: remove them / B: keep them as "earlier, while private" notes | A, **Proposed (auto)**: the owner's brief says "Remove or update", and a historical note in user docs is noise; history stays in the accepted intents and the archive (S7). | Fewer lines; plugin row 3 is updated, not removed, because it is an open-question record. |
-| D2 | `packages/pi/README.md` publishing risk | A: update the text to the public facts only; locking down `pi/pkg-up` and `NPM_TOKEN` is a later change / B: also protect `pi/pkg-up` and move `NPM_TOKEN` into a GitHub Environment in this intent | **Owner question (open question 1), not decided.** Proposed answer A: the brief is a docs change, and protecting a branch or moving a secret changes repository settings that only the owner can approve. Doubt research could not settle: the 2026-11-04 risk acceptance was partly justified by the private plan, which no longer applies. | With A, S4 states the facts and the acceptance stands; with B, the plan adds an owner-run settings task. |
+| D2 | `packages/pi/README.md` publishing risk | A: update the text to the public facts only; locking down `pi/pkg-up` and `NPM_TOKEN` is a later change / B: also protect `pi/pkg-up` and move `NPM_TOKEN` into a GitHub Environment in this intent | A, decided by the owner on 2026-11-06 ("ok", accepting proposal A). Proposal reasoning: the brief is a docs change, and protecting a branch or moving a secret changes repository settings that only the owner can approve. Doubt research could not settle: the 2026-11-04 risk acceptance was partly justified by the private plan, which no longer applies. | With A, S4 states the facts and the acceptance stands; with B, the plan adds an owner-run settings task. |
 
 ## 3. UX and app flow (optional)
 
@@ -67,7 +67,7 @@ Not applicable: no stored data changes.
 
 | # | question | status |
 |---|---|---|
-| 1 | Intent Q1: does locking down `pi/pkg-up` and `NPM_TOKEN` (branch protection, a GitHub Environment) belong to this intent, now that the public repository has them? | open, passed to the owner with the proposed answer A and its reasoning (D2); the `packages/pi/README.md` task waits for the answer. |
+| 1 | Intent Q1: does locking down `pi/pkg-up` and `NPM_TOKEN` (branch protection, a GitHub Environment) belong to this intent, now that the public repository has them? | answered by the owner on 2026-11-06, verbatim: "ok" (proposal A: `packages/pi/README.md` states the public facts only; locking down `pi/pkg-up` and `NPM_TOKEN` is a later change). Context checked: `NPM_TOKEN` is used only by `publish-pi.yml` (push to `pi/pkg-up` or `workflow_dispatch`), no `pull_request` workflow, and the owner is the only collaborator with write access. |
 
 ## 7. Acceptance
 

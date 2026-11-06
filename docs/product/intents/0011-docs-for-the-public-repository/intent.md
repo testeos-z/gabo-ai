@@ -35,7 +35,7 @@ Every new user installing the `gabo` CLI or an engine plugin, every owner who re
 
 | # | question | status |
 |---|---|---|
-| 1 | `packages/pi/README.md` records the owner's acceptance of the npm publishing risk partly because branch protection and GitHub Environments "are not available on this private repository's plan". Public repositories have them. Does locking down `pi/pkg-up` and `NPM_TOKEN` belong to this intent? | open, passed to the owner with a proposed answer (spec D2, open question 1) |
+| 1 | `packages/pi/README.md` records the owner's acceptance of the npm publishing risk partly because branch protection and GitHub Environments "are not available on this private repository's plan". Public repositories have them. Does locking down `pi/pkg-up` and `NPM_TOKEN` belong to this intent? | answered by the owner on 2026-11-06: "ok", proposal A (spec D2, open question 1) |
 
 ## Links
 
@@ -45,5 +45,5 @@ Every new user installing the `gabo` CLI or an engine plugin, every owner who re
 | intent issue | [#355 I0011: Docs for the public repository](https://github.com/testeos-z/gabo-ai/issues/355) |
 | PRD | [PRD](../../PRD.md) |
 | spec | [spec](spec.md) |
-| plan | not written yet (gabo-dev-lead) |
+| plan | [plan](plan.md) |
 | related intent | 0001-claude-code-plugin (open question 3, marketplace while private), 0006-engine-integration-at-init (the credential steps of the report, its open question 7), 0007-update-documentation-for-0-2-6 |
