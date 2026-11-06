@@ -88,9 +88,13 @@ func TestRuntimeCodexWritesTheSpecTOMLShape(t *testing.T) {
 	if !strings.HasPrefix(lines[0], "# gabo-version: ") {
 		t.Errorf("first line %q, want the # gabo-version: comment", lines[0])
 	}
+	// intent 0013 S6: the engine line follows the version line as a comment.
+	if len(lines) < 2 || lines[1] != "# gabo-engine: codex" {
+		t.Errorf("second line of\n%s\nwant # gabo-engine: codex", block)
+	}
 	for i, want := range []string{`name = "`, `description = "`, `developer_instructions = """`} {
-		if i+1 >= len(lines) || !strings.HasPrefix(lines[i+1], want) {
-			t.Errorf("line %d does not start with %q:\n%s", i+2, want, block)
+		if i+2 >= len(lines) || !strings.HasPrefix(lines[i+2], want) {
+			t.Errorf("line %d does not start with %q:\n%s", i+3, want, block)
 		}
 	}
 	if !strings.Contains(block, "\nLoad these skills by name before work: ") || !strings.HasSuffix(block, "\n\"\"\"") {
@@ -134,6 +138,23 @@ func TestRuntimeCodexFillsEverySlot(t *testing.T) {
 			t.Errorf("%s: missing %q", runtimeCodex, s)
 		}
 	}
+}
+
+// intent 0013 S6: the skill fills {{engine}} with codex, writes it as a TOML
+// comment after the version comment and strips both lines from the body.
+func TestRuntimeCodexFillsTheEngineSlot(t *testing.T) {
+	t.Parallel()
+	doc := runtimeCodexDoc(t)
+	for _, s := range []string{
+		"| `{{" + engineSlot + "}}` | `codex`",
+		"`# gabo-engine: codex` is the template's engine line moved into a TOML comment",
+		"the filled template without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", runtimeCodex, s)
+		}
+	}
+	mustLackIn(t, runtimeCodex, doc, "without its first line `gabo-version: …` and the blank line after it")
 }
 
 // The reviewer stays out of the project (D20) and the skill writes no
@@ -227,7 +248,7 @@ func TestRuntimeCodexWritesTheAssistantEntry(t *testing.T) {
 	t.Parallel()
 	section := codexMainSession(t)
 	for _, s := range []string{
-		"When `runtimes.assistant` is `codex`",
+		"When `codex` is listed in `runtimes.assistant` (one engine or a list, intent 0013 S4)",
 		"make `.agents/skills/gabo-assistant` a relative symlink to `../../.gabo/skills/gabo-assistant`",
 		"`main_session.block` of `.gabo/skills/gabo-agent-templates/agents.yaml`",
 		"`.gabo/skills/gabo-assistant/SKILL.md`",
@@ -268,11 +289,12 @@ func TestRuntimeCodexRemovesStaleEntries(t *testing.T) {
 	t.Parallel()
 	section := codexMainSession(t)
 	for _, s := range []string{
-		"When `runtimes.assistant` is not `codex`, remove its block",
-		"removes the shared link only when no declared engine using .agents/skills is runtimes.assistant",
-		"On every build, remove the gabo entry of every other full-tier engine in the Main-Session Entry table of `gabo-agent-templates`",
+		"When `codex` is not listed in `runtimes.assistant`, remove its block",
+		"a block is removed only when no engine listed in `runtimes.assistant` uses its file",
+		"removes the shared link only when no engine listed in `runtimes.assistant` uses `.agents/skills`",
+		"On every build, remove the gabo entry of every other full-tier engine in the Main-Session Entry table of `gabo-agent-templates` that is not listed in `runtimes.assistant`",
 		"recognized only by its gabo identity",
-		"except any link or block the row of the `runtimes.assistant` engine writes",
+		"except any link or block a listed engine's row writes",
 		"a file left empty is kept and reported, never deleted",
 		"an agent file `gabo-assistant` carrying a `gabo-version:` line",
 		"the `gabo-assistant` link to the catalog folder",
@@ -290,6 +312,32 @@ func TestRuntimeCodexRemovesStaleEntries(t *testing.T) {
 		if !strings.Contains(doc, s) {
 			t.Errorf("%s: missing %q", runtimeCodex, s)
 		}
+	}
+}
+
+// intent 0013 S4: Codex and Pi listed together share one block in the one
+// file both load; neither build removes the other's block, and no build
+// removes a listed engine's entry, whatever the rebuild order.
+func TestRuntimeCodexSharesTheBlockWithAListedPi(t *testing.T) {
+	t.Parallel()
+	section := codexMainSession(t)
+	for _, s := range []string{
+		"When `pi` is listed too, the one block serves both",
+		"remove a gabo block from `CLAUDE.md` too",
+		"neither build removes the other's block",
+		"A build never removes the entry of another engine listed in `runtimes.assistant`, so rebuilding the listed engines in any order leaves every listed entry in place",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s Main-Session Entry: missing %q", runtimeCodex, s)
+		}
+	}
+	mustLackIn(t, runtimeCodex+" Main-Session Entry", section,
+		"When `runtimes.assistant` is `codex`",
+		"When `runtimes.assistant` is not `codex`",
+		"is runtimes.assistant",
+	)
+	if want := "with a list, while any engine listed in `runtimes.assistant` uses it (intent 0013 S4)"; !strings.Contains(runtimeCodexDoc(t), want) {
+		t.Errorf("%s: missing %q", runtimeCodex, want)
 	}
 }
 

@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -106,7 +107,7 @@ func TestRuntimeBuilderNamesTheRuntimeSkillShape(t *testing.T) {
 			t.Errorf("## Runtime Skill Shape: capability %s not named", c)
 		}
 	}
-	for _, s := range agentSlots {
+	for _, s := range append(slices.Clone(agentSlots), engineSlot) {
 		if !strings.Contains(shape, "`{{"+s+"}}`") {
 			t.Errorf("## Runtime Skill Shape: does not say how to fill {{%s}}", s)
 		}
@@ -227,4 +228,38 @@ func TestRuntimeBuilderKeepsTheFlexibleTierKeyWrite(t *testing.T) {
 			t.Errorf("step 6: missing %q", s)
 		}
 	}
+}
+
+// intent 0013 S4, S6: a builder-written runtime skill fills {{engine}} with
+// its own engine, builds its main-session entry when its engine is listed in
+// runtimes.assistant (keeping its own key write, intent 0010 D4) and never
+// removes a listed engine's entry, so rebuilds in either order keep both.
+func TestRuntimeBuilderBuildsEveryListedEntry(t *testing.T) {
+	t.Parallel()
+	step5 := runtimeBuilderLine(t, "5. **Spec agents.**")
+	for _, s := range []string{
+		"`gabo-engine: <engine>`",
+		"without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them",
+	} {
+		if !strings.Contains(step5, s) {
+			t.Errorf("step 5: missing %q", s)
+		}
+	}
+	step6 := runtimeBuilderLine(t, "6. **Main-session entry.**")
+	for _, s := range []string{
+		"When `<engine>` is listed in `runtimes.assistant` (one engine or a list, intent 0013 S4)",
+		"every other full-tier engine not listed in `runtimes.assistant`",
+		"never removes the entry of another engine listed in `runtimes.assistant`",
+		"with `runtimes.assistant: [claude, <engine>]`, rebuilding either engine first leaves both entries",
+		"keeps writing its own key while `<engine>` is listed (intent 0010 D4)",
+	} {
+		if !strings.Contains(step6, s) {
+			t.Errorf("step 6: missing %q", s)
+		}
+	}
+	mustContain(t, runtimeBuilderDoc(t),
+		"`{{engine}}` as `<engine>`, the engine as written in `gabo.yaml`",
+		"the main-session entry when `<engine>` is listed in `runtimes.assistant` and the removal of every other full-tier engine's gabo entry not listed in `runtimes.assistant`",
+	)
+	mustLackIn(t, runtimeBuilder, runtimeBuilderDoc(t), "When `runtimes.assistant` is `<engine>`")
 }
