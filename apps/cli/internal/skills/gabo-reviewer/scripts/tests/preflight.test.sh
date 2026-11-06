@@ -251,4 +251,51 @@ check "another head has no verdict comment" helpers "! has_verdict_comment '$com
 check "another login's marker is not a verdict" \
   env HOME="$fake_home" REVIEWER_BOT_LOGIN=stranger bash -c "source '$skill/common.sh'; ! has_verdict_comment \"\$1\" $sha" _ "$comments"
 
+
+echo "# engine set"
+# A copy of the rows of engineSetRows in
+# apps/cli/internal/engineconfig/engines_test.go (intent 0013 S2, D2):
+# coder|reviewer|assistant|the set in role order. declared_agent_dirs
+# mirrors engineconfig.Engines: each engine of the set gives its agent dir,
+# session gives none. Every runtime skill, session's too, declares
+# .<engine>/agents so a stray engine shows up.
+engine_rows=(
+  "session|opencode|[claude, pi]|opencode claude pi"
+  "claude|session|[claude, pi]|claude pi"
+  "session|session|[pi]|pi"
+  "pi|pi|[codex, claude]|pi codex claude"
+  "claude|claude|claude|claude"
+  "pi|claude|claude|pi claude"
+  "codex|claude|pi|codex claude pi"
+  "codex|opencode||codex opencode"
+)
+# engine_base <dir> <coder> <reviewer> <assistant>: a reviewer checkout of
+# the integration branch with that runtimes block and every runtime skill.
+engine_base() {
+  local e
+  mkdir -p "$1"
+  {
+    echo "runtimes:"
+    echo "  coder: $2"
+    echo "  reviewer: $3"
+    [[ -z "$4" ]] || echo "  assistant: $4"
+  } >"$1/gabo.yaml"
+  for e in claude codex opencode pi session; do
+    mkdir -p "$1/.gabo/skills/gabo-runtime-$e"
+    printf -- '---\nname: gabo-runtime-%s\nmetadata:\n  agent_dir: .%s/agents\n---\n' "$e" "$e" >"$1/.gabo/skills/gabo-runtime-$e/SKILL.md"
+  done
+}
+agent_dirs() { HOME="$fake_home" bash -c "source '$skill/common.sh'; BASE_DIR='$1'; declared_agent_dirs | paste -sd' ' -"; }
+i=0
+for row in "${engine_rows[@]}"; do
+  i=$((i + 1))
+  IFS='|' read -r coder reviewer assistant set <<<"$row"
+  engine_base "$work/engines-$i" "$coder" "$reviewer" "$assistant"
+  want="$(for e in $set; do echo ".$e/agents/"; done | sort -u | paste -sd' ' -)"
+  expect_eq "$want" "$(agent_dirs "$work/engines-$i")" "engine set of coder $coder, reviewer $reviewer, assistant ${assistant:-none}"
+done
+engine_base "$work/engines-block" session opencode ""
+printf '  assistant:\n    - claude\n    - pi\n' >>"$work/engines-block/gabo.yaml"
+expect_eq ".claude/agents/ .opencode/agents/ .pi/agents/" "$(agent_dirs "$work/engines-block")" "a block list of assistants"
+
 finish

@@ -379,3 +379,23 @@ func TestOpencodeBuiltAgentSkillsIgnoreTheDirectory(t *testing.T) {
 		})
 	}
 }
+
+// Intent 0013 S5: a fixed reviewer engine beside listed assistants is in
+// the set: reviewer opencode with no OpenCode agents fails with the agents
+// line for opencode, and the OpenCode depth rule applies; session is no
+// engine.
+func TestOpencodeReviewerBesideListedAssistantsNeedsItsAgents(t *testing.T) {
+	t.Parallel()
+	p := with(project(), map[string]string{
+		".gabo/skills/gabo-runtime-pi/SKILL.md":       strings.Replace(claudeSkill, "gabo-runtime-claude", "gabo-runtime-pi", 1),
+		".gabo/skills/gabo-runtime-opencode/SKILL.md": strings.NewReplacer("gabo-runtime-claude", "gabo-runtime-opencode", ".claude/agents", ".opencode/agents").Replace(claudeSkill),
+		".pi/settings.json":                           piKeysJSON,
+	})
+	cfg := withRuntimes(t, validConfig, "  coder: session\n  reviewer: opencode\n  assistant: [claude, pi]\n")
+	r := run(t, p, configFiles{projectFile: cfg}, Settings{})
+	wantFailed(t, r, "✗ agent alpha missing", "why: no file named alpha in .opencode/agents (runtime opencode)")
+	noLineWith(t, r, "runtime session")
+	if !strings.Contains(joined(r), "✗ "+subagentDepthKey) {
+		t.Fatalf("no OpenCode depth line:\n%s", joined(r))
+	}
+}

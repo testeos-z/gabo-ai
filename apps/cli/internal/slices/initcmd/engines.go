@@ -10,6 +10,7 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	projectconfig "github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
@@ -31,8 +32,12 @@ var engineFiles = map[string]string{
 }
 
 // engineSet reads the engine set and the assistant engine from the
-// runtimes mapping of gabo.yaml (S1; intent 0010 D1). It needs only YAML
-// and that mapping, not a fully valid config.
+// runtimes mapping of gabo.yaml (S1; intent 0010 D1): the set is
+// engineconfig.Engines of the roles (intent 0013 S2) in the fixed order of
+// engineconfig.Set. runtimes.assistant is one engine or a list; only a
+// one-engine assistant is the assistant engine here, so a list leaves every
+// main-session key alone. It needs only YAML and that mapping, not a fully
+// valid config.
 func engineSet(b []byte) ([]string, string, error) {
 	var doc struct {
 		Runtimes yaml.Node `yaml:"runtimes"`
@@ -44,15 +49,19 @@ func engineSet(b []byte) ([]string, string, error) {
 		return nil, "", errors.New("has no runtimes mapping")
 	}
 	var rt struct {
-		Coder     string `yaml:"coder"`
-		Reviewer  string `yaml:"reviewer"`
-		Assistant string `yaml:"assistant"`
+		Coder     string                    `yaml:"coder"`
+		Reviewer  string                    `yaml:"reviewer"`
+		Assistant projectconfig.RuntimeList `yaml:"assistant"`
 	}
 	if err := doc.Runtimes.Decode(&rt); err != nil {
 		return nil, "", fmt.Errorf("runtimes cannot be read (%v)", err)
 	}
-	assistant := strings.TrimSpace(rt.Assistant)
-	return engineconfig.Set(rt.Coder, rt.Reviewer, rt.Assistant), assistant, nil
+	assistants := make([]string, len(rt.Assistant))
+	for i, a := range rt.Assistant {
+		assistants[i] = string(a)
+	}
+	assistant := strings.TrimSpace(string(rt.Assistant.Single()))
+	return engineconfig.Set(engineconfig.Engines(rt.Coder, rt.Reviewer, assistants)...), assistant, nil
 }
 
 // engineStep runs each engine's rule in set order and writes each changed

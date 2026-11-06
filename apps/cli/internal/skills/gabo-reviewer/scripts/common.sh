@@ -410,12 +410,16 @@ sync_base() {
   ) 7>"$STATE/locks/mirror.lock"
 }
 
-# declared_agent_dirs: the agent directories that the runtime skills of
-# runtimes.{coder, reviewer, assistant} declare (metadata.agent_dir), from
-# the catalog copy on the integration branch, one per line with a final "/".
+# declared_agent_dirs: the agent directories that the runtime skills of the
+# engine set declare (metadata.agent_dir), from the catalog copy on the
+# integration branch, one per line with a final "/". The engine set mirrors
+# engineconfig.Engines (intent 0013 S2, D2): runtimes.coder, runtimes.reviewer
+# and every engine listed in runtimes.assistant, each once; session adds no
+# engine.
 declared_agent_dirs() {
   local y="$BASE_DIR/gabo.yaml" rt f d
-  for rt in $({ yaml_get "$y" runtimes.coder; yaml_get "$y" runtimes.reviewer; yaml_get "$y" runtimes.assistant; } | sort -u); do
+  for rt in $({ yaml_get "$y" runtimes.coder; yaml_get "$y" runtimes.reviewer; yaml_get "$y" runtimes.assistant; } |
+    awk '$0 != "" && $0 != "session" && !seen[$0]++'); do
     for f in "$BASE_DIR"/.gabo/{skills,runtimes}/gabo-runtime-"$rt"/SKILL.md; do
       d="$(frontmatter_get "$f" metadata.agent_dir | head -n 1)"
       [[ -n "$d" ]] && printf '%s/\n' "${d%/}"
