@@ -1,54 +1,11 @@
 package check
 
 import (
-	"io/fs"
-	"path"
 	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
-
-	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
-	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 )
-
-// piConfig runs every role on Pi.
-const piConfig = `repo:
-  name: o/r
-  integration_branch: dev
-runtimes:
-  coder: pi
-  reviewer: pi
-  assistant: pi
-parallelism: 3
-review:
-  checks: [go test ./...]
-  human_only_paths: [.github/]
-`
-
-// piBuilt is a project with the real embedded catalog and every spec agent
-// built as .pi/agents/<id>.md with a frontmatter name, a gabo-version line
-// and a Skills: line.
-func piBuilt(t *testing.T, version string) fstest.MapFS {
-	t.Helper()
-	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n")}
-	files, err := skills.Files()
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, f := range files {
-		proj[path.Join(CatalogDir, f.Path)] = &fstest.MapFile{Data: f.Data}
-	}
-	spec, err := agentspec.Load(skills.Catalog())
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, a := range spec.Agents {
-		proj[".pi/agents/"+a.ID+".md"] = file("---\nname: " + a.ID + "\ndescription: " + a.Role + "\n---\n" +
-			"<!-- gabo-version: " + version + " -->\nSkills: " + strings.Join(a.Skills, ", ") + "\n")
-	}
-	return proj
-}
 
 // replaceIn rewrites old to repl once in the project file, which must hold old.
 func replaceIn(t *testing.T, proj fstest.MapFS, name, old, repl string) fstest.MapFS {
@@ -68,11 +25,6 @@ func wantConsecutive(t *testing.T, r Report, lines ...string) {
 	if i < 0 || i+len(lines) > len(r.Lines) || !slices.Equal(r.Lines[i:i+len(lines)], lines) {
 		t.Fatalf("output lacks consecutive lines %q:\n%s", lines, joined(r))
 	}
-}
-
-func runPi(t *testing.T, proj fs.FS, s Settings) Report {
-	t.Helper()
-	return run(t, proj, configFiles{projectFile: piConfig}, s)
 }
 
 // S6: an agent whose declared name differs from its spec id fails, for each
