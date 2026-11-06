@@ -25,8 +25,64 @@ const (
 	RuntimeOpencode Runtime = "opencode"
 )
 
-// runtimes lists every supported runtime; each role accepts all of them.
+// RuntimeSession in runtimes.coder or runtimes.reviewer runs that role in
+// the main session, on the engines of runtimes.assistant (intent 0013 S1).
+// It names no engine, so runtimes.assistant refuses it.
+const RuntimeSession Runtime = "session"
+
+// runtimes lists every supported engine; each role accepts all of them.
 var runtimes = []Runtime{RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode}
+
+// RuntimeList is runtimes.assistant: one engine or a list of engines. A
+// scalar decodes to a one-item list; an absent, null or empty scalar to nil
+// (missing); an explicit empty list to an empty, non-nil list (invalid).
+type RuntimeList []Runtime
+
+// UnmarshalYAML accepts a scalar or a sequence of scalars.
+func (l *RuntimeList) UnmarshalYAML(n *yaml.Node) error {
+	switch n.Kind {
+	case yaml.ScalarNode:
+		var r Runtime
+		if err := n.Decode(&r); err != nil {
+			return err
+		}
+		*l = nil
+		if r != "" {
+			*l = RuntimeList{r}
+		}
+		return nil
+	case yaml.SequenceNode:
+		out := RuntimeList{}
+		for _, item := range n.Content {
+			if item.Kind != yaml.ScalarNode {
+				return fmt.Errorf("line %d: runtimes.assistant entries must be engine names", item.Line)
+			}
+			out = append(out, Runtime(item.Value))
+		}
+		*l = out
+		return nil
+	}
+	return fmt.Errorf("line %d: runtimes.assistant must be an engine or a list of engines", n.Line)
+}
+
+// MarshalYAML writes one engine as a scalar, as 0.2.10 did, and nil as null.
+func (l RuntimeList) MarshalYAML() (any, error) {
+	switch {
+	case l == nil:
+		return nil, nil
+	case len(l) == 1:
+		return l[0], nil
+	}
+	return []Runtime(l), nil
+}
+
+// Single returns the engine of a one-item list and "" for any other list.
+func (l RuntimeList) Single() Runtime {
+	if len(l) == 1 {
+		return l[0]
+	}
+	return ""
+}
 
 // Config is the validated content of gabo.yaml.
 type Config struct {
@@ -68,11 +124,12 @@ type Coder struct {
 	Login string `yaml:"login"`
 }
 
-// Runtimes selects the runtime per role.
+// Runtimes selects the runtime per role. Coder and Reviewer hold one engine
+// or RuntimeSession; Assistant holds one engine or a list (intent 0013 D1).
 type Runtimes struct {
-	Coder     Runtime `yaml:"coder"`
-	Reviewer  Runtime `yaml:"reviewer"`
-	Assistant Runtime `yaml:"assistant"`
+	Coder     Runtime     `yaml:"coder"`
+	Reviewer  Runtime     `yaml:"reviewer"`
+	Assistant RuntimeList `yaml:"assistant"`
 }
 
 // Repo is the target GitHub repository.
@@ -180,6 +237,51 @@ func (c Config) Marshal() ([]byte, error) {
 	return b, nil
 }
 
+// engineChoice is the message part naming the four engines.
+var engineChoice = fmt.Sprintf("%q, %q, %q, %q", RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode)
+
+type fieldError struct{ field, msg string }
+
+// runtimeErrors validates the runtimes block (intent 0013 S1): a single
+// value keeps its 0.2.10 message; a list, session and the session rule get
+// their own message with the next step.
+func (c Config) runtimeErrors() []fieldError {
+	var errs []fieldError
+	fail := func(field, msg string) { errs = append(errs, fieldError{field, msg}) }
+	unknown := func(field string, r Runtime) {
+		fail(field, fmt.Sprintf("must be one of %s, got %q", engineChoice, r))
+	}
+	for _, role := range []struct {
+		field string
+		value Runtime
+	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.reviewer", c.Runtimes.Reviewer}} {
+		switch {
+		case role.value == RuntimeSession && c.Runtimes.Assistant == nil:
+			fail(role.field, fmt.Sprintf("%q is valid only with runtimes.assistant set; next: set runtimes.assistant or name an engine for %s", RuntimeSession, role.field))
+		case role.value != RuntimeSession && !slices.Contains(runtimes, role.value):
+			unknown(role.field, role.value)
+		}
+	}
+	const field = "runtimes.assistant"
+	list := c.Runtimes.Assistant
+	if list != nil && len(list) == 0 {
+		fail(field, fmt.Sprintf("must list at least one engine; next: set one of %s or a list of them", engineChoice))
+	}
+	for i, r := range list {
+		switch {
+		case r == RuntimeSession:
+			fail(field, fmt.Sprintf("%q is valid only in runtimes.coder and runtimes.reviewer; next: set the engine of the main session", RuntimeSession))
+		case !slices.Contains(runtimes, r) && len(list) == 1:
+			unknown(field, r)
+		case !slices.Contains(runtimes, r):
+			fail(field, fmt.Sprintf("entry %q must be one of %s; next: replace or remove it", r, engineChoice))
+		case slices.Index(list, r) < i && slices.Index(list[i+1:], r) < 0:
+			fail(field, fmt.Sprintf("%q is listed more than once; next: list each engine once", r))
+		}
+	}
+	return errs
+}
+
 // validate reports every missing required key first, then every invalid
 // value of a key that is set, and ends with NextSetup when a key was missing.
 func (c Config) validate(parallelismSet bool) error {
@@ -190,11 +292,8 @@ func (c Config) validate(parallelismSet bool) error {
 			errs = append(errs, fmt.Errorf("%s: %s", field, msg))
 		}
 	}
-	for _, rt := range []struct {
-		field string
-		value Runtime
-	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.reviewer", c.Runtimes.Reviewer}, {"runtimes.assistant", c.Runtimes.Assistant}} {
-		check(slices.Contains(runtimes, rt.value), rt.field, fmt.Sprintf("must be one of %q, %q, %q, %q, got %q", RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode, rt.value))
+	for _, e := range c.runtimeErrors() {
+		check(false, e.field, e.msg)
 	}
 	check(repoPattern.MatchString(c.Repo.Name), "repo.name", "must be owner/name")
 	check(branchPattern.MatchString(c.Repo.IntegrationBranch), "repo.integration_branch", "invalid branch name")

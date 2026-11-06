@@ -331,7 +331,7 @@ func (u *UseCase) adapterFolder(slot, adapter string) (string, bool) {
 
 func runtimesOf(cfg config.Config) []string {
 	var out []string
-	for _, rt := range []config.Runtime{cfg.Runtimes.Coder, cfg.Runtimes.Reviewer, cfg.Runtimes.Assistant} {
+	for _, rt := range append([]config.Runtime{cfg.Runtimes.Coder, cfg.Runtimes.Reviewer}, cfg.Runtimes.Assistant...) {
 		if rt != "" && !slices.Contains(out, string(rt)) {
 			out = append(out, string(rt))
 		}
