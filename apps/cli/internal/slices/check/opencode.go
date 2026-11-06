@@ -29,12 +29,14 @@ const (
 // checkSubagentDepth requires, when a role runs on OpenCode, the project's
 // experimental.subagent_depth at 3 or more in the first existing file of the
 // S8 lookup order (spec 0004 S11). It reads only the project, never the
-// user's ~/.config/opencode.
+// user's ~/.config/opencode. A missing key or a whole number below 3 is
+// what gabo init raises, so that line names gabo init (intent 0010 S6); a
+// value gabo init refuses to merge names setting it by hand.
 func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 	if !slices.Contains(runtimesOf(cfg), string(config.RuntimeOpencode)) {
 		return nil
 	}
-	file, why := opencodeNewConfig, "no project config"
+	file, why, byInit := opencodeNewConfig, "no project config", true
 	for _, name := range opencodeConfigs {
 		b, err := fs.ReadFile(u.project, name)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -43,42 +45,48 @@ func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
-		file, why = name, depthProblem(b)
+		file = name
+		why, byInit = depthProblem(b)
 		break
 	}
 	if why == "" {
 		return nil
 	}
-	r.fail(fmt.Sprintf("✗ %s must be %d or more in %s: %s", subagentDepthKey, minSubagentDepth, file, why),
-		fmt.Sprintf("next: set %s to %d in %s, then rerun gabo check", subagentDepthKey, minSubagentDepth, file))
+	next := fmt.Sprintf("next: set %s to %d in %s, then rerun gabo check", subagentDepthKey, minSubagentDepth, file)
+	if byInit {
+		next = fmt.Sprintf("next: run gabo init (it sets %s to %d in %s), then rerun gabo check", subagentDepthKey, minSubagentDepth, file)
+	}
+	r.fail(fmt.Sprintf("✗ %s must be %d or more in %s: %s", subagentDepthKey, minSubagentDepth, file, why), next)
 	return nil
 }
 
 // depthProblem returns why the config b does not set
-// experimental.subagent_depth to a whole number of 3 or more, or "".
-func depthProblem(b []byte) string {
+// experimental.subagent_depth to a whole number of 3 or more, or "", and
+// whether gabo init fixes it: a missing key or a whole number below 3.
+func depthProblem(b []byte) (string, bool) {
 	doc, err := parseJSONC(b)
 	if err != nil {
-		return "the file does not parse: " + err.Error()
+		return "the file does not parse: " + err.Error(), false
 	}
 	raw, ok := doc["experimental"]
 	if !ok {
-		return "not set"
+		return "not set", true
 	}
 	exp, ok := raw.(map[string]any)
 	if !ok {
-		return "experimental is not an object"
+		return "experimental is not an object", false
 	}
 	v, ok := exp["subagent_depth"]
 	if !ok {
-		return "not set"
+		return "not set", true
 	}
 	n, isNum := v.(float64)
-	if !isNum || n != float64(int64(n)) || n < minSubagentDepth {
+	whole := isNum && n == float64(int64(n))
+	if !whole || n < minSubagentDepth {
 		shown, _ := json.Marshal(v)
-		return "it is " + string(shown)
+		return "it is " + string(shown), whole
 	}
-	return ""
+	return "", false
 }
 
 // parseJSONC parses a JSON object that may hold // and /* */ comments and
