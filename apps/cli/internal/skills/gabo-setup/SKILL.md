@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-codex`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
+Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-codex`, `gabo-runtime-opencode`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
 
 ## Hard Rules
 
@@ -33,6 +33,8 @@ Load in the owner's agent (Claude Code, Pi or another engine) after the setup pr
 2. **Adapter.** For each slot, the owner points to an adapter (a catalog adapter such as `gabo-tasks-github`, or a skill or document they have), or co-writes one with you through `gabo-adapter-writer`. Check that every operation of `gabo-contract-<slot>` is explained; ask about each gap, one at a time.
 3. **Write the config.** Through `gabo-config-writer`: personal keys to the global user file, team keys and `slots.<slot>.adapter` to `gabo.yaml`, one key at a time, with its `gabo check` after each write.
 4. **Build the agents.** For each engine named in `runtimes.*`, load its runtime skill and build every agent of the neutral agent spec from `gabo-agent-templates`. An engine without a runtime skill in `.gabo/skills/`: run `gabo-runtime-builder` first; if it refuses the engine (no subagents or skills), report that runtime as not built.
+   - **Main-session entry.** The runtime skill of `runtimes.assistant` also writes the owner's main-session entry, as the Main-Session Entry table of `gabo-agent-templates` defines it: the default agent `gabo-assistant` with its one key (`agent` in `.claude/settings.json` for Claude Code, `default_agent` in the OpenCode project config), or the scoped block in `AGENTS.override.md`, `AGENTS.md` (or, for Pi, an existing `CLAUDE.md`) for Codex and Pi. Every runtime skill removes the gabo entry of every other full-tier engine it finds, so the entry follows `gabo.yaml`.
+   - **After you change `runtimes.assistant`, rebuild every agent through the runtime skill of each engine in `runtimes.*`**, the new assistant engine included, before step 5, so the new engine gets its entry and the old one loses it. Never write or remove the entry yourself.
 5. **Check.** Run `gabo check`, fix every failure it reports (a config key with `gabo-config-writer` and the owner, a coverage line with `gabo-adapter-writer`, a missing or stale agent with the runtime skill) and rerun `gabo check` until it passes. A failure you cannot fix without the owner is one question.
 6. **Smoke test.** For each configured slot, launch one subagent of the working kind (for example `gabo-coder`) that runs one harmless operation through the slot's adapter and reads the result back: `tasks` read one issue, `repository_host` read one PR status, `memory` see the memory probe below, `methodology` report its coder instructions, `reviewer_placement` report the placement, `agent_host` report where agents run. A slot whose operation fails stays unverified (APP_FLOW A3): the report names the failing operation, and you ask the owner how to fix the adapter; after the fix rerun `gabo check` and that slot's smoke test, nothing else.
    - **Memory probe.** The memory contract has no delete operation and no save under an arbitrary topic, so the probe uses the backend's own memory tool that the adapter names, and the report says so. With a backend that can delete, write a note only under a dedicated scratch topic `gabo/setup-probe/<timestamp>` (UTC), read it back, then delete it and check that the topic reads back nothing, so nothing stays in the project memory; a probe still there after one retry stays unverified and is reported with its key for the owner to remove. With a backend that has no delete operation, the probe writes nothing: it runs one read-only `search` through the adapter, and the R28 save in step 7, read back, is the write check.
@@ -42,7 +44,7 @@ Load in the owner's agent (Claude Code, Pi or another engine) after the setup pr
    - **Global context.** Scaffold it short, each document through the agent that owns it: a conceptual PRD (what the product offers and what the user gets) through `gabo-pm`; a TRD with conventions only through `gabo-dev-lead`; a `DESIGN.md` only if the app has a UI, through `gabo-frontend`; a `MIGRATIONS.md` only if the app has a database, through `gabo-db-master`; and an empty `docs/product/intents/`. There is no upfront schema, plan or stories: schema changes, UX, flow and tasks come per intent.
    - **Waves.** Ask about `wave.after` and write the answer through `gabo-config-writer`, with its `gabo check`: `next` chains to the next accepted intent when a wave ends, `wait` stops after the wave. Explain that the default is `wait`, that each wave runs one intent, and that there is no batch of accepted intents: the owner accepts each spec one at a time, and the production gate stays the owner's too.
    - **First intent.** Point the owner to creating the first intent through `gabo-pm`; setup writes no intent itself.
-9. Tell the owner which files changed (`gabo.yaml`, `.gabo/`, adapters, agent folders, `docs/product/`) so they can commit them; commit only if the owner asks.
+9. Tell the owner which files changed (`gabo.yaml`, `.gabo/`, adapters, agent folders, the main-session entry such as `.claude/settings.json` or `AGENTS.md`, `docs/product/`) so they can commit them; commit only if the owner asks.
 
 ## Shared memory
 
@@ -70,9 +72,11 @@ Run after a gabo upgrade (TRD 9.4), or when `gabo check` prints one of these lin
 | `✗ no stamp: run gabo init` | run `gabo init`, then rebuild every agent |
 | `✗ agent <id> built with <v>, catalog is <w>: ask your agent to rebuild` | rebuild every agent |
 | `✗ catalog version <w> is newer than gabo <v>` | rebuild nothing: report its `next:` upgrade command to the owner |
+| `✗ <file>: gabo assistant entry missing for <engine>` (or `incomplete`, or `duplicated`) | rebuild every agent; the runtime skill of `runtimes.assistant` rewrites the main-session entry |
+| `✗ <file>: gabo assistant entry for <engine>, but runtimes.assistant is <value>` | rebuild every agent; each runtime skill removes the gabo entry of every other full-tier engine |
 
 1. `gabo init` refreshes the catalog copy `.gabo/skills/` and the stamp `.gabo/VERSION` and reinstalls the user-level `gabo-reviewer` skill; it never touches the config, so ask no setup question again.
-2. For each engine in `runtimes.*`, rebuild every agent through its runtime skill, which rewrites each agent's `gabo-version` line.
+2. For each engine in `runtimes.*`, rebuild every agent through its runtime skill, which rewrites each agent's `gabo-version` line and the main-session entry.
 3. Then rerun `gabo check` and fix what fails until it passes, as in step 5.
 
 ## Output Contract

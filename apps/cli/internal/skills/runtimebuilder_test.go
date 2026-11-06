@@ -167,3 +167,22 @@ func TestRuntimeBuilderTeachesAgentPlaces(t *testing.T) {
 	mustContain(t, shape, "`metadata.agent_skills`", "`metadata.agent_name`",
 		"`frontmatter:<key>`", "`toml:<key>`", "`line:<prefix>`")
 }
+
+// Spec 0009 D5 and S7: a new runtime skill declares its main-session entry in
+// metadata.main_session, as the four shipped runtime skills do, or reports
+// that its engine has none (a flexible-tier engine then gets one warning).
+func TestRuntimeBuilderTeachesTheMainSessionMetadata(t *testing.T) {
+	t.Parallel()
+	mustContain(t, runtimeBuilderDoc(t),
+		"`metadata.main_session`",
+		"`kind: agent` with `config` (the project config files in resolution order) and `key` (the JSON key)",
+		"`kind: block` with `files` (the instructions files in resolution order)",
+		"`<agent_dir>/gabo-assistant.<ext>`",
+		"joined with \" or \"",
+		"report that `<engine>` has no main-session entry",
+		"`! runtime <engine>: gabo-runtime-<engine> declares no metadata.main_session; main-session entry not checked for <engine> (flexible tier)`",
+		"`✗ <file>: gabo assistant entry missing for <engine>`",
+		"Main-Session Entry", "`main_session.template`", "`main_session.block`",
+		"removes the gabo entry of every other full-tier engine",
+	)
+}
