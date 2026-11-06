@@ -48,6 +48,21 @@ func TestCommandGolden(t *testing.T) {
 			"AGENTS.md": "# Project\n\n" + assistantStart + "\nYou are the gabo assistant.\n" + assistantEnd + "\n",
 		})},
 	)
+	// Intent 0010 S6: the lines whose fix is gabo init name it, with the key
+	// and file of metadata.main_session.
+	assistantAgent := map[string]string{".claude/agents/gabo-assistant.md": "---\nname: gabo-assistant\ngabo-version: 1.2.3\n---\nbody\n"}
+	cases = append(cases,
+		tc{name: "main-session-key-only", edit: mainSessionEdit(assistantAgent)},
+		tc{name: "main-session-other-value", edit: mainSessionEdit(withEdits(assistantAgent, map[string]string{
+			".claude/settings.json": withJSONKey(claudeKeysJSON, "agent", "my-agent"),
+		}))},
+		tc{name: "main-session-stale-key", edit: mainSessionEdit(withEdits(assistantAgent, map[string]string{
+			".claude/settings.json": withJSONKey(claudeKeysJSON, "agent", "gabo-assistant"),
+			".gabo/skills/gabo-runtime-opencode/SKILL.md": "---\nname: gabo-runtime-opencode\nmetadata:\n  main_session:\n    kind: agent\n" +
+				"    config: [opencode.json, opencode.jsonc, .opencode/opencode.json, .opencode/opencode.jsonc]\n    key: default_agent\n---\n",
+			"opencode.json": `{"default_agent": "gabo-assistant"}`,
+		}))},
+	)
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
 	}
@@ -110,4 +125,11 @@ func mainSessionEdit(extra map[string]string) map[string]string {
 	}
 	maps.Copy(edit, extra)
 	return edit
+}
+
+// withEdits returns a copy of base with extra added.
+func withEdits(base, extra map[string]string) map[string]string {
+	out := maps.Clone(base)
+	maps.Copy(out, extra)
+	return out
 }

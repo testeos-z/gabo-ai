@@ -1,6 +1,8 @@
 package check
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
 // The markers around the scoped main-session block (spec 0009 S3).
@@ -99,12 +102,13 @@ func (u *UseCase) checkMainSession(r *Report, cfg config.Config) error {
 	if !ok {
 		return nil // reported by checkAgents
 	}
+	set := engineconfig.Set(runtimesOf(cfg)...)
 	if declaresMainSession(r, assistant, own) {
-		if err := u.checkAssistantEntry(r, assistant, own, spec); err != nil {
+		if err := u.checkAssistantEntry(r, set, assistant, own, spec); err != nil {
 			return err
 		}
 	}
-	return u.checkStaleEntries(r, assistant, own, *spec.MainSession)
+	return u.checkStaleEntries(r, set, assistant, own, *spec.MainSession)
 }
 
 // declaresMainSession reports whether the runtime skill declares
@@ -133,10 +137,12 @@ const (
 	pieceDuplicated
 )
 
-// piece is one part of the assistant's entry and the file it lives in.
+// piece is one part of the assistant's entry and the file it lives in;
+// next is the step that clears it, the rebuild when empty.
 type piece struct {
 	file  string
 	state pieceState
+	next  string
 }
 
 // checkAssistantEntry fails for each piece of the assistant engine's entry
@@ -145,7 +151,8 @@ type piece struct {
 // the first existing instructions file (kind block). A piece is "missing"
 // when nothing of the entry is there, else "incomplete"; two blocks are
 // "duplicated".
-func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, spec agentspec.Spec) error {
+// set is the engine set of runtimes.*, for the gabo init hints.
+func (u *UseCase) checkAssistantEntry(r *Report, set []string, rt string, meta runtimeMeta, spec agentspec.Spec) error {
 	m := spec.MainSession
 	var pieces []piece
 	if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) {
@@ -154,7 +161,7 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 			if u.linksTo(link, path.Join(CatalogDir, skill)) {
 				state = piecePresent
 			}
-			pieces = append(pieces, piece{link, state})
+			pieces = append(pieces, piece{file: link, state: state})
 		}
 	}
 	ms := meta.MainSession
@@ -171,11 +178,23 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 		if err != nil {
 			return err
 		}
-		state := pieceAbsent
-		if found && keyNames(b, ms.Key, m.ID) {
-			state = piecePresent
+		v, isSet := keyValue(b, found, ms.Key)
+		switch {
+		case isSet && v == any(m.ID):
+			pieces = append(pieces, piece{file: file, state: piecePresent})
+		case !fullTier(rt): // a flexible-tier runtime skill writes its own key (intent 0010 D4)
+			pieces = append(pieces, piece{file: file, state: pieceAbsent})
+		case isSet:
+			// The user's own value: gabo init keeps it (intent 0010 S6).
+			r.fail(fmt.Sprintf("✗ %s: %s is %s, not %s", file, ms.Key, jsonText(v), jsonText(m.ID)),
+				fmt.Sprintf("next: change %s to %s in %s, or remove it and run gabo init, then rerun gabo check", ms.Key, jsonText(m.ID), file))
+		default:
+			next, err := u.initMergeHint(set, rt, ms, m.ID, file)
+			if err != nil {
+				return err
+			}
+			pieces = append(pieces, piece{file: file, state: pieceAbsent, next: next})
 		}
-		pieces = append(pieces, piece{file, state})
 	case kindBlock:
 		file, b, found, err := u.firstExisting(ms.Files)
 		if err != nil {
@@ -185,7 +204,7 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 		if found {
 			state = blockState(string(b))
 		}
-		pieces = append(pieces, piece{file, state})
+		pieces = append(pieces, piece{file: file, state: state})
 	}
 	anyThere := slices.ContainsFunc(pieces, func(p piece) bool { return p.state != pieceAbsent })
 	for _, p := range pieces {
@@ -200,9 +219,129 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 		default:
 			continue
 		}
-		r.fail("✗ "+p.file+": gabo assistant entry "+word+" for "+rt, NextRebuild)
+		next := p.next
+		if next == "" {
+			next = NextRebuild
+		}
+		r.fail("✗ "+p.file+": gabo assistant entry "+word+" for "+rt, next)
 	}
 	return nil
+}
+
+// initMergeHint is the step that clears a full-tier engine's missing
+// main-session key (intent 0010 S6): gabo init writes it, so the hint names
+// gabo init and the one file it writes, a new one when none exists; when
+// gabo init would refuse a file, the hint is its reason, so following it
+// never loops (D7).
+func (u *UseCase) initMergeHint(set []string, rt string, ms *mainSessionMeta, id, file string) (string, error) {
+	run, err := u.initDryRun(set, rt, rt, ms.Config)
+	if err != nil {
+		return "", err
+	}
+	if name, reason, ok := run.refusal(file, ms.Config); ok {
+		return initRefusalHint(name, reason), nil
+	}
+	for _, name := range ms.Config {
+		if keyNames(run.after(name), ms.Key, id) {
+			return fmt.Sprintf("next: run gabo init (it merges %s: %s into %s), then rerun gabo check", jsonText(ms.Key), jsonText(id), name), nil
+		}
+	}
+	return fmt.Sprintf("next: set %s to %s in %s, then rerun gabo check", ms.Key, jsonText(id), file), nil
+}
+
+// initRun is what gabo init's engine step would do, run in memory: the
+// files it read, the bytes it would write and the files it refuses, each
+// with gabo init's reason.
+type initRun struct {
+	read, writes map[string][]byte
+	refusals     map[string]string
+}
+
+// initDryRun runs gabo init's pure rule for engine on the project's files,
+// in memory, as gabo init runs it: the engine's rule when it is in set,
+// else the removals of the engines not in set. It writes nothing.
+func (u *UseCase) initDryRun(set []string, engine, assistant string, files []string) (initRun, error) {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: u.s.Version, Assistant: assistant}
+	for _, name := range files {
+		b, err := fs.ReadFile(u.project, name)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return initRun{}, fmt.Errorf("read %s: %w", name, err)
+		}
+		in.Files[name] = b
+	}
+	report, writes := engineconfig.Remove(set, in)
+	if slices.Contains(set, engine) {
+		report, writes = engineconfig.Integrate([]string{engine}, in)
+	}
+	run := initRun{read: in.Files, writes: writes, refusals: map[string]string{}}
+	for _, s := range report.Sections {
+		for _, l := range s.Lines {
+			for _, name := range files {
+				if reason, ok := strings.CutPrefix(l, engineconfig.FailurePrefix+" "+name+": "); ok {
+					reason, _, _ = strings.Cut(reason, "; fix it and run gabo init again")
+					run.refusals[name] = reason
+				}
+			}
+		}
+	}
+	return run, nil
+}
+
+// after returns the bytes file would hold after the run, nil when absent.
+func (r initRun) after(file string) []byte {
+	if b, ok := r.writes[file]; ok {
+		return b
+	}
+	return r.read[file]
+}
+
+// refusal returns the file gabo init refuses, file itself first, then the
+// first of order, and gabo init's reason.
+func (r initRun) refusal(file string, order []string) (string, string, bool) {
+	for _, name := range append([]string{file}, order...) {
+		if reason, ok := r.refusals[name]; ok {
+			return name, reason, true
+		}
+	}
+	return "", "", false
+}
+
+// initRefusalHint is the step for a file gabo init refuses to merge.
+func initRefusalHint(file, reason string) string {
+	return "next: fix " + file + " (" + reason + "), then run gabo init and rerun gabo check"
+}
+
+// initRemoveHint is the step that clears another full-tier engine's gabo
+// main-session key (intent 0010 S6): gabo init removes it, so the hint names
+// gabo init; when gabo init would refuse a file it names gabo init's
+// reason, and when gabo init would leave the key (a file it does not parse
+// and does not own) it names removing the key by hand, so no hint loops (D7).
+func (u *UseCase) initRemoveHint(set []string, rt, assistant string, ms *mainSessionMeta, id, file string) (string, error) {
+	run, err := u.initDryRun(set, rt, assistant, ms.Config)
+	if err != nil {
+		return "", err
+	}
+	if name, reason, ok := run.refusal(file, ms.Config); ok {
+		return initRefusalHint(name, reason), nil
+	}
+	if !keyNames(run.after(file), ms.Key, id) {
+		return fmt.Sprintf("next: run gabo init (it removes %s: %s from %s), then rerun gabo check", jsonText(ms.Key), jsonText(id), file), nil
+	}
+	return fmt.Sprintf("next: remove %s: %s from %s, then rerun gabo check", jsonText(ms.Key), jsonText(id), file), nil
+}
+
+// jsonText renders v as compact JSON, without HTML escaping.
+func jsonText(v any) string {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return fmt.Sprint(v)
+	}
+	return strings.TrimSuffix(b.String(), "\n")
 }
 
 // agentFilePiece finds the main-session agent file <dir>/<id>.<ext>; a
@@ -213,7 +352,7 @@ func (u *UseCase) agentFilePiece(dir, id string, spec agentspec.Spec) (piece, er
 		return piece{}, err
 	}
 	if names := files[id]; len(names) > 0 {
-		return piece{path.Join(dir, names[0]), piecePresent}, nil
+		return piece{file: path.Join(dir, names[0]), state: piecePresent}, nil
 	}
 	ext := ".md"
 	for _, a := range spec.IDs() {
@@ -222,7 +361,7 @@ func (u *UseCase) agentFilePiece(dir, id string, spec agentspec.Spec) (piece, er
 			break
 		}
 	}
-	return piece{path.Join(dir, id+ext), pieceAbsent}, nil
+	return piece{file: path.Join(dir, id+ext), state: pieceAbsent}, nil
 }
 
 // firstExisting reads the first existing file of order; when none exists it
@@ -244,12 +383,22 @@ func (u *UseCase) firstExisting(order []string) (string, []byte, bool, error) {
 // keyNames reports whether the JSON (or JSONC) config b sets the top-level
 // key to exactly id.
 func keyNames(b []byte, key, id string) bool {
+	v, set := keyValue(b, true, key)
+	return set && v == any(id)
+}
+
+// keyValue returns the top-level key of the JSON (or JSONC) config b and
+// whether it is set; a missing or unparsable file sets nothing.
+func keyValue(b []byte, found bool, key string) (any, bool) {
+	if !found {
+		return nil, false
+	}
 	doc, err := parseJSONC(b)
 	if err != nil {
-		return false
+		return nil, false
 	}
-	v, ok := doc[key].(string)
-	return ok && v == id
+	v, ok := doc[key]
+	return v, ok
 }
 
 // blockState classifies the scoped blocks in an instructions file.
@@ -287,7 +436,7 @@ func (u *UseCase) linksTo(link, want string) bool {
 // agent_dir and a file its own entry uses are the assistant's, never stale
 // (Codex and Pi share AGENTS.md). Each path is reported once, for the first
 // runtime skill in catalog order that declares it.
-func (u *UseCase) checkStaleEntries(r *Report, assistant string, own runtimeMeta, m agentspec.MainSessionEntry) error {
+func (u *UseCase) checkStaleEntries(r *Report, set []string, assistant string, own runtimeMeta, m agentspec.MainSessionEntry) error {
 	entries, err := fs.ReadDir(u.project, CatalogDir)
 	if err != nil {
 		return nil // reported by checkAgents
@@ -295,12 +444,12 @@ func (u *UseCase) checkStaleEntries(r *Report, assistant string, own runtimeMeta
 	ownFiles := own.MainSession.files()
 	ownSkillDir, ownAgentDir := path.Clean(own.SkillDir), path.Clean(own.AgentDir)
 	var reported []string
-	stale := func(file, rt string) {
+	stale := func(file, rt, next string) {
 		if slices.Contains(reported, file) {
 			return
 		}
 		reported = append(reported, file)
-		r.fail("✗ "+file+": gabo assistant entry for "+rt+", but runtimes.assistant is "+assistant, NextRebuild)
+		r.fail("✗ "+file+": gabo assistant entry for "+rt+", but runtimes.assistant is "+assistant, next)
 	}
 	for _, e := range entries {
 		rt, ok := strings.CutPrefix(e.Name(), "gabo-runtime-")
@@ -318,7 +467,7 @@ func (u *UseCase) checkStaleEntries(r *Report, assistant string, own runtimeMeta
 		if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) && dir != ownSkillDir {
 			for _, skill := range m.Skills {
 				if link := path.Join(dir, skill); u.linksTo(link, path.Join(CatalogDir, skill)) {
-					stale(link, rt)
+					stale(link, rt, NextRebuild)
 				}
 			}
 		}
@@ -335,7 +484,7 @@ func (u *UseCase) checkStaleEntries(r *Report, assistant string, own runtimeMeta
 					return fmt.Errorf("read %s: %w", file, err)
 				}
 				if versionLine(b) != "none" {
-					stale(file, rt)
+					stale(file, rt, NextRebuild)
 				}
 			}
 		}
@@ -350,9 +499,16 @@ func (u *UseCase) checkStaleEntries(r *Report, assistant string, own runtimeMeta
 			if err != nil {
 				return fmt.Errorf("read %s: %w", file, err)
 			}
-			if ms.Kind == kindAgent && slices.Contains(ms.Config, file) && keyNames(b, ms.Key, m.ID) ||
-				ms.Kind == kindBlock && blockState(string(b)) != pieceAbsent {
-				stale(file, rt)
+			switch {
+			case ms.Kind == kindAgent && slices.Contains(ms.Config, file) && keyNames(b, ms.Key, m.ID):
+				// Only full-tier engines reach here: gabo init removes the key (intent 0010 S6).
+				next, err := u.initRemoveHint(set, rt, assistant, ms, m.ID, file)
+				if err != nil {
+					return err
+				}
+				stale(file, rt, next)
+			case ms.Kind == kindBlock && blockState(string(b)) != pieceAbsent:
+				stale(file, rt, NextRebuild)
 			}
 		}
 	}

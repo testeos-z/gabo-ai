@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ .claude/settings.json: agent is "my-agent", not "gabo-assistant"
+next: change agent to "gabo-assistant" in .claude/settings.json, or remove it and run gabo init, then rerun gabo check

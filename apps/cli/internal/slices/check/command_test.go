@@ -91,6 +91,36 @@ func TestCommandHelpNamesTheStricterRules(t *testing.T) {
 	}
 }
 
+// TestCommandHelpNamesTheGaboInitHints pins the help lines of the intent
+// 0010 S6 hints: each line whose fix is gabo init names it.
+func TestCommandHelpNamesTheGaboInitHints(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in",
+		"    a missing or lower whole value names \"run gabo init (it sets",
+		"    experimental.subagent_depth to 3 in <file>)\", any other value names setting",
+		"    (a full-tier runtime skill without it fails, a flexible-tier one warns).",
+		"    For a full-tier engine the key is gabo init's: a missing key names \"run gabo",
+		"    init (it merges \"<key>\": \"gabo-assistant\" into <file>)\", a key holding",
+		"    another value fails as \"<file>: <key> is \"<value>\", not \"gabo-assistant\"\"",
+		"    and names \"change <key> to \"gabo-assistant\" in <file>, or remove it and run",
+		"    gabo init\", and another engine's key names \"run gabo init (it removes",
+		"    \"<key>\": \"gabo-assistant\" from <file>)\"; every other piece, and a",
+		"    flexible-tier engine's key, names asking your agent to rebuild the agents;",
+		"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";",
+		"    a file gabo init refuses names \"fix <file> (<its reason>)\", and a key gabo",
+		"    init would leave as it is names setting or removing it by hand;",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 func runPreWrite(t *testing.T, proj fs.FS, args ...string) (string, error) {
 	t.Helper()
 	return runPreWriteStdin(t, proj, "", args...)
