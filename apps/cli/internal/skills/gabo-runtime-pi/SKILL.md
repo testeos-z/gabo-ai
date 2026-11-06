@@ -10,6 +10,9 @@ metadata:
   former_skill_dir: .pi/skills
   agent_skills: "line:Skills:"
   agent_name: frontmatter:name
+  main_session:
+    kind: block
+    files: [AGENTS.override.md, AGENTS.md, CLAUDE.md]
 ---
 ## Activation Contract
 

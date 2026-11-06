@@ -592,3 +592,12 @@ func TestRuntimeOpenCodeAllowsTheMainSessionKey(t *testing.T) {
 		}
 	}
 }
+
+// gabo check reads the main-session entry of OpenCode from its runtime skill
+// (spec 0009 D5): default_agent in the project config, in OpenCode's lookup
+// order.
+func TestRuntimeOpencodeDeclaresMainSession(t *testing.T) {
+	t.Parallel()
+	wantMainSession(t, runtimeOpenCode, mainSessionMeta{Kind: "agent",
+		Config: []string{"opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"}, Key: "default_agent"})
+}

@@ -291,3 +291,10 @@ func TestRuntimeCodexRemovesStaleEntries(t *testing.T) {
 		}
 	}
 }
+
+// gabo check reads the main-session entry of Codex from its runtime skill
+// (spec 0009 D5): the scoped block in AGENTS.override.md, else AGENTS.md.
+func TestRuntimeCodexDeclaresMainSession(t *testing.T) {
+	t.Parallel()
+	wantMainSession(t, runtimeCodex, mainSessionMeta{Kind: "block", Files: []string{"AGENTS.override.md", "AGENTS.md"}})
+}

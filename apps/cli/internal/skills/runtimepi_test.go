@@ -279,3 +279,10 @@ func TestRuntimePiNamesTheMainSessionEntry(t *testing.T) {
 		"each other engine's entry removed or kept",
 	)
 }
+
+// gabo check reads the main-session entry of Pi from its runtime skill (spec
+// 0009 D5): the scoped block in the order T5 confirmed.
+func TestRuntimePiDeclaresMainSession(t *testing.T) {
+	t.Parallel()
+	wantMainSession(t, runtimePi, mainSessionMeta{Kind: "block", Files: []string{"AGENTS.override.md", "AGENTS.md", "CLAUDE.md"}})
+}
