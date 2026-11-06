@@ -129,6 +129,35 @@ func TestClaudeBuiltSetPassesCheck(t *testing.T) {
 	wantPassed(t, r, PassedLine)
 }
 
+// Spec 0009 D4: the main-session agent file beside the spec agents is no
+// spec agent, so gabo check reports no missing or extra agent for it.
+func TestClaudeBuiltSetWithTheMainSessionAgentPassesCheck(t *testing.T) {
+	t.Parallel()
+	proj := claudeBuilt(t, "1.2.3")
+	spec, err := agentspec.Load(skills.Catalog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.MainSession == nil {
+		t.Fatal("embedded spec has no main_session entry")
+	}
+	body, err := fs.ReadFile(skills.Catalog(), path.Join(agentspec.Dir, spec.MainSession.Template))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, rest, _ := strings.Cut(string(body), "\n")
+	proj[".claude/agents/"+spec.MainSession.ID+".md"] = file("---\nname: " + spec.MainSession.ID +
+		"\ndescription: '" + strings.ReplaceAll(spec.MainSession.Role, "'", "''") + "'\nskills:\n  - gabo-assistant\ngabo-version: 1.2.3\n---\n" +
+		strings.TrimPrefix(rest, "\n"))
+	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+	for _, line := range r.Lines {
+		if strings.Contains(line, "agent") && strings.Contains(line, spec.MainSession.ID) {
+			t.Errorf("unexpected line %q", line)
+		}
+	}
+	wantPassed(t, r, PassedLine)
+}
+
 func TestClaudeBuiltSetFromAnotherVersionFails(t *testing.T) {
 	t.Parallel()
 	r := run(t, with(claudeBuilt(t, "1.2.3"), map[string]string{".gabo/VERSION": "1.2.4\n"}), configFiles{projectFile: validConfig}, Settings{Version: "1.2.4"})
