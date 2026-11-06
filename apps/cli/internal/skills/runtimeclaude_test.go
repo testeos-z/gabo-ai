@@ -296,10 +296,11 @@ func TestRuntimeClaudeWritesTheMainSessionEntry(t *testing.T) {
 	t.Parallel()
 	section := mainSessionSection(t)
 	for _, s := range []string{
-		"`runtimes.assistant` is `claude`",
+		"When `claude` is listed in `runtimes.assistant`",
 		"`.claude/skills/gabo-assistant`", "`../../.gabo/skills/gabo-assistant`",
 		"`.claude/agents/gabo-assistant.md`", "`main_session.template`", "`main_session.role`",
-		"gabo-version: <x.y.z, unquoted>", "the filled body without its first line `gabo-version: …`",
+		"gabo-version: <x.y.z, unquoted>\n   gabo-engine: claude\n",
+		"the filled body without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them",
 		"never an empty body",
 		"`.claude/settings.json`",
 		"a user's own `agent` value", "keep it and report it",
@@ -317,7 +318,7 @@ func TestRuntimeClaudeRemovesItsOwnEntry(t *testing.T) {
 	t.Parallel()
 	section := mainSessionSection(t)
 	for _, s := range []string{
-		"`runtimes.assistant` is not `claude`",
+		"When `claude` is not listed in `runtimes.assistant`",
 		"the `.claude/skills/gabo-assistant` symlink",
 		"`.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
 	} {
@@ -338,7 +339,8 @@ func TestRuntimeClaudeRemovesOtherEnginesEntries(t *testing.T) {
 		"`<!-- GABO_ASSISTANT_START -->`", "`<!-- GABO_ASSISTANT_END -->`",
 		"`AGENTS.override.md`", "`AGENTS.md`", "`CLAUDE.md`",
 		"`.opencode/agents/gabo-assistant.md`", "`.agents/skills/gabo-assistant`",
-		"never a piece the entry of `runtimes.assistant` also uses",
+		"that is not listed in `runtimes.assistant`",
+		"never a piece the entry of a listed engine also uses",
 	} {
 		if !strings.Contains(section, s) {
 			t.Errorf("%s Main-Session Entry: missing %q", runtimeClaude, s)
@@ -421,6 +423,54 @@ func TestRuntimeClaudeProbesTheMainSession(t *testing.T) {
 	} {
 		if !strings.Contains(step8, s) {
 			t.Errorf("%s step 8: missing %q", runtimeClaude, s)
+		}
+	}
+}
+
+// intent 0013 S6: the skill fills {{engine}} with `claude`, as written in
+// gabo.yaml, and writes it after gabo-version in the frontmatter of every
+// agent file, so gabo check can read which engine each file was built for.
+func TestRuntimeClaudeFillsTheEngineSlot(t *testing.T) {
+	t.Parallel()
+	doc := runtimeClaudeDoc(t)
+	mustContainIn(t, runtimeClaude, doc,
+		"| `{{"+engineSlot+"}}` | `claude`, the engine name as written in `gabo.yaml` |",
+		"gabo-version: <x.y.z, unquoted>\n   gabo-engine: claude\n   ---",
+		"the filled body without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them",
+	)
+	mustLackIn(t, runtimeClaude, doc, "without its first line `gabo-version: …`")
+}
+
+// intent 0013 S4: runtimes.assistant may list several engines; the skill
+// builds the Claude Code entry when claude is listed, removes another
+// full-tier engine's entry only when that engine is not listed, and keeps a
+// shared link or block while any listed engine uses it.
+func TestRuntimeClaudeKeepsEveryListedEntry(t *testing.T) {
+	t.Parallel()
+	section := mainSessionSection(t)
+	mustContainIn(t, runtimeClaude+" Main-Session Entry", section,
+		"`runtimes.assistant` is one engine or a list (intent 0013 S4)",
+		"A build never removes the entry of another listed engine",
+		"the shared `.agents/skills/gabo-assistant` link while Codex, OpenCode or Pi is listed in `runtimes.assistant`",
+		"a block in a file that Codex or Pi, when listed, uses",
+	)
+	doc := runtimeClaudeDoc(t)
+	mustLackIn(t, runtimeClaude, doc,
+		"`runtimes.assistant` is `claude`", "`runtimes.assistant` is not `claude`",
+		"that is not `runtimes.assistant`", "the entry of `runtimes.assistant`",
+	)
+	assertRemovalRulesSayNotListed(t, runtimeClaude, skillBody(t, doc))
+}
+
+// assertRemovalRulesSayNotListed fails each line of a runtime skill that
+// names `runtimes.assistant` in a removal rule without saying "not listed in
+// `runtimes.assistant`" (intent 0013 S4: grep -n 'runtimes.assistant').
+func assertRemovalRulesSayNotListed(t *testing.T, name, body string) {
+	t.Helper()
+	for _, l := range strings.Split(body, "\n") {
+		if strings.Contains(l, "`runtimes.assistant`") && strings.Contains(strings.ToLower(l), "remove") &&
+			!strings.Contains(l, "not listed in `runtimes.assistant`") {
+			t.Errorf("%s: removal rule does not say \"not listed in `runtimes.assistant`\": %.100s", name, l)
 		}
 	}
 }
