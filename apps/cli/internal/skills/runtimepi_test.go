@@ -83,7 +83,7 @@ func TestRuntimePiSkill(t *testing.T) {
 }
 
 // The Pi skill carries the narrowed engine-config rule (intent 0004 S8, D7),
-// says `gabo init` writes the project-level keys (intent 0006 S13) and keeps its no-install rule and the subagent package's own config off
+// says `gabo init` writes every engine config key (intent 0010 S5) and keeps its no-install rule and the subagent package's own config off
 // limits.
 func TestRuntimePiNarrowsTheEngineConfigRule(t *testing.T) {
 	t.Parallel()
@@ -95,9 +95,10 @@ func TestRuntimePiNarrowsTheEngineConfigRule(t *testing.T) {
 	assertEngineConfigRule(t, "gabo-runtime-pi/SKILL.md", doc,
 		"Never edit Pi's or the subagent package's own configuration",
 		"Pi needs no engine key today, so this skill writes no Pi config",
+		"`gabo init` writes the project-level gabo integration keys (intent 0006)",
 	)
 	for _, s := range []string{
-		"`gabo init` writes the project-level gabo integration keys (intent 0006); this skill writes no Pi config, and never runs `pi install`.",
+		"`gabo init` writes every engine config key (intent 0010 S5); this skill writes none, no Pi config included, and never runs `pi install`.",
 		"Never run `pi install`, `pi config` or `npm i` yourself; the user installs.",
 		"`subagents.json`",
 	} {
@@ -251,12 +252,31 @@ func TestRuntimePiRemovesOtherEnginesEntries(t *testing.T) {
 		"recognized only by its gabo identity",
 		"`.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
 		"the `.claude/skills/gabo-assistant` symlink to the catalog folder",
-		"the key `agent` in `.claude/settings.json` only when its value is exactly `gabo-assistant`",
 		"`.opencode/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
-		"the key `default_agent` only when its value is exactly `gabo-assistant`",
 		"for Codex, its block in `AGENTS.override.md` and `AGENTS.md`",
 		"keep and report it",
 	)
+}
+
+// intent 0010 S4, S5, D3 A: gabo init writes and removes every engine config
+// key, so the Pi skill no longer removes Claude Code's `agent` or OpenCode's
+// `default_agent`; it keeps removing other engines' agent files, links and
+// blocks and keeps writing its own block.
+func TestRuntimePiLeavesEngineConfigKeysToGaboInit(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	sec := piSection(t, doc, "### Main-session entry")
+	mustContainIn(t, "### Main-session entry", sec,
+		"Never remove Claude Code's `agent` key or OpenCode's `default_agent` key: `gabo init` removes them (intent 0010 S4)",
+		"copy the `main_session.block` of `.gabo/skills/gabo-agent-templates/agents.yaml` verbatim",
+	)
+	mustLackIn(t, runtimePi+" ### Main-session entry", sec,
+		"the key `agent` in `.claude/settings.json` only when its value is exactly `gabo-assistant`",
+		"the key `default_agent` only when its value is exactly `gabo-assistant`",
+		"For a key, remove only that member",
+		"a user's own `agent` or `default_agent` value",
+	)
+	assertKeyLinesNameGaboInit(t, runtimePi, doc)
 }
 
 // intent 0009 S7, D3, D6: the write list names the entry, the build runs it,
