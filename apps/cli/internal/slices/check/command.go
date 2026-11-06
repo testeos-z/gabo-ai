@@ -59,10 +59,22 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    reviewer.env): it fails with the rename to make and is never read;\n" +
 			"  - every agent of the neutral agent spec (" + CatalogDir + "/) in the agent\n" +
 			"    directory each runtime skill declares (metadata.agent_dir);\n" +
-			"  - each agent's gabo-version line against " + StampFile + ";\n" +
+			"  - each agent's gabo-version line, a version x.y.z, against " + StampFile + "; a\n" +
+			"    missing line fails, and without a valid stamp the versions are reported\n" +
+			"    as not compared, never skipped;\n" +
+			"  - for a runtime skill declaring metadata.agent_skills, each agent file lists\n" +
+			"    exactly the skills of its spec agent plus the fixed-name links its template\n" +
+			"    names, each once (or the slot adapter's own name for such a link);\n" +
+			"    a full-tier runtime skill without it fails, a flexible-tier one warns;\n" +
+			"  - for a runtime skill declaring metadata.agent_name, each agent file's\n" +
+			"    declared name equals its spec id (a file that declares none passes);\n" +
 			"  - for a runtime skill declaring metadata.skill_dir, a link <skill_dir>/<name>\n" +
 			"    to " + CatalogDir + "/<name> for each skill a spec agent lists, and a link\n" +
 			"    <skill_dir>/gabo-<slot> to each slot adapter that is a skill folder;\n" +
+			"  - no gabo-reviewer in the project: no <skill_dir>/gabo-reviewer entry and no\n" +
+			"    agent file listing it among its skills;\n" +
+			"  - for a runtime skill declaring metadata.former_skill_dir, no gabo-* link left\n" +
+			"    there that points into " + CatalogDir + "/ or to a slot adapter folder;\n" +
 			"  - for the reviewer runtime's metadata.reviewer_link, a user-level link to\n" +
 			"    ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer holding\n" +
 			"    scripts/reviewer.sh (not checked with CI set);\n" +
@@ -75,6 +87,10 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    [marketplaces.gabo-ai] and [plugins.\"gabo@gabo-ai\"], and a .pi/settings.json\n" +
 			"    packages entry for npm:@gabo-ai/pi (any version); a key set to another\n" +
 			"    value passes, and other engines' files are never read;\n" +
+			"  - the main-session entry against runtimes.assistant, from each runtime skill's\n" +
+			"    metadata.main_session: that engine's gabo-assistant link and its agent file\n" +
+			"    plus key, or exactly one scoped block; no other full-tier engine's entry\n" +
+			"    (a full-tier runtime skill without it fails, a flexible-tier one warns);\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +

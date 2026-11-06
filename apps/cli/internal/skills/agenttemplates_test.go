@@ -64,6 +64,15 @@ func TestEverySpecAgentHasATemplateAndEveryTemplateASpecEntry(t *testing.T) {
 		}
 		used[p] = true
 	}
+	if m := spec.MainSession; m != nil {
+		for _, f := range []string{m.Template, m.Block} {
+			p := path.Join(agentspec.Dir, f)
+			if _, ok := tpls[p]; !ok {
+				t.Errorf("main session %s: %s not embedded", m.ID, p)
+			}
+			used[p] = true
+		}
+	}
 	for p := range tpls {
 		if !used[p] {
 			t.Errorf("%s: template has no spec entry", p)
@@ -73,8 +82,15 @@ func TestEverySpecAgentHasATemplateAndEveryTemplateASpecEntry(t *testing.T) {
 
 func TestAgentTemplatesUseNamedSlotsOnly(t *testing.T) {
 	t.Parallel()
-	for p, doc := range agentTemplates(t) {
-		id := strings.TrimSuffix(path.Base(p), ".md")
+	spec, err := agentspec.Load(Catalog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpls := agentTemplates(t)
+	for _, a := range spec.Agents {
+		p := path.Join(agentspec.Dir, a.Template)
+		doc := tpls[p]
+		id := a.ID
 		lines := strings.Split(doc, "\n")
 		if lines[0] != versionLine {
 			t.Errorf("%s: first line %q, want %q", p, lines[0], versionLine)
@@ -131,6 +147,119 @@ func TestAgentTemplatesSkillTellsToFillOnlyTheSlots(t *testing.T) {
 		want = append(want, "`{{"+s+"}}`")
 	}
 	for _, s := range want {
+		if !strings.Contains(skill, s) {
+			t.Errorf("%s/SKILL.md: missing %q", agentspec.Dir, s)
+		}
+	}
+}
+
+const (
+	mainTemplate = templatesPrefix + "gabo-assistant.md"
+	mainBlock    = templatesPrefix + "gabo-assistant-block.md"
+	blockStart   = "<!-- GABO_ASSISTANT_START -->"
+	blockEnd     = "<!-- GABO_ASSISTANT_END -->"
+)
+
+// mainSessionContent is what spec 0009 S2 asks every main-session entry to
+// tell the session.
+var mainSessionContent = []string{
+	"the gabo assistant", "load the `gabo-assistant` skill", "follow its Session Start", "before your first reply",
+	"`.gabo/skills/gabo-assistant/SKILL.md`", "single point of contact", "never block on long work",
+	"`gabo-pm`", "`gabo-dev-lead`", "`gabo-cycle`", "`gabo-plan-reviewer`",
+}
+
+func containsFold(doc, s string) bool {
+	return strings.Contains(strings.ToLower(doc), strings.ToLower(s))
+}
+
+// Spec 0009 S2, D4: the assistant agent template is engine-neutral, starts
+// with the version line and tells the session it is the gabo assistant.
+func TestMainSessionTemplateMakesTheSessionTheAssistant(t *testing.T) {
+	t.Parallel()
+	doc, ok := agentTemplates(t)[mainTemplate]
+	if !ok {
+		t.Fatalf("%s not embedded", mainTemplate)
+	}
+	lines := strings.Split(doc, "\n")
+	if lines[0] != versionLine {
+		t.Errorf("%s: first line %q, want %q", mainTemplate, lines[0], versionLine)
+	}
+	if strings.HasPrefix(lines[1], "---") {
+		t.Errorf("%s: frontmatter is the runtime skill's job", mainTemplate)
+	}
+	for _, m := range slotPattern.FindAllStringSubmatch(doc, -1) {
+		if m[1] != "gabo_version" {
+			t.Errorf("%s: slot %q; the main-session body is the same in the block, which has no slots", mainTemplate, m[0])
+		}
+	}
+	for _, s := range mainSessionContent {
+		if !containsFold(doc, s) {
+			t.Errorf("%s: missing %q", mainTemplate, s)
+		}
+	}
+	for _, s := range append(engineSyntax, "Placeholder") {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: engine-specific or placeholder text %q", mainTemplate, s)
+		}
+	}
+}
+
+// Spec 0009 S3: the scoped block opens with the role-prompt and headless
+// rule, then carries the template body byte for byte, between the markers,
+// in at most 2 KiB.
+func TestMainSessionBlockIsScopedAndSmall(t *testing.T) {
+	t.Parallel()
+	tpls := agentTemplates(t)
+	doc, ok := tpls[mainBlock]
+	if !ok {
+		t.Fatalf("%s not embedded", mainBlock)
+	}
+	if n := len(doc); n > 2048 {
+		t.Errorf("%s: %d bytes, want at most 2048", mainBlock, n)
+	}
+	if !strings.HasPrefix(doc, blockStart+"\n") || !strings.HasSuffix(doc, "\n"+blockEnd+"\n") {
+		t.Fatalf("%s: not wrapped in %s ... %s", mainBlock, blockStart, blockEnd)
+	}
+	inner := strings.TrimSuffix(strings.TrimPrefix(doc, blockStart+"\n"), blockEnd+"\n")
+	if strings.Count(doc, blockStart) != 1 || strings.Count(doc, blockEnd) != 1 {
+		t.Errorf("%s: markers must appear once each", mainBlock)
+	}
+	rule, body, ok := strings.Cut(inner, "\n\n")
+	if !ok {
+		t.Fatalf("%s: no blank line after the scope rule", mainBlock)
+	}
+	for _, s := range []string{"role prompt", "headless", "`codex exec`", "`pi --print`", "ignores this block", "keeps its role"} {
+		if !strings.Contains(rule, s) {
+			t.Errorf("%s: scope rule misses %q", mainBlock, s)
+		}
+	}
+	_, tplBody, _ := strings.Cut(tpls[mainTemplate], "\n\n")
+	if body != tplBody {
+		t.Errorf("%s: content after the scope rule differs from %s after its version line\nblock:\n%s\ntemplate:\n%s", mainBlock, mainTemplate, body, tplBody)
+	}
+	if strings.Contains(doc, "{{") || strings.Contains(doc, "}}") {
+		t.Errorf("%s: the block is written verbatim; it has no slots", mainBlock)
+	}
+	for _, s := range mainSessionContent {
+		if !containsFold(body, s) {
+			t.Errorf("%s: missing %q", mainBlock, s)
+		}
+	}
+}
+
+// Spec 0009 S1 to S4, D4: the one table of each engine's main-session entry
+// lives in gabo-agent-templates and is built only for runtimes.assistant.
+func TestAgentTemplatesSkillHoldsTheMainSessionEntryTable(t *testing.T) {
+	t.Parallel()
+	skill := embeddedByPath(t)[agentspec.Dir+"/SKILL.md"]
+	for _, s := range []string{
+		"## Main-Session Entry", "only for `runtimes.assistant`", "`main_session`",
+		"`.claude/skills/gabo-assistant`", "`.agents/skills/gabo-assistant`", "`.gabo/skills/gabo-assistant/SKILL.md`",
+		"`.claude/agents/gabo-assistant.md`", "`.claude/settings.json`", "`agent: \"gabo-assistant\"`",
+		"`.opencode/agents/gabo-assistant.md`", "`mode: primary`", "`default_agent: \"gabo-assistant\"`",
+		"`AGENTS.override.md`", "`AGENTS.md`", "`CLAUDE.md`", "`" + blockStart + "`", "`" + blockEnd + "`",
+		"2048 bytes", "| Claude Code |", "| OpenCode |", "| Codex |", "| Pi |",
+	} {
 		if !strings.Contains(skill, s) {
 			t.Errorf("%s/SKILL.md: missing %q", agentspec.Dir, s)
 		}

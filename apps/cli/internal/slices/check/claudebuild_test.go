@@ -18,10 +18,10 @@ import (
 // agent built in the shape gabo-runtime-claude writes: a frontmatter with
 // name, description and the gabo-version line, then the filled body; and
 // each spec skill linked as .claude/skills/<name> -> ../../.gabo/skills/<name>
-// (build step 2).
+// (build step 2); and the main-session entry (spec 0009 S1, S2).
 func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
-	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n"), ".claude/settings.json": file(claudeKeysJSON)}
+	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n"), ".claude/settings.json": file(withJSONKey(claudeKeysJSON, "agent", assistantID))}
 	files, err := skills.Files()
 	if err != nil {
 		t.Fatal(err)
@@ -44,6 +44,11 @@ func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 			proj[".claude/skills/"+name] = symlink("../../.gabo/skills/" + name)
 		}
 	}
+	// The main-session entry of spec 0009 S1, S2: link, agent file and the
+	// agent key above.
+	proj[".claude/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".claude/agents/"+assistantID+".md"] = file("---\nname: " + assistantID +
+		"\ndescription: 'The gabo assistant'\nskills:\n  - gabo-assistant\ngabo-version: " + version + "\n---\n" + assistantBody(t))
 	return proj
 }
 
@@ -129,6 +134,35 @@ func TestClaudeBuiltSetPassesCheck(t *testing.T) {
 	wantPassed(t, r, PassedLine)
 }
 
+// Spec 0009 D4: the main-session agent file beside the spec agents is no
+// spec agent, so gabo check reports no missing or extra agent for it.
+func TestClaudeBuiltSetWithTheMainSessionAgentPassesCheck(t *testing.T) {
+	t.Parallel()
+	proj := claudeBuilt(t, "1.2.3")
+	spec, err := agentspec.Load(skills.Catalog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spec.MainSession == nil {
+		t.Fatal("embedded spec has no main_session entry")
+	}
+	body, err := fs.ReadFile(skills.Catalog(), path.Join(agentspec.Dir, spec.MainSession.Template))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, rest, _ := strings.Cut(string(body), "\n")
+	proj[".claude/agents/"+spec.MainSession.ID+".md"] = file("---\nname: " + spec.MainSession.ID +
+		"\ndescription: '" + strings.ReplaceAll(spec.MainSession.Role, "'", "''") + "'\nskills:\n  - gabo-assistant\ngabo-version: 1.2.3\n---\n" +
+		strings.TrimPrefix(rest, "\n"))
+	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+	for _, line := range r.Lines {
+		if strings.Contains(line, "agent") && strings.Contains(line, spec.MainSession.ID) {
+			t.Errorf("unexpected line %q", line)
+		}
+	}
+	wantPassed(t, r, PassedLine)
+}
+
 func TestClaudeBuiltSetFromAnotherVersionFails(t *testing.T) {
 	t.Parallel()
 	r := run(t, with(claudeBuilt(t, "1.2.3"), map[string]string{".gabo/VERSION": "1.2.4\n"}), configFiles{projectFile: validConfig}, Settings{Version: "1.2.4"})
@@ -158,4 +192,63 @@ func TestClaudeBuiltSetWithoutReviewerLinkFails(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantFailed(t, rep, "✗ reviewer link "+userLink+" missing", NextLink)
+}
+
+// setClaudeSkills rewrites the frontmatter skills list of a built agent.
+func setClaudeSkills(t *testing.T, proj fstest.MapFS, id string, list []string) {
+	t.Helper()
+	name := ".claude/agents/" + id + ".md"
+	var out []string
+	for line := range strings.SplitSeq(string(proj[name].Data), "\n") {
+		switch {
+		case line == "skills:" || strings.HasPrefix(line, "  - "):
+		case strings.HasPrefix(line, "gabo-version:"):
+			if len(list) > 0 {
+				out = append(out, "skills:")
+				for _, s := range list {
+					out = append(out, "  - "+s)
+				}
+			}
+			out = append(out, line)
+		default:
+			out = append(out, line)
+		}
+	}
+	proj[name] = file(strings.Join(out, "\n"))
+}
+
+// Intent 0008 S1 on the agents gabo-runtime-claude builds: the frontmatter
+// skills list holds exactly the spec skills plus the template's fixed-name
+// links, each once; gabo-dev-lead keeps gabo-plan-reviewer throughout.
+func TestClaudeBuiltAgentSkills(t *testing.T) {
+	t.Parallel()
+	for _, tt := range agentSkillsCases("claude") {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			proj := claudeBuilt(t, "1.2.3")
+			setClaudeSkills(t, proj, "gabo-pm", tt.list)
+			r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+			wantSkillLines(t, r, ".claude/agents/gabo-pm.md", tt.want)
+		})
+	}
+}
+
+// The adapter's frontmatter name passes in place of its fixed-name link.
+func TestClaudeBuiltAgentSkillsAcceptAdapterName(t *testing.T) {
+	t.Parallel()
+	proj := claudeBuilt(t, "1.2.3")
+	slots := memoryAdapterSlot(t, proj, ".claude/skills")
+	setClaudeSkills(t, proj, "gabo-pm", []string{"gabo-pm", "gabo-plan-reviewer", "gabo-tasks", "gabo-repository-host", "gabo-memory-engram"})
+	r := run(t, proj, configFiles{projectFile: validConfig + "slots:\n" + slots}, Settings{})
+	wantSkillLines(t, r, ".claude/agents/gabo-pm.md", nil)
+	wantPassed(t, r, PassedLine)
+}
+
+// The fixed-name links come from the template in the project catalog copy:
+// a gabo-pm template without {{adapter:memory}} makes gabo-memory extra.
+func TestClaudeBuiltAgentSkillsFollowTheProjectTemplate(t *testing.T) {
+	t.Parallel()
+	proj := withoutMemorySlot(t, claudeBuilt(t, "1.2.3"))
+	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+	wantSkillLines(t, r, ".claude/agents/gabo-pm.md", []string{"✗ agent gabo-pm (claude): skill gabo-memory not in the agent spec"})
 }

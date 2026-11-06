@@ -12,7 +12,7 @@ import (
 
 // linkedSkill is a runtime skill that declares where its project skill links
 // and its user-level reviewer link live, as gabo-runtime-claude does.
-const linkedSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n  skill_dir: .claude/skills\n  reviewer_link: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer\n---\nbody\n"
+const linkedSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n  skill_dir: .claude/skills\n  agent_skills: frontmatter:skills\n  reviewer_link: ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer\n---\nbody\n"
 
 // linkedSpec lists catalog skills: sk-b twice, so it is checked once.
 const linkedSpec = `agents:
@@ -64,6 +64,8 @@ func linkedProject() fstest.MapFS {
 		".gabo/skills/gabo-contract-reviewer-placement/SKILL.md": "## Operations\n",
 		".claude/skills/gabo-tasks-github/SKILL.md":              "# T\n",
 		".claude/agents/gabo-reviewer.md":                        "---\nname: gabo-reviewer\ngabo-version: 1.2.3\n---\n",
+		".claude/agents/alpha.md":                                "---\nname: alpha\nskills:\n  - sk-a\n  - sk-b\ngabo-version: 1.2.3\n---\nbody\n",
+		".claude/agents/beta.md":                                 "---\nname: beta\nskills: [sk-b]\ngabo-version: 1.2.3\n---\nbody\n",
 	})
 	p[".claude/skills/sk-a"] = symlink("../../.gabo/skills/sk-a")
 	p[".claude/skills/sk-b"] = symlink("../../.gabo/skills/sk-b")
@@ -344,7 +346,7 @@ func TestReviewerLinkWithoutAHomeFails(t *testing.T) {
 func TestReviewerLinkOnlyForTheReviewerRuntime(t *testing.T) {
 	t.Parallel()
 	p := linkedProject()
-	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  reviewer_link: $HOME/.pi/skills/gabo-reviewer\n---\n")
+	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  agent_skills: frontmatter:skills\n  reviewer_link: $HOME/.pi/skills/gabo-reviewer\n---\n")
 	p[".pi/settings.json"] = file(piKeysJSON)
 	cfg := strings.Replace(linkedConfig, "  coder: claude", "  coder: pi", 1)
 	rep, err := NewUseCase(p, configFiles{projectFile: cfg}, goodUser(), Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
@@ -360,7 +362,7 @@ func TestReviewerLinkOnlyForTheReviewerRuntime(t *testing.T) {
 func TestPiReviewerRuntimePassesCheck(t *testing.T) {
 	t.Parallel()
 	p := linkedProject()
-	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n---\n")
+	p[".gabo/skills/gabo-runtime-pi/SKILL.md"] = file("---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  agent_skills: \"line:Skills:\"\n---\n")
 	p[".pi/settings.json"] = file(piKeysJSON)
 	cfg := strings.Replace(linkedConfig, "  reviewer: claude", "  reviewer: pi", 1)
 	u := goodUser().clone()

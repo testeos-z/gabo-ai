@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io/fs"
 	"path"
 	"path/filepath"
@@ -28,9 +29,21 @@ type runtimeMeta struct {
 	// SkillDir is where each catalog skill and fixed-name slot link lives
 	// (repository-relative); empty means the runtime makes no skill links.
 	SkillDir string `yaml:"skill_dir"`
+	// FormerSkillDir is where the runtime made its skill links before the
+	// move to .agents/skills (repository-relative); empty means none
+	// (intent 0008 S4).
+	FormerSkillDir string `yaml:"former_skill_dir"`
 	// ReviewerLink is the user-level link to the reviewer skill, with
 	// ${NAME}, ${NAME:-default} and $NAME expanded; empty means none.
 	ReviewerLink string `yaml:"reviewer_link"`
+	// AgentSkills is where an agent file lists its skills (intent 0008 D1).
+	AgentSkills agentPlace `yaml:"-"`
+	// AgentName is where an agent file declares its name; not declared when
+	// the engine names an agent by its file name (intent 0008 D1).
+	AgentName agentPlace `yaml:"-"`
+	// MainSession is the engine's main-session entry (spec 0009 D5); nil
+	// when not declared.
+	MainSession *mainSessionMeta `yaml:"main_session"`
 }
 
 // parseRuntimeMeta reads metadata from a SKILL.md frontmatter.
@@ -44,15 +57,30 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 		return runtimeMeta{}, errors.New("unterminated frontmatter")
 	}
 	var fm struct {
-		Metadata runtimeMeta `yaml:"metadata"`
+		Metadata struct {
+			runtimeMeta `yaml:",inline"`
+			AgentSkills string `yaml:"agent_skills"`
+			AgentName   string `yaml:"agent_name"`
+		} `yaml:"metadata"`
 	}
-	if err := yaml.Unmarshal(front, &fm); err != nil {
+	err := yaml.Unmarshal(front, &fm)
+	if err != nil {
 		return runtimeMeta{}, err
 	}
-	m := fm.Metadata
+	m := fm.Metadata.runtimeMeta
 	m.AgentDir = strings.TrimSpace(m.AgentDir)
 	m.SkillDir = strings.TrimSpace(m.SkillDir)
+	m.FormerSkillDir = strings.TrimSpace(m.FormerSkillDir)
 	m.ReviewerLink = strings.TrimSpace(m.ReviewerLink)
+	if m.AgentSkills, err = parseAgentPlace("agent_skills", fm.Metadata.AgentSkills); err != nil {
+		return runtimeMeta{}, err
+	}
+	if m.AgentName, err = parseAgentPlace("agent_name", fm.Metadata.AgentName); err != nil {
+		return runtimeMeta{}, err
+	}
+	if err = m.MainSession.normalize(); err != nil {
+		return runtimeMeta{}, err
+	}
 	return m, nil
 }
 
@@ -79,6 +107,9 @@ func (u *UseCase) checkLinks(r *Report, cfg config.Config) error {
 	var checked []string
 	for _, rt := range runtimesOf(cfg) {
 		meta, ok := u.runtimeMeta(rt)
+		if ok && meta.AgentDir != "" {
+			checkAgentMeta(r, rt, meta)
+		}
 		if !ok || meta.SkillDir == "" {
 			continue
 		}
@@ -120,6 +151,60 @@ func (u *UseCase) checkLinks(r *Report, cfg config.Config) error {
 	if rt := string(cfg.Runtimes.Reviewer); rt != "" {
 		if meta, ok := u.runtimeMeta(rt); ok && meta.ReviewerLink != "" {
 			u.checkReviewerLink(r, rt, meta.ReviewerLink)
+		}
+	}
+	return nil
+}
+
+// reviewerSkill is the reviewer skill's name; it lives only at user level
+// (TRD D20).
+const reviewerSkill = "gabo-reviewer"
+
+// NextRemoveReviewer follows a reviewer skill placed in the project.
+const NextRemoveReviewer = "next: remove it; the reviewer runs from the user-level copy"
+
+// checkReviewerIsolation fails, for each runtime declared in runtimes.*, on
+// an entry <skill_dir>/gabo-reviewer of any kind and on every file in its
+// agent_dir whose skills (metadata.agent_skills) include gabo-reviewer, so
+// no agent can load the reviewer from the project (intent 0008 S8). The
+// user-level reviewer link is checkReviewerLink's.
+func (u *UseCase) checkReviewerIsolation(r *Report, cfg config.Config) error {
+	var dirs, agentDirs []string
+	for _, rt := range runtimesOf(cfg) {
+		meta, ok := u.runtimeMeta(rt)
+		if !ok {
+			continue
+		}
+		if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) && !slices.Contains(dirs, dir) {
+			dirs = append(dirs, dir)
+			entry := path.Join(dir, reviewerSkill)
+			if _, err := fs.Lstat(u.project, entry); err == nil {
+				r.fail("✗ "+entry+": "+reviewerSkill+" must not be in the project", NextRemoveReviewer)
+			}
+		}
+		dir := path.Clean(meta.AgentDir)
+		if meta.AgentDir == "" || !insideRepo(dir) || !meta.AgentSkills.declared() || slices.Contains(agentDirs, dir) {
+			continue
+		}
+		agentDirs = append(agentDirs, dir)
+		files, err := u.agentFiles(dir)
+		if err != nil {
+			return err
+		}
+		var names []string
+		for _, ns := range files {
+			names = append(names, ns...)
+		}
+		slices.Sort(names)
+		for _, name := range names {
+			file := path.Join(dir, name)
+			b, err := fs.ReadFile(u.project, file)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", file, err)
+			}
+			if slices.Contains(meta.AgentSkills.skills(b), reviewerSkill) {
+				r.fail("✗ "+file+": "+reviewerSkill+" must not be in the project", NextRemoveReviewer)
+			}
 		}
 	}
 	return nil
