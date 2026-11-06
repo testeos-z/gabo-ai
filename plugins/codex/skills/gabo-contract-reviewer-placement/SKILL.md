@@ -13,7 +13,8 @@ Load when writing, checking or using the adapter of the `reviewer_placement` slo
 ## Hard Rules
 
 - An adapter covers an operation only with a `### <operation>` heading, spelled exactly as below, under its own `## Operations` section. The headings are stable: `gabo check` compares them with the adapter named in `slots.<name>.adapter` and lists every operation it misses; a heading inside a fenced code block does not count.
-- A review request is exactly `PR #<n> head <40-hex sha>`; anything else is refused before any command runs.
+- A review request is exactly `PR #<n> head <40-hex sha>`, or, with the optional `engine` field, `PR #<n> head <40-hex sha> engine <engine>` only when `runtimes.reviewer` is `session` (intent 0013 S11, D5): the engine of the wave that requests the review. An `engine` field under a fixed `runtimes.reviewer`, a missing `engine` under `session`, extra words or any other shape is refused before any command runs.
+- The adapter passes the engine to the scripts as an argument, never as environment; the scripts check it again against the integration branch and refuse with `PREFLIGHT-FAILED <reason>`.
 - The review runs the installed scripts of the user-level `gbai-reviewer` skill, never a copy from the repository under review (D20).
 - One verdict per pushed head (R26): a head that moved or already has a verdict is skipped.
 - The agent relaying the review never reviews, edits, comments, approves or merges itself, and never posts the reviewer marker.
@@ -22,7 +23,7 @@ Load when writing, checking or using the adapter of the `reviewer_placement` slo
 
 ### trigger review
 
-Start one review run for a PR number pinned to its head SHA.
+Start one review run for a PR number pinned to its head SHA, on the engine of the optional `engine` field under `session`, else on the fixed `runtimes.reviewer`.
 
 ### report placement
 
