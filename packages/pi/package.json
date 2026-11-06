@@ -1,6 +1,6 @@
 {
   "name": "@gabo-ai/pi",
-  "version": "0.2.8",
+  "version": "0.2.10",
   "description": "gabo for Pi: the gabo-pi bootstrap skill, the gabo-reviewer-config skill and the gabo extension.",
   "keywords": ["pi-package"],
   "license": "MIT",
