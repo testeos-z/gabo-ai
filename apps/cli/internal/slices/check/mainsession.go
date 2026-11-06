@@ -102,12 +102,13 @@ func (u *UseCase) checkMainSession(r *Report, cfg config.Config) error {
 	if !ok {
 		return nil // reported by checkAgents
 	}
+	set := engineconfig.Set(runtimesOf(cfg)...)
 	if declaresMainSession(r, assistant, own) {
-		if err := u.checkAssistantEntry(r, assistant, own, spec); err != nil {
+		if err := u.checkAssistantEntry(r, set, assistant, own, spec); err != nil {
 			return err
 		}
 	}
-	return u.checkStaleEntries(r, assistant, own, *spec.MainSession)
+	return u.checkStaleEntries(r, set, assistant, own, *spec.MainSession)
 }
 
 // declaresMainSession reports whether the runtime skill declares
@@ -150,7 +151,8 @@ type piece struct {
 // the first existing instructions file (kind block). A piece is "missing"
 // when nothing of the entry is there, else "incomplete"; two blocks are
 // "duplicated".
-func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, spec agentspec.Spec) error {
+// set is the engine set of runtimes.*, for the gabo init hints.
+func (u *UseCase) checkAssistantEntry(r *Report, set []string, rt string, meta runtimeMeta, spec agentspec.Spec) error {
 	m := spec.MainSession
 	var pieces []piece
 	if dir := path.Clean(meta.SkillDir); meta.SkillDir != "" && insideRepo(dir) {
@@ -176,18 +178,18 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 		if err != nil {
 			return err
 		}
-		v, set := keyValue(b, found, ms.Key)
+		v, isSet := keyValue(b, found, ms.Key)
 		switch {
-		case set && v == any(m.ID):
+		case isSet && v == any(m.ID):
 			pieces = append(pieces, piece{file: file, state: piecePresent})
 		case !fullTier(rt): // a flexible-tier runtime skill writes its own key (intent 0010 D4)
 			pieces = append(pieces, piece{file: file, state: pieceAbsent})
-		case set:
+		case isSet:
 			// The user's own value: gabo init keeps it (intent 0010 S6).
 			r.fail(fmt.Sprintf("✗ %s: %s is %s, not %s", file, ms.Key, jsonText(v), jsonText(m.ID)),
 				fmt.Sprintf("next: change %s to %s in %s, or remove it and run gabo init, then rerun gabo check", ms.Key, jsonText(m.ID), file))
 		default:
-			next, err := u.initMergeHint(rt, ms, m.ID, file, found)
+			next, err := u.initMergeHint(set, rt, ms, m.ID, file)
 			if err != nil {
 				return err
 			}
@@ -228,29 +230,37 @@ func (u *UseCase) checkAssistantEntry(r *Report, rt string, meta runtimeMeta, sp
 
 // initMergeHint is the step that clears a full-tier engine's missing
 // main-session key (intent 0010 S6): gabo init writes it, so the hint names
-// gabo init; when gabo init would refuse the file, the hint is its reason,
-// so following it never loops (D7). A missing file is one gabo init creates.
-func (u *UseCase) initMergeHint(rt string, ms *mainSessionMeta, id, file string, found bool) (string, error) {
-	merges := fmt.Sprintf("next: run gabo init (it merges %s: %s into %s), then rerun gabo check", jsonText(ms.Key), jsonText(id), file)
-	if !found {
-		return merges, nil
-	}
-	after, refusal, err := u.initDryRun(rt, rt, ms.Config, file)
-	switch {
-	case err != nil:
+// gabo init and the one file it writes, a new one when none exists; when
+// gabo init would refuse a file, the hint is its reason, so following it
+// never loops (D7).
+func (u *UseCase) initMergeHint(set []string, rt string, ms *mainSessionMeta, id, file string) (string, error) {
+	run, err := u.initDryRun(set, rt, rt, ms.Config)
+	if err != nil {
 		return "", err
-	case refusal != "":
-		return initRefusalHint(file, refusal), nil
-	case keyNames(after, ms.Key, id):
-		return merges, nil
 	}
-	return NextRebuild, nil
+	if name, reason, ok := run.refusal(file, ms.Config); ok {
+		return initRefusalHint(name, reason), nil
+	}
+	for _, name := range ms.Config {
+		if keyNames(run.after(name), ms.Key, id) {
+			return fmt.Sprintf("next: run gabo init (it merges %s: %s into %s), then rerun gabo check", jsonText(ms.Key), jsonText(id), name), nil
+		}
+	}
+	return fmt.Sprintf("next: set %s to %s in %s, then rerun gabo check", ms.Key, jsonText(id), file), nil
+}
+
+// initRun is what gabo init's engine step would do, run in memory: the
+// files it read, the bytes it would write and the files it refuses, each
+// with gabo init's reason.
+type initRun struct {
+	read, writes map[string][]byte
+	refusals     map[string]string
 }
 
 // initDryRun runs gabo init's pure rule for engine on the project's files,
-// in memory, and returns the bytes it would leave in file or the reason it
-// refuses file. It writes nothing.
-func (u *UseCase) initDryRun(engine, assistant string, files []string, file string) ([]byte, string, error) {
+// in memory, as gabo init runs it: the engine's rule when it is in set,
+// else the removals of the engines not in set. It writes nothing.
+func (u *UseCase) initDryRun(set []string, engine, assistant string, files []string) (initRun, error) {
 	in := engineconfig.Input{Files: map[string][]byte{}, Version: u.s.Version, Assistant: assistant}
 	for _, name := range files {
 		b, err := fs.ReadFile(u.project, name)
@@ -258,24 +268,45 @@ func (u *UseCase) initDryRun(engine, assistant string, files []string, file stri
 			continue
 		}
 		if err != nil {
-			return nil, "", fmt.Errorf("read %s: %w", name, err)
+			return initRun{}, fmt.Errorf("read %s: %w", name, err)
 		}
 		in.Files[name] = b
 	}
-	report, writes := engineconfig.Integrate([]string{engine}, in)
-	prefix := engineconfig.FailurePrefix + " " + file + ": "
+	report, writes := engineconfig.Remove(set, in)
+	if slices.Contains(set, engine) {
+		report, writes = engineconfig.Integrate([]string{engine}, in)
+	}
+	run := initRun{read: in.Files, writes: writes, refusals: map[string]string{}}
 	for _, s := range report.Sections {
 		for _, l := range s.Lines {
-			if reason, ok := strings.CutPrefix(l, prefix); ok {
-				reason, _, _ = strings.Cut(reason, "; fix it and run gabo init again")
-				return nil, reason, nil
+			for _, name := range files {
+				if reason, ok := strings.CutPrefix(l, engineconfig.FailurePrefix+" "+name+": "); ok {
+					reason, _, _ = strings.Cut(reason, "; fix it and run gabo init again")
+					run.refusals[name] = reason
+				}
 			}
 		}
 	}
-	if b, ok := writes[file]; ok {
-		return b, "", nil
+	return run, nil
+}
+
+// after returns the bytes file would hold after the run, nil when absent.
+func (r initRun) after(file string) []byte {
+	if b, ok := r.writes[file]; ok {
+		return b
 	}
-	return in.Files[file], "", nil
+	return r.read[file]
+}
+
+// refusal returns the file gabo init refuses, file itself first, then the
+// first of order, and gabo init's reason.
+func (r initRun) refusal(file string, order []string) (string, string, bool) {
+	for _, name := range append([]string{file}, order...) {
+		if reason, ok := r.refusals[name]; ok {
+			return name, reason, true
+		}
+	}
+	return "", "", false
 }
 
 // initRefusalHint is the step for a file gabo init refuses to merge.
@@ -283,10 +314,23 @@ func initRefusalHint(file, reason string) string {
 	return "next: fix " + file + " (" + reason + "), then run gabo init and rerun gabo check"
 }
 
-// initRemovesHint is the step that clears another full-tier engine's gabo
-// main-session key: gabo init removes it (intent 0010 S6).
-func initRemovesHint(key, id, file string) string {
-	return fmt.Sprintf("next: run gabo init (it removes %s: %s from %s), then rerun gabo check", jsonText(key), jsonText(id), file)
+// initRemoveHint is the step that clears another full-tier engine's gabo
+// main-session key (intent 0010 S6): gabo init removes it, so the hint names
+// gabo init; when gabo init would refuse a file it names gabo init's
+// reason, and when gabo init would leave the key (a file it does not parse
+// and does not own) it names removing the key by hand, so no hint loops (D7).
+func (u *UseCase) initRemoveHint(set []string, rt, assistant string, ms *mainSessionMeta, id, file string) (string, error) {
+	run, err := u.initDryRun(set, rt, assistant, ms.Config)
+	if err != nil {
+		return "", err
+	}
+	if name, reason, ok := run.refusal(file, ms.Config); ok {
+		return initRefusalHint(name, reason), nil
+	}
+	if !keyNames(run.after(file), ms.Key, id) {
+		return fmt.Sprintf("next: run gabo init (it removes %s: %s from %s), then rerun gabo check", jsonText(ms.Key), jsonText(id), file), nil
+	}
+	return fmt.Sprintf("next: remove %s: %s from %s, then rerun gabo check", jsonText(ms.Key), jsonText(id), file), nil
 }
 
 // jsonText renders v as compact JSON, without HTML escaping.
@@ -392,7 +436,7 @@ func (u *UseCase) linksTo(link, want string) bool {
 // agent_dir and a file its own entry uses are the assistant's, never stale
 // (Codex and Pi share AGENTS.md). Each path is reported once, for the first
 // runtime skill in catalog order that declares it.
-func (u *UseCase) checkStaleEntries(r *Report, assistant string, own runtimeMeta, m agentspec.MainSessionEntry) error {
+func (u *UseCase) checkStaleEntries(r *Report, set []string, assistant string, own runtimeMeta, m agentspec.MainSessionEntry) error {
 	entries, err := fs.ReadDir(u.project, CatalogDir)
 	if err != nil {
 		return nil // reported by checkAgents
@@ -458,7 +502,11 @@ func (u *UseCase) checkStaleEntries(r *Report, assistant string, own runtimeMeta
 			switch {
 			case ms.Kind == kindAgent && slices.Contains(ms.Config, file) && keyNames(b, ms.Key, m.ID):
 				// Only full-tier engines reach here: gabo init removes the key (intent 0010 S6).
-				stale(file, rt, initRemovesHint(ms.Key, m.ID, file))
+				next, err := u.initRemoveHint(set, rt, assistant, ms, m.ID, file)
+				if err != nil {
+					return err
+				}
+				stale(file, rt, next)
 			case ms.Kind == kindBlock && blockState(string(b)) != pieceAbsent:
 				stale(file, rt, NextRebuild)
 			}

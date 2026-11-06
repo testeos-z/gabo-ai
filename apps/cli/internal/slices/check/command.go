@@ -101,7 +101,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    gabo init\", and another engine's key names \"run gabo init (it removes\n" +
 			"    \"<key>\": \"gabo-assistant\" from <file>)\"; every other piece, and a\n" +
 			"    flexible-tier engine's key, names asking your agent to rebuild the agents;\n" +
-			"    a file gabo init refuses to merge names \"fix <file> (<its reason>)\";\n" +
+			"    a file gabo init refuses names \"fix <file> (<its reason>)\", and a key gabo\n" +
+			"    init would leave as it is names setting or removing it by hand;\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +

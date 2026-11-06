@@ -10,6 +10,7 @@ import (
 	"strconv"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
 // OpenCode's project config lookup order (spec 0004 S8); the first existing
@@ -37,7 +38,7 @@ func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 	if !slices.Contains(runtimesOf(cfg), string(config.RuntimeOpencode)) {
 		return nil
 	}
-	file, why, byInit, found := opencodeNewConfig, "no project config", true, false
+	file, why, byInit := opencodeNewConfig, "no project config", true
 	for _, name := range opencodeConfigs {
 		b, err := fs.ReadFile(u.project, name)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -46,7 +47,7 @@ func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 		if err != nil {
 			return fmt.Errorf("read %s: %w", name, err)
 		}
-		file, found = name, true
+		file = name
 		why, byInit = depthProblem(b)
 		break
 	}
@@ -54,18 +55,18 @@ func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 		return nil
 	}
 	next := fmt.Sprintf("next: set %s to %d in %s, then rerun gabo check", subagentDepthKey, minSubagentDepth, file)
-	if byInit && found {
-		// A file gabo init refuses names the reason, so the hint never loops.
-		after, refusal, err := u.initDryRun(string(config.RuntimeOpencode), string(cfg.Runtimes.Assistant), opencodeConfigs, file)
-		switch {
-		case err != nil:
+	if byInit {
+		// Ask gabo init, in memory: a file it refuses names its reason, so the
+		// hint never loops (intent 0010 D7).
+		set := engineconfig.Set(runtimesOf(cfg)...)
+		run, err := u.initDryRun(set, string(config.RuntimeOpencode), string(cfg.Runtimes.Assistant), opencodeConfigs)
+		if err != nil {
 			return err
-		case refusal != "":
-			next, byInit = initRefusalHint(file, refusal), false
-		default:
-			if p, _ := depthProblem(after); p != "" {
-				byInit = false
-			}
+		}
+		if name, reason, ok := run.refusal(file, opencodeConfigs); ok {
+			next, byInit = initRefusalHint(name, reason), false
+		} else if p, _ := depthProblem(run.after(file)); p != "" {
+			byInit = false
 		}
 	}
 	if byInit {

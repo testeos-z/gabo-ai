@@ -5,6 +5,7 @@ import (
 	"os"
 	"path"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -207,6 +208,11 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 		{"opencode user's own default_agent", "opencode", func(t *testing.T, p fstest.MapFS) {
 			p[ocConfig] = file(withJSONKey(readTestdata(t, "opencode.jsonc"), "default_agent", "build"))
 		}, [][2]string{{`✗ .opencode/opencode.jsonc: default_agent is "build", not "gabo-assistant"`, changeKey("default_agent", ocConfig)}}},
+		// gabo init creates .opencode/opencode.json when no config exists,
+		// so the hint names that one file.
+		{"opencode no config", "opencode", func(_ *testing.T, p fstest.MapFS) { delete(p, ocConfig) },
+			[][2]string{{line("opencode.json or opencode.jsonc or .opencode/opencode.json or .opencode/opencode.jsonc", "incomplete", "opencode")[0],
+				initMerges("default_agent", ".opencode/opencode.json")}}},
 		{"opencode link", "opencode", func(_ *testing.T, p fstest.MapFS) { delete(p, sharedLink) },
 			[][2]string{line(sharedLink, "incomplete", "opencode")}},
 		{"codex block", "codex", func(_ *testing.T, p fstest.MapFS) { p["AGENTS.md"] = file("# Project\n") },
@@ -271,7 +277,7 @@ func TestMainSessionFlexibleTierKeepsTheRebuildHint(t *testing.T) {
 			proj[".zed/settings.json"] = file(doc)
 		}
 		var r Report
-		if err := NewUseCase(proj, nil, nil, Settings{}).checkAssistantEntry(&r, "zed", meta, spec); err != nil {
+		if err := NewUseCase(proj, nil, nil, Settings{}).checkAssistantEntry(&r, []string{"zed"}, "zed", meta, spec); err != nil {
 			t.Fatal(err)
 		}
 		want := []string{"✗ .zed/settings.json: gabo assistant entry missing for zed", NextRebuild}
@@ -308,6 +314,45 @@ func TestMainSessionStaleEntriesFail(t *testing.T) {
 		[2]string{stale(".opencode/agents/gabo-assistant.md", "opencode"), NextRebuild},
 		[2]string{stale("opencode.json", "opencode"), initRemoves("default_agent", "opencode.json")},
 		[2]string{stale("CLAUDE.md", "pi"), NextRebuild})
+}
+
+// Intent 0010 S6, D7: a leftover Claude Code agent key while OpenCode is the
+// assistant names gabo init when gabo init removes it, and removing it by
+// hand when gabo init would leave the file alone (it reads strict JSON).
+func TestMainSessionStaleClaudeKey(t *testing.T) {
+	t.Parallel()
+	const settings = ".claude/settings.json"
+	for _, c := range []struct{ doc, next string }{
+		{`{"agent": "gabo-assistant"}`, initRemoves("agent", settings)},
+		{"// mine\n{\"agent\": \"gabo-assistant\"}\n", `next: remove "agent": "gabo-assistant" from .claude/settings.json, then rerun gabo check`},
+	} {
+		proj := opencodeBuilt(t, "1.2.3")
+		proj[settings] = file(c.doc)
+		r := runOpencode(t, proj, "1.2.3")
+		wantEntry(t, r, [2]string{"✗ " + settings + ": gabo assistant entry for claude, but runtimes.assistant is opencode", c.next})
+	}
+}
+
+// Intent 0010 D7: with OpenCode in the engine set but not the assistant,
+// gabo init refuses every OpenCode change while one of its configs does not
+// parse, so the stale-key and depth lines both name that file to fix.
+func TestMainSessionHintNamesTheFileGaboInitRefuses(t *testing.T) {
+	t.Parallel()
+	proj := claudeBuilt(t, "1.2.3")
+	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 1}}`)
+	proj[".opencode/opencode.jsonc"] = file("{")
+	cfg := strings.Replace(validConfig, "  coder: claude\n", "  coder: opencode\n", 1)
+	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
+	fix := "next: fix .opencode/opencode.jsonc ("
+	for _, l := range []string{
+		"✗ opencode.json: gabo assistant entry for opencode, but runtimes.assistant is claude",
+		"✗ experimental.subagent_depth must be 3 or more in opencode.json: it is 1",
+	} {
+		i := slices.Index(r.Lines, l)
+		if i < 0 || i+1 >= len(r.Lines) || !strings.HasPrefix(r.Lines[i+1], fix) {
+			t.Fatalf("want %q followed by a line starting %q:\n%s", l, fix, joined(r))
+		}
+	}
 }
 
 // Intent 0010 S6: a leftover default_agent while runtimes.assistant is
