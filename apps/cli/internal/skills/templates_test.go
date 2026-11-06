@@ -67,6 +67,7 @@ var templates = map[string]struct {
 			"| id | requirement | acceptance criteria | verification |",
 			"| id | decision | options considered | choice | consequences |",
 			"| surface | entry points | primary action | empty and error states |",
+			"| case | what happened | why | what to do next |",
 			"| order | file | purpose | rollback |",
 			"| policy | conflict | resolution |",
 			"| # | question | status |",
@@ -253,6 +254,40 @@ func TestDesignNormsTemplateRulesAndPerChangeFit(t *testing.T) {
 		}
 	}
 	for _, s := range []string{"UX_UI", "APP_FLOW", "| case | what happened |"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: has %q", p, s)
+		}
+	}
+}
+
+// Intent 0012 S3: spec section 3 holds the change's concrete messages and
+// links the design norms instead of repeating tokens, accessibility or
+// wording rules; product-specific keyboard paths stay in the journey.
+func TestSpecTemplateSection3HoldsMessagesAndLinksNorms(t *testing.T) {
+	t.Parallel()
+	const p = "gabo-pm/templates/spec.md"
+	doc := embeddedByPath(t)[p]
+	const start, end = "## 3. UX and app flow (optional)", "## 4. DB migration steps (optional)"
+	i, j := strings.Index(doc, start), strings.Index(doc, end)
+	if i < 0 || j < i {
+		t.Fatalf("%s: section 3 not found between %q and %q", p, start, end)
+	}
+	section := doc[i:j]
+	for _, s := range []string{
+		"| case | what happened | why | what to do next |",
+		"[`DESIGN.md`](../../DESIGN.md) sections 2-3 (tokens, color)",
+		"section 9 (accessibility)",
+		"section 10 (wording)",
+		"Product-specific keyboard paths stay in the journey.",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s: section 3 missing %q", p, s)
+		}
+	}
+	if !strings.Contains(doc, "Design norms stay in the repository `DESIGN.md`") {
+		t.Errorf("%s: missing the design norms guidance line", p)
+	}
+	for _, s := range []string{"| token |", "Global styles"} {
 		if strings.Contains(doc, s) {
 			t.Errorf("%s: has %q", p, s)
 		}
