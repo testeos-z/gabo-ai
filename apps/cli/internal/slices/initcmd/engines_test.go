@@ -44,7 +44,7 @@ func golden(t *testing.T, name, got string) {
 }
 
 func engineStep(s *memStore, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, "0.2.6")
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, "", "0.2.6")
 }
 
 func sectionOf(t *testing.T, r engineconfig.Report, engine string) engineconfig.Section {
@@ -238,5 +238,144 @@ func TestInitSourcesRunNoProcess(t *testing.T) {
 	}
 	if checked == 0 {
 		t.Fatal("no source checked")
+	}
+}
+
+func engineStepAs(s *memStore, assistant string, set ...string) engineconfig.Report {
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, assistant, "0.2.6")
+}
+
+const (
+	claudeAgent      = root + "/" + engineconfig.ClaudeAgentFile
+	integrationOnly  = "{\n  \"enabledPlugins\": {\n    \"gabo@gabo-ai\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"gabo-ai\": {\n      \"source\": {\n        \"source\": \"github\",\n        \"repo\": \"testeos-z/gabo-ai\"\n      }\n    }\n  }\n}\n"
+	withGaboAgent    = "{\n  \"enabledPlugins\": {\n    \"gabo@gabo-ai\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"gabo-ai\": {\n      \"source\": {\n        \"source\": \"github\",\n        \"repo\": \"testeos-z/gabo-ai\"\n      }\n    }\n  },\n  \"agent\": \"gabo-assistant\"\n}\n"
+	buildAgentStep   = "  - claude: ask your agent to build the agents (the main session needs .claude/agents/gabo-assistant.md)\n"
+	removedGaboAgent = `removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is codex)`
+)
+
+// Intent 0010 S1, S8: with Claude Code as the assistant a fresh project gets
+// the agent key with the integration keys, and the report names agent and
+// the build step while the agent file is missing.
+func TestEngineStepClaudeAssistantGolden(t *testing.T) {
+	t.Parallel()
+	s := newStore(map[string]string{})
+	r := engineStepAs(s, "claude", engineconfig.Set("codex", "claude", "claude")...)
+	if r.Failed() {
+		t.Fatalf("failed:\n%s", r.Render())
+	}
+	golden(t, "engines-claude-assistant.golden", r.Render())
+	if !strings.Contains(s.Files[claudeFile], `"agent": "gabo-assistant"`) {
+		t.Fatalf("%s =\n%s", claudeFile, s.Files[claudeFile])
+	}
+	// Once the agent is built, the next run changes nothing and drops the step.
+	s.Files[claudeAgent] = "---\nname: gabo-assistant\n---\n"
+	s.Writes = nil
+	again := engineStepAs(s, "claude", engineconfig.Set("codex", "claude")...)
+	if len(s.Writes) != 0 || strings.Contains(again.Render(), "main session needs") {
+		t.Fatalf("second run wrote %v:\n%s", s.Writes, again.Render())
+	}
+}
+
+// Intent 0010 S1: the existing integration keys keep every byte, the user's
+// own agent is kept and reported, and an unreadable or symlinked file is
+// refused with one ✗ line.
+func TestEngineStepClaudeAgentKey(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		files  map[string]string
+		modes  map[string]fs.FileMode
+		want   string // the file after the run
+		lines  []string
+		failed bool
+	}{
+		{"adds agent", map[string]string{claudeFile: integrationOnly}, nil, withGaboAgent,
+			[]string{"wrote .claude/settings.json: added agent"}, false},
+		{"already set", map[string]string{claudeFile: withGaboAgent}, nil, withGaboAgent,
+			[]string{"unchanged .claude/settings.json"}, false},
+		{"user's agent", map[string]string{claudeFile: strings.Replace(withGaboAgent, "gabo-assistant", "my-agent", 1)}, nil,
+			strings.Replace(withGaboAgent, "gabo-assistant", "my-agent", 1),
+			[]string{`kept .claude/settings.json agent: "my-agent" (your setting; gabo leaves it)`}, false},
+		{"invalid JSON", map[string]string{claudeFile: `{"agent": `}, nil, `{"agent": `,
+			[]string{"✗ .claude/settings.json: invalid JSON (unexpected end of JSON input); fix it and run gabo init again"}, true},
+		{"top level not an object", map[string]string{claudeFile: `[]`}, nil, `[]`,
+			[]string{"✗ .claude/settings.json: the top level is not a JSON object; fix it and run gabo init again"}, true},
+		{"symlink", map[string]string{claudeFile: integrationOnly}, map[string]fs.FileMode{claudeFile: fs.ModeSymlink}, integrationOnly,
+			[]string{"✗ .claude/settings.json: it is a symlink; gabo init writes only inside the project, so replace it with a real file and run gabo init again"}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(maps.Clone(tt.files))
+			s.Modes = tt.modes
+			r := engineStepAs(s, "claude", "claude")
+			if got := s.Files[claudeFile]; got != tt.want {
+				t.Fatalf("%s =\n%s\nwant\n%s", claudeFile, got, tt.want)
+			}
+			if got := sectionOf(t, r, "claude").Lines; !slices.Equal(got, tt.lines) {
+				t.Fatalf("lines = %q, want %q", got, tt.lines)
+			}
+			if r.Failed() != tt.failed {
+				t.Fatalf("Failed() = %v, want %v", r.Failed(), tt.failed)
+			}
+		})
+	}
+}
+
+// Intent 0010 S4, D2: another assistant engine removes only the gabo value
+// and its comma, also when claude is no longer in runtimes.*; the user's own
+// agent stays; a file of an engine outside the set that gabo cannot read is
+// left alone without a ✗ line.
+func TestEngineStepRemovesTheGaboAgent(t *testing.T) {
+	t.Parallel()
+	t.Run("claude still in runtimes", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(map[string]string{claudeFile: withGaboAgent})
+		r := engineStepAs(s, "codex", engineconfig.Set("claude", "codex")...)
+		if s.Files[claudeFile] != integrationOnly {
+			t.Fatalf("%s =\n%s", claudeFile, s.Files[claudeFile])
+		}
+		if got := sectionOf(t, r, "claude").Lines; !slices.Equal(got, []string{removedGaboAgent}) {
+			t.Fatalf("lines = %q", got)
+		}
+	})
+	t.Run("claude no longer in runtimes", func(t *testing.T) {
+		t.Parallel()
+		s := newStore(map[string]string{claudeFile: withGaboAgent})
+		r := engineStepAs(s, "codex", "codex")
+		if s.Files[claudeFile] != integrationOnly {
+			t.Fatalf("%s =\n%s", claudeFile, s.Files[claudeFile])
+		}
+		golden(t, "engines-agent-removed.golden", r.Render())
+		if r.Failed() {
+			t.Fatal("Failed() = true")
+		}
+		s.Writes = nil
+		again := engineStepAs(s, "codex", "codex")
+		if slices.Contains(s.Writes, claudeFile) || strings.Contains(again.Render(), "claude") {
+			t.Fatalf("second run wrote %v:\n%s", s.Writes, again.Render())
+		}
+	})
+	for name, tt := range map[string]struct {
+		file  string
+		modes map[string]fs.FileMode
+	}{
+		"user's agent stays":  {strings.Replace(withGaboAgent, "gabo-assistant", "my-agent", 1), nil},
+		"invalid JSON stays":  {`{"agent": "gabo-assistant"`, nil},
+		"symlink is not read": {withGaboAgent, map[string]fs.FileMode{claudeFile: fs.ModeSymlink}},
+		".claude symlink":     {withGaboAgent, map[string]fs.FileMode{root + "/.claude": fs.ModeSymlink | fs.ModeDir}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(map[string]string{claudeFile: tt.file})
+			s.Modes = tt.modes
+			r := engineStepAs(s, "codex", "codex")
+			if s.Files[claudeFile] != tt.file || slices.Contains(s.Writes, claudeFile) {
+				t.Fatalf("%s touched: %q, writes %v", claudeFile, s.Files[claudeFile], s.Writes)
+			}
+			if r.Failed() || strings.Contains(r.Render(), "claude") {
+				t.Fatalf("report:\n%s", r.Render())
+			}
+		})
 	}
 }

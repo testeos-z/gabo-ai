@@ -106,3 +106,54 @@ func TestPackageSourceDoesNoMachineLookup(t *testing.T) {
 		t.Fatal("no package source checked")
 	}
 }
+
+// S4, D2: the gabo main-session value of an engine that is no longer in
+// runtimes.* is still removed, and only that member; any other value, an
+// engine still in the set, a missing or unreadable file and no assistant
+// change nothing and add no section.
+func TestRemoveMainSessionOfEnginesNotInTheSet(t *testing.T) {
+	gabo := "{\n  \"permissions\": {},\n  \"agent\": \"gabo-assistant\"\n}\n"
+	cases := []struct {
+		name      string
+		set       []string
+		assistant string
+		file      *string
+		out       string
+		lines     []string
+	}{
+		{"claude not in runtimes", Set("codex"), "codex", &gabo, "{\n  \"permissions\": {}\n}\n",
+			[]string{`removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is codex)`}},
+		{"user's agent stays", Set("codex"), "codex", ptr(strings.Replace(gabo, "gabo-assistant", "my-agent", 1)), "", nil},
+		{"claude in the set is left to its rule", Set("claude", "codex"), "codex", &gabo, "", nil},
+		{"no file", Set("codex"), "codex", nil, "", nil},
+		{"invalid JSON", Set("codex"), "codex", ptr(`{"agent": "gabo-assistant"`), "", nil},
+		{"no assistant", Set("codex"), "", &gabo, "", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			in := Input{Files: map[string][]byte{}, Version: "0.2.6", Assistant: c.assistant}
+			if c.file != nil {
+				in.Files[ClaudeSettings] = []byte(*c.file)
+			}
+			report, writes := Remove(c.set, in)
+			if c.out == "" {
+				if len(writes) != 0 || len(report.Sections) != 0 {
+					t.Fatalf("writes %q sections %+v, want none", writes, report.Sections)
+				}
+				return
+			}
+			if len(writes) != 1 || string(writes[ClaudeSettings]) != c.out {
+				t.Fatalf("writes %q, want %s =\n%s", writes, ClaudeSettings, c.out)
+			}
+			if len(report.Sections) != 1 || report.Sections[0].Engine != Claude || !slices.Equal(report.Sections[0].Lines, c.lines) || len(report.Sections[0].Steps) != 0 {
+				t.Fatalf("sections = %+v, want one claude section with %q and no step", report.Sections, c.lines)
+			}
+			if report.Failed() {
+				t.Fatal("Failed() = true")
+			}
+		})
+	}
+	if !Removable(Claude) || Removable(Codex) || Removable("acme") {
+		t.Error("Removable: want only claude in this task")
+	}
+}
