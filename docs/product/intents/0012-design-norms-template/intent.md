@@ -52,7 +52,7 @@ The first attempt (PR #163, the template; PR #168, its plan) was closed on 2026-
 | intent issue | [#374 I0012: Design norms template](https://github.com/testeos-z/gabo-ai/issues/374) |
 | PRD | [PRD](../../PRD.md) R20 |
 | spec | [spec](spec.md) (accepted 2026-11-06) |
-| plan | not written yet (gabo-dev-lead, after acceptance) |
+| plan | [plan](plan.md) |
 | origin | [cappy-lab/vulcam#624](https://github.com/cappy-lab/vulcam/issues/624) (owner decisions 2026-10-30) |
 | earlier requests | [#162](https://github.com/testeos-z/gabo-ai/issues/162) (DESIGN.md norms template), [#164](https://github.com/testeos-z/gabo-ai/issues/164) (UX_UI split) |
 | earlier PRs (closed) | [#163](https://github.com/testeos-z/gabo-ai/pull/163) (branch `feat/design-template`, the template), [#168](https://github.com/testeos-z/gabo-ai/pull/168) (branch `docs/plan-t078-t079-design-template`, plan T078 and T079) |
