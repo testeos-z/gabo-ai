@@ -304,3 +304,32 @@ func TestPlanChangeAgentsLoadThePlanReviewerSkill(t *testing.T) {
 		t.Errorf("agent %s: not in the spec", id)
 	}
 }
+
+// Spec 0010 S5: the Main-Session Entry table names `gabo init` as the writer of
+// `agent` and `default_agent`; the runtime skill builds the agent file and
+// link, and writes no engine config key.
+func TestAgentTemplatesMainSessionEntryNamesGaboInitAsKeyWriter(t *testing.T) {
+	t.Parallel()
+	skill := embeddedByPath(t)[agentspec.Dir+"/SKILL.md"]
+	_, sec, ok := strings.Cut(skill, "## Main-Session Entry")
+	if !ok {
+		t.Fatalf("%s/SKILL.md: no ## Main-Session Entry section", agentspec.Dir)
+	}
+	sec, _, _ = strings.Cut(sec, "\n## ")
+	for _, s := range []string{
+		"`gabo init` writes the one key `agent: \"gabo-assistant\"`",
+		"`gabo init` writes the one key `default_agent: \"gabo-assistant\"`",
+		"the runtime skill of that engine builds the agent file and the link",
+		"`gabo init` removes the key of each other engine",
+	} {
+		if !strings.Contains(sec, s) {
+			t.Errorf("%s/SKILL.md ## Main-Session Entry: missing %q", agentspec.Dir, s)
+		}
+	}
+	for _, s := range []string{"merged into `.claude/settings.json`", "Merge only the one key", "writes and refreshes its row"} {
+		if strings.Contains(sec, s) {
+			t.Errorf("%s/SKILL.md ## Main-Session Entry: still says the runtime skill writes the key: %q", agentspec.Dir, s)
+		}
+	}
+	assertKeyLinesNameGaboInit(t, agentspec.Dir+"/SKILL.md", sec)
+}
