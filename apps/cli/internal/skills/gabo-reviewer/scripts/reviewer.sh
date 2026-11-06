@@ -5,6 +5,10 @@
 #   reviewer.sh due <pr> <sha>       exit 0 when that head is due, else 1
 #   reviewer.sh list-due             prints "<pr> <sha>" for each due head
 #   reviewer.sh once                 reviews every due head, one at a time
+# Every mode takes a trailing `engine <claude|codex|pi|opencode>`, required
+# when runtimes.reviewer (or REVIEWER_ENGINE) is `session` and refused
+# otherwise; under session the engine must be listed in runtimes.assistant on
+# the integration branch (intent 0013 S11, D5).
 # Run it from a checkout of the repository (its gabo.yaml names the
 # repository and the integration branch) or set REVIEWER_REPO. Every other
 # repository setting comes from gabo.yaml in the reviewer's own clean checkout
@@ -22,21 +26,36 @@ source "$(dirname "$0")/common.sh"
 HEAD_SCRIPT="$reviewer_dir/review-head.sh"
 mode="${1:-}"
 usage() {
-  echo "usage: reviewer.sh preflight|once|list-due|due <pr> <sha>|head <pr> <40-hex sha>" >&2
+  echo "usage: reviewer.sh preflight|once|list-due|due <pr> <sha>|head <pr> <40-hex sha> [engine <engine>]" >&2
   exit 2
 }
 [[ "$mode" =~ ^(once|preflight|list-due|due|head)$ ]] || usage
+nargs=1
 if [[ "$mode" == due || "$mode" == head ]]; then
   is_number "${2:-}" && [[ "${3:-}" =~ ^[0-9a-f]{40}$ ]] || usage
+  nargs=3
 fi
+# The optional trailing `engine <engine>` (intent 0013 S11, D5).
+extra=("${@:nargs+1}")
+((${#extra[@]} == 0)) || [[ "${extra[0]}" == engine ]] || usage
 
 preflight_failed() {
   echo "PREFLIGHT-FAILED $1"
   [[ "$mode" != head ]] || echo "VERDICT PR #$2 head $3 verdict=error merge=none"
   exit 2
 }
+# The engine argument is checked before anything else uses it.
+ARG_ENGINE_SET=false
+ARG_ENGINE=""
+if ((${#extra[@]})); then
+  ((${#extra[@]} == 2)) || preflight_failed "the engine argument needs exactly one value: engine <claude|codex|pi|opencode>" "${2:-}" "${3:-}"
+  problem="$(engine_arg_shape_problem "${extra[1]}")"
+  [[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
+  ARG_ENGINE_SET=true
+  ARG_ENGINE="${extra[1]}"
+fi
 [[ -z "${SUDO_USER:-}" ]] || preflight_failed "single-user mode runs as the calling user, never through sudo" "${2:-}" "${3:-}"
-problem="$(validate_static)"
+problem="$(validate_static unresolved)"
 [[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
 problem="$(repo_copy_problem)"
 [[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
@@ -47,6 +66,17 @@ for tool in jq flock git setsid; do
 done
 problem="$(sync_base)" || preflight_failed "${problem:-could not update the reviewer checkout of $BASE_BRANCH}" "${2:-}" "${3:-}"
 load_base_config
+# Resolves runtimes.reviewer session to the engine argument; refuses the
+# argument under a fixed engine and session without it.
+problem="$(engine_arg_problem "$ARG_ENGINE_SET" "$ARG_ENGINE")"
+[[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
+if [[ "$ENGINE" == session ]]; then
+  SESSION_ENGINE=true
+  ENGINE="$ARG_ENGINE"
+  # The child scripts review on the resolved engine.
+  REVIEWER_ENGINE="$ARG_ENGINE"
+  export REVIEWER_ENGINE
+fi
 problem="$(validate_config)"
 [[ -z "$problem" ]] || preflight_failed "$problem" "${2:-}" "${3:-}"
 problem="$(minimum_problem)"
