@@ -4,7 +4,7 @@ description: "Trigger: gabo wave report, build wave report, save wave report, wa
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.0"
+  version: "1.1"
 ---
 ## Activation Contract
 
@@ -19,7 +19,7 @@ Load in `gabo-cycle` when it builds the wave report (J3) and in the assistant wh
 
 ## Report Format (TRD 9.2)
 
-1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`.
+1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`, and the line `session engine: <engine>`, the engine the wave ran on (intent 0013 S7; `unknown (rebuild the agents)` when the cycle's agent has no engine line). When `runtimes.coder` is a fixed engine other than the session engine, also the line `coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`.
 2. **Tasks**: one line per task: task id, status (DONE, HANDED, BLOCKED), PR, last verdict, fix rounds, coder handle. A BLOCKED task adds its reason.
 3. **Questions**: each question raised with its answer and resolver (R5), and whether it was a manual answer or an auto decision record.
 4. **Interactions**: interaction count with the reasons for each interaction with the owner (R29).
