@@ -62,8 +62,13 @@ func TestRuntimeOpenCodeDeclaresItsDirs(t *testing.T) {
 	if got := fm.Metadata["agent_dir"]; got != ".opencode/agents" {
 		t.Errorf("metadata.agent_dir = %v, want .opencode/agents", got)
 	}
-	if got := fm.Metadata["skill_dir"]; got != ".opencode/skills" {
-		t.Errorf("metadata.skill_dir = %v, want .opencode/skills", got)
+	// intent 0008 S3, S4: links live in the shared .agents/skills;
+	// .opencode/skills is where the links were made before the move.
+	if got := fm.Metadata["skill_dir"]; got != ".agents/skills" {
+		t.Errorf("metadata.skill_dir = %v, want .agents/skills", got)
+	}
+	if got := fm.Metadata["former_skill_dir"]; got != ".opencode/skills" {
+		t.Errorf("metadata.former_skill_dir = %v, want .opencode/skills", got)
 	}
 	if got, ok := fm.Metadata["reviewer_link"]; ok {
 		t.Errorf("metadata.reviewer_link = %v, want no such key (D5)", got)
@@ -214,7 +219,7 @@ func TestRuntimeOpenCodeReviewerRules(t *testing.T) {
 	doc := runtimeOpenCodeDoc(t)
 	for _, want := range []string{
 		"Never place `gabo-reviewer` in the project",
-		"never create `.opencode/skills/gabo-reviewer`",
+		"never create `.agents/skills/gabo-reviewer`",
 		"no reviewer link",
 		"every agent but `gabo-reviewer`",
 		"`gabo-reviewer: deny`",
@@ -242,19 +247,21 @@ func TestRuntimeOpenCodeFillsEverySlot(t *testing.T) {
 }
 
 // The link rules: each spec skill and each SKILL.md slot adapter is a
-// relative symlink in .opencode/skills, the reviewer-configuration skill is
-// linked like a spec skill and survives every rebuild, any other gabo-* link
-// is removed, and gabo-reviewer is never linked (S5, S14, D11, D12).
+// relative symlink in the shared .agents/skills (intent 0008 S3), the
+// reviewer-configuration skill is linked like a spec skill and survives every
+// rebuild, any other gabo-* link this skill made is removed under the
+// shared-directory rule, and gabo-reviewer is never linked (S5, S14, D11, D12).
 func TestRuntimeOpenCodeLinkRules(t *testing.T) {
 	t.Parallel()
 	doc := runtimeOpenCodeDoc(t)
 	steps := openCodeSection(t, doc, "Build Steps")
 	for _, want := range []string{
-		"make `.opencode/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`",
-		"make `.opencode/skills/gabo-reviewer-config` a relative symlink to `../../.gabo/skills/gabo-reviewer-config`",
+		"make `.agents/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`",
+		"make `.agents/skills/gabo-reviewer-config` a relative symlink to `../../.gabo/skills/gabo-reviewer-config`",
 		"on every build, also when it already exists",
-		"remove each `.opencode/skills/gabo-*` symlink that no spec skill or slot asks for any more, except `.opencode/skills/gabo-reviewer-config`",
-		"never create `.opencode/skills/gabo-reviewer`",
+		"remove each `.agents/skills/gabo-*` symlink that no spec skill or slot asks for any more and that this skill made",
+		"except `.agents/skills/gabo-reviewer-config`",
+		"never create `.agents/skills/gabo-reviewer`",
 	} {
 		if !strings.Contains(steps, want) {
 			t.Errorf("## Build Steps: missing %q", want)
@@ -262,7 +269,7 @@ func TestRuntimeOpenCodeLinkRules(t *testing.T) {
 	}
 	fixed := openCodeSection(t, doc, "Fixed-Name Links")
 	for _, want := range []string{
-		"whose adapter is a `<folder>/SKILL.md` gets one link `.opencode/skills/gabo-<slot>` (`_` written `-`)",
+		"whose adapter is a `<folder>/SKILL.md` gets one link `.agents/skills/gabo-<slot>` (`_` written `-`)",
 		"as a relative symlink",
 	} {
 		if !strings.Contains(fixed, want) {
@@ -285,7 +292,7 @@ func TestRuntimeOpenCodeLinkRules(t *testing.T) {
 // Each agent names its skills by path in one line (S5, D4).
 func TestRuntimeOpenCodeSkillsLine(t *testing.T) {
 	t.Parallel()
-	const want = "Skills: before work read .opencode/skills/<name>/SKILL.md for each of <spec skills, then the fixed-name links the body names>."
+	const want = "Skills: before work read .agents/skills/<name>/SKILL.md for each of <spec skills, then the fixed-name links the body names>."
 	doc := runtimeOpenCodeDoc(t)
 	m := markdownFence.FindStringSubmatch(doc)
 	if m == nil {
@@ -363,7 +370,7 @@ func TestRuntimeOpenCodeSubagentDepthRule(t *testing.T) {
 func TestRuntimeOpenCodeWriteList(t *testing.T) {
 	t.Parallel()
 	doc := runtimeOpenCodeDoc(t)
-	const list = "Write only `.opencode/agents/<id>.md` for spec ids, `.opencode/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete, and the project-level key `experimental.subagent_depth` of the Prerequisites, merged into one project config file."
+	const list = "Write only `.opencode/agents/<id>.md` for spec ids, `.agents/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete, and the project-level key `experimental.subagent_depth` of the Prerequisites, merged into one project config file."
 	rules := openCodeSection(t, doc, "Hard Rules")
 	if !strings.Contains(rules, list) {
 		t.Errorf("## Hard Rules: missing the write list %q", list)
@@ -434,5 +441,57 @@ func TestRuntimeOpenCodeDeclaresAgentPlaces(t *testing.T) {
 	skills, name := runtimeAgentPlaces(t, "gabo-runtime-opencode/SKILL.md")
 	if skills != "line:Skills:" || name != "" {
 		t.Fatalf("agent_skills, agent_name = %q, %q; want line:Skills: and none", skills, name)
+	}
+}
+
+// intent 0008 S3, S4: the OpenCode build places every link in the shared
+// .agents/skills, names it in the Skills: line, and migrates the links it
+// made in .opencode/skills: it removes only its own symlinks and leaves and
+// reports anything else.
+func TestRuntimeOpenCodeMovesToAgentsSkills(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	steps := openCodeSection(t, doc, "Build Steps")
+	for _, s := range []string{
+		"remove each `.opencode/skills/gabo-*` symlink that this skill made",
+		"one that points into `../../.gabo/skills/` or to a slot adapter folder of `gabo.yaml`",
+		"`.opencode/skills/gabo-reviewer-config` included",
+		"Leave and report any other entry of `.opencode/skills/`, and never remove a real folder or file.",
+		"`gabo check` fails on such a leftover: `✗ .opencode/skills/<name>: gabo link left after the move to .agents/skills`",
+	} {
+		if !strings.Contains(steps, s) {
+			t.Errorf("## Build Steps: missing %q", s)
+		}
+	}
+	if out := openCodeSection(t, doc, "Output Contract"); !strings.Contains(out, "each `.opencode/skills/` link removed and each entry left with why") {
+		t.Errorf("## Output Contract does not report the migration")
+	}
+	for _, s := range []string{"`.opencode/skills/<name>`", "read .opencode/skills/<name>/SKILL.md", "`.opencode/skills/gabo-<slot>`", "`.opencode/skills/` links"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: still places links in .opencode/skills: %q", runtimeOpenCode, s)
+		}
+	}
+}
+
+// intent 0008 S5: removing unneeded links in the shared directory keeps
+// every link a declared engine needs, the assistant link included.
+func TestRuntimeOpenCodeKeepsSharedLinks(t *testing.T) {
+	t.Parallel()
+	assertSharedRemovalRule(t, runtimeOpenCode, runtimeOpenCodeDoc(t))
+}
+
+// intent 0008 S5, D6: the Sources cite the T9 probe of OpenCode with the same
+// skill in .claude/skills and .agents/skills.
+func TestRuntimeOpenCodeCitesTheDuplicateProbe(t *testing.T) {
+	t.Parallel()
+	s := openCodeSection(t, runtimeOpenCodeDoc(t), "Sources")
+	for _, want := range []string{
+		"https://github.com/testeos-z/gabo-ai/issues/315#issuecomment-6689595417",
+		"lists it once",
+		"`.claude/skills` before `.agents/skills`",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("## Sources: missing %q", want)
+		}
 	}
 }
