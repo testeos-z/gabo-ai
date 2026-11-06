@@ -7,6 +7,7 @@ metadata:
   version: "0.1"
   agent_dir: .opencode/agents
   skill_dir: .opencode/skills
+  agent_skills: "line:Skills:"
 ---
 ## Activation Contract
 
