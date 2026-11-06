@@ -95,3 +95,28 @@ func TestReviewerConfigIsolationShellTests(t *testing.T) {
 		t.Fatalf("isolation shell tests: %v\n%s", err, out)
 	}
 }
+
+// Intent 0013 S11: the owner may answer session; then the CLI check and the
+// isolation test run once for each codex or opencode engine listed in
+// runtimes.assistant, and any failure leaves runtimes.reviewer unchanged.
+func TestReviewerConfigAcceptsSession(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(Catalog(), "gabo-reviewer-config/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(b)
+	for _, s := range []string{
+		"the four engines of the table or `session` as the only answers",
+		"`session` reviews each wave on the engine of the main session that starts it, one of the engines listed in `runtimes.assistant`",
+		"for each engine listed in `runtimes.assistant`",
+		"once for each listed `codex` or `opencode` engine",
+		"If any of them fails, leave `runtimes.reviewer` unchanged",
+		"Set `runtimes.reviewer` to the engine, or to `session`,",
+		"the isolation test result per listed engine",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-reviewer-config/SKILL.md: missing %q", s)
+		}
+	}
+}
