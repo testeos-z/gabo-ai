@@ -164,19 +164,19 @@ func TestRuntimeClaudeProbesEveryLink(t *testing.T) {
 }
 
 // The Claude Code skill carries the narrowed engine-config rule (intent 0004
-// S8, D7): `gabo init` writes the project-level gabo integration keys
-// (intent 0006 S13), and the skill itself writes only the main-session key
-// (spec 0009 S2, D3).
+// S8, D7): `gabo init` writes every engine config key, the main-session key
+// `agent` included, and the skill writes none (intent 0010 S5).
 func TestRuntimeClaudeNarrowsTheEngineConfigRule(t *testing.T) {
 	t.Parallel()
 	doc := runtimeClaudeDoc(t)
 	assertEngineConfigRule(t, runtimeClaude, doc,
 		"Claude Code needs no engine key today, so this skill writes no settings file",
 		"this skill writes no settings file",
+		"this skill writes only the one main-session key `agent` in `.claude/settings.json`",
 	)
 	for _, s := range []string{
 		"Never install or upgrade Claude Code", "`~/.claude/settings.json`",
-		"`gabo init` writes the project-level gabo integration keys (intent 0006); this skill writes only the one main-session key `agent` in `.claude/settings.json` (Main-Session Entry).",
+		"`gabo init` writes every engine config key (intent 0010 S5), the main-session key `agent` in `.claude/settings.json` included; this skill writes none",
 	} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("%s: missing %q", runtimeClaude, s)
@@ -301,7 +301,7 @@ func TestRuntimeClaudeWritesTheMainSessionEntry(t *testing.T) {
 		"`.claude/agents/gabo-assistant.md`", "`main_session.template`", "`main_session.role`",
 		"gabo-version: <x.y.z, unquoted>", "the filled body without its first line `gabo-version: …`",
 		"never an empty body",
-		"`agent: \"gabo-assistant\"`", "`.claude/settings.json`", "keep every other byte",
+		"`.claude/settings.json`",
 		"a user's own `agent` value", "keep it and report it",
 		"`.gabo/skills/gabo-assistant/SKILL.md`",
 	} {
@@ -320,7 +320,6 @@ func TestRuntimeClaudeRemovesItsOwnEntry(t *testing.T) {
 		"`runtimes.assistant` is not `claude`",
 		"the `.claude/skills/gabo-assistant` symlink",
 		"`.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
-		"the `agent` key only when its value is exactly `gabo-assistant`",
 	} {
 		if !strings.Contains(section, s) {
 			t.Errorf("%s Main-Session Entry: missing %q", runtimeClaude, s)
@@ -338,8 +337,6 @@ func TestRuntimeClaudeRemovesOtherEnginesEntries(t *testing.T) {
 		"On every build", "Main-Session Entry table of `gabo-agent-templates`",
 		"`<!-- GABO_ASSISTANT_START -->`", "`<!-- GABO_ASSISTANT_END -->`",
 		"`AGENTS.override.md`", "`AGENTS.md`", "`CLAUDE.md`",
-		"`default_agent: \"gabo-assistant\"`", "`opencode.json`", "`opencode.jsonc`",
-		"`.opencode/opencode.json`", "`.opencode/opencode.jsonc`",
 		"`.opencode/agents/gabo-assistant.md`", "`.agents/skills/gabo-assistant`",
 		"never a piece the entry of `runtimes.assistant` also uses",
 	} {
@@ -359,6 +356,52 @@ func TestRuntimeClaudeRemovesOtherEnginesEntries(t *testing.T) {
 			t.Errorf("%s Main-Session Entry: T1 table names %q, the skill does not", runtimeClaude, m[1])
 		}
 	}
+}
+
+// intent 0010 S4, S5: gabo init writes and removes Claude Code's `agent`
+// key and OpenCode's `default_agent`, so the Main-Session Entry drops its
+// step 3 merge and both removals, keeps the agent file, the link and the
+// removal of other engines' agent files and links, and reports
+// `run gabo init` when `agent` is missing.
+func TestRuntimeClaudeLeavesEngineConfigKeysToGaboInit(t *testing.T) {
+	t.Parallel()
+	section := mainSessionSection(t)
+	mustContainIn(t, runtimeClaude+" Main-Session Entry", section,
+		"1. Link `.claude/skills/gabo-assistant`",
+		"2. Write `.claude/agents/gabo-assistant.md`",
+		"`gabo init` writes the `agent` key of `.claude/settings.json` (intent 0010 S4); this skill only reads it",
+		"report `run gabo init`",
+		"Never remove Claude Code's `agent` key or OpenCode's `default_agent` key: `gabo init` removes them (intent 0010 S4)",
+		"`.opencode/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
+		"`.agents/skills/gabo-assistant`, when it is a symlink",
+	)
+	mustLackIn(t, runtimeClaude+" Main-Session Entry", section,
+		"3. Merge",
+		"Merge `agent: \"gabo-assistant\"`",
+		"the `agent` key only when its value is exactly `gabo-assistant`",
+		"`default_agent: \"gabo-assistant\"`",
+	)
+	for _, l := range strings.Split(section, "\n") {
+		if strings.HasPrefix(l, "3. ") {
+			t.Errorf("%s Main-Session Entry: still has a step 3: %.80s", runtimeClaude, l)
+		}
+	}
+	assertKeyLinesNameGaboInit(t, runtimeClaude, skillBody(t, runtimeClaudeDoc(t)))
+}
+
+// skillBody returns a skill without its YAML frontmatter, whose
+// metadata.main_session names the key gabo check reads (spec 0009 D5).
+func skillBody(t *testing.T, doc string) string {
+	t.Helper()
+	rest, ok := strings.CutPrefix(doc, "---\n")
+	if !ok {
+		t.Fatal("no frontmatter")
+	}
+	_, body, ok := strings.Cut(rest, "\n---\n")
+	if !ok {
+		t.Fatal("unterminated frontmatter")
+	}
+	return body
 }
 
 // The probe of build step 8 gains the main-session check (spec 0009 D2, S2):
