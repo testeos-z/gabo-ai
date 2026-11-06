@@ -174,3 +174,12 @@ func TestRuntimeCodexCitesItsSources(t *testing.T) {
 		}
 	}
 }
+
+// intent 0008 S2, D1.
+func TestRuntimeCodexDeclaresAgentPlaces(t *testing.T) {
+	t.Parallel()
+	skills, name := runtimeAgentPlaces(t, runtimeCodex)
+	if skills != "line:Load these skills by name before work:" || name != "toml:name" {
+		t.Fatalf("agent_skills, agent_name = %q, %q; want line:Load these skills by name before work:, toml:name", skills, name)
+	}
+}

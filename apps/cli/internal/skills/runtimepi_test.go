@@ -96,3 +96,12 @@ func TestRuntimePiNarrowsTheEngineConfigRule(t *testing.T) {
 		}
 	}
 }
+
+// intent 0008 S2, D1.
+func TestRuntimePiDeclaresAgentPlaces(t *testing.T) {
+	t.Parallel()
+	skills, name := runtimeAgentPlaces(t, "gabo-runtime-pi/SKILL.md")
+	if skills != "line:Skills:" || name != "frontmatter:name" {
+		t.Fatalf("agent_skills, agent_name = %q, %q; want line:Skills:, frontmatter:name", skills, name)
+	}
+}

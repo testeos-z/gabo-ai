@@ -159,7 +159,7 @@ func TestEngineKeysPi(t *testing.T) {
 	cfg := configFiles{projectFile: strings.Replace(validConfig, "coder: claude", "coder: pi", 1)}
 	proj := with(project(), map[string]string{
 		".claude/settings.json":                   claudeKeysJSON,
-		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n---\n",
+		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n  agent_skills: \"line:Skills:\"\n---\n",
 		".pi/agents/alpha.md":                     "---\ngabo-version: 1.2.3\n---\n",
 		".pi/agents/beta.md":                      "---\ngabo-version: 1.2.3\n---\n",
 	})

@@ -153,3 +153,17 @@ func TestRuntimeBuilderNarrowsTheEngineConfigRule(t *testing.T) {
 	)
 	mustContain(t, doc, "Never install or upgrade the engine")
 }
+
+// A runtime skill the builder writes declares where its agent files keep
+// their skill list and name, in the forms gabo check reads (intent 0008 D1).
+func TestRuntimeBuilderTeachesAgentPlaces(t *testing.T) {
+	t.Parallel()
+	doc := runtimeBuilderDoc(t)
+	_, shape, ok := strings.Cut(doc, "## Runtime Skill Shape")
+	if !ok {
+		t.Fatalf("%s: no ## Runtime Skill Shape section", runtimeBuilder)
+	}
+	shape, _, _ = strings.Cut(shape, "\n## ")
+	mustContain(t, shape, "`metadata.agent_skills`", "`metadata.agent_name`",
+		"`frontmatter:<key>`", "`toml:<key>`", "`line:<prefix>`")
+}

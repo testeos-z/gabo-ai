@@ -6,6 +6,8 @@ metadata:
   author: gabo-ai
   version: "1.0"
   agent_dir: .pi/agents
+  agent_skills: "line:Skills:"
+  agent_name: frontmatter:name
 ---
 ## Activation Contract
 

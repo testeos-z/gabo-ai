@@ -45,7 +45,7 @@ const spec = `agents:
     template: agents/beta.md
 `
 
-const claudeSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\nbody\n"
+const claudeSkill = "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n  agent_skills: frontmatter:skills\n---\nbody\n"
 
 // configFiles is an in-memory config.Reader.
 type configFiles map[string]string
@@ -310,7 +310,7 @@ func TestBuilderWrittenRuntimeSkill(t *testing.T) {
 	t.Parallel()
 	pi := strings.ReplaceAll(validConfig, "coder: claude", "coder: pi")
 	proj := with(project(), map[string]string{
-		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n---\n",
+		".gabo/runtimes/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n  agent_skills: \"line:Skills:\"\n---\n",
 		".pi/agents/alpha.md":                     "---\ngabo-version: 1.2.3\n---\n",
 	})
 	r := run(t, proj, configFiles{projectFile: pi}, Settings{})
