@@ -59,7 +59,7 @@ func (u *UseCase) checkSubagentDepth(r *Report, cfg config.Config) error {
 		// Ask gabo init, in memory: a file it refuses names its reason, so the
 		// hint never loops (intent 0010 D7).
 		set := engineconfig.Set(runtimesOf(cfg)...)
-		run, err := u.initDryRun(set, string(config.RuntimeOpencode), string(cfg.Runtimes.Assistant), opencodeConfigs)
+		run, err := u.initDryRun(set, string(config.RuntimeOpencode), string(cfg.Runtimes.Assistant.Single()), opencodeConfigs)
 		if err != nil {
 			return err
 		}

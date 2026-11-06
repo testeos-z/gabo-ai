@@ -89,7 +89,7 @@ func (m *mainSessionMeta) files() []string {
 // entry, and no other full-tier runtime skill of the catalog copy keeps a
 // gabo entry. A catalog without a main_session entry checks nothing.
 func (u *UseCase) checkMainSession(r *Report, cfg config.Config) error {
-	assistant := string(cfg.Runtimes.Assistant)
+	assistant := string(cfg.Runtimes.Assistant.Single()) // "" for a list: its main-session rule is not checked yet
 	catalog, err := fs.Sub(u.project, CatalogDir)
 	if err != nil {
 		return err

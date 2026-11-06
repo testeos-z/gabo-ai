@@ -50,7 +50,8 @@ func (c Config) missingKeys(parallelismSet bool) []string {
 	}
 	add(c.Runtimes.Coder == "", "runtimes.coder")
 	add(c.Runtimes.Reviewer == "", "runtimes.reviewer")
-	add(c.Runtimes.Assistant == "", "runtimes.assistant")
+	// nil is absent; an explicit empty list is set and fails validation.
+	add(c.Runtimes.Assistant == nil, "runtimes.assistant")
 	add(c.Repo.IntegrationBranch == "", "repo.integration_branch")
 	add(c.Review.Checks == nil, "review.checks")
 	add(c.Review.HumanOnlyPaths == nil, "review.human_only_paths")
