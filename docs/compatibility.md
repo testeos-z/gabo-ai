@@ -36,14 +36,13 @@ Status for gabo 0.2.6 (tag `apps/cli/v0.2.6`), checked against the code. **Yes**
   Only that one key or the block is written; every other byte of the file stays. The Claude Code agent carries a short assistant prompt because Claude Code 2.1.302 does not preload a main-session agent's skills. `gabo check` fails on a missing, incomplete or duplicated entry (`✗ <file>: gabo assistant entry missing for <engine>`) and on an entry left for another engine (`✗ <file>: gabo assistant entry for <engine>, but runtimes.assistant is <value>`), each with `next: ask your agent to rebuild the agents, then rerun gabo check`. After you change `runtimes.assistant`, rebuild the agents. In gabo-ai itself the owner commits the Claude Code entry, because `.claude/` is human-only.
 - **Reviewer configuration.** The catalog skill `gabo-reviewer-config` configures any of the four engines as reviewer. For `codex` and `opencode` it runs a one-time isolation test first; the reviewer runs those engines only while its pass marker matches the installed engine version.
 - **Pi needs a subagent package.** Pi core has no subagents. `gabo-runtime-pi` builds nothing until a subagent package is present. It recommends [gentle-pi](https://www.npmjs.com/package/gentle-pi) and, as the full setup, the [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) installed with `gentle-ai install --agent pi`. The gabo Pi package is not a subagent package. See [Your engine](setup-prompt.md#your-engine).
-- **Private repository.** While `testeos-z/gabo-ai` is private, every engine clones it with your own git credentials. Set them up first: run `gh auth setup-git`, or add an SSH key that can read the repository.
 - **Tracking.** All engine work is tracked under the product card [#171 Runtime integrations](https://github.com/testeos-z/gabo-ai/issues/171).
 
 ## Claude Code plugin
 
 The repository is its own Claude Code marketplace, `gabo-ai`, with one plugin, `gabo`. The plugin adds the gabo catalog skills (except the skills that run reviews) and two hooks that run `gabo check` around Claude's writes in a gabo project.
 
-**With `gabo init`.** When `gabo.yaml` names `claude` in `runtimes.*`, `gabo init` adds `extraKnownMarketplaces."gabo-ai"` and `enabledPlugins."gabo@gabo-ai"` to the project's `.claude/settings.json`, never to your global Claude Code settings. Its `engine integration:` report then asks you to trust the project folder in Claude Code, so the marketplace and the plugin apply, and, while the repository is private, to give git credentials that can read it. Commit `.claude/settings.json`. As the alternative, install the plugin at user level by hand:
+**With `gabo init`.** When `gabo.yaml` names `claude` in `runtimes.*`, `gabo init` adds `extraKnownMarketplaces."gabo-ai"` and `enabledPlugins."gabo@gabo-ai"` to the project's `.claude/settings.json`, never to your global Claude Code settings. Its `engine integration:` report then asks you to trust the project folder in Claude Code, so the marketplace and the plugin apply. Commit `.claude/settings.json`. As the alternative, install the plugin at user level by hand:
 
 ```sh
 claude plugin marketplace add testeos-z/gabo-ai
@@ -60,7 +59,7 @@ See [`plugins/claude-code/README.md`](../plugins/claude-code/README.md) for the 
 
 The repository is also a Codex marketplace, `gabo-ai` ([`.agents/plugins/marketplace.json`](../.agents/plugins/marketplace.json)), with one plugin, `gabo`. It ships the same skills as the Claude Code plugin and two hooks that run `gabo check` around Codex's `apply_patch` edits in a gabo project. These steps are for the Codex CLI.
 
-**With `gabo init`.** When `gabo.yaml` names `codex` in `runtimes.*`, `gabo init` adds `[marketplaces.gabo-ai]` and `[plugins."gabo@gabo-ai"]` to the project's `.codex/config.toml`, never to your global Codex config. Its `engine integration:` report then asks you to trust the project in Codex, so it loads `.codex/config.toml`, to trust both gabo hooks in `/hooks` and, while the repository is private, to set up git credentials that can read it. If Codex does not list the gabo plugin after trust, the report tells you to run the two commands below. Commit `.codex/config.toml`. As the alternative, install the plugin by hand:
+**With `gabo init`.** When `gabo.yaml` names `codex` in `runtimes.*`, `gabo init` adds `[marketplaces.gabo-ai]` and `[plugins."gabo@gabo-ai"]` to the project's `.codex/config.toml`, never to your global Codex config. Its `engine integration:` report then asks you to trust the project in Codex, so it loads `.codex/config.toml`, and to trust both gabo hooks in `/hooks`. If Codex does not list the gabo plugin after trust, the report tells you to run the two commands below. Commit `.codex/config.toml`. As the alternative, install the plugin by hand:
 
 ```sh
 codex plugin marketplace add testeos-z/gabo-ai

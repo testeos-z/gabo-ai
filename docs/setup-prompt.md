@@ -37,7 +37,7 @@ cd gabo-ai
 go -C apps/cli install -ldflags "-X main.buildVersion=<x.y.z>" ./cmd/gabo
 ```
 
-While the repository is private, Go must fetch it with your own git credentials: set `GOPRIVATE=github.com/testeos-z/*` so Go skips the public module proxy. Check the install with `gabo version`.
+Check the install with `gabo version`.
 
 ## Your engine
 
