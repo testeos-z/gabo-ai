@@ -11,19 +11,19 @@ import (
 )
 
 // agentSlots are the named slots an agent template may carry (TRD 8.1, D24):
-// identity, the version line, the methodology link and the adapter of each
-// slot. A runtime skill fills exactly these and nothing else.
+// identity, the version line, the engine line (intent 0013 S6), the
+// methodology link and the adapter of each slot. A runtime skill fills
+// exactly these and nothing else.
 var agentSlots = []string{
-	"id", "role", "gabo_version", "methodology",
+	"id", "role", "gabo_version", engineSlot, "methodology",
 	"adapter:tasks", "adapter:repository_host", "adapter:memory",
 	"reviewer_script",
 }
 
 const versionLine = "gabo-version: {{gabo_version}}"
 
-// engineSlot is the slot of the engine line (intent 0013 S6). It joins
-// agentSlots, which the runtime skill tests read, when the runtime skills
-// fill it (plan 0013 T6, T7).
+// engineSlot is the slot of the engine line (intent 0013 S6); every runtime
+// skill fills it (plan 0013 T6, T7), so it is one of agentSlots.
 const engineSlot = "engine"
 
 // engineLine names the engine a built agent was built for (intent 0013 S6,
@@ -115,7 +115,7 @@ func TestAgentTemplatesUseNamedSlotsOnly(t *testing.T) {
 			t.Errorf("%s: hardcodes its id %q; use {{id}}", p, id)
 		}
 		for _, m := range slotPattern.FindAllStringSubmatch(doc, -1) {
-			if !slices.Contains(agentSlots, m[1]) && m[1] != engineSlot {
+			if !slices.Contains(agentSlots, m[1]) {
 				t.Errorf("%s: unknown slot %q", p, m[0])
 			}
 		}

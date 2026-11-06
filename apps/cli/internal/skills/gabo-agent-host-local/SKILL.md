@@ -4,11 +4,11 @@ description: "Trigger: agent host local, agent_host slot, agents on my machine, 
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.0"
+  version: "1.1"
 ---
 ## Activation Contract
 
-Use when an agent starts, stops or reports agent sessions that run on the owner's own machine. This adapter fills the `agent_host` slot contract (`gabo-contract-agent-host`, TRD 9.1; R8, R11, US-007) with the agent CLI of the role's runtime (`runtimes.coder` or `runtimes.assistant`: `claude` or `pi`) run as a local process inside the task worktree. Point `slots.agent_host.adapter` at this skill's `SKILL.md`. Verified against Claude Code 2.1.312 (`claude --help`) and pi 1.4.0 (`pi --help`).
+Use when an agent starts, stops or reports agent sessions that run on the owner's own machine. This adapter fills the `agent_host` slot contract (`gabo-contract-agent-host`, TRD 9.1; R8, R11, US-007) with the agent CLI of the role's resolved engine (`claude` or `pi`, see Engine Resolution) run as a local process inside the task worktree. Point `slots.agent_host.adapter` at this skill's `SKILL.md`. Verified against Claude Code 2.1.312 (`claude --help`) and pi 1.4.0 (`pi --help`).
 
 Subagents launched inside the owner's runtime session (for example `gabo-cycle` launching `gabo-coder`) need no agent host; use this adapter only when a role must run as its own session process.
 
@@ -37,6 +37,15 @@ Subagents launched inside the owner's runtime session (for example `gabo-cycle` 
 
 The role's prompt comes from its built agent and the brief of the caller; the OS user is the owner.
 
+## Engine Resolution
+
+Resolve the role's engine from `gabo.yaml` before any check of `start agent session` (intent 0013 S10); a refusal starts nothing and is reported instead of a handle:
+
+- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the agent that loaded this adapter (for example `gabo-cycle` or `gabo-assistant`). A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
+- Start a `coder` on the resolved coder engine: `runtimes.coder` `session` resolves to the calling session's engine, and a fixed `runtimes.coder` is that engine. Example: `coder: session` from a Pi session ⇒ `pi`.
+- Start an `assistant` only on an engine listed in `runtimes.assistant` (one engine or a list, intent 0013 S4): the engine the caller asks for, or the calling session's engine when it names none. Refuse any other with `refused: <engine> is not listed in runtimes.assistant (<value>)`, `<value>` as written in `gabo.yaml`. Example: with `assistant: [claude, pi]`: an `assistant` on `codex` ⇒ `refused: codex is not listed in runtimes.assistant ([claude, pi])`.
+- This adapter has start commands for `claude` and `pi` only: a resolved `codex` or `opencode` is refused with `refused: <engine> has no local start command in gabo-agent-host-local`.
+
 ## Operations
 
 ### start agent session
@@ -46,7 +55,7 @@ A session runs headless (`--print`), so nobody can answer a permission prompt. T
 - `claude`: `--permission-mode dontAsk --permission-prompts none` denies every tool that is not pre-approved, and `--allowedTools "$tools"` pre-approves exactly the tools of the role's built agent (the one `tools:` line of its frontmatter, for example `Read, Grep, Glob, Edit, Write, Bash, Skill, Agent` for `gabo-coder`). The owner's settings `deny` rules still apply on top. The session also reads the worktree's project settings; that is safe only because the worktree holds the task's own branch, written by the same role, which is why a `reviewer` session is never started.
 - `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. It starts only the `coder` and `assistant` roles, which need edit and shell tools anyway: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, `--append-system-prompt <role agent file>` reads the file (pi 1.4.0 `--help`: "Append text or file contents to the system prompt"), and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same role.
 
-Check before starting, and start nothing when a check fails; report which one failed instead of a handle. When the `tools:` check fails, say that the built agent needs exactly one one-line `tools: A, B, C` entry in its frontmatter (a YAML list under `tools:` is refused, never guessed):
+Check before starting, after Engine Resolution, on the resolved engine, and start nothing when a check fails; report which one failed instead of a handle. When the `tools:` check fails, say that the built agent needs exactly one one-line `tools: A, B, C` entry in its frontmatter (a YAML list under `tools:` is refused, never guessed):
 
 ```bash
 # both runtimes: only the coder and assistant roles; a reviewer is refused before anything else
@@ -111,4 +120,4 @@ Host: the owner's machine (`hostname`); OS user: the owner (`id -un`); reviewer 
 
 ## Output Contract
 
-Return the host, the OS user, the reviewer mode, and per session its role, worktree, process id, session id, scratch dir and log path, the commands run and the final state (`running`, `stopped`, `finished`, `failed to start` or `refused`).
+Return the host, the OS user, the reviewer mode, and per session its role, resolved engine, worktree, process id, session id, scratch dir and log path, the commands run and the final state (`running`, `stopped`, `finished`, `failed to start` or `refused`, with the refusal line).
