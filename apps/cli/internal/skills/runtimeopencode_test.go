@@ -156,8 +156,11 @@ func TestRuntimeOpenCodeWritesTheAgentShape(t *testing.T) {
 	if len(bl) < 2 || !strings.HasPrefix(bl[0], "<!-- gabo-version: ") || !strings.HasSuffix(bl[0], " -->") {
 		t.Errorf("body first line = %q, want <!-- gabo-version: … -->", bl[0])
 	}
-	if len(bl) < 2 || !strings.HasPrefix(bl[1], "Skills: ") {
-		t.Errorf("body second line does not start with Skills: :\n%s", body)
+	if len(bl) < 3 || bl[1] != "<!-- gabo-engine: opencode -->" {
+		t.Errorf("body second line = %q, want <!-- gabo-engine: opencode --> (intent 0013 S6)", bl[1])
+	}
+	if len(bl) < 3 || !strings.HasPrefix(bl[2], "Skills: ") {
+		t.Errorf("body third line does not start with Skills: :\n%s", body)
 	}
 	for _, want := range []string{"`.opencode/agents/<id>.md`", "no other key", "double quotes", "`mode: subagent`"} {
 		if !strings.Contains(doc, want) {
@@ -508,7 +511,7 @@ func TestRuntimeOpenCodeBuildsTheMainSessionEntry(t *testing.T) {
 	for _, want := range []string{
 		"Main-session entry (intent 0009 S1, S2, S4, D3)",
 		"the Main-Session Entry table of `gabo-agent-templates`",
-		"When `runtimes.assistant` is `opencode`",
+		"When `opencode` is listed in `runtimes.assistant`",
 		"make `.agents/skills/gabo-assistant` a relative symlink to `../../.gabo/skills/gabo-assistant`",
 		"write `.opencode/agents/gabo-assistant.md` from `main_session.template`",
 		"`mode: primary`",
@@ -532,9 +535,9 @@ func TestRuntimeOpenCodeRemovesItsEntryWhenNotAssistant(t *testing.T) {
 	t.Parallel()
 	steps := openCodeSection(t, runtimeOpenCodeDoc(t), "Build Steps")
 	for _, want := range []string{
-		"When `runtimes.assistant` is not `opencode`",
+		"When `opencode` is not listed in `runtimes.assistant`",
 		"remove `.opencode/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
-		"removes the shared `.agents/skills/gabo-assistant` link only when no declared engine using `.agents/skills` is `runtimes.assistant`",
+		"removes the shared `.agents/skills/gabo-assistant` link only when every declared engine using `.agents/skills` is not listed in `runtimes.assistant`",
 	} {
 		if !strings.Contains(steps, want) {
 			t.Errorf("## Build Steps: missing %q", want)
@@ -552,14 +555,14 @@ func TestRuntimeOpenCodeRemovesOtherEnginesEntries(t *testing.T) {
 	t.Parallel()
 	steps := openCodeSection(t, runtimeOpenCodeDoc(t), "Build Steps")
 	for _, want := range []string{
-		"On every build, remove the gabo main-session entry of every other full-tier engine of that table that is not `runtimes.assistant`",
+		"On every build, remove the gabo main-session entry of every other full-tier engine of that table that is not listed in `runtimes.assistant`",
 		"recognized only by its gabo identity",
 		"`.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
 		"the `.claude/skills/gabo-assistant` symlink to the catalog folder",
 		"Never remove Claude Code's `agent` key or OpenCode's `default_agent` key: `gabo init` removes them (intent 0010 S4)",
 		"the bytes from `<!-- GABO_ASSISTANT_START -->` to `<!-- GABO_ASSISTANT_END -->`",
 		"`AGENTS.override.md`, `AGENTS.md` and `CLAUDE.md`",
-		"keep a block in a file the entry of the engine in `runtimes.assistant` uses",
+		"keep a block in a file the entry of an engine listed in `runtimes.assistant` uses",
 	} {
 		if !strings.Contains(steps, want) {
 			t.Errorf("## Build Steps: missing %q", want)
@@ -580,7 +583,7 @@ func TestRuntimeOpenCodeAllowsTheMainSessionKey(t *testing.T) {
 	for _, want := range []string{
 		"`.opencode/agents/gabo-assistant.md`",
 		"Every spec agent is `mode: subagent`",
-		"the only primary agent a build writes is `gabo-assistant`, and only when `runtimes.assistant` is `opencode`",
+		"the only primary agent a build writes is `gabo-assistant`, and only when `opencode` is listed in `runtimes.assistant`",
 	} {
 		if !strings.Contains(rules, want) {
 			t.Errorf("## Hard Rules: missing %q", want)
@@ -623,4 +626,40 @@ func TestRuntimeOpencodeDeclaresMainSession(t *testing.T) {
 	t.Parallel()
 	wantMainSession(t, runtimeOpenCode, mainSessionMeta{Kind: "agent",
 		Config: []string{"opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"}, Key: "default_agent"})
+}
+
+// intent 0013 S6: the skill fills {{engine}} with `opencode`, as written in
+// gabo.yaml, and writes it as an HTML comment after the version comment of
+// every agent file, the main-session agent included.
+func TestRuntimeOpenCodeFillsTheEngineSlot(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	steps := openCodeSection(t, doc, "Build Steps")
+	mustContainIn(t, "## Build Steps", steps,
+		"| `{{"+engineSlot+"}}` | `opencode`, the engine name as written in `gabo.yaml` |",
+		"`<!-- gabo-engine: opencode -->` is the template's engine line moved into an HTML comment",
+		"`<filled body>` is the filled template without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them",
+		"the body is the template filled with `{{gabo_version}}` and `{{engine}}`",
+	)
+	mustLackIn(t, runtimeOpenCode, doc, "without its first line `gabo-version: …`")
+}
+
+// intent 0013 S4: runtimes.assistant may list several engines; the skill
+// builds the OpenCode entry when opencode is listed, removes another
+// full-tier engine's entry only when that engine is not listed, and keeps the
+// shared link while any listed engine uses .agents/skills.
+func TestRuntimeOpenCodeKeepsEveryListedEntry(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	mustContainIn(t, "## Build Steps", openCodeSection(t, doc, "Build Steps"),
+		"`runtimes.assistant` is one engine or a list (intent 0013 S4)",
+		"A build removes another full-tier engine's entry only when it is not listed in `runtimes.assistant`, never the entry of another listed engine",
+		"it is removed only when every engine that uses `.agents/skills` is not listed in `runtimes.assistant` (intent 0013 S4)",
+	)
+	mustLackIn(t, runtimeOpenCode, doc,
+		"`runtimes.assistant` is `opencode`", "`runtimes.assistant` is not `opencode`",
+		"that is not `runtimes.assistant`", "the engine in `runtimes.assistant`",
+		"is `runtimes.assistant`",
+	)
+	assertRemovalRulesSayNotListed(t, runtimeOpenCode, skillBody(t, doc))
 }
