@@ -45,7 +45,7 @@ Every owner of a gabo project, with the engine named in `runtimes.assistant` (`c
 | kind | reference |
 |---|---|
 | product card | [#171 Runtime integrations](https://github.com/testeos-z/gabo-ai/issues/171) |
-| intent issue | pending: opened after the coordinator's corrections |
+| intent issue | [#305 I0009: Main session defaults to the gabo assistant](https://github.com/testeos-z/gabo-ai/issues/305) |
 | PRD | [PRD](../../PRD.md) |
 | spec | [spec](spec.md) |
 | plan | [plan](plan.md) (not written: waits for the spec's acceptance) |

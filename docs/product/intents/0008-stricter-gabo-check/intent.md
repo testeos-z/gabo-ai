@@ -44,7 +44,7 @@ Every owner and team who builds or rebuilds gabo agents with any of the four ful
 | kind | reference |
 |---|---|
 | product card | [#171 Runtime integrations](https://github.com/testeos-z/gabo-ai/issues/171) |
-| intent issue | pending: opened after the coordinator's corrections |
+| intent issue | [#304 I0008: Stricter gabo check](https://github.com/testeos-z/gabo-ai/issues/304) |
 | PRD | [PRD](../../PRD.md) |
 | spec | [spec](spec.md) |
 | plan | [plan](plan.md) (not written: waits for the spec's acceptance) |
