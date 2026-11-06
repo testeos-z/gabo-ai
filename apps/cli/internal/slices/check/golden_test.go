@@ -24,11 +24,15 @@ func TestCommandGolden(t *testing.T) {
 		name string
 		args []string
 		tree string
+		// edit changes project files; an empty value removes the file.
+		edit map[string]string
 	}
 	cases := []tc{
 		{name: "no-intents"},
 		{name: "usage-extra-arg", args: []string{"extra"}},
 		{name: "usage-unknown-flag", args: []string{"--bogus"}},
+		{name: "versions-no-stamp", edit: map[string]string{".gabo/VERSION": ""}},
+		{name: "versions-no-version-line", edit: map[string]string{".claude/agents/beta.md": "---\nname: beta\n---\nbody\n"}},
 	}
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
@@ -37,6 +41,9 @@ func TestCommandGolden(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			proj := project()
+			if c.edit != nil {
+				proj = with(proj, c.edit)
+			}
 			if c.tree != "" {
 				proj = withTree(t, proj, c.tree)
 			}

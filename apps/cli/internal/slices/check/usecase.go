@@ -265,9 +265,10 @@ func (u *UseCase) checkStamp(r *Report) (string, bool) {
 }
 
 // checkAgents requires, for each distinct runtime, every spec agent in the
-// directory its runtime skill declares, with a version line equal to the
-// stamp (when the stamp is valid).
+// directory its runtime skill declares, with a version line x.y.z equal to
+// the stamp when the stamp is valid (checkAgentVersion).
 func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasStamp bool) error {
+	checkVersionsComparable(r, hasStamp)
 	catalog, err := fs.Sub(u.project, CatalogDir)
 	if err != nil {
 		return err
@@ -294,17 +295,9 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 				r.fail("✗ agent "+id+" missing", fmt.Sprintf("why: no file named %s in %s (runtime %s)", id, dir, rt), NextBuildAgent)
 				continue
 			}
-			if !hasStamp {
-				continue
-			}
 			for _, name := range names {
-				b, err := fs.ReadFile(u.project, path.Join(dir, name))
-				if err != nil {
-					return fmt.Errorf("read %s: %w", path.Join(dir, name), err)
-				}
-				if v := versionLine(b); v != stamp {
-					r.fail(fmt.Sprintf("✗ agent %s built with %s, catalog is %s: ask your agent to rebuild", id, v, stamp),
-						"why: "+path.Join(dir, name), NextRebuild)
+				if err := u.checkAgentVersion(r, id, rt, path.Join(dir, name), stamp, hasStamp); err != nil {
+					return err
 				}
 			}
 		}

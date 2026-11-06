@@ -1,0 +1,6 @@
+exit 1
+error: ""
+--- stdout
+✗ agent beta (claude): no gabo-version line
+why: .claude/agents/beta.md
+next: ask your agent to rebuild the agents, then rerun gabo check
