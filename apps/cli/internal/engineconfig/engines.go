@@ -40,11 +40,14 @@ func Set(runtimes ...string) []string {
 }
 
 // Input is what an engine rule reads: the current bytes of the project's
-// engine files by project-relative path (a missing file has no entry) and
-// the binary version.
+// engine files by project-relative path (a missing file has no entry), the
+// binary version and the assistant engine (runtimes.assistant), which picks
+// the engine whose main-session key gabo writes (intent 0010 S1, D1). An
+// empty Assistant leaves every main-session key alone.
 type Input struct {
-	Files   map[string][]byte
-	Version string
+	Files     map[string][]byte
+	Version   string
+	Assistant string
 }
 
 // Result is what an engine rule returns: its report section and the new
@@ -79,6 +82,46 @@ func Integrate(set []string, in Input) (Report, map[string][]byte) {
 			continue
 		}
 		res := rule(in)
+		res.Section.Engine = engine
+		report.Sections = append(report.Sections, res.Section)
+		for path, b := range res.Writes {
+			writes[path] = b
+		}
+	}
+	return report, writes
+}
+
+// removals hold, per engine, the removal of the gabo main-session value
+// from that engine's file when the engine is not in the set (intent 0010
+// S4, D2). The engine's own rule removes it when the engine is in the set.
+var removals = map[string]Rule{
+	Claude: claudeRemoval,
+}
+
+// Removable reports whether engine has a main-session removal, so the
+// caller knows whose file to read even when the engine is not in the set.
+func Removable(engine string) bool {
+	_, ok := removals[engine]
+	return ok
+}
+
+// Remove runs the main-session removal of each engine that is not in set,
+// in the fixed order, and returns a section only for an engine whose file
+// changed. A missing or unreadable file changes nothing and reports
+// nothing: gabo init does not own the files of an engine it no longer
+// integrates, it only clears its own value from them.
+func Remove(set []string, in Input) (Report, map[string][]byte) {
+	var report Report
+	writes := map[string][]byte{}
+	for _, engine := range order {
+		remove, ok := removals[engine]
+		if !ok || slices.Contains(set, engine) {
+			continue
+		}
+		res := remove(in)
+		if len(res.Writes) == 0 {
+			continue
+		}
 		res.Section.Engine = engine
 		report.Sections = append(report.Sections, res.Section)
 		for path, b := range res.Writes {

@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
+	"slices"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -28,17 +30,18 @@ var engineFiles = map[string]string{
 	engineconfig.Pi:     engineconfig.PiSettings,
 }
 
-// engineSet reads the engine set from the runtimes mapping of gabo.yaml
-// (S1). It needs only YAML and that mapping, not a fully valid config.
-func engineSet(b []byte) ([]string, error) {
+// engineSet reads the engine set and the assistant engine from the
+// runtimes mapping of gabo.yaml (S1; intent 0010 D1). It needs only YAML
+// and that mapping, not a fully valid config.
+func engineSet(b []byte) ([]string, string, error) {
 	var doc struct {
 		Runtimes yaml.Node `yaml:"runtimes"`
 	}
 	if err := yaml.Unmarshal(b, &doc); err != nil {
-		return nil, fmt.Errorf("cannot be read as YAML (%v)", err)
+		return nil, "", fmt.Errorf("cannot be read as YAML (%v)", err)
 	}
 	if doc.Runtimes.Kind != yaml.MappingNode {
-		return nil, errors.New("has no runtimes mapping")
+		return nil, "", errors.New("has no runtimes mapping")
 	}
 	var rt struct {
 		Coder     string `yaml:"coder"`
@@ -46,24 +49,28 @@ func engineSet(b []byte) ([]string, error) {
 		Assistant string `yaml:"assistant"`
 	}
 	if err := doc.Runtimes.Decode(&rt); err != nil {
-		return nil, fmt.Errorf("runtimes cannot be read (%v)", err)
+		return nil, "", fmt.Errorf("runtimes cannot be read (%v)", err)
 	}
-	return engineconfig.Set(rt.Coder, rt.Reviewer, rt.Assistant), nil
+	assistant := strings.TrimSpace(rt.Assistant)
+	return engineconfig.Set(rt.Coder, rt.Reviewer, rt.Assistant), assistant, nil
 }
 
 // engineStep runs each engine's rule in set order and writes each changed
 // engine file. A refused or failed engine gets its ✗ line and the next
-// engine still runs (S5, D10). It reads and writes only project files.
-func (u *UseCase) engineStep(set []string, version string) engineconfig.Report {
+// engine still runs (S5, D10). Then it removes the gabo main-session value
+// from the file of each engine outside the set (intent 0010 S4, D2). It
+// reads and writes only project files.
+func (u *UseCase) engineStep(set []string, assistant, version string) engineconfig.Report {
 	var report engineconfig.Report
 	for _, engine := range set {
-		report.Sections = append(report.Sections, u.integrateEngine(engine, version))
+		report.Sections = append(report.Sections, u.integrateEngine(engine, assistant, version))
 	}
+	report.Sections = append(report.Sections, u.removeMainSession(set, assistant, version)...)
 	return report
 }
 
-func (u *UseCase) integrateEngine(engine, version string) engineconfig.Section {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: version}
+func (u *UseCase) integrateEngine(engine, assistant, version string) engineconfig.Section {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistant: assistant}
 	file, owns := engineFiles[engine]
 	fail := func(reason string) engineconfig.Section {
 		return engineconfig.Section{Engine: engine, Lines: []string{engineconfig.FailurePrefix + " " + file + ": " + reason}}
@@ -80,6 +87,12 @@ func (u *UseCase) integrateEngine(engine, version string) engineconfig.Section {
 			return fail(fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err))
 		}
 	}
+	if engine == engineconfig.Claude {
+		// The rule only needs to know whether the main session's agent is built (S8).
+		if _, err := u.store.Lstat(u.path(engineconfig.ClaudeAgentFile)); err == nil {
+			in.Files[engineconfig.ClaudeAgentFile] = nil
+		}
+	}
 	if engine == engineconfig.Opencode {
 		if b, err := u.store.ReadFile(u.path(engineconfig.OpencodeStageGate)); err == nil {
 			in.Files[engineconfig.OpencodeStageGate] = b
@@ -94,6 +107,34 @@ func (u *UseCase) integrateEngine(engine, version string) engineconfig.Section {
 		}
 	}
 	return section
+}
+
+// removeMainSession reads the file of each engine outside set that has a
+// main-session removal and writes the files the removal changes. gabo init
+// no longer integrates those engines, so a refused, missing or unreadable
+// file is left alone without a line; only a failed write is a ✗ line.
+func (u *UseCase) removeMainSession(set []string, assistant, version string) []engineconfig.Section {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistant: assistant}
+	for engine, file := range engineFiles {
+		if !engineconfig.Removable(engine) || slices.Contains(set, engine) || u.refuseEngineFile(file) != "" {
+			continue
+		}
+		if b, err := u.store.ReadFile(u.path(file)); err == nil {
+			in.Files[file] = b
+		}
+	}
+	report, writes := engineconfig.Remove(set, in)
+	for i, section := range report.Sections {
+		file := engineFiles[section.Engine]
+		data, ok := writes[file]
+		if !ok {
+			continue
+		}
+		if err := u.store.WriteFile(u.path(file), data); err != nil {
+			report.Sections[i].Lines = append(section.Lines, engineconfig.FailurePrefix+" "+file+": cannot write it ("+err.Error()+"); fix it and run gabo init again")
+		}
+	}
+	return report.Sections
 }
 
 // refuseEngineFile returns why file must not be written: its engine

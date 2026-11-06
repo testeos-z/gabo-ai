@@ -25,9 +25,10 @@ const (
 )
 
 // claudeBlock is the engine integration block a run with cfgYAML prints
-// for the given project files, as lines.
+// for the given project files, as lines; cfgYAML names claude as the
+// assistant engine.
 func claudeBlock(files map[string]string) []string {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: "1.2.3"}
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: "1.2.3", Assistant: engineconfig.Claude}
 	for path, data := range files {
 		if rel, ok := strings.CutPrefix(path, root+"/"); ok {
 			in.Files[rel] = []byte(data)
@@ -39,7 +40,7 @@ func claudeBlock(files map[string]string) []string {
 
 // claudeIntegrated is the .claude/settings.json a first run writes.
 func claudeIntegrated() string {
-	_, w := engineconfig.Integrate(engineconfig.Set("claude"), engineconfig.Input{Files: map[string][]byte{}})
+	_, w := engineconfig.Integrate(engineconfig.Set("claude"), engineconfig.Input{Files: map[string][]byte{}, Assistant: engineconfig.Claude})
 	return string(w[engineconfig.ClaudeSettings])
 }
 

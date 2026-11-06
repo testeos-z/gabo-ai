@@ -42,6 +42,9 @@ func TestCommandHelpNamesTheEngineFiles(t *testing.T) {
 	for _, s := range []string{
 		".claude/settings.json, .codex/config.toml and .pi/settings.json are the only engine files it writes",
 		"it never writes user-level engine config",
+		`With runtimes.assistant: claude it also sets the top-level "agent": "gabo-assistant" key of .claude/settings.json`,
+		`another value of "agent" is yours and kept`,
+		`With another assistant engine it removes that exact "agent" value`,
 	} {
 		if !strings.Contains(help, s) {
 			t.Errorf("help is missing %q:\n%s", s, out.String())
