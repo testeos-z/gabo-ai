@@ -23,7 +23,7 @@ const noConfigLine = "engine integration: no gabo.yaml yet; after your agent wri
 var ErrEngineFailures = errors.New("engine integration failed; fix the ✗ lines above and run gabo init again")
 
 // engineFiles is the one project file init writes per full-tier engine
-// (S2, S3, S7); OpenCode has none (S6).
+// (S2, S3, S7); OpenCode's config is found by loadOpencodeConfigs.
 var engineFiles = map[string]string{
 	engineconfig.Claude: engineconfig.ClaudeSettings,
 	engineconfig.Codex:  engineconfig.CodexConfigPath,
@@ -93,46 +93,110 @@ func (u *UseCase) integrateEngine(engine, assistant, version string) engineconfi
 			in.Files[engineconfig.ClaudeAgentFile] = nil
 		}
 	}
+	var writable []string // the already checked files this engine may write
+	if owns {
+		writable = []string{file}
+	}
 	if engine == engineconfig.Opencode {
 		if b, err := u.store.ReadFile(u.path(engineconfig.OpencodeStageGate)); err == nil {
 			in.Files[engineconfig.OpencodeStageGate] = b
 		}
+		if _, err := u.store.Lstat(u.path(engineconfig.OpencodeAgentFile)); err == nil {
+			in.Files[engineconfig.OpencodeAgentFile] = nil
+		}
+		var reason string
+		if writable, file, reason = u.loadOpencodeConfigs(&in, assistant); reason != "" {
+			return fail(reason)
+		}
 	}
 	report, writes := engineconfig.Integrate([]string{engine}, in)
 	section := report.Sections[0]
-	// Only the engine's own, already checked file is ever written.
-	if data, ok := writes[file]; owns && ok {
-		if err := u.store.WriteFile(u.path(file), data); err != nil {
-			section.Lines = append(section.Lines, engineconfig.FailurePrefix+" "+file+": cannot write it ("+err.Error()+"); fix it and run gabo init again")
-		}
-	}
+	section.Lines = append(section.Lines, u.writeEngineFiles(writes, writable)...)
 	return section
 }
 
-// removeMainSession reads the file of each engine outside set that has a
-// main-session removal and writes the files the removal changes. gabo init
-// no longer integrates those engines, so a refused, missing or unreadable
-// file is left alone without a line; only a failed write is a ✗ line.
-func (u *UseCase) removeMainSession(set []string, assistant, version string) []engineconfig.Section {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistant: assistant}
-	for engine, file := range engineFiles {
-		if !engineconfig.Removable(engine) || slices.Contains(set, engine) || u.refuseEngineFile(file) != "" {
+// loadOpencodeConfigs reads the OpenCode configs the rule may change
+// (intent 0010 S2, S4): with OpenCode as the assistant, the first existing
+// one (else the new .opencode/opencode.json), which must not be refused;
+// with another assistant, every existing one that is not refused. It
+// returns the files that may be written, or the refused or unreadable file
+// and why.
+func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistant string) ([]string, string, string) {
+	switch assistant {
+	case "":
+		return nil, "", ""
+	case engineconfig.Opencode:
+		target := engineconfig.OpencodeNewConfig
+		for _, p := range engineconfig.OpencodeConfigs {
+			if _, err := u.store.Lstat(u.path(p)); err == nil || u.refuseEngineFile(p) != "" {
+				target = p
+				break
+			}
+		}
+		if reason := u.refuseEngineFile(target); reason != "" {
+			return nil, target, reason
+		}
+		b, err := u.store.ReadFile(u.path(target))
+		switch {
+		case err == nil:
+			in.Files[target] = b
+		case !errors.Is(err, fs.ErrNotExist):
+			return nil, target, fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err)
+		}
+		return []string{target}, "", ""
+	default:
+		return u.readRemovable(in, engineconfig.OpencodeConfigs), "", ""
+	}
+}
+
+// readRemovable reads each of files that is not refused into in and returns
+// those it read. A missing, refused or unreadable file is skipped: gabo init
+// only clears its own value from them.
+func (u *UseCase) readRemovable(in *engineconfig.Input, files []string) []string {
+	var read []string
+	for _, file := range files {
+		if u.refuseEngineFile(file) != "" {
 			continue
 		}
 		if b, err := u.store.ReadFile(u.path(file)); err == nil {
 			in.Files[file] = b
+			read = append(read, file)
 		}
 	}
-	report, writes := engineconfig.Remove(set, in)
-	for i, section := range report.Sections {
-		file := engineFiles[section.Engine]
+	return read
+}
+
+// writeEngineFiles writes each changed file that is in writable, in
+// writable order, and returns a ✗ line for each failed write.
+func (u *UseCase) writeEngineFiles(writes map[string][]byte, writable []string) []string {
+	var lines []string
+	for _, file := range writable {
 		data, ok := writes[file]
 		if !ok {
 			continue
 		}
 		if err := u.store.WriteFile(u.path(file), data); err != nil {
-			report.Sections[i].Lines = append(section.Lines, engineconfig.FailurePrefix+" "+file+": cannot write it ("+err.Error()+"); fix it and run gabo init again")
+			lines = append(lines, engineconfig.FailurePrefix+" "+file+": cannot write it ("+err.Error()+"); fix it and run gabo init again")
 		}
+	}
+	return lines
+}
+
+// removeMainSession reads the files of each engine outside set that has a
+// main-session removal and writes the files the removal changes. gabo init
+// no longer integrates those engines, so a refused, missing or unreadable
+// file is left alone without a line; only a failed write is a ✗ line.
+func (u *UseCase) removeMainSession(set []string, assistant, version string) []engineconfig.Section {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistant: assistant}
+	read := map[string][]string{}
+	for _, engine := range engineconfig.Set(engineconfig.Claude, engineconfig.Codex, engineconfig.Opencode, engineconfig.Pi) {
+		if engineconfig.Removable(engine) && !slices.Contains(set, engine) {
+			read[engine] = u.readRemovable(&in, engineconfig.RemovalFiles(engine))
+		}
+	}
+	report, writes := engineconfig.Remove(set, in)
+	for i, section := range report.Sections {
+		report.Sections[i].Lines = append(section.Lines, u.writeEngineFiles(writes, read[section.Engine])...)
 	}
 	return report.Sections
 }
@@ -141,11 +205,14 @@ func (u *UseCase) removeMainSession(set []string, assistant, version string) []e
 // directory or the file is a symlink or of the wrong kind (S5). Empty means
 // the file may be read and written.
 func (u *UseCase) refuseEngineFile(file string) string {
-	dir := path.Dir(file)
-	for _, p := range []struct {
+	checks := []struct {
 		rel string
 		dir bool
-	}{{dir, true}, {file, false}} {
+	}{{path.Dir(file), true}, {file, false}}
+	if checks[0].rel == "." { // a file at the project root has no engine directory
+		checks = checks[1:]
+	}
+	for _, p := range checks {
 		mode, err := u.store.Lstat(u.path(p.rel))
 		name := p.rel
 		if !p.dir {
