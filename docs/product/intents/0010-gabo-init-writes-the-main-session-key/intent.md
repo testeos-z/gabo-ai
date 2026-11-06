@@ -53,6 +53,6 @@ Rationale to record, owner's brief, verbatim: "Rationale to record: one command 
 | intent issue | [#354 I0010: gabo init writes the main-session key](https://github.com/testeos-z/gabo-ai/issues/354) |
 | PRD | [PRD](../../PRD.md) R32, R33 |
 | spec | [spec](spec.md) |
-| plan | not written yet (gabo-dev-lead) |
+| plan | [plan](plan.md) |
 | review findings | cappy-lab/vulcam PRs #650 and #652 (the vulcam session's report) |
 | related intent | 0009-main-session-defaults-to-the-gabo-assistant (the main-session entry), 0006-engine-integration-at-init (the `gabo init` engine keys), 0004-opencode-runtime (`experimental.subagent_depth`), 0008-stricter-gabo-check (TRD 8.5) |
