@@ -47,5 +47,5 @@ Every owner and team who builds or rebuilds gabo agents with any of the four ful
 | intent issue | [#304 I0008: Stricter gabo check](https://github.com/testeos-z/gabo-ai/issues/304) |
 | PRD | [PRD](../../PRD.md) |
 | spec | [spec](spec.md) |
-| plan | [plan](plan.md) (not written: waits for the spec's acceptance) |
+| plan | [plan](plan.md) |
 | related intent | 0009-main-session-defaults-to-the-gabo-assistant (its block check), 0006-engine-integration-at-init (engine keys), 0005-any-runtime-engine (flexible tier) |
