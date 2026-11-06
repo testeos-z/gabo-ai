@@ -130,6 +130,7 @@ func (u *UseCase) Run() (Report, error) {
 		if err := u.checkLinks(&r, cfg); err != nil {
 			return Report{}, err
 		}
+		u.checkLeftovers(&r, cfg)
 		if err := u.checkSubagentDepth(&r, cfg); err != nil {
 			return Report{}, err
 		}
