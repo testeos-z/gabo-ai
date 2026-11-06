@@ -196,6 +196,21 @@ func TestEveryTemplateHasParseableFixedQuestions(t *testing.T) {
 	}
 }
 
+// S10 (intent 0008, TRD 8.5): every plan asks whether the change needs a
+// `gabo check` update, answered in Steps, and the table keeps its columns.
+func TestPlanTemplateAsksForGaboCheckImpact(t *testing.T) {
+	t.Parallel()
+	doc := embeddedByPath(t)["gabo-dev-lead/templates/plan.md"]
+	qs, err := fixedQuestions(doc)
+	if err != nil {
+		t.Fatalf("gabo-dev-lead/templates/plan.md: %v", err)
+	}
+	want := [3]string{"Q9", "Does the change need a `gabo check` update, and which task covers it?", "Steps"}
+	if !slices.Contains(qs, want) {
+		t.Errorf("gabo-dev-lead/templates/plan.md: fixed questions %v, want row %v", qs, want)
+	}
+}
+
 func TestTemplatesKeepStableColumnsAndSections(t *testing.T) {
 	t.Parallel()
 	byPath := embeddedByPath(t)

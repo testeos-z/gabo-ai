@@ -15,6 +15,7 @@ Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git
 - Never merge, approve or set commit statuses; the reviewer does that.
 - Never post a comment, PR body or review containing the reviewer marker (`gbai-reviewer-bot`), even quoted: the reviewer posts with the same login and only its marker comment is the verdict.
 - Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Closes #<n>`. On a base that is not the default branch the keyword closes nothing; the Task Close does. Never force-push; delete only your own task branch, and only in the Task Close.
+- The PR body also holds one line `gabo check impact: <none, with the reason / updated in <file>>` (TRD 8.5): whether the change adds or alters something `gabo check` should verify (an agent file, a runtime skill, the neutral agent spec, a slot contract or a project file gabo writes) and where the check was updated, or why it needs no update.
 - After every push, request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`. Act on the `VERDICT` line it returns; the PR comment holds the findings.
 - Questions go back to the cycle in your outcome; never ask the owner directly.
 - You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
