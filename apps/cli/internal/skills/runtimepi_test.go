@@ -158,3 +158,124 @@ func TestRuntimePiKeepsSharedLinks(t *testing.T) {
 	}
 	assertSharedRemovalRule(t, "gabo-runtime-pi/SKILL.md", string(b))
 }
+
+const runtimePi = "gabo-runtime-pi/SKILL.md"
+
+func runtimePiDoc(t *testing.T) string {
+	t.Helper()
+	b, err := fs.ReadFile(Catalog(), runtimePi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// piSection returns the body of the heading line head up to the next "## "
+// or "### " heading.
+func piSection(t *testing.T, doc, head string) string {
+	t.Helper()
+	_, s, ok := strings.Cut(doc, "\n"+head+"\n")
+	if !ok {
+		t.Fatalf("%s: no %s section", runtimePi, head)
+	}
+	s, _, _ = strings.Cut(s, "\n## ")
+	s, _, _ = strings.Cut(s, "\n### ")
+	return s
+}
+
+func mustContainIn(t *testing.T, where, doc string, want ...string) {
+	t.Helper()
+	for _, s := range want {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s %s: missing %q", runtimePi, where, s)
+		}
+	}
+}
+
+// intent 0009 S1, S3, D1, D6: when runtimes.assistant is pi, the build links
+// gabo-assistant into the shared .agents/skills and writes the T1 block into
+// the first existing file of the order the T5 probe confirmed.
+func TestRuntimePiBuildsTheMainSessionEntry(t *testing.T) {
+	t.Parallel()
+	sec := piSection(t, runtimePiDoc(t), "### Main-session entry")
+	mustContainIn(t, "### Main-session entry", sec,
+		"intent 0009 S1, S3, S4, D1, D3",
+		"the Main-Session Entry table of `gabo-agent-templates`",
+		"When `runtimes.assistant` is `pi`",
+		"make `.agents/skills/gabo-assistant` a relative symlink to `../../.gabo/skills/gabo-assistant`",
+		"copy the `main_session.block` of `.gabo/skills/gabo-agent-templates/agents.yaml` verbatim, from `<!-- GABO_ASSISTANT_START -->` to `<!-- GABO_ASSISTANT_END -->`",
+		"into the first existing file of `AGENTS.override.md`, `AGENTS.md` and `CLAUDE.md` at the repository root, in that order",
+		"`AGENTS.md` created when none exists",
+		"`.gabo/skills/gabo-assistant/SKILL.md`",
+		"at most 2048 bytes",
+		"Keep exactly one block",
+	)
+}
+
+// intent 0009 S3: the same marker, size, idempotence and symlink rules as the
+// Codex block (T6).
+func TestRuntimePiWritesTheBlockInPlace(t *testing.T) {
+	t.Parallel()
+	sec := piSection(t, runtimePiDoc(t), "### Main-session entry")
+	mustContainIn(t, "### Main-session entry", sec,
+		"replace only the bytes between the markers",
+		"append it after one blank line when absent",
+		"keep every other byte, so a second build leaves the file byte-identical",
+		"A file whose markers are unpaired: change nothing and report it.",
+		"write through a symlinked file only when its target stays inside the repository",
+	)
+}
+
+// intent 0009 S1, S4: when runtimes.assistant is not pi, the build removes its
+// block and the shared link only under the shared rule of T6, so a Pi coder
+// keeps the Codex assistant's link.
+func TestRuntimePiRemovesItsEntryWhenNotAssistant(t *testing.T) {
+	t.Parallel()
+	sec := piSection(t, runtimePiDoc(t), "### Main-session entry")
+	mustContainIn(t, "### Main-session entry", sec,
+		"When `runtimes.assistant` is not `pi`, remove its block from `AGENTS.override.md`, `AGENTS.md` and `CLAUDE.md`",
+		"except from the file the row of the `runtimes.assistant` engine writes its own block to (Codex uses the same files)",
+		"removes the shared link only when no declared engine using .agents/skills is runtimes.assistant",
+		"With `runtimes.assistant: codex` and `runtimes.coder: pi`, a Pi rebuild keeps `.agents/skills/gabo-assistant`",
+	)
+}
+
+// intent 0009 S4: on every build the skill removes the gabo entry of every
+// other full-tier engine of the T1 table that is not runtimes.assistant,
+// recognized only by its gabo identity.
+func TestRuntimePiRemovesOtherEnginesEntries(t *testing.T) {
+	t.Parallel()
+	sec := piSection(t, runtimePiDoc(t), "### Main-session entry")
+	mustContainIn(t, "### Main-session entry", sec,
+		"On every build, remove the gabo entry of every other full-tier engine in the Main-Session Entry table of `gabo-agent-templates` that is not `runtimes.assistant`",
+		"recognized only by its gabo identity",
+		"`.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
+		"the `.claude/skills/gabo-assistant` symlink to the catalog folder",
+		"the key `agent` in `.claude/settings.json` only when its value is exactly `gabo-assistant`",
+		"`.opencode/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
+		"the key `default_agent` only when its value is exactly `gabo-assistant`",
+		"for Codex, its block in `AGENTS.override.md` and `AGENTS.md`",
+		"keep and report it",
+	)
+}
+
+// intent 0009 S7, D3, D6: the write list names the entry, the build runs it,
+// the T5 probe is a source and the output reports the entry.
+func TestRuntimePiNamesTheMainSessionEntry(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	mustContainIn(t, "## Hard Rules", piSection(t, doc, "## Hard Rules"),
+		"the `.agents/skills/gabo-assistant` link and the scoped block of the Main-session entry",
+		"the main-session entries of other engines that section removes",
+	)
+	mustContainIn(t, "## Sources", piSection(t, doc, "## Sources"),
+		"Pi 1.4.0 loads only the first existing file per directory",
+		"`AGENTS.override.md`, then `AGENTS.md`, then `CLAUDE.md`",
+		"`dist/core/resource-loader.js`",
+		"https://github.com/testeos-z/gabo-ai/issues/324#issuecomment-6690677042",
+	)
+	mustContainIn(t, "## Output Contract", piSection(t, doc, "## Output Contract"),
+		"the main-session entry",
+		"each other engine's entry removed or kept",
+	)
+}
