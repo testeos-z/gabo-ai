@@ -131,6 +131,9 @@ func (u *UseCase) Run() (Report, error) {
 			return Report{}, err
 		}
 		u.checkLeftovers(&r, cfg)
+		if err := u.checkReviewerIsolation(&r, cfg); err != nil {
+			return Report{}, err
+		}
 		if err := u.checkSubagentDepth(&r, cfg); err != nil {
 			return Report{}, err
 		}
