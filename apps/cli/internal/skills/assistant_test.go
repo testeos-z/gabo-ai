@@ -32,3 +32,24 @@ func TestAssistantActivationNamesTheMainSessionEntry(t *testing.T) {
 		}
 	}
 }
+
+// Spec 0010 S5: where the Activation Contract says who writes the
+// main-session key, it names `gabo init`; the runtime skill builds the rest.
+func TestAssistantActivationNamesGaboInitAsKeyWriter(t *testing.T) {
+	t.Parallel()
+	b, err := content.ReadFile("gabo-assistant/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, contract, _ := strings.Cut(string(b), "## Activation Contract")
+	contract, _, _ = strings.Cut(contract, "\n## ")
+	for _, s := range []string{
+		"keys that `gabo init` writes",
+		"the main-session entry that `gabo init` and the runtime skill of `runtimes.assistant` build",
+	} {
+		if !strings.Contains(contract, s) {
+			t.Errorf("gabo-assistant Activation Contract: missing %q", s)
+		}
+	}
+	assertKeyLinesNameGaboInit(t, "gabo-assistant/SKILL.md", contract)
+}

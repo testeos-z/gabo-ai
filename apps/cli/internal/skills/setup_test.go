@@ -318,10 +318,29 @@ func TestSetupRebuildsAfterChangingTheAssistantRuntime(t *testing.T) {
 	requireAll(t, setupDoc(t), []string{
 		"`gabo-runtime-opencode`",
 		"main-session entry", "Main-Session Entry", "`gabo-agent-templates`",
-		"After you change `runtimes.assistant`, rebuild every agent through the runtime skill of each engine in `runtimes.*`",
+		"After you change `runtimes.*`, run `gabo init`, then rebuild every agent through the runtime skill of each engine in `runtimes.*`",
 		"removes the gabo entry of every other full-tier engine",
 		"`✗ <file>: gabo assistant entry missing for <engine>` (or `incomplete`, or `duplicated`)",
 		"`✗ <file>: gabo assistant entry for <engine>, but runtimes.assistant is <value>`",
 		"`.claude/settings.json`", "`AGENTS.md`",
 	})
+}
+
+// Spec 0010 S5: after it changes runtimes.*, setup runs `gabo init` (the
+// writer of the main-session key) and then rebuilds the agents; every line
+// naming an engine config key names `gabo init`.
+func TestSetupRunsGaboInitAfterChangingRuntimes(t *testing.T) {
+	t.Parallel()
+	doc := setupDoc(t)
+	requireAll(t, doc, []string{
+		"After you change `runtimes.*`, run `gabo init`, then rebuild every agent through the runtime skill of each engine in `runtimes.*`",
+		"`gabo init` writes the main-session key",
+		"the runtime skill of `runtimes.assistant` builds the agent file and link",
+	})
+	for _, s := range []string{"also writes the owner's main-session entry", "rewrites the main-session entry", "never touches the config,"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: still says the runtime skill writes the key or gabo init writes no config: %q", setupSkill, s)
+		}
+	}
+	assertKeyLinesNameGaboInit(t, setupSkill, doc)
 }
