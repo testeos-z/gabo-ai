@@ -4,6 +4,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/fstest"
 )
 
 // runtimeDoc is a runtime skill whose metadata holds the given lines.
@@ -181,4 +182,100 @@ func TestMissingAgentSkillsSkippedOnUpgradePR(t *testing.T) {
 	})
 	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{UpgradePR: true})
 	noLineWith(t, r, "agent_skills")
+}
+
+// piCoder is the plain project with Pi as its coder engine: a Pi runtime
+// skill and both spec agents built in .pi/agents, alpha with alphaPi.
+func piCoder(alphaPi string) (fstest.MapFS, string) {
+	cfg := strings.Replace(validConfig, "  coder: claude\n", "  coder: pi\n", 1)
+	return with(project(), map[string]string{
+		".gabo/skills/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n  agent_skills: frontmatter:skills\n---\n",
+		".pi/agents/alpha.md":                   alphaPi,
+		".pi/agents/beta.md":                    "---\nname: beta\ngabo-version: 1.2.3\ngabo-engine: pi\n---\nbody\n",
+		".pi/settings.json":                     piKeysJSON,
+	}), cfg
+}
+
+// Intent 0013 S6: a built agent whose filled engine differs from the engine
+// of its agent directory fails with the rebuild hint; a matching engine and
+// a file with no engine line (a 0.2.10 build) pass.
+func TestAgentBuiltForAnotherEngineFails(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name, alpha string
+		fail        bool
+	}{
+		{"claude agent copied into .pi/agents", "---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: claude\n---\nbody\n", true},
+		{"quoted value", "---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: \"claude\"\n---\nbody\n", true},
+		{"matching engine", "---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: pi\n---\nbody\n", false},
+		{"no engine line", "---\nname: alpha\ngabo-version: 1.2.3\n---\nbody\n", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			proj, cfg := piCoder(tt.alpha)
+			r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
+			if tt.fail {
+				wantFailed(t, r, "✗ .pi/agents/alpha.md: built for claude, not pi", NextRebuild)
+				if !strings.HasPrefix(NextRebuild, "next: ask your agent to rebuild the agents") {
+					t.Fatalf("NextRebuild = %q", NextRebuild)
+				}
+				return
+			}
+			wantPassed(t, r, PassedLine)
+			noLineWith(t, r, "built for")
+		})
+	}
+}
+
+// Intent 0013 S6: the Claude Code agents of the plain project carry their
+// own engine and pass beside the Pi ones; only the Pi file built for Claude
+// fails.
+func TestAgentBuiltForChecksEachAgentDirectory(t *testing.T) {
+	t.Parallel()
+	proj, cfg := piCoder("---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: claude\n---\nbody\n")
+	proj = with(proj, map[string]string{
+		".claude/agents/alpha.md": "---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: claude\n---\nbody\n",
+		".claude/agents/beta.md":  "---\nname: beta\ngabo-version: 1.2.3\ngabo-engine: pi\n---\nbody\n",
+	})
+	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
+	wantFailed(t, r, "✗ .pi/agents/alpha.md: built for claude, not pi", "✗ .claude/agents/beta.md: built for pi, not claude")
+	noLineWith(t, r, ".claude/agents/alpha.md: built for")
+}
+
+// mapFSEdit turns a project into the edit map of the golden harness.
+func mapFSEdit(proj fstest.MapFS) map[string]string {
+	edit := map[string]string{}
+	for name, f := range proj {
+		edit[name] = string(f.Data)
+	}
+	return edit
+}
+
+// Intent 0013 S6: the help names the built-for rule.
+func TestCommandHelpNamesTheBuiltForRule(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - each agent file's filled gabo-engine line names the engine of the agent",
+		"    directory it is in (a file with no engine line passes);",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+// Intent 0013 S6: the main-session agent file is a built agent too.
+func TestMainSessionAgentBuiltForAnotherEngineFails(t *testing.T) {
+	t.Parallel()
+	proj := with(project(), mainSessionEdit(map[string]string{
+		".claude/agents/gabo-assistant.md": "---\nname: gabo-assistant\ngabo-version: 1.2.3\ngabo-engine: opencode\n---\nbody\n",
+		".claude/settings.json":            withJSONKey(claudeKeysJSON, "agent", "gabo-assistant"),
+	}))
+	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+	wantFailed(t, r, "✗ .claude/agents/gabo-assistant.md: built for opencode, not claude", NextRebuild)
 }
