@@ -366,11 +366,12 @@ func TestRuntimeOpenCodeSubagentDepthRule(t *testing.T) {
 }
 
 // The write list of S9 is the only one: the skill lists what it writes once,
-// never changes another project config key and collides with no agent (S9, D8).
+// never changes another project config key but the one main-session key of
+// intent 0009 S7, and collides with no agent (S9, D8).
 func TestRuntimeOpenCodeWriteList(t *testing.T) {
 	t.Parallel()
 	doc := runtimeOpenCodeDoc(t)
-	const list = "Write only `.opencode/agents/<id>.md` for spec ids, `.agents/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete, and the project-level key `experimental.subagent_depth` of the Prerequisites, merged into one project config file."
+	const list = "Write only `.opencode/agents/<id>.md` for spec ids and `.opencode/agents/gabo-assistant.md`, `.agents/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete, the project-level key `experimental.subagent_depth` of the Prerequisites and the project-level key `default_agent` of build step 9, both merged into the one project config file `<file>`, and the removals of other engines' main-session entries of build step 9."
 	rules := openCodeSection(t, doc, "Hard Rules")
 	if !strings.Contains(rules, list) {
 		t.Errorf("## Hard Rules: missing the write list %q", list)
@@ -492,6 +493,102 @@ func TestRuntimeOpenCodeCitesTheDuplicateProbe(t *testing.T) {
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("## Sources: missing %q", want)
+		}
+	}
+}
+
+// intent 0009 S1, S2, S4, D3: when runtimes.assistant is opencode, the build
+// links gabo-assistant into the shared .agents/skills, writes the primary
+// agent .opencode/agents/gabo-assistant.md from the T1 template and merges
+// only default_agent into the project config file it already resolves.
+func TestRuntimeOpenCodeBuildsTheMainSessionEntry(t *testing.T) {
+	t.Parallel()
+	steps := openCodeSection(t, runtimeOpenCodeDoc(t), "Build Steps")
+	for _, want := range []string{
+		"Main-session entry (intent 0009 S1, S2, S4, D3)",
+		"the Main-Session Entry table of `gabo-agent-templates`",
+		"When `runtimes.assistant` is `opencode`",
+		"make `.agents/skills/gabo-assistant` a relative symlink to `../../.gabo/skills/gabo-assistant`",
+		"write `.opencode/agents/gabo-assistant.md` from `main_session.template`",
+		"`mode: primary`",
+		"merge only the key `default_agent` with the value `\"gabo-assistant\"` into `<file>`",
+		"keeping every other byte",
+		"A `default_agent` with another value is the owner's own: leave it and report it",
+	} {
+		if !strings.Contains(steps, want) {
+			t.Errorf("## Build Steps: missing %q", want)
+		}
+	}
+}
+
+// intent 0009 S1, S4: when runtimes.assistant is not opencode, the build
+// removes its own entry, and the shared link only under the shared rule.
+func TestRuntimeOpenCodeRemovesItsEntryWhenNotAssistant(t *testing.T) {
+	t.Parallel()
+	steps := openCodeSection(t, runtimeOpenCodeDoc(t), "Build Steps")
+	for _, want := range []string{
+		"When `runtimes.assistant` is not `opencode`",
+		"remove `.opencode/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
+		"remove the key `default_agent` from `<file>` only when its value is exactly `gabo-assistant`",
+		"removes the shared `.agents/skills/gabo-assistant` link only when no declared engine using `.agents/skills` is `runtimes.assistant`",
+	} {
+		if !strings.Contains(steps, want) {
+			t.Errorf("## Build Steps: missing %q", want)
+		}
+	}
+}
+
+// intent 0009 S4: on every build the skill removes the gabo entry of every
+// other full-tier engine of the T1 table, recognized only by its gabo
+// identity, and never the entry of the engine in runtimes.assistant.
+func TestRuntimeOpenCodeRemovesOtherEnginesEntries(t *testing.T) {
+	t.Parallel()
+	steps := openCodeSection(t, runtimeOpenCodeDoc(t), "Build Steps")
+	for _, want := range []string{
+		"On every build, remove the gabo main-session entry of every other full-tier engine of that table that is not `runtimes.assistant`",
+		"recognized only by its gabo identity",
+		"`.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line",
+		"the `.claude/skills/gabo-assistant` symlink to the catalog folder",
+		"the key `agent` in `.claude/settings.json` only when its value is exactly `gabo-assistant`",
+		"the bytes from `<!-- GABO_ASSISTANT_START -->` to `<!-- GABO_ASSISTANT_END -->`",
+		"`AGENTS.override.md`, `AGENTS.md` and `CLAUDE.md`",
+		"keep a block in a file the entry of the engine in `runtimes.assistant` uses",
+	} {
+		if !strings.Contains(steps, want) {
+			t.Errorf("## Build Steps: missing %q", want)
+		}
+	}
+}
+
+// intent 0009 S7, D3: the engine-config rule allows the one main-session key
+// and the files of the entry; no build sets a default agent but this one.
+func TestRuntimeOpenCodeAllowsTheMainSessionKey(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	rules := openCodeSection(t, doc, "Hard Rules")
+	for _, want := range []string{
+		"the project-level key `default_agent` of build step 9",
+		"`.opencode/agents/gabo-assistant.md`",
+		"Every spec agent is `mode: subagent`",
+		"the only default agent a build sets is `gabo-assistant`, and only when `runtimes.assistant` is `opencode`",
+	} {
+		if !strings.Contains(rules, want) {
+			t.Errorf("## Hard Rules: missing %q", want)
+		}
+	}
+	if strings.Contains(doc, "no build sets a default agent") {
+		t.Errorf("%s: still says no build sets a default agent", runtimeOpenCode)
+	}
+	src := openCodeSection(t, doc, "Sources")
+	for _, want := range []string{"https://opencode.ai/docs/config", "`default_agent`", "must be a primary agent"} {
+		if !strings.Contains(src, want) {
+			t.Errorf("## Sources: missing %q", want)
+		}
+	}
+	out := openCodeSection(t, doc, "Output Contract")
+	for _, want := range []string{"the main-session entry", "`default_agent`", "each other engine's entry removed"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("## Output Contract: missing %q", want)
 		}
 	}
 }
