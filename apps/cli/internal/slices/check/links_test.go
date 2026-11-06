@@ -404,3 +404,72 @@ func TestExpand(t *testing.T) {
 		}
 	}
 }
+
+// singleRuntimes is the runtimes block of validConfig and linkedConfig.
+const singleRuntimes = "  coder: claude\n  reviewer: claude\n  assistant: claude\n"
+
+// sessionRuntimes runs the coder and the reviewer in the main session and
+// lists two assistant engines (intent 0013 S1, S2).
+const sessionRuntimes = "  coder: session\n  reviewer: session\n  assistant: [claude, pi]\n"
+
+// withRuntimes replaces the runtimes block of cfg.
+func withRuntimes(t *testing.T, cfg, runtimes string) string {
+	t.Helper()
+	if !strings.Contains(cfg, singleRuntimes) {
+		t.Fatalf("config has no %q block", singleRuntimes)
+	}
+	return strings.Replace(cfg, singleRuntimes, runtimes, 1)
+}
+
+// piLinkedSkill is a Pi runtime skill sharing the Claude agent and skill
+// dirs, with its own user-level reviewer link.
+const piLinkedSkill = "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .claude/agents\n  skill_dir: .claude/skills\n  agent_skills: frontmatter:skills\n  reviewer_link: $HOME/.pi/skills/gabo-reviewer\n---\n"
+
+const piUserLink = "/home/o/.pi/skills/gabo-reviewer"
+
+// listedProject is linkedProject with the Pi runtime skill and Pi keys, for
+// sessionRuntimes.
+func listedProject() fstest.MapFS {
+	return with(linkedProject(), map[string]string{
+		".gabo/skills/gabo-runtime-pi/SKILL.md": piLinkedSkill,
+		".pi/settings.json":                     piKeysJSON,
+	})
+}
+
+// Intent 0013 S5: with runtimes.reviewer session the reviewer link of every
+// listed assistant engine is checked, each once, and session is no engine.
+func TestReviewerLinkForEveryListedAssistantUnderSession(t *testing.T) {
+	t.Parallel()
+	cfg := withRuntimes(t, linkedConfig, sessionRuntimes)
+	s := Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}
+	rep, err := NewUseCase(listedProject(), configFiles{projectFile: cfg}, goodUser(), s).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFailed(t, rep, "✗ reviewer link "+piUserLink+" missing",
+		"why: the gabo-reviewer agent runs "+piUserLink+"/scripts/reviewer.sh; link it to "+reviewerDir+" (runtime pi)")
+	noLineWith(t, rep, "reviewer link "+userLink)
+	noLineWith(t, rep, "runtime session")
+
+	u := goodUser().clone()
+	u.links[piUserLink] = reviewerDir
+	rep, err = NewUseCase(listedProject(), configFiles{projectFile: cfg}, u, s).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantPassed(t, rep, PassedLine)
+}
+
+// Intent 0013 S5: the skill links are required in the skill dir of every
+// listed assistant engine.
+func TestSkillLinksForEveryListedAssistant(t *testing.T) {
+	t.Parallel()
+	p := with(listedProject(), map[string]string{".gabo/skills/gabo-runtime-pi/SKILL.md": otherSkill})
+	cfg := withRuntimes(t, linkedConfig, sessionRuntimes)
+	rep, err := NewUseCase(p, configFiles{projectFile: cfg}, goodUser(), Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFailed(t, rep, "✗ skill link .other/skills/sk-a missing", "why: agent alpha lists sk-a; link it to ../../.gabo/skills/sk-a (runtime pi)")
+	noLineWith(t, rep, "runtime session")
+}

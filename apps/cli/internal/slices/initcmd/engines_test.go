@@ -567,3 +567,58 @@ func TestEngineStepOpencodeSubagentDepth(t *testing.T) {
 		})
 	}
 }
+
+// engineSet reads runtimes.assistant as one engine or a list (intent 0013
+// S2): the set is engineconfig.Engines of the roles, in the fixed order of
+// engineconfig.Set; session adds no engine. A one-engine assistant is still
+// the assistant engine; a list leaves every main-session key alone until
+// the list rule of intent 0013 S3.
+func TestEngineSetReadsTheAssistantList(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct {
+		name, runtimes string
+		set            []string
+		assistant      string
+	}{
+		{"flow list", "  coder: session\n  reviewer: opencode\n  assistant: [claude, pi]\n", []string{"claude", "opencode", "pi"}, ""},
+		{"block list", "  coder: session\n  reviewer: opencode\n  assistant:\n    - claude\n    - pi\n", []string{"claude", "opencode", "pi"}, ""},
+		{"session reviewer", "  coder: claude\n  reviewer: session\n  assistant: [pi]\n", []string{"claude", "pi"}, "pi"},
+		{"single values", "  coder: pi\n  reviewer: claude\n  assistant: claude\n", []string{"claude", "pi"}, "claude"},
+		{"no assistant", "  coder: codex\n  reviewer: claude\n", []string{"claude", "codex"}, ""},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			set, assistant, err := engineSet([]byte("runtimes:\n" + c.runtimes))
+			if err != nil {
+				t.Fatalf("engineSet error = %v", err)
+			}
+			if !slices.Equal(set, c.set) || assistant != c.assistant {
+				t.Fatalf("engineSet = %q, %q; want %q, %q", set, assistant, c.set, c.assistant)
+			}
+		})
+	}
+}
+
+// Through Run, a listed assistant integrates every engine of the set and
+// does not fail on the list (intent 0013 S2).
+func TestInitIntegratesEveryListedAssistant(t *testing.T) {
+	t.Parallel()
+	cfg := "runtimes:\n  coder: session\n  reviewer: opencode\n  assistant: [claude, pi]\n"
+	s := newStore(map[string]string{config: cfg, stamp: "1.2.2\n"})
+	out, err := run(t, s, "1.2.3")
+	if err != nil {
+		t.Fatalf("err = %v\n%s", err, joined(out))
+	}
+	text := joined(out)
+	for _, e := range []string{"claude", "opencode", "pi"} {
+		if !strings.Contains(text, "\n  "+e+":") {
+			t.Fatalf("no %s section:\n%s", e, text)
+		}
+	}
+	if strings.Contains(text, "session") {
+		t.Fatalf("session reported as an engine:\n%s", text)
+	}
+	if !slices.Contains(s.Writes, claudeFile) || !slices.Contains(s.Writes, piFile) || !slices.Contains(s.Writes, opencodeNew) {
+		t.Fatalf("writes = %v", s.Writes)
+	}
+}

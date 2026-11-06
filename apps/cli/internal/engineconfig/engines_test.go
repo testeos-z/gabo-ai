@@ -8,6 +8,51 @@ import (
 	"testing"
 )
 
+// engineSetRows is the one fixture table of runtimes blocks and their engine
+// sets (intent 0013 S2, D2). Roles is the set in role order (what Engines
+// returns and gabo check walks); Fixed is the same set through Set (what
+// gabo init integrates). The reviewer scripts' declared_agent_dirs mirrors
+// it with a copy of these rows in
+// internal/skills/gabo-reviewer/scripts/tests/preflight.test.sh.
+var engineSetRows = []struct {
+	name            string
+	coder, reviewer string
+	assistants      []string
+	roles, fixed    []string
+}{
+	{"assistant list, session coder, fixed reviewer", "session", "opencode", []string{"claude", "pi"}, []string{"opencode", "claude", "pi"}, []string{"claude", "opencode", "pi"}},
+	{"session reviewer adds no engine", "claude", "session", []string{"claude", "pi"}, []string{"claude", "pi"}, []string{"claude", "pi"}},
+	{"both roles session", "session", "session", []string{"pi"}, []string{"pi"}, []string{"pi"}},
+	{"assistants in listed order", "pi", "pi", []string{"codex", "claude"}, []string{"pi", "codex", "claude"}, []string{"claude", "codex", "pi"}},
+	{"single values, one engine", "claude", "claude", []string{"claude"}, []string{"claude"}, []string{"claude"}},
+	{"single values, mixed engines", "pi", "claude", []string{"claude"}, []string{"pi", "claude"}, []string{"claude", "pi"}},
+	{"single values, three engines", "codex", "claude", []string{"pi"}, []string{"codex", "claude", "pi"}, []string{"claude", "codex", "pi"}},
+	{"no assistant", "codex", "opencode", nil, []string{"codex", "opencode"}, []string{"codex", "opencode"}},
+}
+
+func TestEnginesFollowsTheFixtureTable(t *testing.T) {
+	for _, row := range engineSetRows {
+		t.Run(row.name, func(t *testing.T) {
+			got := Engines(row.coder, row.reviewer, row.assistants)
+			if !slices.Equal(got, row.roles) {
+				t.Errorf("Engines(%q, %q, %q) = %q, want %q", row.coder, row.reviewer, row.assistants, got, row.roles)
+			}
+			if fixed := Set(got...); !slices.Equal(fixed, row.fixed) {
+				t.Errorf("Set(Engines(...)) = %q, want %q", fixed, row.fixed)
+			}
+		})
+	}
+}
+
+// Engines drops empty names and repeats, trims, and keeps a name outside
+// the four engines in role order, as Set does.
+func TestEnginesSkipsEmptyAndRepeatedNames(t *testing.T) {
+	got := Engines(" pi ", "", []string{"", "pi", "acme", "claude", "acme"})
+	if want := []string{"pi", "acme", "claude"}; !slices.Equal(got, want) {
+		t.Errorf("Engines = %q, want %q", got, want)
+	}
+}
+
 func TestSetTakesEachEngineOnceInFixedOrder(t *testing.T) {
 	cases := []struct {
 		name     string

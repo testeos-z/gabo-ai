@@ -19,6 +19,28 @@ const (
 
 var order = []string{Claude, Codex, Opencode, Pi}
 
+// session in runtimes.coder or runtimes.reviewer runs that role in the main
+// session's engine, one of the listed assistants, so it adds no engine
+// (intent 0013 S2).
+const session = "session"
+
+// Engines returns the engine set of a project (intent 0013 S2, D2): the
+// coder and reviewer engines, then every listed assistant engine in its
+// listed order, each once, in that order of first appearance. session and
+// empty names add no engine. gabo check walks this role order; the rules
+// that need the fixed order wrap it in Set. The reviewer scripts'
+// declared_agent_dirs mirrors this rule.
+func Engines(coder, reviewer string, assistants []string) []string {
+	var out []string
+	for _, name := range append([]string{coder, reviewer}, assistants...) {
+		name = strings.TrimSpace(name)
+		if name != "" && name != session && !slices.Contains(out, name) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
 // Set returns the engine set named by the runtime roles (coder, reviewer,
 // assistant), each engine once: the known engines in the fixed order, then
 // any other name in the order it appears. Empty names are skipped.

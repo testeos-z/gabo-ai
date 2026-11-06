@@ -14,6 +14,7 @@ import (
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/agentspec"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
 
 // NextLink follows a missing or wrong skill or reviewer link.
@@ -93,8 +94,9 @@ func insideRepo(dir string) bool {
 // checkLinks requires, for each runtime whose skill declares a skill_dir, a
 // link <skill_dir>/<name> to the catalog copy for every skill a spec agent
 // lists, and a fixed-name link <skill_dir>/gabo-<slot> to every slot adapter
-// that is a skill folder. Then it checks the reviewer runtime's user-level
-// reviewer link.
+// that is a skill folder. Then it checks the user-level reviewer link of
+// each engine the reviewer may run on (reviewerEngines), each declared link
+// once.
 func (u *UseCase) checkLinks(r *Report, cfg config.Config) error {
 	catalog, err := fs.Sub(u.project, CatalogDir)
 	if err != nil {
@@ -148,8 +150,10 @@ func (u *UseCase) checkLinks(r *Report, cfg config.Config) error {
 				"why: slots."+slot+".adapter is "+strings.TrimSpace(cfg.Slots[slot].Adapter)+"; link it to "+relTo(dir, folder)+" (runtime "+rt+")")
 		}
 	}
-	if rt := string(cfg.Runtimes.Reviewer); rt != "" {
-		if meta, ok := u.runtimeMeta(rt); ok && meta.ReviewerLink != "" {
+	var links []string
+	for _, rt := range reviewerEngines(cfg) {
+		if meta, ok := u.runtimeMeta(rt); ok && meta.ReviewerLink != "" && !slices.Contains(links, meta.ReviewerLink) {
+			links = append(links, meta.ReviewerLink)
 			u.checkReviewerLink(r, rt, meta.ReviewerLink)
 		}
 	}
@@ -329,14 +333,31 @@ func (u *UseCase) adapterFolder(slot, adapter string) (string, bool) {
 	return path.Dir(file), true
 }
 
+// runtimesOf returns the engine set of gabo.yaml in role order
+// (engineconfig.Engines, intent 0013 S2): every engine rule of gabo check
+// walks it, and the rules that need the fixed order wrap it in
+// engineconfig.Set.
 func runtimesOf(cfg config.Config) []string {
-	var out []string
-	for _, rt := range append([]config.Runtime{cfg.Runtimes.Coder, cfg.Runtimes.Reviewer}, cfg.Runtimes.Assistant...) {
-		if rt != "" && !slices.Contains(out, string(rt)) {
-			out = append(out, string(rt))
-		}
+	return engineconfig.Engines(string(cfg.Runtimes.Coder), string(cfg.Runtimes.Reviewer), assistantsOf(cfg))
+}
+
+// assistantsOf returns the engines listed in runtimes.assistant.
+func assistantsOf(cfg config.Config) []string {
+	out := make([]string, len(cfg.Runtimes.Assistant))
+	for i, rt := range cfg.Runtimes.Assistant {
+		out[i] = string(rt)
 	}
 	return out
+}
+
+// reviewerEngines returns the engines the reviewer may run on: the fixed
+// runtimes.reviewer engine, or with session every listed assistant engine
+// (intent 0013 S5).
+func reviewerEngines(cfg config.Config) []string {
+	if cfg.Runtimes.Reviewer == config.RuntimeSession {
+		return engineconfig.Engines("", "", assistantsOf(cfg))
+	}
+	return engineconfig.Engines("", string(cfg.Runtimes.Reviewer), nil)
 }
 
 func slotNames(cfg config.Config) []string {
