@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0012-design-norms-template |
-| status | Specified (spec awaiting the owner's acceptance) |
+| status | Accepted |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-06 |
@@ -51,7 +51,7 @@ The first attempt (PR #163, the template; PR #168, its plan) was closed on 2026-
 | product card | [#171 Runtime integrations](https://github.com/testeos-z/gabo-ai/issues/171) |
 | intent issue | [#374 I0012: Design norms template](https://github.com/testeos-z/gabo-ai/issues/374) |
 | PRD | [PRD](../../PRD.md) R20 |
-| spec | [spec](spec.md) (awaiting the owner's acceptance) |
+| spec | [spec](spec.md) (accepted 2026-11-06) |
 | plan | not written yet (gabo-dev-lead, after acceptance) |
 | origin | [cappy-lab/vulcam#624](https://github.com/cappy-lab/vulcam/issues/624) (owner decisions 2026-10-30) |
 | earlier requests | [#162](https://github.com/testeos-z/gabo-ai/issues/162) (DESIGN.md norms template), [#164](https://github.com/testeos-z/gabo-ai/issues/164) (UX_UI split) |

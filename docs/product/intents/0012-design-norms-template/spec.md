@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0012-design-norms-template](intent.md) |
-| status | Draft, awaiting the owner's acceptance |
+| status | Accepted |
 | owner | gabo-pm |
 | contributors | — (no `gabo-frontend` section 3: the change has no user-facing surface, see section 3) |
 | date | 2026-11-06 |
@@ -56,7 +56,7 @@ Not applicable: no stored data changes.
 
 | policy | conflict | resolution |
 |---|---|---|
-| TRD D14 (global documents; global UX and app-flow documents retired) | Issue #164 asks for a `UX_UI.md` template. | S3 maps the split onto the per-change model (rules in `DESIGN.md`, concrete cases in spec section 3) and keeps the retired-template tests; the open choice is open question 1. TRD D14 amendment, **Proposed (auto)**, awaiting the owner's acceptance of this spec, written in this PR: it names the norms shape of the optional `DESIGN.md` (one rules table per area `id \| rule \| level \| rationale \| verification \| examples \| source`, RFC 2119 levels, the component inventory, exceptions and a changelog). |
+| TRD D14 (global documents; global UX and app-flow documents retired) | Issue #164 asks for a `UX_UI.md` template. | S3 maps the split onto the per-change model (rules in `DESIGN.md`, concrete cases in spec section 3) and keeps the retired-template tests; the open choice is open question 1. TRD D14 amendment, accepted with this spec (owner, 2026-11-06), written in this PR: it names the norms shape of the optional `DESIGN.md` (one rules table per area `id \| rule \| level \| rationale \| verification \| examples \| source`, RFC 2119 levels, the component inventory, exceptions and a changelog). |
 | TRD D7 (no plan edit in a code PR) | PR #163 edited PRD R20. | S8: PRD R20 already covers the template and stays unchanged; only this `docs/product` PR edits the TRD. |
 | PRD R20 | — | No amendment: R20 already names "the optional `DESIGN.md`" among the templated documents. |
 | TRD 8.5 (`gabo check` impact) | — | S7: none, with the reason; open question 2 asks the owner to confirm. |
@@ -76,4 +76,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
-| — | — | pending: awaiting the owner's acceptance |
+| leomerida15 (owner) | 2026-11-06 | Accepted by the owner, with every **Proposed (auto)** answer (open questions 1 and 2 stay with the owner), and added to release 0.2.10. Asked "Aceptas la spec del intent 12 y la sumo a la 0.2.10?", the owner answered: "ss" (yes). Recorded by the coordinator on the owner's instruction, relayed verbatim from the owner's session of 2026-11-06. |
