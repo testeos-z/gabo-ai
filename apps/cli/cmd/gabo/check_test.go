@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"maps"
 	"os"
+	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -73,7 +75,19 @@ func checkProject(t *testing.T, version string) string {
 		t.Fatal(err)
 	}
 	for _, a := range spec.Agents {
-		write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\ngabo-version: "+version+"\n---\n")
+		// The skills list of gabo-runtime-claude: spec skills, then the
+		// fixed-name links the template names (intent 0008 S1).
+		tmpl, err := fs.ReadFile(skills.Catalog(), path.Join(agentspec.Dir, a.Template))
+		if err != nil {
+			t.Fatal(err)
+		}
+		list := slices.Clone(a.Skills)
+		for _, l := range [][2]string{{"{{methodology}}", "gabo-methodology"}, {"{{adapter:tasks}}", "gabo-tasks"}, {"{{adapter:repository_host}}", "gabo-repository-host"}, {"{{adapter:memory}}", "gabo-memory"}} {
+			if strings.Contains(string(tmpl), l[0]) {
+				list = append(list, l[1])
+			}
+		}
+		write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\nskills: ["+strings.Join(list, ", ")+"]\ngabo-version: "+version+"\n---\n")
 		for _, name := range a.Skills {
 			link(t, "../../.gabo/skills/"+name, filepath.Join(project, ".claude", "skills", name))
 		}

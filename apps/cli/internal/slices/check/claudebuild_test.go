@@ -159,3 +159,62 @@ func TestClaudeBuiltSetWithoutReviewerLinkFails(t *testing.T) {
 	}
 	wantFailed(t, rep, "✗ reviewer link "+userLink+" missing", NextLink)
 }
+
+// setClaudeSkills rewrites the frontmatter skills list of a built agent.
+func setClaudeSkills(t *testing.T, proj fstest.MapFS, id string, list []string) {
+	t.Helper()
+	name := ".claude/agents/" + id + ".md"
+	var out []string
+	for line := range strings.SplitSeq(string(proj[name].Data), "\n") {
+		switch {
+		case line == "skills:" || strings.HasPrefix(line, "  - "):
+		case strings.HasPrefix(line, "gabo-version:"):
+			if len(list) > 0 {
+				out = append(out, "skills:")
+				for _, s := range list {
+					out = append(out, "  - "+s)
+				}
+			}
+			out = append(out, line)
+		default:
+			out = append(out, line)
+		}
+	}
+	proj[name] = file(strings.Join(out, "\n"))
+}
+
+// Intent 0008 S1 on the agents gabo-runtime-claude builds: the frontmatter
+// skills list holds exactly the spec skills plus the template's fixed-name
+// links, each once; gabo-dev-lead keeps gabo-plan-reviewer throughout.
+func TestClaudeBuiltAgentSkills(t *testing.T) {
+	t.Parallel()
+	for _, tt := range agentSkillsCases("claude") {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			proj := claudeBuilt(t, "1.2.3")
+			setClaudeSkills(t, proj, "gabo-pm", tt.list)
+			r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+			wantSkillLines(t, r, ".claude/agents/gabo-pm.md", tt.want)
+		})
+	}
+}
+
+// The adapter's frontmatter name passes in place of its fixed-name link.
+func TestClaudeBuiltAgentSkillsAcceptAdapterName(t *testing.T) {
+	t.Parallel()
+	proj := claudeBuilt(t, "1.2.3")
+	slots := memoryAdapterSlot(t, proj, ".claude/skills")
+	setClaudeSkills(t, proj, "gabo-pm", []string{"gabo-pm", "gabo-plan-reviewer", "gabo-tasks", "gabo-repository-host", "gabo-memory-engram"})
+	r := run(t, proj, configFiles{projectFile: validConfig + "slots:\n" + slots}, Settings{})
+	wantSkillLines(t, r, ".claude/agents/gabo-pm.md", nil)
+	wantPassed(t, r, PassedLine)
+}
+
+// The fixed-name links come from the template in the project catalog copy:
+// a gabo-pm template without {{adapter:memory}} makes gabo-memory extra.
+func TestClaudeBuiltAgentSkillsFollowTheProjectTemplate(t *testing.T) {
+	t.Parallel()
+	proj := withoutMemorySlot(t, claudeBuilt(t, "1.2.3"))
+	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+	wantSkillLines(t, r, ".claude/agents/gabo-pm.md", []string{"✗ agent gabo-pm (claude): skill gabo-memory not in the agent spec"})
+}

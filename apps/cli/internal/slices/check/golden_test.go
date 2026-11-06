@@ -33,6 +33,7 @@ func TestCommandGolden(t *testing.T) {
 		{name: "usage-unknown-flag", args: []string{"--bogus"}},
 		{name: "versions-no-stamp", edit: map[string]string{".gabo/VERSION": ""}},
 		{name: "versions-no-version-line", edit: map[string]string{".claude/agents/beta.md": "---\nname: beta\n---\nbody\n"}},
+		{name: "agent-skills-extra", edit: map[string]string{".claude/agents/alpha.md": "---\nname: alpha\nskills:\n  - sk-x\ngabo-version: 1.2.3\n---\nbody\n"}},
 	}
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
