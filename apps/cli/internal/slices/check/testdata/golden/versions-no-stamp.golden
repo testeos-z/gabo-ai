@@ -1,0 +1,6 @@
+exit 1
+error: ""
+--- stdout
+✗ no stamp: run gabo init
+✗ agent versions not compared: no valid catalog stamp
+next: run gabo init, then ask your agent to rebuild the agents
