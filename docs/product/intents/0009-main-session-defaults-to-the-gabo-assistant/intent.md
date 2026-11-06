@@ -48,6 +48,6 @@ Every owner of a gabo project, with the engine named in `runtimes.assistant` (`c
 | intent issue | [#305 I0009: Main session defaults to the gabo assistant](https://github.com/testeos-z/gabo-ai/issues/305) |
 | PRD | [PRD](../../PRD.md) |
 | spec | [spec](spec.md) |
-| plan | [plan](plan.md) (not written: waits for the spec's acceptance) |
+| plan | [plan](plan.md) |
 | review findings | gabo-reviewer findings on cappy-lab/vulcam PR #638 (assistant skill not linked; project instruction files reach every session; no owner for the block) |
 | related intent | 0008-stricter-gabo-check (the stricter check set this block check joins), 0006-engine-integration-at-init |

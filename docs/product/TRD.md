@@ -330,6 +330,14 @@ Every task write is followed by a verifying re-read. This rule lives in the cycl
 - Approved (owner 2026-10-26), D22: personalization observations are kept in the `memory` slot under the topic `user/preferences`; the assistant reads them at session start.
 - Proposed (auto): the assistant records the setup start time in memory and the first wave report states the elapsed time to its start (R28, success metric 5). Reason: R28 had no technical measurement point.
 
+### 8.5 `gabo check` impact (intent 0008 S10)
+
+Amended (owner 2026-11-06, [intent 0008](intents/0008-stricter-gabo-check/spec.md) S10). Owner, verbatim: "1. pondremos una regla cada cambio debe revisar si es necesario actualizar el check".
+
+- Any change that adds or alters something an agent file, a runtime skill, the neutral agent spec, a slot contract or a project file gabo writes must update `gabo check` or say why not.
+- Each intent's `plan.md` answers "Does the change need a `gabo check` update, and which task covers it?" in its fixed questions, and each task's acceptance states its `gabo check impact`.
+- Each coder PR body states `gabo check impact: <none, with the reason / updated in <file>>`.
+
 ## 9. Interfaces (proposed (auto), awaiting owner)
 
 Key names follow [9.3](#93-configuration-shapes) and the JSON Schemas in `schemas/`.
