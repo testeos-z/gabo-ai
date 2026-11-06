@@ -1,6 +1,6 @@
 {
   "name": "gabo",
-  "version": "0.2.6",
+  "version": "0.2.8",
   "description": "gabo catalog skills for Claude Code: plan, build and review work with the gabo SDLC.",
   "author": {
     "name": "testeos-z"
