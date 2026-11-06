@@ -26,7 +26,9 @@ func TestRuntimePiSkill(t *testing.T) {
 	}
 	var fm struct {
 		Metadata struct {
-			AgentDir string `yaml:"agent_dir"`
+			AgentDir       string `yaml:"agent_dir"`
+			SkillDir       string `yaml:"skill_dir"`
+			FormerSkillDir string `yaml:"former_skill_dir"`
 		} `yaml:"metadata"`
 	}
 	if err := yaml.Unmarshal(front, &fm); err != nil {
@@ -34,6 +36,14 @@ func TestRuntimePiSkill(t *testing.T) {
 	}
 	if fm.Metadata.AgentDir != ".pi/agents" {
 		t.Errorf("metadata.agent_dir = %q, want .pi/agents", fm.Metadata.AgentDir)
+	}
+	// intent 0008 S3, S4: links live in the shared .agents/skills; .pi/skills
+	// is where the links were made before the move.
+	if fm.Metadata.SkillDir != ".agents/skills" {
+		t.Errorf("metadata.skill_dir = %q, want .agents/skills", fm.Metadata.SkillDir)
+	}
+	if fm.Metadata.FormerSkillDir != ".pi/skills" {
+		t.Errorf("metadata.former_skill_dir = %q, want .pi/skills", fm.Metadata.FormerSkillDir)
 	}
 
 	for _, s := range []string{
@@ -49,8 +59,8 @@ func TestRuntimePiSkill(t *testing.T) {
 		// agents: one file per spec id, version line in the frontmatter.
 		"`.pi/agents/<id>.md`", "gabo-version: <version>", "`tools`",
 		"subagent_run",
-		// skills and fixed-name links.
-		"`.pi/skills/<skill>`", "`../../.gabo/skills/<skill>`", "`.pi/skills/gabo-methodology`", "`gabo-<slot>`",
+		// skills and fixed-name links in the shared .agents/skills (intent 0008 S3).
+		"`.agents/skills/<skill>`", "`../../.gabo/skills/<skill>`", "`.agents/skills/gabo-methodology`", "`gabo-<slot>`",
 		// reviewer stays at user level, linked into the active Pi agent home.
 		"Never place `gabo-reviewer` in the project",
 		"`GENTLE_PI_AGENT_HOME`", "`PI_CODING_AGENT_DIR`", "`~/.pi/agent`", "`~/.gentle-shell/agent`",
@@ -104,4 +114,47 @@ func TestRuntimePiDeclaresAgentPlaces(t *testing.T) {
 	if skills != "line:Skills:" || name != "frontmatter:name" {
 		t.Fatalf("agent_skills, agent_name = %q, %q; want line:Skills:, frontmatter:name", skills, name)
 	}
+}
+
+// intent 0008 S3, S4: the Pi build places every link in the shared
+// .agents/skills, names it in the Skills: line, and migrates the links it
+// made in .pi/skills: it removes only its own symlinks and leaves and reports
+// anything else.
+func TestRuntimePiMovesToAgentsSkills(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(Catalog(), "gabo-runtime-pi/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(b)
+	for _, s := range []string{
+		"Skills: before work read `.agents/skills/<name>/SKILL.md` for each of",
+		"relative to `.agents/skills/`",
+		"`.agents/skills/gabo-<slot>/SKILL.md`",
+		// migration of the former links (S4).
+		"remove each `.pi/skills/gabo-*` symlink that this skill made",
+		"one that points into `../../.gabo/skills/` or to a slot adapter folder of `gabo.yaml`",
+		"Leave and report any other entry of `.pi/skills/`, and never remove a real folder or file.",
+		"`gabo check` fails on such a leftover: `✗ .pi/skills/<name>: gabo link left after the move to .agents/skills`",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-runtime-pi/SKILL.md: missing %q", s)
+		}
+	}
+	for _, s := range []string{"`.pi/skills/<skill>`", "`.pi/skills/<name>/SKILL.md` for each", "`.pi/skills/gabo-methodology`"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("gabo-runtime-pi/SKILL.md: still places links in .pi/skills: %q", s)
+		}
+	}
+}
+
+// intent 0008 S5: removing unneeded links in the shared directory keeps
+// every link a declared engine needs, the assistant link included.
+func TestRuntimePiKeepsSharedLinks(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(Catalog(), "gabo-runtime-pi/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertSharedRemovalRule(t, "gabo-runtime-pi/SKILL.md", string(b))
 }

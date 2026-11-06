@@ -92,14 +92,17 @@ func setSkillsLine(t *testing.T, proj fstest.MapFS, name, where string, list []s
 	proj[name] = file(strings.Join(out, ""))
 }
 
-// piWhere is the path gabo-runtime-pi writes in the Skills: line.
-const piWhere = "`.pi/skills/<name>/SKILL.md`"
+// piWhere is the path gabo-runtime-pi writes in the Skills: line: the shared
+// .agents/skills (intent 0008 S3).
+const piWhere = "`.agents/skills/<name>/SKILL.md`"
 
 // piBuilt is a project with the real embedded catalog (gabo-runtime-pi
 // included) and every spec agent built in the shape gabo-runtime-pi writes:
 // .pi/agents/<id>.md with frontmatter name, description, gabo-version and
 // tools, then the Skills: body line (omitted for an empty list) and the
-// filled template body; plus the .pi/settings.json gabo init writes.
+// filled template body; each spec skill linked as .agents/skills/<name> ->
+// ../../.gabo/skills/<name> and the fixed-name links of piConfig's skill
+// adapters (intent 0008 S3); plus the .pi/settings.json gabo init writes.
 func piBuilt(t *testing.T, version string) fstest.MapFS {
 	t.Helper()
 	proj := fstest.MapFS{".gabo/VERSION": file(version + "\n"), ".pi/settings.json": file(piKeysJSON)}
@@ -135,7 +138,12 @@ func piBuilt(t *testing.T, version string) fstest.MapFS {
 			body = line + "\n" + body
 		}
 		proj[".pi/agents/"+a.ID+".md"] = file(front + "---\n" + body)
+		for _, name := range a.Skills {
+			proj[".agents/skills/"+name] = symlink("../../.gabo/skills/" + name)
+		}
 	}
+	proj[".agents/skills/gabo-reviewer-placement"] = symlink("../../.gabo/skills/gabo-reviewer-placement-local")
+	proj[".agents/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
 	return proj
 }
 
@@ -150,6 +158,64 @@ func TestPiBuiltSetPassesCheck(t *testing.T) {
 	rep := runPi(t, piBuilt(t, "1.2.3"), Settings{})
 	wantSkillLines(t, rep, ".pi/agents/gabo-pm.md", nil)
 	wantPassed(t, rep, PassedLine)
+	noLineWith(t, rep, "skill link")
+}
+
+// Intent 0008 S3: the link rule now runs for Pi through its skill_dir, so a
+// Pi build without .agents/skills/gabo-pm fails with the existing line.
+func TestPiBuiltSetWithoutALinkFails(t *testing.T) {
+	t.Parallel()
+	proj := piBuilt(t, "1.2.3")
+	delete(proj, ".agents/skills/gabo-pm")
+	wantFailed(t, runPi(t, proj, Settings{}), "✗ skill link .agents/skills/gabo-pm missing")
+}
+
+// Intent 0008 S4: a link gabo-runtime-pi left in .pi/skills fails with the
+// leftover line; a user's own entry there is not reported.
+func TestPiBuiltLeftoverLinkFails(t *testing.T) {
+	t.Parallel()
+	proj := piBuilt(t, "1.2.3")
+	proj[".pi/skills/my-skill"] = symlink("../../.gabo/skills/gabo-pm")
+	wantPassed(t, runPi(t, proj, Settings{}), PassedLine)
+	proj[".pi/skills/gabo-pm"] = symlink("../../.gabo/skills/gabo-pm")
+	wantFailed(t, runPi(t, proj, Settings{}),
+		"✗ .pi/skills/gabo-pm: gabo link left after the move to .agents/skills", NextRebuild)
+}
+
+// codexPiConfig declares codex and pi: both read the shared .agents/skills.
+var codexPiConfig = strings.Replace(codexConfig, "  assistant: codex\n", "  assistant: pi\n", 1)
+
+// Intent 0008 S5: with runtimes naming codex and pi, one set of links in
+// .agents/skills serves both and gabo check passes.
+func TestCodexAndPiShareOneSetOfLinks(t *testing.T) {
+	t.Parallel()
+	if codexPiConfig == codexConfig {
+		t.Fatal("codexConfig has no assistant: codex line to replace")
+	}
+	proj := codexBuilt(t, "1.2.3")
+	for name, f := range piBuilt(t, "1.2.3") {
+		if prev, ok := proj[name]; ok && strings.HasPrefix(name, ".agents/skills/") && string(prev.Data) != string(f.Data) {
+			t.Fatalf("%s: codex links %q, pi links %q", name, prev.Data, f.Data)
+		}
+		proj[name] = f
+	}
+	run := func(p fstest.MapFS) Report {
+		rep, err := NewUseCase(p, configFiles{projectFile: codexPiConfig}, codexUser(),
+			Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}).Run()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rep
+	}
+	rep := run(proj)
+	wantPassed(t, rep, PassedLine)
+	noLineWith(t, rep, "skill link")
+	delete(proj, ".agents/skills/gabo-pm")
+	rep = run(proj)
+	wantFailed(t, rep, "✗ skill link .agents/skills/gabo-pm missing")
+	if n := strings.Count(strings.Join(rep.Lines, "\n"), "✗ skill link .agents/skills/gabo-pm missing"); n != 1 {
+		t.Errorf("the shared link is reported %d times, want once:\n%s", n, strings.Join(rep.Lines, "\n"))
+	}
 }
 
 // Intent 0008 S1 on the agents gabo-runtime-pi builds: the Skills: line

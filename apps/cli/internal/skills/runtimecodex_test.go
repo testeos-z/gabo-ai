@@ -183,3 +183,28 @@ func TestRuntimeCodexDeclaresAgentPlaces(t *testing.T) {
 		t.Fatalf("agent_skills, agent_name = %q, %q; want line:Load these skills by name before work:, toml:name", skills, name)
 	}
 }
+
+// sharedRemovalRule is the text every runtime skill that makes links in the
+// shared .agents/skills carries (intent 0008 S5; intent 0009 S1).
+var sharedRemovalRule = []string{
+	"`.agents/skills/` is shared by every engine that reads it (Codex, Pi and OpenCode)",
+	"keep every link any engine declared in `runtimes.*` needs",
+	"an engine uses `.agents/skills` when its runtime skill `.gabo/skills/gabo-runtime-<engine>/SKILL.md` declares `metadata.skill_dir: .agents/skills`",
+	"keep `.agents/skills/gabo-assistant` while `runtimes.assistant` names an engine that uses `.agents/skills` (intent 0009 S1)",
+}
+
+func assertSharedRemovalRule(t *testing.T, name, doc string) {
+	t.Helper()
+	for _, s := range sharedRemovalRule {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", name, s)
+		}
+	}
+}
+
+// intent 0008 S5: build step 3 removes an unneeded .agents/skills link only
+// when no declared engine needs it, the assistant link included.
+func TestRuntimeCodexKeepsSharedLinks(t *testing.T) {
+	t.Parallel()
+	assertSharedRemovalRule(t, runtimeCodex, runtimeCodexDoc(t))
+}
