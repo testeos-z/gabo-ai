@@ -23,4 +23,18 @@ docs/product/intents/
 
 `gabo check` validates every folder here offline: the folder name and a unique number, an `intent.md` in each folder, the stage order (no `plan.md` without a `spec.md` whose acceptance table a human filled) and the plan task table (ids, cross-intent references, `depends_on` mirrored by `unblocks`, no dependency cycle). Plain files in this folder, such as this README, are skipped.
 
-There are no intents yet. Do not create one by hand to fill the folder; directiva opens the first one when the owner asks for a change.
+## Index
+
+Directiva opens each intent when the owner asks for a change; never create one by hand to fill the folder. The status is the `intent.md` status; acceptance lives in each spec's section 7.
+
+| intent | title | intent issue | spec | target release |
+|---|---|---|---|---|
+| [0001](0001-claude-code-plugin/intent.md) | Claude Code plugin | [#172](https://github.com/testeos-z/gabo-ai/issues/172) | [spec](0001-claude-code-plugin/spec.md) | — |
+| [0002](0002-codex-plugin/intent.md) | Codex plugin | [#173](https://github.com/testeos-z/gabo-ai/issues/173) | [spec](0002-codex-plugin/spec.md) | — |
+| [0003](0003-pi-package/intent.md) | Pi package | [#174](https://github.com/testeos-z/gabo-ai/issues/174) | [spec](0003-pi-package/spec.md) | — |
+| [0004](0004-opencode-runtime/intent.md) | OpenCode runtime | [#175](https://github.com/testeos-z/gabo-ai/issues/175) | [spec](0004-opencode-runtime/spec.md) | — |
+| [0005](0005-any-runtime-engine/intent.md) | Any runtime engine | [#176](https://github.com/testeos-z/gabo-ai/issues/176) | — (no spec yet) | — |
+| [0006](0006-engine-integration-at-init/intent.md) | Engine integration at init | [#261](https://github.com/testeos-z/gabo-ai/issues/261) | [spec](0006-engine-integration-at-init/spec.md) | 0.2.6 |
+| [0007](0007-update-documentation-for-0-2-6/intent.md) | Update documentation for 0.2.6 | [#263](https://github.com/testeos-z/gabo-ai/issues/263) | [spec](0007-update-documentation-for-0-2-6/spec.md) | 0.2.6 |
+| [0008](0008-stricter-gabo-check/intent.md) | Stricter gabo check | pending | [spec](0008-stricter-gabo-check/spec.md) (accepted 2026-11-06) | 0.2.8 |
+| [0009](0009-main-session-defaults-to-the-gabo-assistant/intent.md) | Main session defaults to the gabo assistant | pending | [spec](0009-main-session-defaults-to-the-gabo-assistant/spec.md) (accepted 2026-11-06) | 0.2.8 |
