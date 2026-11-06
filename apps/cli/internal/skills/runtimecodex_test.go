@@ -274,7 +274,8 @@ func TestRuntimeCodexRemovesStaleEntries(t *testing.T) {
 		"recognized only by its gabo identity",
 		"except any link or block the row of the `runtimes.assistant` engine writes",
 		"a file left empty is kept and reported, never deleted",
-		"a key whose value is exactly `gabo-assistant`",
+		"an agent file `gabo-assistant` carrying a `gabo-version:` line",
+		"the `gabo-assistant` link to the catalog folder",
 		"keep and report",
 	} {
 		if !strings.Contains(section, s) {
@@ -288,6 +289,57 @@ func TestRuntimeCodexRemovesStaleEntries(t *testing.T) {
 	} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("%s: missing %q", runtimeCodex, s)
+		}
+	}
+}
+
+// intent 0010 S4, S5, D3 A: gabo init writes and removes every engine config
+// key, so the Codex skill no longer removes Claude Code's `agent` or
+// OpenCode's `default_agent`; it keeps removing other engines' agent files,
+// links and blocks and keeps writing its own block.
+func TestRuntimeCodexLeavesEngineConfigKeysToGaboInit(t *testing.T) {
+	t.Parallel()
+	section := codexMainSession(t)
+	for _, s := range []string{
+		"Never remove Claude Code's `agent` key or OpenCode's `default_agent` key: `gabo init` removes them (intent 0010 S4)",
+		"copy the `main_session.block` of `.gabo/skills/gabo-agent-templates/agents.yaml` verbatim",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s Main-Session Entry: missing %q", runtimeCodex, s)
+		}
+	}
+	mustLackIn(t, runtimeCodex+" Main-Session Entry", section,
+		"a key whose value is exactly `gabo-assistant`",
+		"For a key, remove only that member",
+		"a user's own `agent` or `default_agent` value",
+	)
+	doc := runtimeCodexDoc(t)
+	assertEngineConfigRule(t, runtimeCodex, doc)
+	if want := "`gabo init` writes every engine config key (intent 0010 S5); this skill writes none"; !strings.Contains(doc, want) {
+		t.Errorf("%s: missing %q", runtimeCodex, want)
+	}
+	assertKeyLinesNameGaboInit(t, runtimeCodex, doc)
+}
+
+// mustLackIn fails for each unwanted string found in doc.
+func mustLackIn(t *testing.T, where, doc string, unwanted ...string) {
+	t.Helper()
+	for _, s := range unwanted {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: still carries %q", where, s)
+		}
+	}
+}
+
+// assertKeyLinesNameGaboInit checks intent 0010 S5: every line of a runtime
+// skill that names `settings.json`, `default_agent` or `subagent_depth` says
+// that `gabo init` writes the key, never that the skill writes it.
+func assertKeyLinesNameGaboInit(t *testing.T, name, doc string) {
+	t.Helper()
+	key := regexp.MustCompile(`settings\.json|default_agent|subagent_depth`)
+	for i, line := range strings.Split(doc, "\n") {
+		if key.MatchString(line) && !strings.Contains(line, "`gabo init`") {
+			t.Errorf("%s:%d names an engine config key without `gabo init`: %.120s", name, i+1, line)
 		}
 	}
 }
