@@ -176,7 +176,7 @@ func TestRemoveMainSessionOfEnginesNotInTheSet(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			in := Input{Files: map[string][]byte{}, Version: "0.2.6", Assistant: c.assistant}
+			in := Input{Files: map[string][]byte{}, Version: "0.2.6", Assistants: []string{c.assistant}}
 			if c.file != nil {
 				in.Files[ClaudeSettings] = []byte(*c.file)
 			}

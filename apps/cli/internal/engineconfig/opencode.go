@@ -43,9 +43,10 @@ const opencodeMainSessionStep = "ask your agent to build the agents (the main se
 // opencodeRule writes gabo's OpenCode keys into the S2 file, the first
 // existing config, else a new .opencode/opencode.json, keeping every other
 // byte and comment (intent 0010 S2, S3, S4): it raises
-// experimental.subagent_depth to at least 3; with OpenCode as the assistant
-// it merges "default_agent": "gabo-assistant", with another assistant it
-// removes exactly that value from each config. Anything it cannot merge
+// experimental.subagent_depth to at least 3; with OpenCode a listed
+// assistant engine it merges "default_agent": "gabo-assistant", with OpenCode
+// not listed it removes exactly that value from each config (intent 0013
+// S3, D7). Anything it cannot merge
 // without loss writes nothing and gets one ✗ line. Then it reports whether
 // the stage-gate plugin is in the project.
 func opencodeRule(in Input) Result {
@@ -84,7 +85,7 @@ func opencodeKeys(in Input) (Result, bool) {
 	}
 	writes := map[string][]byte{}
 	var removed []string
-	if in.Assistant != "" && in.Assistant != Opencode {
+	if in.unlists(Opencode) {
 		rem := removeDefaultAgent(in, true)
 		if len(rem.Section.Lines) > 0 && strings.HasPrefix(rem.Section.Lines[0], FailurePrefix) {
 			return rem, false
@@ -102,7 +103,7 @@ func opencodeKeys(in Input) (Result, bool) {
 	if !exists {
 		obj := jsonObj{{opencodeExperimental, jsonObj{{opencodeDepthKey, opencodeMinDepth}}}}
 		parts = append(parts, opencodeDepthName+" unset → "+strconv.Itoa(opencodeMinDepth))
-		if in.Assistant == Opencode {
+		if in.lists(Opencode) {
 			obj = append(obj, jsonKV{opencodeAgentKey, opencodeAgentValue})
 			parts = append(parts, "added "+opencodeAgentKey)
 			agentIsGabo = true
@@ -120,7 +121,7 @@ func opencodeKeys(in Input) (Result, bool) {
 		if part != "" {
 			parts = append(parts, part)
 		}
-		if in.Assistant == Opencode {
+		if in.lists(Opencode) {
 			top = scanObject(out, top.open)
 			switch m, ok := top.member(out, opencodeAgentKey); {
 			case !ok:
@@ -143,7 +144,7 @@ func opencodeKeys(in Input) (Result, bool) {
 	}
 	res.Section.Lines = append(res.Section.Lines, removed...)
 	res.Section.Lines = append(res.Section.Lines, kept...)
-	if len(res.Section.Lines) == 0 && in.Assistant == Opencode {
+	if len(res.Section.Lines) == 0 && in.lists(Opencode) {
 		res.Section.Lines = []string{"unchanged " + file}
 	}
 	if len(writes) > 0 {
@@ -217,7 +218,7 @@ func compactJSON(raw []byte) string {
 // project whose engine set no longer holds OpenCode (intent 0010 S4, D2);
 // a config that does not parse is left alone without a line.
 func opencodeRemoval(in Input) Result {
-	if in.Assistant == "" || in.Assistant == Opencode {
+	if !in.unlists(Opencode) {
 		return Result{}
 	}
 	return removeDefaultAgent(in, false)
@@ -249,7 +250,7 @@ func removeDefaultAgent(in Input, strict bool) Result {
 				res.Writes = map[string][]byte{}
 			}
 			res.Writes[file] = removeMember(src, top, i)
-			res.Section.Lines = append(res.Section.Lines, "removed "+file+" "+opencodeAgentKey+": "+quoteJSON(opencodeAgentValue)+" (runtimes.assistant is "+in.Assistant+")")
+			res.Section.Lines = append(res.Section.Lines, removedMainSessionLine(file, opencodeAgentKey, opencodeAgentValue, in))
 			break
 		}
 	}

@@ -157,7 +157,7 @@ func TestOpencodeRuleDefaultAgent(t *testing.T) {
 			if c.built {
 				files[OpencodeAgentFile] = nil
 			}
-			res := opencodeRule(Input{Files: files, Version: "0.2.6", Assistant: Opencode})
+			res := opencodeRule(Input{Files: files, Version: "0.2.6", Assistants: []string{Opencode}})
 			if !slices.Equal(res.Section.Lines, c.lines) {
 				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, c.lines)
 			}
@@ -174,7 +174,7 @@ func TestOpencodeRuleDefaultAgent(t *testing.T) {
 				t.Fatalf("writes = %q, want only %s =\n%s", res.Writes, c.target, c.out)
 			}
 			files[c.target] = res.Writes[c.target]
-			again := opencodeRule(Input{Files: files, Version: "0.2.6", Assistant: Opencode})
+			again := opencodeRule(Input{Files: files, Version: "0.2.6", Assistants: []string{Opencode}})
 			if len(again.Writes) != 0 || again.Section.Lines[0] != "unchanged "+c.target {
 				t.Errorf("second run writes %q lines %q, want none and unchanged", again.Writes, again.Section.Lines)
 			}
@@ -214,14 +214,14 @@ func TestOpencodeDefaultAgentRemoval(t *testing.T) {
 		}
 	}
 	t.Run("opencode in runtimes", func(t *testing.T) {
-		res := opencodeRule(Input{Files: maps.Clone(files), Assistant: Claude})
+		res := opencodeRule(Input{Files: maps.Clone(files), Assistants: []string{Claude}})
 		check(t, res.Writes, res.Section.Lines)
 		if !slices.Equal(res.Section.Lines[len(removed):], []string{opencodeMissingNow}) || !slices.Equal(res.Section.Steps, []string{wantOpencodeStep}) {
 			t.Errorf("section = %+v", res.Section)
 		}
 	})
 	t.Run("opencode not in runtimes", func(t *testing.T) {
-		report, writes := Remove(Set("claude"), Input{Files: maps.Clone(files), Assistant: Claude})
+		report, writes := Remove(Set("claude"), Input{Files: maps.Clone(files), Assistants: []string{Claude}})
 		if len(report.Sections) != 1 || report.Sections[0].Engine != Opencode || len(report.Sections[0].Steps) != 0 {
 			t.Fatalf("sections = %+v", report.Sections)
 		}
@@ -231,13 +231,13 @@ func TestOpencodeDefaultAgentRemoval(t *testing.T) {
 		}
 	})
 	t.Run("unparsable file outside the set is skipped", func(t *testing.T) {
-		in := Input{Files: map[string][]byte{"opencode.json": []byte(`{"default_agent": "gabo-assistant"`)}, Assistant: Claude}
+		in := Input{Files: map[string][]byte{"opencode.json": []byte(`{"default_agent": "gabo-assistant"`)}, Assistants: []string{Claude}}
 		if report, writes := Remove(Set("claude"), in); len(writes) != 0 || len(report.Sections) != 0 {
 			t.Errorf("writes %q sections %+v", writes, report.Sections)
 		}
 	})
 	t.Run("unparsable file in the set fails", func(t *testing.T) {
-		in := Input{Files: map[string][]byte{"opencode.json": []byte(`{"default_agent": "gabo-assistant"`), ".opencode/opencode.json": []byte(gabo)}, Assistant: Claude}
+		in := Input{Files: map[string][]byte{"opencode.json": []byte(`{"default_agent": "gabo-assistant"`), ".opencode/opencode.json": []byte(gabo)}, Assistants: []string{Claude}}
 		res := opencodeRule(in)
 		if len(res.Writes) != 0 || len(failuresOf(res.Section.Lines)) != 1 {
 			t.Errorf("writes %q lines %q, want none and one ✗", res.Writes, res.Section.Lines)
@@ -381,7 +381,7 @@ func TestOpencodeRuleSubagentDepth(t *testing.T) {
 			files := maps.Clone(c.files)
 			files[OpencodeStageGate] = stage
 			files[OpencodeAgentFile] = nil
-			res := opencodeRule(Input{Files: files, Version: "0.2.6", Assistant: c.assistant})
+			res := opencodeRule(Input{Files: files, Version: "0.2.6", Assistants: []string{c.assistant}})
 			want := append(slices.Clone(c.lines), opencodeInPlace)
 			if !slices.Equal(res.Section.Lines, want) {
 				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, want)
@@ -399,7 +399,7 @@ func TestOpencodeRuleSubagentDepth(t *testing.T) {
 				t.Fatalf("writes = %q, want only %s =\n%s", res.Writes, c.target, c.out)
 			}
 			files[c.target] = res.Writes[c.target]
-			again := opencodeRule(Input{Files: files, Version: "0.2.6", Assistant: c.assistant})
+			again := opencodeRule(Input{Files: files, Version: "0.2.6", Assistants: []string{c.assistant}})
 			if len(again.Writes) != 0 {
 				t.Errorf("second run writes %q, want none", again.Writes)
 			}
@@ -419,4 +419,57 @@ func TestOpencodeDepthThroughIntegrate(t *testing.T) {
 	if !strings.Contains(out, "  opencode:\n    wrote opencode.json: experimental.subagent_depth 1 → 3\n") || strings.Contains(out, "you still need to:\n  - opencode") {
 		t.Errorf("Render() =\n%s", out)
 	}
+}
+
+// Intent 0013 S3, D7: OpenCode listed with another engine writes
+// default_agent like a single opencode and never removes it; OpenCode not
+// listed loses only the gabo value, also when it is outside the engine set,
+// and the line names the list.
+func TestOpencodeDefaultAgentAssistantList(t *testing.T) {
+	gabo := "{\n  \"experimental\": {\"subagent_depth\": 3},\n  \"model\": \"x\", // pinned\n  \"default_agent\": \"gabo-assistant\"\n}\n"
+	clean := "{\n  \"experimental\": {\"subagent_depth\": 3},\n  \"model\": \"x\" // pinned\n}\n"
+	t.Run("opencode listed adds default_agent", func(t *testing.T) {
+		files := map[string][]byte{"opencode.json": []byte(clean), OpencodeStageGate: nil, OpencodeAgentFile: nil}
+		in := Input{Files: files, Version: "0.2.6", Assistants: []string{Claude, Opencode}}
+		res := opencodeRule(in)
+		if got := string(res.Writes["opencode.json"]); got != gabo || len(res.Writes) != 1 {
+			t.Fatalf("writes = %q, want only opencode.json =\n%s", res.Writes, gabo)
+		}
+		if want := []string{"wrote opencode.json: added default_agent", opencodeInPlace}; !slices.Equal(res.Section.Lines, want) {
+			t.Errorf("lines = %q, want %q", res.Section.Lines, want)
+		}
+		files["opencode.json"] = res.Writes["opencode.json"]
+		if again := opencodeRule(in); len(again.Writes) != 0 {
+			t.Errorf("second run writes %q, want none", again.Writes)
+		}
+	})
+	t.Run("opencode listed keeps the gabo value", func(t *testing.T) {
+		files := map[string][]byte{"opencode.json": []byte(gabo), "opencode.jsonc": []byte(gabo), OpencodeStageGate: nil}
+		if res := opencodeRule(Input{Files: files, Assistants: []string{Pi, Opencode}}); len(res.Writes) != 0 {
+			t.Errorf("writes = %q, want none", res.Writes)
+		}
+		if report, writes := Remove(Set(Pi, Opencode), Input{Files: files, Assistants: []string{Pi, Opencode}}); len(writes) != 0 || len(report.Sections) != 0 {
+			t.Errorf("Remove writes %q sections %+v, want none", writes, report.Sections)
+		}
+	})
+	t.Run("opencode not listed and outside the set is removed", func(t *testing.T) {
+		in := Input{Files: map[string][]byte{"opencode.json": []byte(gabo)}, Assistants: []string{Claude, Pi}}
+		report, writes := Remove(Set(Claude, Pi), in)
+		if got := string(writes["opencode.json"]); got != clean || len(writes) != 1 {
+			t.Fatalf("writes = %q, want only opencode.json =\n%s", writes, clean)
+		}
+		want := []string{`removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude, pi)`}
+		if len(report.Sections) != 1 || report.Sections[0].Engine != Opencode || !slices.Equal(report.Sections[0].Lines, want) {
+			t.Errorf("sections = %+v, want one opencode section %q", report.Sections, want)
+		}
+	})
+	t.Run("opencode not listed and in the set is removed", func(t *testing.T) {
+		res := opencodeRule(Input{Files: map[string][]byte{"opencode.json": []byte(gabo), OpencodeStageGate: nil}, Assistants: []string{Claude, Pi}})
+		if got := string(res.Writes["opencode.json"]); got != clean {
+			t.Fatalf("writes = %q, want opencode.json =\n%s", res.Writes, clean)
+		}
+		if res.Section.Lines[0] != `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude, pi)` {
+			t.Errorf("lines = %q", res.Section.Lines)
+		}
+	})
 }

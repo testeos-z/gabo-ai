@@ -34,14 +34,16 @@ func NewCommand(factory Factory) *cobra.Command {
 			"engine in runtimes, merged with the existing project config (unrelated keys kept):\n" +
 			engineconfig.ClaudeSettings + ", " + engineconfig.CodexConfigPath + ", " + engineconfig.PiSettings + " and the OpenCode configs\n" +
 			"named below are the only engine files it writes; it never writes user-level engine config.\n" +
-			"With runtimes.assistant: claude it also sets the top-level \"agent\": \"gabo-assistant\" key of\n" +
+			"It writes the main-session key of every engine listed in runtimes.assistant (one engine\n" +
+			"or a list), and removes gabo's value only from an engine that is not listed.\n" +
+			"With claude listed it also sets the top-level \"agent\": \"gabo-assistant\" key of\n" +
 			engineconfig.ClaudeSettings + " so Claude Code starts in the gabo assistant; another value of \"agent\" is\n" +
-			"yours and kept. With another assistant engine it removes that exact \"agent\" value,\n" +
+			"yours and kept. With claude not listed it removes that exact \"agent\" value,\n" +
 			"also when claude is no longer in runtimes.\n" +
-			"With runtimes.assistant: opencode it sets \"default_agent\": \"gabo-assistant\" in the first existing of\n" +
+			"With opencode listed it sets \"default_agent\": \"gabo-assistant\" in the first existing of\n" +
 			strings.Join(engineconfig.OpencodeConfigs[:3], ", ") + " and " + engineconfig.OpencodeConfigs[3] + ", else in a new\n" +
 			engineconfig.OpencodeNewConfig + ", comments kept; another value of \"default_agent\" is yours and kept.\n" +
-			"With another assistant engine it removes that exact \"default_agent\" value from each of those\n" +
+			"With opencode not listed it removes that exact \"default_agent\" value from each of those\n" +
 			"files, also when opencode is no longer in runtimes.\n" +
 			"With opencode in runtimes it also raises experimental.subagent_depth to 3 in the first existing\n" +
 			"of those files, else in a new " + engineconfig.OpencodeNewConfig + ", when it is unset or lower; a whole number\n" +

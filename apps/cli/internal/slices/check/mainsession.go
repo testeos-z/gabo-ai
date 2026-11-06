@@ -234,7 +234,7 @@ func (u *UseCase) checkAssistantEntry(r *Report, set []string, rt string, meta r
 // gabo init would refuse a file, the hint is its reason, so following it
 // never loops (D7).
 func (u *UseCase) initMergeHint(set []string, rt string, ms *mainSessionMeta, id, file string) (string, error) {
-	run, err := u.initDryRun(set, rt, rt, ms.Config)
+	run, err := u.initDryRun(set, rt, []string{rt}, ms.Config)
 	if err != nil {
 		return "", err
 	}
@@ -260,8 +260,8 @@ type initRun struct {
 // initDryRun runs gabo init's pure rule for engine on the project's files,
 // in memory, as gabo init runs it: the engine's rule when it is in set,
 // else the removals of the engines not in set. It writes nothing.
-func (u *UseCase) initDryRun(set []string, engine, assistant string, files []string) (initRun, error) {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: u.s.Version, Assistant: assistant}
+func (u *UseCase) initDryRun(set []string, engine string, assistants, files []string) (initRun, error) {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: u.s.Version, Assistants: assistants}
 	for _, name := range files {
 		b, err := fs.ReadFile(u.project, name)
 		if errors.Is(err, fs.ErrNotExist) {
@@ -320,7 +320,7 @@ func initRefusalHint(file, reason string) string {
 // reason, and when gabo init would leave the key (a file it does not parse
 // and does not own) it names removing the key by hand, so no hint loops (D7).
 func (u *UseCase) initRemoveHint(set []string, rt, assistant string, ms *mainSessionMeta, id, file string) (string, error) {
-	run, err := u.initDryRun(set, rt, assistant, ms.Config)
+	run, err := u.initDryRun(set, rt, []string{assistant}, ms.Config)
 	if err != nil {
 		return "", err
 	}

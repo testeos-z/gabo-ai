@@ -51,10 +51,11 @@ func (k claudeKey) name() string {
 }
 
 // wantedKeys are the keys the rule writes for in: the S2 keys, plus the
-// main-session key when Claude Code is the assistant engine (intent 0010 S1).
+// main-session key when Claude Code is a listed assistant engine (intent
+// 0010 S1; intent 0013 S3).
 func wantedKeys(in Input) []claudeKey {
 	keys := slices.Clone(claudeKeys)
-	if in.Assistant == Claude {
+	if in.lists(Claude) {
 		keys = append(keys, claudeKey{"", claudeAgentKey, claudeAgentValue})
 	}
 	return keys
@@ -64,8 +65,9 @@ func wantedKeys(in Input) []claudeKey {
 // existing byte (D5): a missing key is inserted, a key with another value is
 // kept and reported (S4, D6), and a file that does not parse is left alone
 // with one ✗ line (S5). The top-level agent key follows the assistant
-// engine (intent 0010 S1, S4): Claude Code merges "gabo-assistant" with the
-// same rule; another engine removes exactly that value.
+// engines (intent 0010 S1, S4; intent 0013 S3, D7): Claude Code listed
+// merges "gabo-assistant" with the same rule; Claude Code not listed removes
+// exactly that value.
 func claudeRule(in Input) Result {
 	res := Result{Section: Section{Steps: append([]string(nil), claudeSteps...)}}
 	fail := func(reason string) Result {
@@ -154,7 +156,7 @@ func claudeRule(in Input) Result {
 	if removesAgent(in) {
 		var removed bool
 		if out, removed = removeGaboAgent(out); removed {
-			lines = append(lines, removedLine(in))
+			lines = append(lines, removedMainSessionLine(ClaudeSettings, claudeAgentKey, claudeAgentValue, in))
 		}
 	}
 	if len(lines) == 0 {
@@ -189,12 +191,13 @@ func claudeRemoval(in Input) Result {
 	if !removed {
 		return Result{}
 	}
-	return Result{Section: Section{Lines: []string{removedLine(in)}}, Writes: map[string][]byte{ClaudeSettings: out}}
+	return Result{Section: Section{Lines: []string{removedMainSessionLine(ClaudeSettings, claudeAgentKey, claudeAgentValue, in)}}, Writes: map[string][]byte{ClaudeSettings: out}}
 }
 
-// removesAgent reports whether another engine is the assistant, so the gabo
-// main-session value must leave the Claude Code settings (intent 0010 S4).
-func removesAgent(in Input) bool { return in.Assistant != "" && in.Assistant != Claude }
+// removesAgent reports whether Claude Code is not a listed assistant engine
+// while another is, so the gabo main-session value must leave the Claude
+// Code settings (intent 0010 S4; intent 0013 D7).
+func removesAgent(in Input) bool { return in.unlists(Claude) }
 
 // removeGaboAgent deletes the top-level agent member whose value is exactly
 // the gabo value, with its separating comma; every other byte is kept. src
@@ -212,7 +215,7 @@ func removeGaboAgent(src []byte) ([]byte, bool) {
 // appendBuildStep adds the S8 build step when the main session is gabo's
 // agent and its agent file is not in the project yet.
 func appendBuildStep(steps []string, in Input, agentIsGabo bool) []string {
-	if _, built := in.Files[ClaudeAgentFile]; in.Assistant == Claude && agentIsGabo && !built {
+	if _, built := in.Files[ClaudeAgentFile]; in.lists(Claude) && agentIsGabo && !built {
 		return append(steps, claudeBuildStep)
 	}
 	return steps
@@ -226,8 +229,4 @@ func keptLine(k claudeKey, raw []byte) string {
 	var compact bytes.Buffer
 	_ = json.Compact(&compact, raw)
 	return "kept " + ClaudeSettings + " " + k.name() + ": " + compact.String() + " (your setting; gabo leaves it)"
-}
-
-func removedLine(in Input) string {
-	return "removed " + ClaudeSettings + " " + claudeAgentKey + ": " + quoteJSON(claudeAgentValue) + " (runtimes.assistant is " + in.Assistant + ")"
 }

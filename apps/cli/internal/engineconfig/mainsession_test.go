@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -124,5 +125,27 @@ func TestMatchMainSessionReportsAChangedCopy(t *testing.T) {
 				t.Errorf("matchMainSession(changed copy) = %v, want an error containing %q", err, c.want)
 			}
 		})
+	}
+}
+
+// Intent 0013 S3: every listed assistant engine gets its own main-session
+// key and none removes another; a second run on the output writes nothing.
+func TestEveryListedAssistantGetsItsMainSessionKey(t *testing.T) {
+	assistants := []string{Claude, Opencode}
+	in := Input{Files: map[string][]byte{}, Version: "0.2.6", Assistants: assistants}
+	set := Set(Engines("", "", assistants)...)
+	report, writes := Integrate(set, in)
+	removals, removed := Remove(set, in)
+	if report.Failed() || len(removed) != 0 || len(removals.Sections) != 0 {
+		t.Fatalf("report:\n%s\nremovals %+v writes %q", report.Render(), removals.Sections, removed)
+	}
+	for engine, file := range map[string]string{Claude: ClaudeSettings, Opencode: OpencodeNewConfig} {
+		if !bytes.Contains(writes[file], []byte(`"`+mainSessionKeys[engine]+`": "gabo-assistant"`)) {
+			t.Errorf("%s =\n%s\nwant the %s key", file, writes[file], mainSessionKeys[engine])
+		}
+	}
+	maps.Copy(in.Files, writes)
+	if _, again := Integrate(set, in); len(again) != 0 {
+		t.Errorf("second run writes %q, want none", again)
 	}
 }
