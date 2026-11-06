@@ -57,11 +57,17 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 			t.Fatal(err)
 		}
 		_, rest, _ := strings.Cut(string(tmpl), "\n")
+		list := slices.Clone(a.Skills)
+		for _, l := range [][2]string{{"{{methodology}}", "gabo-methodology"}, {"{{adapter:tasks}}", "gabo-tasks"}, {"{{adapter:repository_host}}", "gabo-repository-host"}, {"{{adapter:memory}}", "gabo-memory"}} {
+			if strings.Contains(string(tmpl), l[0]) {
+				list = append(list, l[1])
+			}
+		}
 		proj[".opencode/agents/"+a.ID+".md"] = file("---\n" +
 			`description: "` + strings.ReplaceAll(a.Role, `"`, `\"`) + "\"\n" +
 			"mode: subagent\npermission:\n  skill:\n    gabo-reviewer: deny\n---\n" +
 			"<!-- gabo-version: " + version + " -->\n" +
-			"Skills: " + strings.Join(a.Skills, ", ") + "\n" +
+			"Skills: " + strings.Join(list, ", ") + "\n" +
 			strings.TrimPrefix(rest, "\n"))
 		for _, name := range a.Skills {
 			proj[".opencode/skills/"+name] = symlink("../../.gabo/skills/" + name)

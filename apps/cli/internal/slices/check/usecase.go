@@ -299,6 +299,9 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 				if err := u.checkAgentVersion(r, id, rt, path.Join(dir, name), stamp, hasStamp); err != nil {
 					return err
 				}
+				if err := u.checkAgentSkills(r, cfg, rt, spec, id, path.Join(dir, name)); err != nil {
+					return err
+				}
 			}
 		}
 	}
