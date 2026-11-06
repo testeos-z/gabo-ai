@@ -26,6 +26,8 @@ func TestCommandGolden(t *testing.T) {
 		name string
 		args []string
 		tree string
+		// cfg is the project gabo.yaml; empty means validConfig.
+		cfg string
 		// edit changes project files; an empty value removes the file.
 		edit map[string]string
 	}
@@ -63,6 +65,30 @@ func TestCommandGolden(t *testing.T) {
 			"opencode.json": `{"default_agent": "gabo-assistant"}`,
 		}))},
 	)
+	// Intent 0013 S5: assistant [claude, pi], both entries built; then the Pi
+	// block removed; then a leftover OpenCode key, whose stale line names the
+	// list.
+	listedCfg := strings.Replace(validConfig, "  assistant: claude\n", "  assistant: [claude, pi]\n", 1)
+	listed := withEdits(assistantAgent, map[string]string{
+		".claude/settings.json": withJSONKey(claudeKeysJSON, "agent", "gabo-assistant"),
+		".gabo/skills/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n  agent_skills: frontmatter:skills\n" +
+			"  main_session:\n    kind: block\n    files: [AGENTS.md]\n---\n",
+		".pi/agents/alpha.md": "---\nname: alpha\ngabo-version: 1.2.3\n---\nbody\n",
+		".pi/agents/beta.md":  "---\nname: beta\ngabo-version: 1.2.3\n---\nbody\n",
+		".pi/settings.json":   piKeysJSON,
+		"AGENTS.md":           "# Project\n\n" + assistantStart + "\nYou are the gabo assistant.\n" + assistantEnd + "\n",
+	})
+	cases = append(cases,
+		tc{name: "main-session-list-built", cfg: listedCfg, edit: mainSessionEdit(listed)},
+		tc{name: "main-session-list-pi-block-removed", cfg: listedCfg, edit: mainSessionEdit(withEdits(listed, map[string]string{
+			"AGENTS.md": "# Project\n",
+		}))},
+		tc{name: "main-session-list-stale-key", cfg: listedCfg, edit: mainSessionEdit(withEdits(listed, map[string]string{
+			".gabo/skills/gabo-runtime-opencode/SKILL.md": "---\nname: gabo-runtime-opencode\nmetadata:\n  main_session:\n    kind: agent\n" +
+				"    config: [opencode.json, opencode.jsonc, .opencode/opencode.json, .opencode/opencode.jsonc]\n    key: default_agent\n---\n",
+			"opencode.json": `{"default_agent": "gabo-assistant"}`,
+		}))},
+	)
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
 	}
@@ -77,7 +103,11 @@ func TestCommandGolden(t *testing.T) {
 				proj = withTree(t, proj, c.tree)
 			}
 			// A nil slice would make cobra read os.Args (the test flags).
-			out, err := runCommand(t, proj, append([]string{}, c.args...)...)
+			cfg := c.cfg
+			if cfg == "" {
+				cfg = validConfig
+			}
+			out, err := runCommandConfig(t, proj, cfg, append([]string{}, c.args...)...)
 			code := 0
 			var ee *ExitError
 			if errors.As(err, &ee) {

@@ -2,6 +2,7 @@ package check
 
 import (
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"regexp"
@@ -277,7 +278,7 @@ func TestMainSessionFlexibleTierKeepsTheRebuildHint(t *testing.T) {
 			proj[".zed/settings.json"] = file(doc)
 		}
 		var r Report
-		if err := NewUseCase(proj, nil, nil, Settings{}).checkAssistantEntry(&r, []string{"zed"}, "zed", meta, spec); err != nil {
+		if err := NewUseCase(proj, nil, nil, Settings{}).checkAssistantEntry(&r, []string{"zed"}, []string{"zed"}, "zed", meta, spec); err != nil {
 			t.Fatal(err)
 		}
 		want := []string{"✗ .zed/settings.json: gabo assistant entry missing for zed", NextRebuild}
@@ -532,9 +533,60 @@ func TestCommandHelpNamesTheMainSessionRule(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"the main-session entry against runtimes.assistant", "metadata.main_session"} {
+	for _, want := range []string{"the main-session entry of every engine listed in runtimes.assistant", "metadata.main_session"} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("help lacks %q:\n%s", want, out)
 		}
 	}
+}
+
+// listedRuntimes lists two assistant engines (intent 0013 S1).
+const listedRuntimes = "  coder: claude\n  reviewer: claude\n  assistant: [claude, pi]\n"
+
+// listedBuilt is a correct build of Claude Code and Pi, both listed in
+// runtimes.assistant: each engine's agents, links, keys and main-session
+// entry.
+func listedBuilt(t *testing.T) fstest.MapFS {
+	t.Helper()
+	proj := claudeBuilt(t, "1.2.3")
+	maps.Copy(proj, piBuilt(t, "1.2.3"))
+	return proj
+}
+
+func runListed(t *testing.T, proj fs.FS) Report {
+	t.Helper()
+	return run(t, proj, configFiles{projectFile: withRuntimes(t, validConfig, listedRuntimes)}, Settings{})
+}
+
+// Intent 0013 S5: the main-session entry of every engine listed in
+// runtimes.assistant is checked; one built entry never covers another, and
+// a listed engine's entry is never stale (Pi's AGENTS.md block is not
+// Codex's).
+func TestMainSessionEveryListedAssistant(t *testing.T) {
+	t.Parallel()
+	r := runListed(t, listedBuilt(t))
+	if got := entryLines(r); len(got) != 0 {
+		t.Fatalf("entry lines %q:\n%s", got, joined(r))
+	}
+	wantPassed(t, r, PassedLine)
+
+	proj := listedBuilt(t)
+	proj["AGENTS.md"] = file("# Project\n")
+	wantEntry(t, runListed(t, proj), [2]string{"✗ AGENTS.md: gabo assistant entry incomplete for pi", NextRebuild})
+
+	proj = listedBuilt(t)
+	proj[".claude/settings.json"] = file(claudeKeysJSON)
+	wantEntry(t, runListed(t, proj), [2]string{"✗ .claude/settings.json: gabo assistant entry incomplete for claude",
+		initMerges("agent", ".claude/settings.json")})
+}
+
+// Intent 0013 S5: a stale entry fails only for a full-tier engine that is
+// not listed, and the stale line names the listed engines joined with ", ".
+func TestMainSessionStaleLineNamesTheList(t *testing.T) {
+	t.Parallel()
+	proj := listedBuilt(t)
+	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant"}`)
+	wantEntry(t, runListed(t, proj), [2]string{
+		"✗ opencode.json: gabo assistant entry for opencode, but runtimes.assistant is claude, pi",
+		initRemoves("default_agent", "opencode.json")})
 }
