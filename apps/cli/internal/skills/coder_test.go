@@ -18,7 +18,12 @@ func TestCoderClosesOnlyItsOwnWaveResources(t *testing.T) {
 		"only entries of your own wave's ledger (`gabo/ledger/<wave>`)",
 		"A resource of another wave",
 		"is neither removed nor reported as a leftover of this wave",
+		// the scope keeps a kept worktree and a refused branch as leftovers.
+		"`leftovers:` lists only resources of this task (its worktree and branch)",
 	})
+	if strings.Contains(doc, "lists only paths of your own worktree") {
+		t.Error("gabo-coder/SKILL.md: `leftovers:` must keep a refused or kept branch (Task Close steps 3 and 4)")
+	}
 	_, closing, ok := strings.Cut(doc, "## Task Close")
 	if !ok {
 		t.Fatal("gabo-coder/SKILL.md: no ## Task Close section")
