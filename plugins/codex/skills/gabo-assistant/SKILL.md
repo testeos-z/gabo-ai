@@ -28,7 +28,8 @@ The entry applies only to the owner's interactive main session: a session starte
 
 ## Session Start
 
-1. Read the global user file `~/.config/gabo/config.yaml` (stable layer: `alias`, `language`, `tone`, `interaction_level`) and `gabo.yaml`. Missing config ⇒ note the setup start time (UTC ISO 8601) in the session, run `gabo-setup`, and save it as described in Wave Close step 2.
+1. Read the global user file `~/.config/gabo/config.yaml` (stable layer: `alias`, `language`, `tone`, `interaction_level`) and `gabo.yaml`. Absent file ⇒ note the setup start time (UTC ISO 8601) in the session, run `gabo-setup`, and save it as described in Wave Close step 2.
+   A user file that exists but cannot be read, a read the engine denies, or one that waits for an approval nobody can give (gentle-pi's permission gate in an unattended Pi run), is unreadable, not missing (intent 0013 S19, D13): do not run `gabo-setup` for it, report exactly `user config unreadable (<reason>): continuing without alias, language, tone and interaction level` (`<reason>`: the engine's denial, or `approval pending`), and continue with step 2 without the stable layer. Write no value to the user file in that session.
 2. Resolve the owner's identity yourself, with file reads and `git config user.email` only. No `gabo` command runs during the work (D18).
    1. The global `alias` wins: if set, use it.
    2. Otherwise use the alias mapped to `git config user.email` in `developers` in `gabo.yaml` (D10).

@@ -1,6 +1,8 @@
 package skills
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -112,4 +114,65 @@ func TestAssistantResolvesItsEngineOnEveryEntry(t *testing.T) {
 		"Codex and Pi: the fixed session-engine line in the opening scope paragraph of the block (`codex` when Codex loaded it, `pi` when Pi loaded it)",
 		"`session engine unknown (rebuild the agents)`",
 	})
+}
+
+// Intent 0013 S19, D13 (plan T20): a user file the engine denies, or whose
+// read waits for an approval nobody gives, is unreadable, not missing: the
+// assistant runs no `gabo-setup` for it, goes on to step 2 without the stable
+// layer and reports one exact line; an absent file still runs `gabo-setup`.
+func TestAssistantSessionStartToleratesAnUnreadableUserFile(t *testing.T) {
+	t.Parallel()
+	b, err := content.ReadFile("gabo-assistant/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, start, ok := strings.Cut(string(b), "## Session Start")
+	if !ok {
+		t.Fatal("gabo-assistant/SKILL.md: no ## Session Start section")
+	}
+	start, _, _ = strings.Cut(start, "\n## ")
+	step1, _, ok := strings.Cut(start, "\n2. ")
+	if !ok {
+		t.Fatal("gabo-assistant Session Start: no step 2")
+	}
+	for _, s := range []string{
+		"Absent file ⇒ note the setup start time (UTC ISO 8601) in the session, run `gabo-setup`",
+		"a read the engine denies, or one that waits for an approval nobody can give",
+		"is unreadable, not missing",
+		"do not run `gabo-setup` for it",
+		"continue with step 2 without the stable layer",
+		"report exactly `user config unreadable (<reason>): continuing without alias, language, tone and interaction level`",
+	} {
+		if !strings.Contains(step1, s) {
+			t.Errorf("gabo-assistant Session Start step 1: missing %q", s)
+		}
+	}
+	if strings.Contains(step1, "Missing config ⇒") {
+		t.Error("gabo-assistant Session Start step 1: \"Missing config ⇒\" no longer separates an absent file from an unreadable one")
+	}
+}
+
+// Intent 0013 S19, D13 (plan T20): the Pi section of docs/compatibility.md
+// names the gentle-pi permission for the read of the global user file.
+func TestCompatibilityPiNamesTheUserFilePermission(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile(filepath.Join(repoRoot, "docs/compatibility.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, pi, ok := strings.Cut(string(b), "\n## Pi package\n")
+	if !ok {
+		t.Fatal("docs/compatibility.md: no ## Pi package section")
+	}
+	pi, _, _ = strings.Cut(pi, "\n## ")
+	for _, s := range []string{
+		"`~/.config/gabo/config.yaml`", "gentle-pi",
+		"approve that read once in an interactive session",
+		"unattended Pi waves", "`/gentle:mode`",
+		"user config unreadable (<reason>): continuing without alias, language, tone and interaction level",
+	} {
+		if !strings.Contains(pi, s) {
+			t.Errorf("docs/compatibility.md Pi section: missing %q", s)
+		}
+	}
 }
