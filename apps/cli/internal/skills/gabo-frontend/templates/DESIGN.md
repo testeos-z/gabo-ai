@@ -1,6 +1,6 @@
 # DESIGN template
 
-Scaffold for the repository `DESIGN.md`, the design norms of the product: the rules every component, template and screen follows, the product principles and the shared component inventory. It is optional and written only when the product has a UI or a user-facing surface worth styling. Tokens are the source of truth for values; this document states the rules that use them. UX and app flow of each change live in section 3 of that intent's `spec.md`, which cites rule ids instead of repeating rules. A product without a GUI marks the visual sections (2 to 8 and 12) "not applicable" with the reason and writes its conversation or CLI conventions under sections 1 and 10. Answer every fixed question before filling its section; an answer you do not have goes to section 15 as an open question, never an invented rule. Keep the table columns exactly as written.
+Scaffold for the repository `DESIGN.md`, the design norms of the product: the rules every component, template and screen follows, and the product principles. It is optional and written only when the product has a UI or a user-facing surface worth styling. Tokens are the source of truth for values; this document states the rules that use them. UX and app flow of each change live in section 3 of that intent's `spec.md`, which cites rule ids instead of repeating rules. The components a change adds or uses are listed in that same section 3. A product without a GUI marks the visual sections (2 to 8 and 12) "not applicable" with the reason and writes its conversation or CLI conventions under sections 1 and 10. Answer every fixed question before filling its section; an answer you do not have goes to section 15 as an open question, never an invented rule. Keep the table columns exactly as written.
 
 Every rule is one row of a rules table, written this way:
 
@@ -29,7 +29,7 @@ A rule that cannot state its verification is a SHOULD at most. An exception is a
 | Q9 | How do keyboard navigation, focus order, focus visibility, target size, contrast and screen-reader labels work? | 9. Accessibility |
 | Q10 | Which voice and tone apply, and how are buttons, titles, helper text, empty states, errors and long text written? | 10. Content and writing |
 | Q11 | How do forms label fields, validate, show errors and confirm success? | 11. Forms |
-| Q12 | Which shared components exist, at which level and with which states, which intents use them, and how are their stories and examples kept? | 12. Components |
+| Q12 | Which component rules apply: atomic levels, required states, and how stories and examples are kept? | 12. Components |
 | Q13 | Who approves an exception or a rule change, and where is it recorded? | 13. Exceptions, 14. Changelog |
 | Q14 | What is still undecided? | 15. Open questions |
 
@@ -119,10 +119,6 @@ A rule that cannot state its verification is a SHOULD at most. An exception is a
 ## 12. Components
 
 Atomic design: atom, molecule, organism, template, page. Each component gets a Storybook story per state.
-
-| component | level | states | used by |
-|---|---|---|---|
-| <Button> | <atom> | default, hover, focus, disabled, loading, error, empty | <NNNN-slug> |
 
 | id | rule | level | rationale | verification | examples | source |
 |---|---|---|---|---|---|---|

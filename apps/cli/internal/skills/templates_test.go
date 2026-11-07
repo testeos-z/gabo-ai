@@ -67,6 +67,7 @@ var templates = map[string]struct {
 			"| id | requirement | acceptance criteria | verification |",
 			"| id | decision | options considered | choice | consequences |",
 			"| surface | entry points | primary action | empty and error states |",
+			"| component | level | states | stories | used by |",
 			"| case | what happened | why | what to do next |",
 			"| order | file | purpose | rollback |",
 			"| policy | conflict | resolution |",
@@ -139,14 +140,13 @@ var templates = map[string]struct {
 			"## Open questions",
 		},
 	},
-	// Design norms (intent 0012 S1, S3): one rules table per area, the
-	// component inventory, exceptions and a changelog; UX and app flow live in
-	// each spec.
+	// Design norms (intent 0012 S1, S3): one rules table per area, exceptions
+	// and a changelog; UX and app flow and the component inventory live in each
+	// spec section 3 (D2).
 	"gabo-frontend/templates/DESIGN.md": {
 		columns: []string{
 			"| field | value |",
 			"| id | rule | level | rationale | verification | examples | source |",
-			"| component | level | states | used by |",
 			"| rule id | exception | reason | owner | date |",
 			"| date | rule ids | change | decision |",
 		},
@@ -253,10 +253,24 @@ func TestDesignNormsTemplateRulesAndPerChangeFit(t *testing.T) {
 			t.Errorf("%s: missing %q", p, s)
 		}
 	}
-	for _, s := range []string{"UX_UI", "APP_FLOW", "| case | what happened |"} {
+	for _, s := range []string{"UX_UI", "APP_FLOW", "| case | what happened |", "| component | level |", "shared component inventory"} {
 		if strings.Contains(doc, s) {
 			t.Errorf("%s: has %q", p, s)
 		}
+	}
+	// Intent 0012 S3, D2: section 12 keeps only the K component rules, and
+	// Q12 asks for those rules instead of the list of components.
+	const k12, k13 = "## 12. Components", "## 13. Exceptions"
+	i, j := strings.Index(doc, k12), strings.Index(doc, k13)
+	if i < 0 || j < i {
+		t.Fatalf("%s: section 12 not found between %q and %q", p, k12, k13)
+	}
+	if !strings.Contains(doc[i:j], "| K1 |") {
+		t.Errorf("%s: section 12 missing the K1 rules row", p)
+	}
+	want := [3]string{"Q12", "Which component rules apply: atomic levels, required states, and how stories and examples are kept?", "12. Components"}
+	if !slices.Contains(qs, want) {
+		t.Errorf("%s: fixed questions %v, want row %v", p, qs, want)
 	}
 }
 
@@ -279,6 +293,9 @@ func TestSpecTemplateSection3HoldsMessagesAndLinksNorms(t *testing.T) {
 		"section 9 (accessibility)",
 		"section 10 (wording)",
 		"Product-specific keyboard paths stay in the journey.",
+		"| component | level | states | stories | used by |",
+		"follow the `K` rules of `DESIGN.md` section 12",
+		"\"used by\" names the change's surfaces",
 	} {
 		if !strings.Contains(section, s) {
 			t.Errorf("%s: section 3 missing %q", p, s)
@@ -309,6 +326,27 @@ func TestTemplatesKeepStableColumnsAndSections(t *testing.T) {
 				t.Errorf("%s: missing line %q", p, l)
 			}
 		}
+	}
+}
+
+// Intent 0012 S4, D2: in gabo-frontend's steps the component inventory is
+// written in the spec section 3 step (3), never in the DESIGN.md step (2).
+func TestFrontendSkillPutsTheInventoryInTheSpecStep(t *testing.T) {
+	t.Parallel()
+	const p = "gabo-frontend/SKILL.md"
+	steps := map[string]string{}
+	for _, l := range strings.Split(embeddedByPath(t)[p], "\n") {
+		for _, n := range []string{"2. ", "3. "} {
+			if strings.HasPrefix(l, n) {
+				steps[n] = l
+			}
+		}
+	}
+	if !strings.Contains(steps["3. "], "| component | level | states | stories | used by |") {
+		t.Errorf("%s: step 3 does not name the component inventory table: %q", p, steps["3. "])
+	}
+	if steps["2. "] == "" || strings.Contains(strings.ToLower(steps["2. "]), "inventory") {
+		t.Errorf("%s: step 2 missing or names an inventory: %q", p, steps["2. "])
 	}
 }
 
@@ -384,6 +422,7 @@ func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
 			"exceptions (section 13)", "a changelog (section 14)",
 			"messages table `| case | what happened | why | what to do next |`",
 			"links `DESIGN.md` sections 2-3 (tokens, color), 9 (accessibility) and 10 (wording)",
+			"component inventory table `| component | level | states | stories | used by |`",
 			"never rewrite an existing `DESIGN.md` in another shape silently",
 			"the next `DESIGN.md` update proposes the conversion", "to the owner in manual mode",
 			"as **Proposed (auto)** in auto mode", "keeps every existing rule with a new id",

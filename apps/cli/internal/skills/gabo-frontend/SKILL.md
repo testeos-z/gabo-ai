@@ -4,7 +4,7 @@ description: "Trigger: UX, UI, Storybook, components, design tokens, design norm
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.3"
+  version: "1.4"
 ---
 ## Activation Contract
 
@@ -39,9 +39,9 @@ Any gap blocks the next planning step: fix it in your own documents or return it
 
 1. Read the PRD users and journeys, `DESIGN.md` if present, and the intent's `intent.md` and `spec.md`.
 2. Only when the product warrants it: answer the DESIGN fixed questions, then write or update `DESIGN.md`: one rules table per area, each rule with an RFC 2119 level (MUST, SHOULD or MAY), a rationale, a verification, examples and a source, plus exceptions (section 13) and a changelog (section 14). A `DESIGN.md` in another shape gets the conversion proposal (Hard Rules) first.
-3. Per intent: answer the spec's UX and app flow question, then write that spec section as a surface list, the journeys, a flow diagram (Mermaid) and the messages table `| case | what happened | why | what to do next |` with the concrete cases of the change, or "not applicable" with the reason. The section links `DESIGN.md` sections 2-3 (tokens, color), 9 (accessibility) and 10 (wording) and cites their rule ids instead of repeating rules.
+3. Per intent: answer the spec's UX and app flow question, then write that spec section as a surface list, the journeys, a flow diagram (Mermaid), the component inventory table `| component | level | states | stories | used by |` (one row per component the change adds or uses, following the `K` rules of `DESIGN.md` section 12, "used by" naming the change's surfaces) and the messages table `| case | what happened | why | what to do next |` with the concrete cases of the change, or "not applicable" with the reason. The section links `DESIGN.md` sections 2-3 (tokens, color), 9 (accessibility) and 10 (wording) and cites their rule ids instead of repeating rules.
 4. Run the traceability check before the next planning step.
 
 ## Output Contract
 
-Return the component inventory, the surfaces the intent changes, the components each implementation task needs, and traceability gaps (or none).
+Return the intent's component inventory (spec section 3), the surfaces the intent changes, the components each implementation task needs, and traceability gaps (or none).
