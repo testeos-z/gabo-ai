@@ -1,0 +1,4 @@
+exit 0
+error: ""
+--- stdout
+check passed: config, agents, slot coverage and catalog version

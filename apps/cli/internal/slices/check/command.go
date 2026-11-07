@@ -113,6 +113,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +
 			"  - each " + IntentsDir + "/<NNNN-slug>/ folder: its name, intent.md, an accepted\n" +
 			"    spec.md before any plan.md, and the plan's task ids and dependency graph.\n" +
+			"  - " + DesignFile + " when present: its 15 sections, the rule-table columns,\n" +
+			"    the RFC 2119 level, MUST verification, the exceptions and the changelog.\n" +
 			"With GABO_UPGRADE_PR=1 only the config is validated.\n" +
 			"It writes nothing and never updates itself.\n" +
 			"Exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error.\n" +

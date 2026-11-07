@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/DESIGN.md: section 6 has no rules table and does not say "not applicable"
+next: fix docs/product/DESIGN.md above (gabo-frontend keeps it), then rerun gabo check

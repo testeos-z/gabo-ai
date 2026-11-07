@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/DESIGN.md: section 14 needs the table | date | rule ids | change | decision |
+next: fix docs/product/DESIGN.md above (gabo-frontend keeps it), then rerun gabo check
