@@ -4,11 +4,11 @@ description: "Trigger: gabo coder, implement issue, worktree coder, open PR, req
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "2.2"
+  version: "2.3"
 ---
 ## Activation Contract
 
-Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
+Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. The cycle gives you the wave id, the task, the worktree, the branch and the mode; the worktree is `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, inside your wave's folder (intent 0013 S9, D6). Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
 
 ## Hard Rules
 
@@ -43,7 +43,7 @@ Max 4 fix rounds; then label the issue `needs-user`, report BLOCKED with the que
 
 ## Task Close
 
-Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome. Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover.
+Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome: they are entries of your wave's ledger, and the close touches only entries of your own wave's ledger (`gabo/ledger/<wave>`), per intent 0013 S9 and D6. A resource of another wave (a worktree under another `<repo-name>-worktrees/<wave>/` folder, or a branch or container of another wave's task) is neither removed nor reported as a leftover of this wave; `leftovers:` lists only paths of your own worktree. Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover.
 
 1. Verify through `repository_host` (read status) that the PR is merged into `repo.integration_branch` from your branch, and note its merged head SHA. Not merged, or another base or head branch ⇒ change nothing, report HANDED "not merged".
 2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
