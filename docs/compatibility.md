@@ -100,6 +100,7 @@ Use the gabo CLI version as `<version>`. Before the package is on npm, install i
 
 - **`gabo init` and `gabo-runtime-pi` stay required.** The package itself writes no project file and builds no agents; with `runtimes.coder: pi`, `gabo-runtime-pi` builds them in `.pi/agents/` and links the skills under `.agents/skills/`.
 - **It is not a subagent package.** gabo on Pi still needs one, such as gentle-pi; without it the extension warns at session start and blocks writes under `.pi/agents/`.
+- **The user file needs a gentle-pi permission.** At session start the gabo assistant reads your global user file `~/.config/gabo/config.yaml` (`$XDG_CONFIG_HOME/gabo/config.yaml` when set), which is outside the project, so gentle-pi's permission gate asks before that read. Either approve that read once in an interactive session, or run unattended Pi waves in a gentle-pi permission mode that allows it (`/gentle:mode`, checked with gentle-pi 4.5.1). A read that is denied or waits for an approval nobody gives does not stop the session and does not run `gabo-setup`: the assistant reports `user config unreadable (<reason>): continuing without alias, language, tone and interaction level` and takes your identity from `developers` in `gabo.yaml` and `git config user.email`.
 
 See [`packages/pi/README.md`](../packages/pi/README.md) for the package layout, coexistence rules and release pipeline, and [`packages/pi/VERIFY.md`](../packages/pi/VERIFY.md) for the manual verification run before each release.
 
