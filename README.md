@@ -77,11 +77,13 @@ After setup, open your agent in the project and talk to the assistant, your sing
 
 1. Describe a change. The PM agent writes its intent and spec.
 2. Read the spec and accept it. The dev lead writes the plan and the task issues.
-3. Ask for the wave. `gabo-cycle` claims the intent's unblocked tasks, creates worktrees and launches coders, up to `parallelism`.
+3. Ask for the wave. `gabo-cycle` claims the intent on its issue, then its unblocked tasks, creates worktrees and launches coders, up to `parallelism`.
 4. Each PR goes through the reviewer, which merges clean ones into `dev`.
 5. You get a wave report. When the work is ready, merge `dev` into `main`.
 
 Coder questions travel through the cycle to the assistant. In `manual` mode it asks you one question at a time; in `auto` mode it decides and records each decision with its reason. See the [app flow](docs/product/APP_FLOW.md#j3-run-a-wave-without-watching-r4-r5-r15).
+
+**Several engines at once.** With `runtimes.assistant: [claude, pi]` you can open a main session on each listed engine and run one wave per intent in each, at the same time. A wave claims its intent before any task, and the assistant starts waves only on unclaimed intents. A second session asked for a claimed intent claims nothing and returns `intent <I####> is claimed by session <session id> (engine <engine>) since <UTC time>; it is released when that wave closes`. A claim has no timeout: it holds until that wave closes, or until you tell any assistant to release that session. Each wave keeps its own ledger and its worktrees under `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, and cleans only its own resources. Task ids repeat across waves, so to keep a worktree, list its absolute path in `worktree.keep`.
 
 ## Concepts
 
@@ -90,7 +92,7 @@ Coder questions travel through the cycle to the assistant. In `manual` mode it a
 | **Assistant** | The agent you talk to. It delegates everything else. |
 | **Directiva** | The planning agents: PM (PRD, intents, specs), dev lead (TRD, plans, task issues), DB master (data changes and the [migrations log](docs/product/MIGRATIONS.md)) and frontend (UX and flow in the spec). |
 | **gabo-cycle, coders, reviewer** | The wave runner, the agents that implement one task each, and the independent merge gate. The reviewer never reads the shared memory. |
-| **Runtimes** | The engine each role runs in: `runtimes.coder`, `runtimes.reviewer`, `runtimes.assistant`. |
+| **Runtimes** | The engine each role runs in: `runtimes.coder`, `runtimes.reviewer`, `runtimes.assistant`. `runtimes.assistant` takes one engine or a list without duplicates, such as `[claude, pi]`: each listed engine gets its own main-session entry. `runtimes.coder` and `runtimes.reviewer` take one engine or `session`, the engine of the main session that starts the wave (valid only with `runtimes.assistant` set). A fixed `runtimes.reviewer`, such as `pi`, reviews the waves of every engine. |
 | **Slots and adapters** | Each pluggable part (`tasks`, `repository_host`, `memory`, `methodology`, `reviewer_placement`, `agent_host`, and optional `notifications`, `direct_sessions`) has a contract. An adapter is a Markdown skill that explains how to meet it with your tool. No tool-specific behavior is compiled code. |
 | **Integration branch** | `repo.integration_branch`, for example `dev`. Agents merge only there; `main` is yours. |
 
@@ -119,9 +121,9 @@ The project file overrides the user file key by key; unknown keys fail. Secrets 
 ## Upgrading
 
 1. Install the newer CLI (the `go install` command above, or `@vX.Y.Z` to pin a release).
-2. Run `gabo init` in the project, after every upgrade and after every change of `runtimes.*` in `gabo.yaml`. It refreshes the catalog and adds any missing engine key, keeping the ones you set. It is the writer of the engine config keys: the main-session key of `runtimes.assistant` (`agent` in `.claude/settings.json`, `default_agent` in the OpenCode project config, removed from the engine that is no longer the assistant) and OpenCode's `experimental.subagent_depth` (raised to 3).
-3. Ask your agent to rebuild the agents. The runtime skills build the agent files, the skill links and the Codex and Pi main-session block; they write no engine config key.
-4. Run `gabo check` until it passes. A `next: run gabo init (it merges …)`, `(it removes …)` or `(it sets experimental.subagent_depth to 3 in <file>)` hint means step 2 is the fix.
+2. Run `gabo init` in the project, after every upgrade and after every change of `runtimes.*` in `gabo.yaml`. It refreshes the catalog and adds any missing engine key, keeping the ones you set. It is the writer of the engine config keys: the main-session key of each engine listed in `runtimes.assistant` (`agent` in `.claude/settings.json`, `default_agent` in the OpenCode project config) and OpenCode's `experimental.subagent_depth` (raised to 3). It removes the main-session key of an engine that is not listed and reports `removed <file> <key>: "gabo-assistant" (runtimes.assistant is <engines joined with ", ">)`; a listed engine's key is never removed.
+3. Ask your agent to rebuild the agents of every engine named in `runtimes.*`. The runtime skills build the agent files, each stamped with the engine it was built for, the skill links and the Codex and Pi main-session block; they write no engine config key.
+4. Run `gabo check` until it passes. A `next: run gabo init (it merges …)`, `(it removes …)` or `(it sets experimental.subagent_depth to 3 in <file>)` hint means step 2 is the fix. `✗ <file>: gabo assistant entry for <engine>, but runtimes.assistant is <engines joined with ", ">` is an entry left for an engine that is not listed, and `✗ <file>: built for <value>, not <engine>` an agent file built for another engine; each line names its fix (step 2 for a key, step 3 for the rest).
 
 ## Known limitations
 
