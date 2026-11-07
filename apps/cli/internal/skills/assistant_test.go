@@ -53,3 +53,39 @@ func TestAssistantActivationNamesGaboInitAsKeyWriter(t *testing.T) {
 	}
 	assertKeyLinesNameGaboInit(t, "gabo-assistant/SKILL.md", contract)
 }
+
+// Intent 0013 S8, S12 (plan T9): the assistant knows its engine, starts waves
+// and chains `wave.after: next` only on unclaimed intents, reports holders on
+// request and posts the owner's release only on the owner's instruction.
+func TestAssistantStartsWavesOnlyOnUnclaimedIntents(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-assistant/SKILL.md")
+	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
+		// its engine.
+		"Session engine (intent 0013 S6, S12)", "`gabo-engine:`", "`{{engine}}`",
+		// unclaimed only, at start and when chaining.
+		"intent 0013 S8", "the earliest claim not followed by its own release holds the intent",
+		"An intent another session holds is not eligible",
+		"`next`: start the next eligible intent as in Wave Start, only an unclaimed one",
+		// resume.
+		"`resume`",
+		// report holders.
+		"which session holds which intent",
+		"`<I####>: session <session id> (engine <engine>) since <UTC time>`", "`<I####>: unclaimed`",
+		// owner release.
+		"only on the owner's own instruction",
+		"`intent released by owner for session <session id>`", "`log progress`", "`read one`",
+	})
+	_, gates, _ := strings.Cut(doc, "## Decision Gates")
+	gates, _, _ = strings.Cut(gates, "\n## ")
+	if !strings.Contains(gates, "`resume`") {
+		t.Error("gabo-assistant Decision Gates: the cycle launch does not pass `resume`")
+	}
+	const line = "- Start a wave only on an intent no other session has claimed; the skill holds the claim rules."
+	tpls := agentTemplates(t)
+	for _, name := range []string{mainTemplate, mainBlock} {
+		if !strings.Contains(tpls[name], line) {
+			t.Errorf("%s: missing %q", name, line)
+		}
+	}
+}
