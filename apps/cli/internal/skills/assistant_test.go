@@ -69,8 +69,11 @@ func TestAssistantStartsWavesOnlyOnUnclaimedIntents(t *testing.T) {
 		"`next`: start the next eligible intent as in Wave Start, only an unclaimed one",
 		// resume: only a wave launched in this same session; the trace is
 		// shared, so another session's wave needs the owner's release first.
-		"`resume <session id>`", "only for a wave you launched in this same session",
-		"never read from the trace", "is resumed only after the owner releases its claim",
+		"`resume <session id>`", "A wave you launched in this same session",
+		"After a session restart, the holder's resume from the trace (D17)",
+		"resume only when the owner asks you to resume that wave",
+		"Never resume another session's wave on your own",
+		"does not stop a wave that is still running",
 		// a refused session writes nothing to the holder's trace.
 		"Before any trace write, `read one` the intent issue",
 		"write nothing to `gabo/trace/<wave>`", "a refused session never writes the holder's trace",

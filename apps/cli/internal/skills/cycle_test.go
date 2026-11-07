@@ -168,6 +168,9 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 		"`resume <session id>`", "never adopted on its own",
 		"that id equals the session id in the trace", "never adopting the trace's id",
 		"`session id: <session id>`", "a refused session writes nothing to the trace",
+		// one refusal form; an owner release stops the next coder launch.
+		"returns only three lines", "re-checks it with `read one` before each coder launch",
+		"when you no longer hold the intent (an owner release), launch no more coders",
 	})
 	_, steps, ok := strings.Cut(doc, "## Execution Steps")
 	if !ok {
