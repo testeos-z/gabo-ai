@@ -45,6 +45,15 @@ func TestCommandGolden(t *testing.T) {
 				"  agent_skills: frontmatter:skills\n  agent_name: frontmatter:name\n---\nbody\n",
 			".claude/agents/alpha.md": "---\ngabo-version: 1.2.3\n---\nbody\n",
 		}},
+		// Spec 0014 S2: a spec skill missing, one listed twice and one not in
+		// the spec, in that order.
+		{name: "agent-skills-listed-twice", edit: map[string]string{
+			".gabo/skills/gabo-agent-templates/agents.yaml": strings.Replace(spec, "    template: agents/alpha.md\n",
+				"    template: agents/alpha.md\n    skills: [sk-a, sk-b]\n", 1),
+			".gabo/skills/sk-a/SKILL.md": "---\nname: sk-a\n---\n",
+			".gabo/skills/sk-b/SKILL.md": "---\nname: sk-b\n---\n",
+			".claude/agents/alpha.md":    "---\nname: alpha\nskills:\n  - sk-x\n  - sk-a\n  - sk-a\ngabo-version: 1.2.3\n---\nbody\n",
+		}},
 	}
 	// Spec 0009 S5 on the plain project with a main_session entry: nothing of
 	// the claude entry built, then a correct entry beside a Codex block.

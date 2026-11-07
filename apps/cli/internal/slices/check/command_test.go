@@ -84,6 +84,7 @@ func TestCommandHelpNamesTheStricterRules(t *testing.T) {
 		"    as not compared, never skipped;",
 		"  - for a runtime skill declaring metadata.agent_skills, each agent file lists",
 		"    exactly the skills of its spec agent plus the fixed-name links its template",
+		"    a skill listed more than once fails with \"listed twice\";",
 		"    a full-tier runtime skill without it fails, a flexible-tier one warns;",
 		"  - for a runtime skill declaring metadata.agent_name, each agent file's",
 		"    declared name equals its spec id, and a file that declares no name fails",
