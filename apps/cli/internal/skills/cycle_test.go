@@ -192,3 +192,49 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 		t.Error("gabo-contract-tasks/SKILL.md: D4 adds no `claim intent` operation")
 	}
 }
+
+// Intent 0013 S9, D6 (plan T10): each wave keeps its own resources. Every
+// ledger line names the session id, the worktrees live under a per-wave
+// folder, and the fallback sweep touches only this wave's ledger: a resource
+// of another wave is neither removed nor reported as a leftover of this wave.
+func TestCycleKeepsAndCleansOnlyItsOwnWave(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"intent 0013 S9", "D6",
+		// the ledger line names the session id.
+		"One line per resource: kind, name or path, creator, task, the session id of this wave, state (live, removed, leftover)",
+		// the worktree namespace.
+		"`<repo-parent>/<repo-name>-worktrees/<wave>/<task>`",
+		"`git worktree add <repo-parent>/<repo-name>-worktrees/<wave>/<task> -b <branch> origin/dev`",
+		// the sweep touches only this wave's ledger.
+		"only entries of this wave's ledger (`gabo/ledger/<wave>`)",
+		"A resource of another wave",
+		"is neither removed nor reported as a leftover of this wave",
+	})
+	if strings.Contains(doc, "`git worktree add <path>") {
+		t.Error("gabo-cycle/SKILL.md: the worktree path must be the per-wave path, not a free `<path>`")
+	}
+	rule := lineWith(t, doc, "Resource ledger")
+	if !strings.Contains(rule, "session id") {
+		t.Errorf("gabo-cycle/SKILL.md: the ledger rule does not name the session id: %q", rule)
+	}
+	sweep := lineWith(t, doc, "fallback sweep) runs only")
+	for _, s := range []string{"this wave's ledger", "another wave"} {
+		if !strings.Contains(sweep, s) {
+			t.Errorf("gabo-cycle/SKILL.md: the fallback sweep rule does not say %q", s)
+		}
+	}
+}
+
+// lineWith returns the first line of doc containing s.
+func lineWith(t *testing.T, doc, s string) string {
+	t.Helper()
+	for _, l := range strings.Split(doc, "\n") {
+		if strings.Contains(l, s) {
+			return l
+		}
+	}
+	t.Fatalf("no line contains %q", s)
+	return ""
+}
