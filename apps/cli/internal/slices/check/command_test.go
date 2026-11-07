@@ -390,3 +390,26 @@ func TestCommandPreWriteBadStdinExitsTwo(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0013 S17, S20 (plans T19, T22): the help names the agent tools rule
+// and the rule on tools a subagent never has.
+func TestCommandHelpNamesTheAgentToolsRules(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - for a runtime skill declaring metadata.agent_tools and",
+		"    metadata.agent_tool_requirements, each built agent file lists every tool its",
+		"    spec capabilities require (a required mem_<x> is also met by",
+		"    mcp__<server>__mem_<x> or mcp__<server>__*);",
+		"  - for a runtime skill declaring metadata.agent_tools_unavailable, no built",
+		"    agent file lists a tool a subagent never has (a trailing * matches a",
+		"    prefix; only gabo-runtime-pi declares it, subagent_*);",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}

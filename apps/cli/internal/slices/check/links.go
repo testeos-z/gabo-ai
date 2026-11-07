@@ -51,6 +51,10 @@ type runtimeMeta struct {
 	// ToolRequirements are the tools each spec capability requires, in
 	// declaration order; nil when not declared.
 	ToolRequirements []toolRequirement `yaml:"-"`
+	// UnavailableTools are the tools a subagent of the engine never has, in
+	// declaration order, a trailing * a prefix match; nil when not declared
+	// (intent 0013 S20).
+	UnavailableTools []string `yaml:"-"`
 	// ToolsErr is a malformed tool declaration, kept so the rest of the
 	// metadata stays readable; checkAgentTools reports it.
 	ToolsErr error `yaml:"-"`
@@ -73,6 +77,7 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 			AgentName   string    `yaml:"agent_name"`
 			AgentTools  yaml.Node `yaml:"agent_tools"`
 			ToolReqs    yaml.Node `yaml:"agent_tool_requirements"`
+			Unavailable yaml.Node `yaml:"agent_tools_unavailable"`
 		} `yaml:"metadata"`
 	}
 	err := yaml.Unmarshal(front, &fm)
@@ -94,6 +99,9 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 		return runtimeMeta{}, err
 	}
 	m.AgentTools, m.ToolRequirements, m.ToolsErr = parseToolDeclaration(fm.Metadata.AgentTools, fm.Metadata.ToolReqs)
+	if m.ToolsErr == nil {
+		m.UnavailableTools, m.ToolsErr = parseUnavailableTools(fm.Metadata.Unavailable, m.AgentTools.declared())
+	}
 	return m, nil
 }
 
@@ -104,7 +112,7 @@ func insideRepo(dir string) bool {
 }
 
 // checkLinks checks each runtime skill's agent metadata and the tools of its
-// built agents (checkAgentTools), then requires, for each runtime whose skill
+// built agents (checkAgentTools: required and unavailable tools), then requires, for each runtime whose skill
 // declares a skill_dir, a
 // link <skill_dir>/<name> to the catalog copy for every skill a spec agent
 // lists, and a fixed-name link <skill_dir>/gabo-<slot> to every slot adapter

@@ -35,3 +35,23 @@ func TestCoderClosesOnlyItsOwnWaveResources(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0013 S20, D14 (plan T22): on Pi the coder runs the reviewer script
+// itself as its agent file says; on the other engines it launches
+// gabo-reviewer. gabo-reviewer-notes names the same exception.
+func TestCoderNamesThePiReviewException(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-coder/SKILL.md")
+	requireIn(t, "gabo-coder/SKILL.md", doc, []string{
+		"On Pi (`gabo-engine: pi`) you run as a gentle-pi subagent with no `subagent_*` tools",
+		"validate the request and run the reviewer script yourself, exactly as your agent file says",
+		"on every other engine you launch the `gabo-reviewer` subagent",
+		"intent 0013 S20, D14",
+	})
+	notes := readCatalog(t, "gabo-reviewer-notes/SKILL.md")
+	requireIn(t, "gabo-reviewer-notes/SKILL.md", notes, []string{
+		"On Pi a coder runs as a gentle-pi subagent with no `subagent_*` tools",
+		"validates the request with the relay's patterns and runs the reviewer script itself",
+		"intent 0013 S20, D14",
+	})
+}
