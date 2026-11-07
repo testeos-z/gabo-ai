@@ -238,3 +238,29 @@ func lineWith(t *testing.T, doc, s string) string {
 	t.Fatalf("no line contains %q", s)
 	return ""
 }
+
+// Intent 0013 S18, D12 (plan T21): on a Pi main session the assistant loads
+// this skill in that session; the session engine is the block line (S16) and
+// each coder is one first-level `subagent_run`.
+func TestCycleRunsInThePiMainSession(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	_, act, _ := strings.Cut(doc, "## Activation Contract")
+	act, _, _ = strings.Cut(act, "\n## ")
+	requireIn(t, "gabo-cycle Activation Contract", act, []string{
+		"Load in the `gabo-cycle` subagent on Claude Code, Codex and OpenCode",
+		"on a Pi main session, in that main session itself",
+		"`gabo-assistant` loads this skill there and runs it with the same inputs",
+		"a gentle-pi subagent gets no `subagent_*` tools (intent 0013 S18, D12)",
+	})
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		// session engine from the block line there.
+		"On a Pi main session your session engine is the block's fixed session-engine line (`pi`, intent 0013 S16), not an agent file",
+		// coders as first-level subagent runs.
+		"On a Pi main session each coder is one first-level `subagent_run` of that session",
+	})
+	step5 := lineWith(t, doc, "5. Per task:")
+	if !strings.Contains(step5, "on a Pi main session one first-level `subagent_run`") {
+		t.Error("gabo-cycle step 5: the coder launch does not name the Pi first-level `subagent_run`")
+	}
+}
