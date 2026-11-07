@@ -57,6 +57,12 @@ Acceptance is a human gate. An agent never fills section 7 and never marks the s
 - **Journey.** Trigger, actors, steps, decision points, outcome, failure and escalation. Product-specific keyboard paths stay in the journey.
 - **Flow.** <One Mermaid flowchart of the changed journey.>
 
+Components: one row per component the change adds or uses; the components follow the `K` rules of `DESIGN.md` section 12, and "used by" names the change's surfaces.
+
+| component | level | states | stories | used by |
+|---|---|---|---|---|
+| <Button> | <atom / molecule / organism / template / page> | <default, hover, focus, disabled, loading, error, empty> | <Storybook story ids, one per state> | <surface of this change> |
+
 Messages: one row per concrete case of this change; wording follows `DESIGN.md` section 10.
 
 | case | what happened | why | what to do next |
