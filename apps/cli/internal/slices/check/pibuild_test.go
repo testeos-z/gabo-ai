@@ -167,6 +167,7 @@ func TestPiBuiltSetPassesCheck(t *testing.T) {
 	noLineWith(t, rep, "skill link")
 	noLineWith(t, rep, "tools missing")
 	noLineWith(t, rep, "never has")
+	noLineWith(t, rep, "declares no name")
 	for name, f := range piBuilt(t, "1.2.3") {
 		if strings.HasPrefix(name, ".pi/agents/") && strings.Contains(string(f.Data), "  - subagent_") {
 			t.Errorf("%s lists a subagent_* tool", name)

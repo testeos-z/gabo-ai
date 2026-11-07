@@ -106,11 +106,118 @@ func TestDeclaredAgentNameSkippedForFlexibleTierWithoutAgentSkills(t *testing.T)
 	}
 }
 
-// S9: under GABO_UPGRADE_PR=1 the name line never prints.
+// S9, spec 0014 S1: under GABO_UPGRADE_PR=1 the name line never prints, for
+// a name that differs, a nameless agent file and a nameless gabo-assistant
+// file.
 func TestDeclaredAgentNameSkippedOnUpgradePR(t *testing.T) {
 	t.Parallel()
-	proj := replaceIn(t, piBuilt(t, "1.2.3"), ".pi/agents/gabo-pm.md", "name: gabo-pm\n", "name: pm\n")
-	r := runPi(t, proj, Settings{UpgradePR: true})
-	noLineWith(t, r, "declares name")
-	wantLines(t, r, UpgradePRLine)
+	t.Run("differs", func(t *testing.T) {
+		t.Parallel()
+		proj := replaceIn(t, piBuilt(t, "1.2.3"), ".pi/agents/gabo-pm.md", "name: gabo-pm\n", "name: pm\n")
+		r := runPi(t, proj, Settings{UpgradePR: true})
+		noLineWith(t, r, "declares name")
+		wantLines(t, r, UpgradePRLine)
+	})
+	t.Run("nameless", func(t *testing.T) {
+		t.Parallel()
+		proj := replaceIn(t, claudeBuilt(t, "1.2.3"), ".claude/agents/gabo-pm.md", "name: gabo-pm\n", "")
+		proj = replaceIn(t, proj, ".claude/agents/"+assistantID+".md", "name: "+assistantID+"\n", "")
+		r := run(t, proj, configFiles{projectFile: validConfig}, Settings{UpgradePR: true})
+		noLineWith(t, r, "declares")
+		wantLines(t, r, UpgradePRLine)
+	})
+}
+
+// Spec 0014 S1, D1, D2: an agent file that declares no name (absent, blank,
+// non-string, unparsable frontmatter or TOML) fails, for each engine whose
+// runtime skill declares metadata.agent_name.
+func TestDeclaredAgentNameMissingFails(t *testing.T) {
+	t.Parallel()
+	codexLine := []string{"✗ agent gabo-pm (codex): declares no name", "why: .codex/agents/gabo-pm.toml", NextRebuild}
+	claudeLine := []string{"✗ agent gabo-pm (claude): declares no name", "why: .claude/agents/gabo-pm.md", NextRebuild}
+	piLine := []string{"✗ agent gabo-pm (pi): declares no name", "why: .pi/agents/gabo-pm.md", NextRebuild}
+	codex := func(old, repl string) func(t *testing.T) Report {
+		return func(t *testing.T) Report {
+			proj := replaceIn(t, codexBuilt(t, "1.2.3"), ".codex/agents/gabo-pm.toml", old, repl)
+			return runCodex(t, proj, codexUser(), "1.2.3")
+		}
+	}
+	claude := func(old, repl string) func(t *testing.T) Report {
+		return func(t *testing.T) Report {
+			proj := replaceIn(t, claudeBuilt(t, "1.2.3"), ".claude/agents/gabo-pm.md", old, repl)
+			return run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+		}
+	}
+	tests := []struct {
+		name string
+		run  func(t *testing.T) Report
+		want []string
+	}{
+		{"codex without name", codex(`name = "gabo-pm"`+"\n", ""), codexLine},
+		{"codex blank name", codex(`name = "gabo-pm"`, `name = "  "`), codexLine},
+		{"codex non-string name", codex(`name = "gabo-pm"`, `name = 7`), codexLine},
+		{"codex unparsable toml", codex(`name = "gabo-pm"`, `name = "gabo-pm`), codexLine},
+		{"claude without name", claude("name: gabo-pm\n", ""), claudeLine},
+		{"claude non-string name", claude("name: gabo-pm\n", "name: [gabo-pm]\n"), claudeLine},
+		{"claude unparsable frontmatter", claude("name: gabo-pm\n", "name: gabo-pm\n: [\n"), claudeLine},
+		{"pi without name", func(t *testing.T) Report {
+			proj := replaceIn(t, piBuilt(t, "1.2.3"), ".pi/agents/gabo-pm.md", "name: gabo-pm\n", "")
+			return runPi(t, proj, Settings{})
+		}, piLine},
+		{"claude main-session file without name", func(t *testing.T) Report {
+			proj := replaceIn(t, claudeBuilt(t, "1.2.3"), ".claude/agents/"+assistantID+".md", "name: "+assistantID+"\n", "")
+			return run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+		}, []string{"✗ agent gabo-assistant (claude): declares no name", "why: .claude/agents/gabo-assistant.md", NextRebuild}},
+		{"claude main-session file with another name", func(t *testing.T) Report {
+			proj := replaceIn(t, claudeBuilt(t, "1.2.3"), ".claude/agents/"+assistantID+".md", "name: "+assistantID+"\n", "name: assistant\n")
+			return run(t, proj, configFiles{projectFile: validConfig}, Settings{})
+		}, []string{"✗ agent gabo-assistant (claude): declares name assistant", "why: .claude/agents/gabo-assistant.md", NextRebuild}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			r := tt.run(t)
+			if !r.Failed {
+				t.Fatalf("Failed = false, want true:\n%s", joined(r))
+			}
+			wantConsecutive(t, r, tt.want...)
+		})
+	}
+}
+
+// Spec 0014 S1: a declared name that differs still gives only "declares
+// name", never "declares no name".
+func TestDeclaredAgentNameDiffersGivesNoMissingLine(t *testing.T) {
+	t.Parallel()
+	proj := replaceIn(t, codexBuilt(t, "1.2.3"), ".codex/agents/gabo-pm.toml", `name = "gabo-pm"`, `name = "pm"`)
+	r := runCodex(t, proj, codexUser(), "1.2.3")
+	wantConsecutive(t, r, "✗ agent gabo-pm (codex): declares name pm", "why: .codex/agents/gabo-pm.toml", NextRebuild)
+	noLineWith(t, r, "declares no name")
+}
+
+// Spec 0014 S1: OpenCode declares no agent_name, so a nameless OpenCode agent
+// file gives no name line; a flexible-tier engine without agent_skills is
+// skipped (intent 0008 S2) even for a nameless file.
+func TestDeclaredAgentNameMissingSkipped(t *testing.T) {
+	t.Parallel()
+	t.Run("opencode", func(t *testing.T) {
+		t.Parallel()
+		proj := opencodeBuilt(t, "1.2.3")
+		if strings.Contains(string(proj[".opencode/agents/gabo-pm.md"].Data), "\nname:") {
+			t.Fatal("opencode fixture declares a name")
+		}
+		noLineWith(t, runOpencode(t, proj, "1.2.3"), "declares no name")
+	})
+	t.Run("flexible tier without agent_skills", func(t *testing.T) {
+		t.Parallel()
+		proj := fstest.MapFS{
+			CatalogDir + "/gabo-runtime-zed/SKILL.md": file("---\nname: gabo-runtime-zed\nmetadata:\n  agent_dir: .zed/agents\n  agent_name: frontmatter:name\n---\n"),
+			".zed/agents/alpha.md":                    file("---\ngabo-version: 1.2.3\n---\n"),
+		}
+		var r Report
+		(&UseCase{project: proj}).checkAgentName(&r, "alpha", "zed", ".zed/agents/alpha.md")
+		if r.Failed || len(r.Lines) != 0 {
+			t.Fatalf("lines = %q, failed = %v", r.Lines, r.Failed)
+		}
+	})
 }
