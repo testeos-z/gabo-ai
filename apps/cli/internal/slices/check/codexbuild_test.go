@@ -266,6 +266,7 @@ func TestCodexBuiltSetPassesCheck(t *testing.T) {
 	proj := codexBuilt(t, "1.2.3")
 	rep := runCodex(t, proj, codexUser(), "1.2.3")
 	wantPassed(t, rep, PassedLine)
+	noLineWith(t, rep, "declares no name")
 	for _, l := range rep.Lines {
 		if strings.HasPrefix(l, "✗ skill link") || strings.HasPrefix(l, "✗ reviewer link") {
 			t.Errorf("unexpected %q", l)

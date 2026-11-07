@@ -67,7 +67,9 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    names, each once (or the slot adapter's own name for such a link);\n" +
 			"    a full-tier runtime skill without it fails, a flexible-tier one warns;\n" +
 			"  - for a runtime skill declaring metadata.agent_name, each agent file's\n" +
-			"    declared name equals its spec id (a file that declares none passes);\n" +
+			"    declared name equals its spec id, and a file that declares no name fails\n" +
+			"    with \"declares no name\", the main-session agent file gabo-assistant\n" +
+			"    included;\n" +
 			"  - each agent file's filled gabo-engine line names the engine of the agent\n" +
 			"    directory it is in (a file with no engine line passes);\n" +
 			"  - for a runtime skill declaring metadata.agent_tools and\n" +

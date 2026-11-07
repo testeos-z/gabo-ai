@@ -322,6 +322,7 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 		}
 		if m := spec.MainSession; m != nil {
 			for _, name := range files[m.ID] {
+				u.checkAgentName(r, m.ID, rt, path.Join(dir, name))
 				if err := u.checkAgentEngine(r, rt, path.Join(dir, name)); err != nil {
 					return err
 				}

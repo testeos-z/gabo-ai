@@ -38,6 +38,13 @@ func TestCommandGolden(t *testing.T) {
 		{name: "versions-no-stamp", edit: map[string]string{".gabo/VERSION": ""}},
 		{name: "versions-no-version-line", edit: map[string]string{".claude/agents/beta.md": "---\nname: beta\n---\nbody\n"}},
 		{name: "agent-skills-extra", edit: map[string]string{".claude/agents/alpha.md": "---\nname: alpha\nskills:\n  - sk-x\ngabo-version: 1.2.3\n---\nbody\n"}},
+		// Spec 0014 S1: a runtime skill declaring agent_name and an agent
+		// file that declares no name.
+		{name: "agent-name-missing", edit: map[string]string{
+			".gabo/skills/gabo-runtime-claude/SKILL.md": "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n" +
+				"  agent_skills: frontmatter:skills\n  agent_name: frontmatter:name\n---\nbody\n",
+			".claude/agents/alpha.md": "---\ngabo-version: 1.2.3\n---\nbody\n",
+		}},
 	}
 	// Spec 0009 S5 on the plain project with a main_session entry: nothing of
 	// the claude entry built, then a correct entry beside a Codex block.
