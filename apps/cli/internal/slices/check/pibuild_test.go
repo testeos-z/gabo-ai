@@ -32,12 +32,14 @@ slots:
 `
 
 // piTools maps each spec capability to its Pi tools (gabo-runtime-pi, build
-// step Agents, with gentle-pi as the subagent package and no web package).
+// step Agents, with gentle-pi as the subagent package, gentle-engram as the
+// memory package and no web package; intent 0013 S17).
 var piTools = map[string][]string{
 	"read": {"read"}, "skills": {"read"},
 	"search": {"grep", "find", "ls"},
 	"edit":   {"edit", "write"},
-	"shell":  {"bash"}, "git": {"bash"}, "tracker": {"bash"}, "repository-host": {"bash"}, "memory": {"bash"},
+	"shell":  {"bash"}, "git": {"bash"}, "tracker": {"bash"}, "repository-host": {"bash"},
+	"memory":    {"bash", "mem_search", "mem_save", "mem_update", "mem_get_observation"},
 	"subagents": {"subagent_run", "subagent_status", "subagent_result", "subagent_continue", "subagent_reply", "subagent_cancel", "subagent_list_agents"},
 }
 
@@ -162,6 +164,29 @@ func TestPiBuiltSetPassesCheck(t *testing.T) {
 	wantSkillLines(t, rep, ".pi/agents/gabo-pm.md", nil)
 	wantPassed(t, rep, PassedLine)
 	noLineWith(t, rep, "skill link")
+	noLineWith(t, rep, "tools missing")
+}
+
+// Intent 0013 S17: a Pi agent built before the memory tools were listed
+// (memory as bash only) fails the tools rule of the real gabo-runtime-pi.
+func TestPiBuiltAgentWithoutMemoryToolsFails(t *testing.T) {
+	t.Parallel()
+	proj := piBuilt(t, "1.2.3")
+	name := ".pi/agents/gabo-pm.md"
+	old := string(proj[name].Data)
+	stripped := old
+	for _, tool := range []string{"mem_search", "mem_save", "mem_update", "mem_get_observation"} {
+		stripped = strings.Replace(stripped, "  - "+tool+"\n", "", 1)
+	}
+	if stripped == old {
+		t.Fatalf("%s lists no memory tools:\n%s", name, old)
+	}
+	proj[name] = file(stripped)
+	rep := runPi(t, proj, Settings{})
+	wantFailed(t, rep, "✗ .pi/agents/gabo-pm.md: tools missing for its spec capabilities: mem_search, mem_save, mem_update, mem_get_observation", NextRebuild)
+	if n := strings.Count(joined(rep), "tools missing"); n != 1 {
+		t.Fatalf("tools lines = %d, want 1:\n%s", n, joined(rep))
+	}
 }
 
 // Intent 0008 S3: the link rule now runs for Pi through its skill_dir, so a
