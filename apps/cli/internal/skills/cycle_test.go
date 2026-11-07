@@ -162,17 +162,25 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 		// the holder.
 		"keeps its claim on resume", release, "at wave close",
 		// a stale claim: no timeout, owner release.
-		"no timeout", owner,
+		"no timeout", owner, "orphan claim",
+		// the trace is shared: a resume keeps a claim only with its own id,
+		// and a refused session writes nothing to it.
+		"`resume <session id>`", "never adopted on its own",
+		"that id equals the session id in the trace", "never adopting the trace's id",
+		"`session id: <session id>`", "a refused session writes nothing to the trace",
 	})
-	steps := doc[strings.Index(doc, "## Execution Steps"):]
+	_, steps, ok := strings.Cut(doc, "## Execution Steps")
+	if !ok {
+		t.Fatal("gabo-cycle/SKILL.md: no ## Execution Steps section")
+	}
 	pre := strings.Index(steps, "preflight engine <engine>")
 	at := strings.Index(steps, "Intent claim")
 	task := strings.Index(steps, "Claim each")
 	if pre < 0 || at < 0 || task < 0 || !(pre < at && at < task) {
 		t.Errorf("gabo-cycle/SKILL.md: want the preflight (%d), then the intent claim (%d), then `Claim each` (%d)", pre, at, task)
 	}
-	closing := steps[strings.Index(steps, "The wave closes"):]
-	if !strings.Contains(closing, release) {
+	_, closing, ok := strings.Cut(steps, "The wave closes")
+	if !ok || !strings.Contains(closing, release) {
 		t.Errorf("gabo-cycle/SKILL.md: wave close does not post %s", release)
 	}
 	// D4: the claim adds no operation to the `tasks` contract.

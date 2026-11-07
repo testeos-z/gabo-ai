@@ -67,8 +67,15 @@ func TestAssistantStartsWavesOnlyOnUnclaimedIntents(t *testing.T) {
 		"intent 0013 S8", "the earliest claim not followed by its own release holds the intent",
 		"An intent another session holds is not eligible",
 		"`next`: start the next eligible intent as in Wave Start, only an unclaimed one",
-		// resume.
-		"`resume`",
+		// resume: only a wave launched in this same session; the trace is
+		// shared, so another session's wave needs the owner's release first.
+		"`resume <session id>`", "only for a wave you launched in this same session",
+		"never read from the trace", "is resumed only after the owner releases its claim",
+		// a refused session writes nothing to the holder's trace.
+		"Before any trace write, `read one` the intent issue",
+		"write nothing to `gabo/trace/<wave>`", "a refused session never writes the holder's trace",
+		// stale or orphan claims.
+		"may be stale",
 		// report holders.
 		"which session holds which intent",
 		"`<I####>: session <session id> (engine <engine>) since <UTC time>`", "`<I####>: unclaimed`",
@@ -78,7 +85,7 @@ func TestAssistantStartsWavesOnlyOnUnclaimedIntents(t *testing.T) {
 	})
 	_, gates, _ := strings.Cut(doc, "## Decision Gates")
 	gates, _, _ = strings.Cut(gates, "\n## ")
-	if !strings.Contains(gates, "`resume`") {
+	if !strings.Contains(gates, "`resume <session id>`") {
 		t.Error("gabo-assistant Decision Gates: the cycle launch does not pass `resume`")
 	}
 	const line = "- Start a wave only on an intent no other session has claimed; the skill holds the claim rules."
