@@ -26,6 +26,8 @@ func TestCommandGolden(t *testing.T) {
 		name string
 		args []string
 		tree string
+		// cfg is the project gabo.yaml; empty means validConfig.
+		cfg string
 		// edit changes project files; an empty value removes the file.
 		edit map[string]string
 	}
@@ -48,6 +50,48 @@ func TestCommandGolden(t *testing.T) {
 			"AGENTS.md": "# Project\n\n" + assistantStart + "\nYou are the gabo assistant.\n" + assistantEnd + "\n",
 		})},
 	)
+	// Intent 0010 S6: the lines whose fix is gabo init name it, with the key
+	// and file of metadata.main_session.
+	assistantAgent := map[string]string{".claude/agents/gabo-assistant.md": "---\nname: gabo-assistant\ngabo-version: 1.2.3\n---\nbody\n"}
+	cases = append(cases,
+		tc{name: "main-session-key-only", edit: mainSessionEdit(assistantAgent)},
+		tc{name: "main-session-other-value", edit: mainSessionEdit(withEdits(assistantAgent, map[string]string{
+			".claude/settings.json": withJSONKey(claudeKeysJSON, "agent", "my-agent"),
+		}))},
+		tc{name: "main-session-stale-key", edit: mainSessionEdit(withEdits(assistantAgent, map[string]string{
+			".claude/settings.json": withJSONKey(claudeKeysJSON, "agent", "gabo-assistant"),
+			".gabo/skills/gabo-runtime-opencode/SKILL.md": "---\nname: gabo-runtime-opencode\nmetadata:\n  main_session:\n    kind: agent\n" +
+				"    config: [opencode.json, opencode.jsonc, .opencode/opencode.json, .opencode/opencode.jsonc]\n    key: default_agent\n---\n",
+			"opencode.json": `{"default_agent": "gabo-assistant"}`,
+		}))},
+	)
+	// Intent 0013 S5: assistant [claude, pi], both entries built; then the Pi
+	// block removed; then a leftover OpenCode key, whose stale line names the
+	// list.
+	listedCfg := strings.Replace(validConfig, "  assistant: claude\n", "  assistant: [claude, pi]\n", 1)
+	listed := withEdits(assistantAgent, map[string]string{
+		".claude/settings.json": withJSONKey(claudeKeysJSON, "agent", "gabo-assistant"),
+		".gabo/skills/gabo-runtime-pi/SKILL.md": "---\nname: gabo-runtime-pi\nmetadata:\n  agent_dir: .pi/agents\n  agent_skills: frontmatter:skills\n" +
+			"  main_session:\n    kind: block\n    files: [AGENTS.md]\n---\n",
+		".pi/agents/alpha.md": "---\nname: alpha\ngabo-version: 1.2.3\n---\nbody\n",
+		".pi/agents/beta.md":  "---\nname: beta\ngabo-version: 1.2.3\n---\nbody\n",
+		".pi/settings.json":   piKeysJSON,
+		"AGENTS.md":           "# Project\n\n" + assistantStart + "\nYou are the gabo assistant.\n" + assistantEnd + "\n",
+	})
+	cases = append(cases,
+		tc{name: "main-session-list-built", cfg: listedCfg, edit: mainSessionEdit(listed)},
+		tc{name: "main-session-list-pi-block-removed", cfg: listedCfg, edit: mainSessionEdit(withEdits(listed, map[string]string{
+			"AGENTS.md": "# Project\n",
+		}))},
+		tc{name: "main-session-list-stale-key", cfg: listedCfg, edit: mainSessionEdit(withEdits(listed, map[string]string{
+			".gabo/skills/gabo-runtime-opencode/SKILL.md": "---\nname: gabo-runtime-opencode\nmetadata:\n  main_session:\n    kind: agent\n" +
+				"    config: [opencode.json, opencode.jsonc, .opencode/opencode.json, .opencode/opencode.jsonc]\n    key: default_agent\n---\n",
+			"opencode.json": `{"default_agent": "gabo-assistant"}`,
+		}))},
+	)
+	// Intent 0013 S6: a Claude Code agent copied into .pi/agents.
+	builtFor, builtForCfg := piCoder("---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: claude\n---\nbody\n")
+	cases = append(cases, tc{name: "agent-built-for-other-engine", cfg: builtForCfg, edit: mapFSEdit(builtFor)})
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
 	}
@@ -62,7 +106,11 @@ func TestCommandGolden(t *testing.T) {
 				proj = withTree(t, proj, c.tree)
 			}
 			// A nil slice would make cobra read os.Args (the test flags).
-			out, err := runCommand(t, proj, append([]string{}, c.args...)...)
+			cfg := c.cfg
+			if cfg == "" {
+				cfg = validConfig
+			}
+			out, err := runCommandConfig(t, proj, cfg, append([]string{}, c.args...)...)
 			code := 0
 			var ee *ExitError
 			if errors.As(err, &ee) {
@@ -110,4 +158,11 @@ func mainSessionEdit(extra map[string]string) map[string]string {
 	}
 	maps.Copy(edit, extra)
 	return edit
+}
+
+// withEdits returns a copy of base with extra added.
+func withEdits(base, extra map[string]string) map[string]string {
+	out := maps.Clone(base)
+	maps.Copy(out, extra)
+	return out
 }

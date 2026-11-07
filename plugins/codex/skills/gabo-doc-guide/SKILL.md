@@ -4,7 +4,7 @@ description: "Trigger: which doc to read, where is it documented, doc map, find 
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "2.0"
+  version: "2.1"
 ---
 ## Activation Contract
 
@@ -18,7 +18,7 @@ Each project keeps its product docs in `docs/product/`, written from the templat
 |---|---|---|
 | What does the product offer, for whom, and what does the user get? | `docs/product/PRD.md` | `gabo-pm` |
 | Which stack did the user choose, and which architecture, code and test conventions and global decisions (D#) apply? | `docs/product/TRD.md` | `gabo-dev-lead` |
-| Which global styles, tokens and components apply (optional, only when the product warrants UX/UI)? | `docs/product/DESIGN.md` | `gabo-frontend` |
+| Which design norms apply: the rules per area with their level and verification, the exceptions and the changelog (optional, only when the product warrants UX/UI)? | `docs/product/DESIGN.md` | `gabo-frontend` |
 | Which migrations and data scripts were applied, in which order, and how does persistence work? | `docs/product/MIGRATIONS.md` | `gabo-db-master` |
 | What problem does one change solve? | `docs/product/intents/<NNNN-slug>/intent.md` | `gabo-pm` |
 | What exactly does the change require and how is it designed (requirements, UX and app flow, migration steps), and who accepted it? | `docs/product/intents/<NNNN-slug>/spec.md` | `gabo-pm` (UX section `gabo-frontend`, migration section `gabo-db-master`; acceptance by the owner) |
@@ -49,7 +49,7 @@ Each project keeps its product docs in `docs/product/`, written from the templat
 | How are the TRD, an intent's plan and the task issues written? | `gabo-dev-lead` |
 | How does a plan change travel, which approval scale applies, and how does the plan reviewer decide? | `gabo-plan-reviewer` |
 | How are migrations and the persistence conventions written? | `gabo-db-master` |
-| How are global styles, tokens and an intent's UX and app flow designed? | `gabo-frontend` |
+| How are the design norms, tokens and an intent's UX and app flow designed? | `gabo-frontend` |
 | Which agents exist and what is each one's body template? | `gabo-agent-templates` |
 | Which operations must an adapter for a slot cover? | `gabo-contract-<slot>` (`tasks`, `repository-host`, `memory`, `methodology`, `reviewer-placement`, `notifications`, `direct-sessions`, `agent-host`), each with an example adapter under `examples/` |
 | How does the reviewer run on the owner's machine (local placement)? | `gabo-reviewer-placement-local` |

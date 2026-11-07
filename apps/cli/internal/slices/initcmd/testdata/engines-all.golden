@@ -4,19 +4,18 @@ engine integration:
   codex:
     wrote .codex/config.toml: added marketplaces.gabo-ai.source_type, marketplaces.gabo-ai.source, plugins."gabo@gabo-ai".enabled
   opencode:
-    no .opencode/plugins/gabo-stage-gate.js yet; nothing written
+    wrote .opencode/opencode.json: experimental.subagent_depth unset → 3
+    no .opencode/plugins/gabo-stage-gate.js yet
   pi:
     wrote .pi/settings.json: added packages entry npm:@gabo-ai/pi@0.2.6
     gabo refuses to build on Pi without a subagent package:
     Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild.
 you still need to:
   - claude: trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply
-  - claude: while testeos-z/gabo-ai is private, give git credentials that can read it (Claude Code clones the marketplace from GitHub)
   - codex: trust the project in Codex so it loads .codex/config.toml
   - codex: trust both gabo hooks in /hooks
   - codex: if Codex does not list the gabo plugin after trust, run: codex plugin marketplace add testeos-z/gabo-ai
   - codex: if Codex does not list the gabo plugin after trust, run: codex plugin add gabo@gabo-ai
-  - codex: while testeos-z/gabo-ai is private, set up git credentials that can read it
-  - opencode: ask your agent to build the agents with gabo-runtime-opencode (it installs .opencode/plugins/gabo-stage-gate.js and the project-level experimental.subagent_depth key)
+  - opencode: ask your agent to build the agents with gabo-runtime-opencode (it installs .opencode/plugins/gabo-stage-gate.js)
   - pi: trust the project in Pi so it installs and loads @gabo-ai/pi from .pi/settings.json
   - pi: install a subagent package (see the refusal above)

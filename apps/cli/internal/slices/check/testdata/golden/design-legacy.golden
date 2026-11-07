@@ -1,0 +1,5 @@
+exit 0
+error: ""
+--- stdout
+! docs/product/DESIGN.md: not in the design norms shape (no "# Design norms" title); ask gabo-frontend to propose the conversion
+check passed: config, agents, slot coverage and catalog version

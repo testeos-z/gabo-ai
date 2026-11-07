@@ -221,6 +221,9 @@ func depthLines(r Report) []string {
 // S8, S11: with no project config, or experimental.subagent_depth below 3
 // (or missing, or unreadable) in the first existing file of the S8 order,
 // gabo check fails with one ✗ line naming the key, the value 3 and the file.
+// Intent 0010 S6: a missing key or a whole number below 3 is gabo init's fix,
+// so the hint names gabo init; a value gabo init refuses to merge keeps the
+// hint to set it by hand, and a file gabo init refuses names its reason.
 func TestOpencodeSubagentDepthBelowThreeFails(t *testing.T) {
 	t.Parallel()
 	const (
@@ -234,17 +237,23 @@ func TestOpencodeSubagentDepthBelowThreeFails(t *testing.T) {
 		files map[string]string
 		file  string
 		why   string
+		init  bool
 	}{
-		{"no project config", nil, nested, "no project config"},
-		{"below 3", map[string]string{jsonc: `{"experimental": {"subagent_depth": 2}}`}, jsonc, "it is 2"},
-		{"key missing", map[string]string{root: `{"theme": "x"}`}, root, "not set"},
-		{"experimental not an object", map[string]string{root: `{"experimental": true}`}, root, "experimental is not an object"},
-		{"not a number", map[string]string{root: `{"experimental": {"subagent_depth": "3"}}`}, root, `it is "3"`},
-		{"not a whole number", map[string]string{root: `{"experimental": {"subagent_depth": 3.5}}`}, root, "it is 3.5"},
-		{"does not parse", map[string]string{rootC: `{"experimental": {"subagent_depth": 3}`}, rootC, "the file does not parse"},
+		{"no project config", nil, nested, "no project config", true},
+		{"below 3", map[string]string{jsonc: `{"experimental": {"subagent_depth": 2}}`}, jsonc, "it is 2", true},
+		{"negative", map[string]string{jsonc: `{"experimental": {"subagent_depth": -1}}`}, jsonc, "it is -1", true},
+		{"key missing", map[string]string{root: `{"theme": "x"}`}, root, "not set", true},
+		{"experimental without the key", map[string]string{root: `{"experimental": {}}`}, root, "not set", true},
+		{"experimental not an object", map[string]string{root: `{"experimental": true}`}, root, "experimental is not an object", false},
+		{"not a number", map[string]string{root: `{"experimental": {"subagent_depth": "3"}}`}, root, `it is "3"`, false},
+		{"not a whole number", map[string]string{root: `{"experimental": {"subagent_depth": 3.5}}`}, root, "it is 3.5", false},
+		{"does not parse", map[string]string{rootC: `{"experimental": {"subagent_depth": 3}`}, rootC, "the file does not parse", false},
 		// Only the first existing file counts, as in OpenCode's lookup order.
-		{"first file wins", map[string]string{rootC: `{"experimental": {"subagent_depth": 1}}`, nested: `{"experimental": {"subagent_depth": 3}}`}, rootC, "it is 1"},
-		{"root before nested", map[string]string{root: `{}`, jsonc: `{"experimental": {"subagent_depth": 5}}`}, root, "not set"},
+		{"first file wins", map[string]string{rootC: `{"experimental": {"subagent_depth": 1}}`, nested: `{"experimental": {"subagent_depth": 3}}`}, rootC, "it is 1", true},
+		{"root before nested", map[string]string{root: `{}`, jsonc: `{"experimental": {"subagent_depth": 5}}`}, root, "not set", true},
+		// gabo init refuses a repeated key, so following its hint would loop.
+		{"repeated key", map[string]string{root: `{"experimental": {"subagent_depth": 1, "subagent_depth": 2}}`}, root, "it is 2", false},
+		{"repeated experimental", map[string]string{root: `{"experimental": {}, "experimental": {"subagent_depth": 1}}`}, root, "it is 1", false},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
@@ -259,7 +268,16 @@ func TestOpencodeSubagentDepthBelowThreeFails(t *testing.T) {
 			if len(got) != 1 || !strings.HasPrefix(got[0], want) {
 				t.Fatalf("depth lines %q, want one starting with %q:\n%s", got, want, joined(rep))
 			}
-			wantFailed(t, rep, "next: set experimental.subagent_depth to 3 in "+c.file+", then rerun gabo check")
+			next := "next: set experimental.subagent_depth to 3 in " + c.file + ", then rerun gabo check"
+			if strings.HasPrefix(c.name, "repeated") {
+				what := map[bool]string{true: "experimental", false: "experimental.subagent_depth"}[c.name == "repeated experimental"]
+				next = "next: fix " + c.file + " (" + what + " appears more than once), then run gabo init and rerun gabo check"
+			}
+			if c.init {
+				next = "next: run gabo init (it sets experimental.subagent_depth to 3 in " + c.file + "), then rerun gabo check"
+			}
+			wantFailed(t, rep)
+			wantConsecutive(t, rep, got[0], next)
 		})
 	}
 }
@@ -359,5 +377,25 @@ func TestOpencodeBuiltAgentSkillsIgnoreTheDirectory(t *testing.T) {
 			wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-pm.md",
 				[]string{"✗ agent gabo-pm (opencode): skill gabo-plan-reviewer missing"})
 		})
+	}
+}
+
+// Intent 0013 S5: a fixed reviewer engine beside listed assistants is in
+// the set: reviewer opencode with no OpenCode agents fails with the agents
+// line for opencode, and the OpenCode depth rule applies; session is no
+// engine.
+func TestOpencodeReviewerBesideListedAssistantsNeedsItsAgents(t *testing.T) {
+	t.Parallel()
+	p := with(project(), map[string]string{
+		".gabo/skills/gabo-runtime-pi/SKILL.md":       strings.Replace(claudeSkill, "gabo-runtime-claude", "gabo-runtime-pi", 1),
+		".gabo/skills/gabo-runtime-opencode/SKILL.md": strings.NewReplacer("gabo-runtime-claude", "gabo-runtime-opencode", ".claude/agents", ".opencode/agents").Replace(claudeSkill),
+		".pi/settings.json":                           piKeysJSON,
+	})
+	cfg := withRuntimes(t, validConfig, "  coder: session\n  reviewer: opencode\n  assistant: [claude, pi]\n")
+	r := run(t, p, configFiles{projectFile: cfg}, Settings{})
+	wantFailed(t, r, "✗ agent alpha missing", "why: no file named alpha in .opencode/agents (runtime opencode)")
+	noLineWith(t, r, "runtime session")
+	if !strings.Contains(joined(r), "✗ "+subagentDepthKey) {
+		t.Fatalf("no OpenCode depth line:\n%s", joined(r))
 	}
 }

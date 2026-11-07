@@ -188,6 +188,8 @@ apply_repo_settings() {
   # The review engine (runtimes.reviewer) and, for pi only, the name of the
   # env var whose value reaches the review step instead of the owner's login.
   ENGINE="${REVIEWER_ENGINE:-claude}"
+  # true once reviewer.sh resolved runtimes.reviewer session to its argument.
+  SESSION_ENGINE=false
   PI_CREDENTIAL_ENV="${REVIEWER_PI_CREDENTIAL_ENV:-}"
 }
 apply_repo_settings
@@ -313,7 +315,51 @@ trust_problem() {
   done
 }
 
-# validate_static: the settings that do not depend on the repository.
+# is_engine <word>: true for one of the four review engines.
+is_engine() { [[ "$1" =~ ^(claude|codex|pi|opencode)$ ]]; }
+
+# engine_arg_shape_problem <value>: prints why the value of the reviewer.sh
+# `engine` argument is not one of the four engines, or nothing. A value that
+# is not a bare lowercase word is never echoed back.
+engine_arg_shape_problem() {
+  [[ "$1" =~ ^[a-z]+$ ]] || { echo "the engine argument must be a bare lowercase word"; return; }
+  is_engine "$1" || echo "the engine argument must be claude, codex, pi or opencode, got '$1'"
+}
+
+# engine_arg_problem <true|false: argument given> <engine>: after
+# load_base_config, prints why the engine argument does not fit the
+# configured reviewer, or nothing (intent 0013 S11, D5). The argument is
+# accepted only when runtimes.reviewer on the integration branch (or
+# REVIEWER_ENGINE, which stands in for it) is session, and only for an engine
+# listed in runtimes.assistant on the integration branch; session without it
+# is refused. The PR head's gabo.yaml never counts.
+engine_arg_problem() {
+  local source listed
+  if [[ "$ENGINE" != session ]]; then
+    [[ "$1" == true ]] || return 0
+    source="runtimes.reviewer on $BASE_BRANCH"
+    [[ "${ENGINE_FROM_ENV:-false}" != true ]] || source="REVIEWER_ENGINE"
+    echo "the engine argument is accepted only when runtimes.reviewer is session; $source is $ENGINE"
+    return
+  fi
+  [[ "$1" == true ]] ||
+    { echo "runtimes.reviewer on $BASE_BRANCH is session: pass the engine of the requesting wave as engine <claude|codex|pi|opencode>"; return; }
+  listed="$(yaml_get "$BASE_DIR/gabo.yaml" runtimes.assistant | awk '$0 != "" && !seen[$0]++' | paste -sd' ' -)"
+  [[ " $listed " == *" $2 "* ]] ||
+    echo "engine $2 is not listed in runtimes.assistant on $BASE_BRANCH ($listed)"
+}
+
+# engine_role: how the preflight names the review engine.
+engine_role() {
+  if [[ "${SESSION_ENGINE:-false}" == true ]]; then
+    echo "runtimes.reviewer session (engine $ENGINE)"
+  else
+    echo "runtimes.reviewer $ENGINE"
+  fi
+}
+
+# validate_static [unresolved]: the settings that do not depend on the
+# repository.
 validate_static() {
   local n
   [[ "$REPO" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] ||
@@ -324,7 +370,10 @@ validate_static() {
   [[ "$MODE" != isolated ]] ||
     { echo "REVIEWER_MODE=isolated belongs to the reviewer_placement adapter; these scripts run single-user mode only"; return; }
   [[ "$MODE" == single-user ]] || { echo "REVIEWER_MODE must be single-user"; return; }
-  [[ "$ENGINE" =~ ^(claude|codex|pi|opencode)$ ]] ||
+  # session is a valid runtimes.reviewer only before reviewer.sh resolves it
+  # to the engine argument (validate_static unresolved); the child scripts
+  # always get the resolved engine.
+  is_engine "$ENGINE" || [[ "$ENGINE" == session && "${1:-}" == unresolved ]] ||
     { echo "REVIEWER_ENGINE must be claude, codex, pi or opencode (runtimes.reviewer), got '$ENGINE'"; return; }
   [[ "$PI_CREDENTIAL_ENV" =~ ^([A-Z_][A-Z0-9_]*)?$ ]] ||
     { echo "review.pi_credential_env must be an environment variable name (got '$PI_CREDENTIAL_ENV')"; return; }
@@ -410,12 +459,16 @@ sync_base() {
   ) 7>"$STATE/locks/mirror.lock"
 }
 
-# declared_agent_dirs: the agent directories that the runtime skills of
-# runtimes.{coder, reviewer, assistant} declare (metadata.agent_dir), from
-# the catalog copy on the integration branch, one per line with a final "/".
+# declared_agent_dirs: the agent directories that the runtime skills of the
+# engine set declare (metadata.agent_dir), from the catalog copy on the
+# integration branch, one per line with a final "/". The engine set mirrors
+# engineconfig.Engines (intent 0013 S2, D2): runtimes.coder, runtimes.reviewer
+# and every engine listed in runtimes.assistant, each once; session adds no
+# engine.
 declared_agent_dirs() {
   local y="$BASE_DIR/gabo.yaml" rt f d
-  for rt in $({ yaml_get "$y" runtimes.coder; yaml_get "$y" runtimes.reviewer; yaml_get "$y" runtimes.assistant; } | sort -u); do
+  for rt in $({ yaml_get "$y" runtimes.coder; yaml_get "$y" runtimes.reviewer; yaml_get "$y" runtimes.assistant; } |
+    awk '$0 != "" && $0 != "session" && !seen[$0]++'); do
     for f in "$BASE_DIR"/.gabo/{skills,runtimes}/gabo-runtime-"$rt"/SKILL.md; do
       d="$(frontmatter_get "$f" metadata.agent_dir | head -n 1)"
       [[ -n "$d" ]] && printf '%s/\n' "${d%/}"
@@ -439,7 +492,11 @@ load_base_config() {
   [[ -n "${REVIEWER_PLACEMENT+set}" ]] || REVIEWER_PLACEMENT="$(yaml_get "$y" reviewer.placement | head -n 1)"
   [[ -n "${REVIEWER_AGENT_DIRS+set}" ]] || REVIEWER_AGENT_DIRS="$(declared_agent_dirs | paste -sd' ' -)"
   [[ -n "${REVIEWER_CHECK_ENV+set}" ]] || REVIEWER_CHECK_ENV="$(yaml_get "$y" review.check_env | paste -sd' ' -)"
-  [[ -n "${REVIEWER_ENGINE+set}" ]] || REVIEWER_ENGINE="$(yaml_get "$y" runtimes.reviewer | head -n 1)"
+  ENGINE_FROM_ENV=true
+  if [[ -z "${REVIEWER_ENGINE+set}" ]]; then
+    ENGINE_FROM_ENV=false
+    REVIEWER_ENGINE="$(yaml_get "$y" runtimes.reviewer | head -n 1)"
+  fi
   [[ -n "${REVIEWER_PI_CREDENTIAL_ENV+set}" ]] || REVIEWER_PI_CREDENTIAL_ENV="$(yaml_get "$y" review.pi_credential_env | head -n 1)"
   export REVIEWER_ENGINE REVIEWER_PI_CREDENTIAL_ENV
   # The base stamp is a minimum; the PR head's stamp never counts.
@@ -517,7 +574,7 @@ engine_problem() {
   local bin var
   read -r bin var <<<"$(engine_bin)"
   command -v "$bin" >/dev/null 2>&1 ||
-    { echo "no $ENGINE binary ($var=$bin) for runtimes.reviewer $ENGINE"; return; }
+    { echo "no $ENGINE binary ($var=$bin) for $(engine_role)"; return; }
   [[ "$ENGINE" != pi || -z "$PI_CREDENTIAL_ENV" || -n "${!PI_CREDENTIAL_ENV:-}" ]] ||
     { echo "review.pi_credential_env names $PI_CREDENTIAL_ENV, which is empty: set it for the reviewer, or remove the key to reuse the owner's Pi login"; return; }
   isolation_problem "$bin"
@@ -544,7 +601,7 @@ isolation_problem() {
     [[ "$want" != "$have" ]] || return 0
     want="$marker records $want"
   fi
-  echo "runtimes.reviewer $ENGINE has no isolation test pass for $have: $want; run the gabo-reviewer-config isolation test (isolation-test.sh $ENGINE)"
+  echo "$(engine_role) has no isolation test pass for $have: $want; run the gabo-reviewer-config isolation test (isolation-test.sh $ENGINE)"
 }
 
 # resolve_bot_login: sets BOT_LOGIN to the active gh login when it is empty.

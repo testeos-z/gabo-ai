@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ .pi/agents/alpha.md: tools missing for its spec capabilities: mem_save
+next: ask your agent to rebuild the agents, then rerun gabo check

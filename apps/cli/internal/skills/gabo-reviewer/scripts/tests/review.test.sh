@@ -36,7 +36,8 @@ origin() {
 }
 
 # scenario <name> [VAR=value...]: one review of PR 7 at HEAD_SHA of ORIGIN in a
-# fresh state dir and fixture, run from CALLER; prints the VERDICT line.
+# fresh state dir and fixture, run from CALLER, with `engine $SCENARIO_ENGINE`
+# when it is set; prints the VERDICT line.
 scenario() {
   local name="$1"
   shift
@@ -57,7 +58,7 @@ scenario() {
       REVIEWER_NOW=2026-10-20T12:00:00Z REVIEWER_MERGE_DELAY=0 REVIEWER_MERGE_TRIES=2
     for kv in "$@"; do export "${kv?}"; done
     write_stub_context "$work/bin"
-    bash "$skill/reviewer.sh" head 7 "$HEAD_SHA" >"$fx/out.log" 2>&1
+    bash "$skill/reviewer.sh" head 7 "$HEAD_SHA" ${SCENARIO_ENGINE+engine "$SCENARIO_ENGINE"} >"$fx/out.log" 2>&1
     echo "exit=$?" >>"$fx/out.log"
     tail -n 2 "$fx/out.log" | head -n 1
   )
@@ -240,6 +241,37 @@ check "checks never get the Pi credential" bash -c "! grep '^check-env' '$work/p
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario pi_key_unset)" "a named credential env var that is empty is refused"
 check "the refusal names the env var" grep -qF 'review.pi_credential_env names PI_TEST_KEY, which is empty' "$work/pi_key_unset/out.log"
 check "nothing runs without the named credential" bash -c "! grep -qE '^(pi|go-argc)' '$work/pi_key_unset/calls.log'"
+
+echo "# engine argument under runtimes.reviewer: session (intent 0013 S11, D5)"
+origin session O_REVIEWER=session O_ASSISTANT='[claude, pi]' O_AUTO_MERGE=true O_PR=pi
+v="$(SCENARIO_ENGINE=pi scenario session_pi)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" "session with engine pi listed in runtimes.assistant reviews and merges"
+check "the session review runs on Pi" grep -qE '^pi --mode json --no-session ' "$work/session_pi/calls.log"
+check "claude never runs for a session review on Pi" bash -c "! grep -q '^claude ' '$work/session_pi/calls.log'"
+check "the comment says a Pi review" grep -qF 'then a Pi review' "$work/session_pi/posted_7.md"
+expect_match '^reviewer/review success pi: no blocking issues found' "$(status_line session_pi reviewer/review)" \
+  "the review status names the resolved engine"
+v="$(scenario session_none)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$v" "(c) session without an engine argument ends with an error VERDICT"
+check "(c) the refusal names the missing engine argument" grep -qF 'PREFLIGHT-FAILED runtimes.reviewer on dev is session: pass the engine' "$work/session_none/out.log"
+check "(c) no engine runs, nothing is posted or merged" \
+  bash -c "! grep -qE '^(claude |pi |codex exec|opencode run|gh pr merge|gh api -X POST|STATUS )' '$work/session_none/calls.log'"
+# (e) runtimes.reviewer: session only on the PR head (and in the caller's
+# checkout of it): the reviewer reads the integration branch, where it is claude.
+origin headonly O_PR=session
+git -C "$CALLER" checkout -q "$HEAD_SHA"
+v="$(SCENARIO_ENGINE=pi scenario session_headonly)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$v" "(e) session only on the PR head: an engine argument ends with an error VERDICT"
+check "(e) refused: runtimes.reviewer is read from the integration branch, never the head" \
+  grep -qxF 'PREFLIGHT-FAILED the engine argument is accepted only when runtimes.reviewer is session; runtimes.reviewer on dev is claude' \
+  "$work/session_headonly/out.log"
+check "(e) no engine runs, nothing is posted or merged" \
+  bash -c "! grep -qE '^(claude |pi |codex exec|opencode run|gh pr merge|gh api -X POST|STATUS )' '$work/session_headonly/calls.log'"
+# The child scripts only ever get a resolved engine.
+out="$(cd "$CALLER" && HOME="$fake_home" REVIEWER_GH="$work/bin/gh" GABO_REVIEWER_STATE_DIR="$work/session_child" \
+  REVIEWER_REPO=example-org/example-repo REVIEWER_CHECKS='go test ./...' REVIEWER_ENGINE=session bash "$skill/review-head.sh" 7 "$HEAD_SHA" 2>&1)"
+expect_match "^PREFLIGHT-FAILED REVIEWER_ENGINE must be claude, codex, pi or opencode \(runtimes.reviewer\), got 'session'$" "$out" \
+  "review-head.sh refuses an unresolved session engine"
 
 echo "# codex reviewer (runtimes.reviewer: codex)"
 origin codex O_REVIEWER=codex O_AUTO_MERGE=true

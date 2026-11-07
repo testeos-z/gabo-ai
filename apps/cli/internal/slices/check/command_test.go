@@ -12,9 +12,15 @@ import (
 
 func runCommand(t *testing.T, proj fs.FS, args ...string) (string, error) {
 	t.Helper()
+	return runCommandConfig(t, proj, validConfig, args...)
+}
+
+// runCommandConfig runs gabo check with cfg as the project gabo.yaml.
+func runCommandConfig(t *testing.T, proj fs.FS, cfg string, args ...string) (string, error) {
+	t.Helper()
 	s := Settings{Version: "1.2.3", Layers: layers(), Getenv: env("HOME", home), ReviewerDir: reviewerDir}
 	cmd := NewCommand(func(context.Context) (*UseCase, error) {
-		return NewUseCase(proj, configFiles{projectFile: validConfig}, goodUser(), s), nil
+		return NewUseCase(proj, configFiles{projectFile: cfg}, goodUser(), s), nil
 	})
 	// The root command silences cobra's own error and usage output.
 	cmd.SilenceUsage, cmd.SilenceErrors = true, true
@@ -91,6 +97,57 @@ func TestCommandHelpNamesTheStricterRules(t *testing.T) {
 	}
 }
 
+// TestCommandHelpNamesTheGaboInitHints pins the help lines of the intent
+// 0010 S6 hints: each line whose fix is gabo init names it.
+func TestCommandHelpNamesTheGaboInitHints(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in",
+		"    a missing or lower whole value names \"run gabo init (it sets",
+		"    experimental.subagent_depth to 3 in <file>)\", any other value names setting",
+		"    (a full-tier runtime skill without it fails, a flexible-tier one warns).",
+		"    For a full-tier engine the key is gabo init's: a missing key names \"run gabo",
+		"    init (it merges \"<key>\": \"gabo-assistant\" into <file>)\", a key holding",
+		"    another value fails as \"<file>: <key> is \"<value>\", not \"gabo-assistant\"\"",
+		"    and names \"change <key> to \"gabo-assistant\" in <file>, or remove it and run",
+		"    gabo init\", and another engine's key names \"run gabo init (it removes",
+		"    \"<key>\": \"gabo-assistant\" from <file>)\"; every other piece, and a",
+		"    flexible-tier engine's key, names asking your agent to rebuild the agents;",
+		"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";",
+		"    a file gabo init refuses names \"fix <file> (<its reason>)\", and a key gabo",
+		"    init would leave as it is names setting or removing it by hand;",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
+// Intent 0013 S5: the help says the main-session entry is checked for every
+// engine listed in runtimes.assistant, and names the stale line with a list.
+func TestCommandHelpNamesEveryListedAssistant(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - the main-session entry of every engine listed in runtimes.assistant, from",
+		"    each runtime skill's metadata.main_session: each listed engine's",
+		"    block; no entry of a full-tier engine that is not listed, named as \"<file>:",
+		"    gabo assistant entry for <engine>, but runtimes.assistant is <the listed",
+		"    engines, joined with \", \">\"",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 func runPreWrite(t *testing.T, proj fs.FS, args ...string) (string, error) {
 	t.Helper()
 	return runPreWriteStdin(t, proj, "", args...)
@@ -141,6 +198,23 @@ func TestCommandPreWriteUsageExitsTwo(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "usage: gabo check --pre-write <path>...") || out != "" {
 			t.Fatalf("%q: err = %v, stdout = %q", args, err, out)
+		}
+	}
+}
+
+// Spec 0012 S7: the help names the design norms rule.
+func TestCommandHelpNamesTheDesignRule(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - docs/product/DESIGN.md when present: its 15 sections, the rule-table columns,",
+		"    the RFC 2119 level, MUST verification, the exceptions and the changelog.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("help lacks %q:\n%s", want, out)
 		}
 	}
 }
@@ -313,6 +387,29 @@ func TestCommandPreWriteBadStdinExitsTwo(t *testing.T) {
 		}
 		if msg := err.Error(); !strings.HasPrefix(msg, "usage: gabo check --pre-write <path>...") || strings.Contains(msg, "\n") || out.String() != "" {
 			t.Fatalf("%q: err = %q, stdout = %q, want one usage line", stdin, msg, out.String())
+		}
+	}
+}
+
+// Intent 0013 S17, S20 (plans T19, T22): the help names the agent tools rule
+// and the rule on tools a subagent never has.
+func TestCommandHelpNamesTheAgentToolsRules(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - for a runtime skill declaring metadata.agent_tools and",
+		"    metadata.agent_tool_requirements, each built agent file lists every tool its",
+		"    spec capabilities require (a required mem_<x> is also met by",
+		"    mcp__<server>__mem_<x> or mcp__<server>__*);",
+		"  - for a runtime skill declaring metadata.agent_tools_unavailable, no built",
+		"    agent file lists a tool a subagent never has (a trailing * matches a",
+		"    prefix; only gabo-runtime-pi declares it, subagent_*);",
+	} {
+		if !strings.Contains(out, want+"\n") {
+			t.Fatalf("help lacks %q:\n%s", want, out)
 		}
 	}
 }

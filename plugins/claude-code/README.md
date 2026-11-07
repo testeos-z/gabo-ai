@@ -4,7 +4,7 @@ The `gabo` plugin of the `gabo-ai` marketplace (this repository, [`.claude-plugi
 
 ## Install
 
-**With `gabo init`.** When `gabo.yaml` names `claude` in `runtimes.*`, `gabo init` writes the plugin's project keys `extraKnownMarketplaces."gabo-ai"` (the GitHub source `testeos-z/gabo-ai`) and `enabledPlugins."gabo@gabo-ai": true` to the project's `.claude/settings.json`, never to your global Claude Code settings. It only adds missing keys and keeps every value you set. What you still do, as its `engine integration:` report says: trust the project folder in Claude Code, so the marketplace and the plugin apply, and, while `testeos-z/gabo-ai` is private, give git credentials that can read it. Commit `.claude/settings.json`.
+**With `gabo init`.** When `gabo.yaml` names `claude` in `runtimes.*`, `gabo init` writes the plugin's project keys `extraKnownMarketplaces."gabo-ai"` (the GitHub source `testeos-z/gabo-ai`) and `enabledPlugins."gabo@gabo-ai": true` to the project's `.claude/settings.json`, never to your global Claude Code settings. It only adds missing keys and keeps every value you set. What you still do, as its `engine integration:` report says: trust the project folder in Claude Code, so the marketplace and the plugin apply. Commit `.claude/settings.json`.
 
 **By hand.** As the alternative, install the plugin at user level:
 
@@ -12,8 +12,6 @@ The `gabo` plugin of the `gabo-ai` marketplace (this repository, [`.claude-plugi
 claude plugin marketplace add testeos-z/gabo-ai
 claude plugin install gabo@gabo-ai
 ```
-
-While the repository is private, Claude Code clones it with your own git credentials: run `gh auth setup-git` or add an SSH key that can read it.
 
 The plugin does not replace `gabo init`. Per-project config (`gabo.yaml`), slots, adapters and agents still come from `gabo init` and the setup prompt (see the [Install and set up](../../README.md#install-and-set-up)).
 
@@ -37,7 +35,7 @@ These questions from the [spec](../../docs/product/intents/0001-claude-code-plug
 
 | # | question | recommended (not decided) |
 |---|---|---|
-| 3 | Which marketplace hosts the plugin while the repository is private? | This repository as the marketplace; users need git credentials (`gh auth setup-git` or an SSH key) until it is public. Anthropic's plugin directory when the repository goes public. |
+| 3 | Which marketplace hosts the plugin? | The repository is public since 2026-11-06, so this repository works as the marketplace and needs no git credentials. Anthropic's plugin directory is the recommended host; that move is not decided. |
 | 4 | Which ref do users install from, and who bumps the version? | The default branch `main`, with `version` bumped by hand in the release commit until a release pipeline exists (see the release checklist below). |
 | 5 | Inside a gabo project, how should the main session treat the plugin skills that duplicate the project copy in `.gabo/skills/`? | Accept both copies (agents are unaffected). To use only the project copy in one project, disable the plugin there with `"enabledPlugins": { "gabo@gabo-ai": false }` in that project's `.claude/settings.json`. |
 

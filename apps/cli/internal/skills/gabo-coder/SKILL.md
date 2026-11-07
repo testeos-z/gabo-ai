@@ -4,11 +4,11 @@ description: "Trigger: gabo coder, implement issue, worktree coder, open PR, req
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "2.1"
+  version: "2.3"
 ---
 ## Activation Contract
 
-Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
+Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. The cycle gives you the wave id, the task, the worktree, the branch and the mode; the worktree is `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, inside your wave's folder (intent 0013 S9, D6). Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
 
 ## Hard Rules
 
@@ -17,6 +17,8 @@ Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git
 - Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Closes #<n>`. On a base that is not the default branch the keyword closes nothing; the Task Close does. Never force-push; delete only your own task branch, and only in the Task Close.
 - The PR body also holds one line `gabo check impact: <none, with the reason / updated in <file>>` (TRD 8.5): whether the change adds or alters something `gabo check` should verify (an agent file, a runtime skill, the neutral agent spec, a slot contract or a project file gabo writes) and where the check was updated, or why it needs no update.
 - After every push, request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`. Act on the `VERDICT` line it returns; the PR comment holds the findings.
+- Pi exception (intent 0013 S20, D14): On Pi (`gabo-engine: pi`) you run as a gentle-pi subagent with no `subagent_*` tools, so you cannot launch `gabo-reviewer`: validate the request and run the reviewer script yourself, exactly as your agent file says, and act on its `VERDICT` line as on the relay's reply; on every other engine you launch the `gabo-reviewer` subagent.
+- Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the reviewer refuses it.
 - Questions go back to the cycle in your outcome; never ask the owner directly.
 - You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
 
@@ -42,7 +44,7 @@ Max 4 fix rounds; then label the issue `needs-user`, report BLOCKED with the que
 
 ## Task Close
 
-Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome. Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover.
+Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome: they are entries of your wave's ledger, and the close touches only entries of your own wave's ledger (`gabo/ledger/<wave>`), per intent 0013 S9 and D6. A resource of another wave (a worktree under another `<repo-name>-worktrees/<wave>/` folder, or a branch or container of another wave's task) is neither removed nor reported as a leftover of this wave; `leftovers:` lists only resources of this task (its worktree and branch). Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover.
 
 1. Verify through `repository_host` (read status) that the PR is merged into `repo.integration_branch` from your branch, and note its merged head SHA. Not merged, or another base or head branch ⇒ change nothing, report HANDED "not merged".
 2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
