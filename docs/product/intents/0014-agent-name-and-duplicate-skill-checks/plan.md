@@ -56,8 +56,8 @@ Intent tracker item: [#444](https://github.com/testeos-z/gabo-ai/issues/444) und
 
 | task | issue |
 |---|---|
-| T1 | (pending) |
-| T2 | (pending) |
+| T1 | [#467](https://github.com/testeos-z/gabo-ai/issues/467) |
+| T2 | [#468](https://github.com/testeos-z/gabo-ai/issues/468) |
 
 ## Risks to the plan
 
