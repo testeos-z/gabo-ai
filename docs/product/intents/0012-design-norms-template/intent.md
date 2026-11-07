@@ -42,7 +42,7 @@ The first attempt (PR #163, the template; PR #168, its plan) was closed on 2026-
 | # | question | status |
 |---|---|---|
 | 1 | With no global `UX_UI.md` any more, where do the global "what" items of issue #164 live: the product principles and the shared component inventory? | carried to the spec (D2, open question 1), passed to the owner with a proposed answer; answered by the owner 2026-11-07: the principles stay in `DESIGN.md`, the component inventory goes in each change's spec section 3 (spec D2 C) |
-| 2 | Should `gabo check` validate a project's `DESIGN.md` rule tables? | carried to the spec (D4, open question 2), passed to the owner with a proposed answer |
+| 2 | Should `gabo check` validate a project's `DESIGN.md` rule tables? | carried to the spec (D4, open question 2), passed to the owner with a proposed answer; answered by the owner 2026-11-07, verbatim: "6. que si lo valide.": `gabo check` validates `DESIGN.md` when the project has one (spec D4 B, S7, plan T5) |
 
 ## Links
 
