@@ -45,6 +45,15 @@ type runtimeMeta struct {
 	// MainSession is the engine's main-session entry (spec 0009 D5); nil
 	// when not declared.
 	MainSession *mainSessionMeta `yaml:"main_session"`
+	// AgentTools is where an agent file lists its tools (intent 0013 D11,
+	// intent 0008 D1 forms).
+	AgentTools agentPlace `yaml:"-"`
+	// ToolRequirements are the tools each spec capability requires, in
+	// declaration order; nil when not declared.
+	ToolRequirements []toolRequirement `yaml:"-"`
+	// ToolsErr is a malformed tool declaration, kept so the rest of the
+	// metadata stays readable; checkAgentTools reports it.
+	ToolsErr error `yaml:"-"`
 }
 
 // parseRuntimeMeta reads metadata from a SKILL.md frontmatter.
@@ -60,8 +69,10 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 	var fm struct {
 		Metadata struct {
 			runtimeMeta `yaml:",inline"`
-			AgentSkills string `yaml:"agent_skills"`
-			AgentName   string `yaml:"agent_name"`
+			AgentSkills string    `yaml:"agent_skills"`
+			AgentName   string    `yaml:"agent_name"`
+			AgentTools  yaml.Node `yaml:"agent_tools"`
+			ToolReqs    yaml.Node `yaml:"agent_tool_requirements"`
 		} `yaml:"metadata"`
 	}
 	err := yaml.Unmarshal(front, &fm)
@@ -82,6 +93,7 @@ func parseRuntimeMeta(b []byte) (runtimeMeta, error) {
 	if err = m.MainSession.normalize(); err != nil {
 		return runtimeMeta{}, err
 	}
+	m.AgentTools, m.ToolRequirements, m.ToolsErr = parseToolDeclaration(fm.Metadata.AgentTools, fm.Metadata.ToolReqs)
 	return m, nil
 }
 
@@ -91,7 +103,9 @@ func insideRepo(dir string) bool {
 	return !path.IsAbs(dir) && !slices.Contains(strings.Split(dir, "/"), "..") && fs.ValidPath(path.Clean(dir))
 }
 
-// checkLinks requires, for each runtime whose skill declares a skill_dir, a
+// checkLinks checks each runtime skill's agent metadata and the tools of its
+// built agents (checkAgentTools), then requires, for each runtime whose skill
+// declares a skill_dir, a
 // link <skill_dir>/<name> to the catalog copy for every skill a spec agent
 // lists, and a fixed-name link <skill_dir>/gabo-<slot> to every slot adapter
 // that is a skill folder. Then it checks the user-level reviewer link of
@@ -111,6 +125,9 @@ func (u *UseCase) checkLinks(r *Report, cfg config.Config) error {
 		meta, ok := u.runtimeMeta(rt)
 		if ok && meta.AgentDir != "" {
 			checkAgentMeta(r, rt, meta)
+			if err := u.checkAgentTools(r, rt, meta, spec); err != nil {
+				return err
+			}
 		}
 		if !ok || meta.SkillDir == "" {
 			continue

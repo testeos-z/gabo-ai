@@ -473,3 +473,63 @@ func TestSkillLinksForEveryListedAssistant(t *testing.T) {
 	wantFailed(t, rep, "✗ skill link .other/skills/sk-a missing", "why: agent alpha lists sk-a; link it to ../../.gabo/skills/sk-a (runtime pi)")
 	noLineWith(t, rep, "runtime session")
 }
+
+// Intent 0013 D11: parseRuntimeMeta reads metadata.agent_tools (an agent
+// place, intent 0008 D1 forms) and metadata.agent_tool_requirements (each
+// capability to its tool names, in declaration order).
+func TestParseRuntimeMetaReadsToolDeclaration(t *testing.T) {
+	t.Parallel()
+	m, err := parseRuntimeMeta(runtimeDoc("  agent_tools: frontmatter:tools", "  agent_tool_requirements:",
+		"    memory: [mem_search, mem_save]", "    search: [grep, find]", "    web: []"))
+	if err != nil {
+		t.Fatalf("parseRuntimeMeta() error = %v", err)
+	}
+	if m.AgentTools != (agentPlace{"frontmatter", "tools"}) || !m.declaresTools() || m.ToolsErr != nil {
+		t.Fatalf("agent_tools = %+v, declared %v, err %v", m.AgentTools, m.declaresTools(), m.ToolsErr)
+	}
+	want := []toolRequirement{{"memory", []string{"mem_search", "mem_save"}}, {"search", []string{"grep", "find"}}, {"web", nil}}
+	if len(m.ToolRequirements) != len(want) {
+		t.Fatalf("requirements = %+v, want %+v", m.ToolRequirements, want)
+	}
+	for i, w := range want {
+		g := m.ToolRequirements[i]
+		if g.capability != w.capability || strings.Join(g.tools, ",") != strings.Join(w.tools, ",") {
+			t.Fatalf("requirement %d = %+v, want %+v", i, g, w)
+		}
+	}
+	m, err = parseRuntimeMeta(runtimeDoc("  agent_skills: frontmatter:skills"))
+	if err != nil || m.declaresTools() || m.ToolsErr != nil {
+		t.Fatalf("no declaration: declared %v, err %v, %v", m.declaresTools(), err, m.ToolsErr)
+	}
+}
+
+// A malformed tool declaration does not fail the whole frontmatter: the
+// other metadata stays readable and ToolsErr names the key.
+func TestParseRuntimeMetaKeepsAMalformedToolDeclaration(t *testing.T) {
+	t.Parallel()
+	reqs := []string{"  agent_tool_requirements:", "    memory: [mem_save]"}
+	for name, meta := range map[string][]string{
+		"unknown form":              append([]string{"  agent_tools: json:tools"}, reqs...),
+		"agent_tools is a list":     append([]string{"  agent_tools: [tools]"}, reqs...),
+		"requirements not a map":    {"  agent_tools: frontmatter:tools", "  agent_tool_requirements: memory"},
+		"requirement not a list":    {"  agent_tools: frontmatter:tools", "  agent_tool_requirements:", "    memory: mem_save"},
+		"tool not a name":           {"  agent_tools: frontmatter:tools", "  agent_tool_requirements:", "    memory: [{a: b}]"},
+		"only agent_tools":          {"  agent_tools: frontmatter:tools"},
+		"only tool requirements":    reqs,
+		"empty tool name in a list": {"  agent_tools: frontmatter:tools", "  agent_tool_requirements:", `    memory: [""]`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m, err := parseRuntimeMeta(runtimeDoc(append([]string{"  agent_skills: frontmatter:skills"}, meta...)...))
+			if err != nil {
+				t.Fatalf("parseRuntimeMeta() error = %v, want the rest of the metadata read", err)
+			}
+			if m.ToolsErr == nil || !strings.Contains(m.ToolsErr.Error(), "metadata.agent_tool") {
+				t.Fatalf("ToolsErr = %v, want an error naming the key", m.ToolsErr)
+			}
+			if m.declaresTools() || m.AgentDir != ".x/agents" || !m.AgentSkills.declared() {
+				t.Fatalf("meta = %+v", m)
+			}
+		})
+	}
+}
