@@ -82,7 +82,7 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
    - On a Pi main session (session engine `pi`, intent 0013 S18, D12), launch no `gabo-cycle` subagent: a gentle-pi subagent gets no `subagent_*` tools, so it could not launch coders. Instead load the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`) in your own session and run it with the same inputs (wave id, mode, the wave start time or `resume <session id>`); each coder is one first-level `subagent_run` of this session, and the cycle's wave report starts the Wave Close.
 
    The cycle claims the intent before any task; when another session holds it, the cycle returns the refusal line naming the holder: relay it, start nothing else for that intent. The owner performs no launch, relay or copy step.
-4. End your turn while the cycle runs (on a Pi main session, while its coders run); never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
+4. End your turn while the cycle runs (on a Pi main session, while its coders run: gentle-pi wakes this session with each finished coder's result, and the cycle continues from that outcome); never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
 
 ## Wave Close
 

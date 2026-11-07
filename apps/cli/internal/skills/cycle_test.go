@@ -258,6 +258,10 @@ func TestCycleRunsInThePiMainSession(t *testing.T) {
 		"On a Pi main session your session engine is the block's fixed session-engine line (`pi`, intent 0013 S16), not an agent file",
 		// coders as first-level subagent runs.
 		"On a Pi main session each coder is one first-level `subagent_run` of that session",
+		// what wakes the session for steps 6 and 7.
+		"gentle-pi delivers each finished subagent's result to that session and wakes it (gentle-pi 4.5.1 completion notice)",
+		"a run in task mode returns only when the coder ends",
+		"each wake is the next outcome of step 6",
 	})
 	step5 := lineWith(t, doc, "5. Per task:")
 	if !strings.Contains(step5, "on a Pi main session one first-level `subagent_run`") {

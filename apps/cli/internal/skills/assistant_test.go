@@ -199,6 +199,7 @@ func TestAssistantRunsThePiWaveInItsOwnSession(t *testing.T) {
 		"a gentle-pi subagent gets no `subagent_*` tools",
 		"load the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`) in your own session and run it with the same inputs",
 		"each coder is one first-level `subagent_run`",
+		"gentle-pi wakes this session with each finished coder's result, and the cycle continues from that outcome",
 	})
 	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
 		// the delegation table and the session engine say the same.
