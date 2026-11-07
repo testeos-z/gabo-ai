@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/DESIGN.md: section 4: table columns must be | id | rule | level | rationale | verification | examples | source |
+next: fix docs/product/DESIGN.md above (gabo-frontend keeps it), then rerun gabo check

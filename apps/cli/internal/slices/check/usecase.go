@@ -150,6 +150,9 @@ func (u *UseCase) Run() (Report, error) {
 	if err := u.checkIntents(&r); err != nil {
 		return Report{}, err
 	}
+	if err := u.checkDesign(&r); err != nil {
+		return Report{}, err
+	}
 	if !r.Failed {
 		r.Lines = append(r.Lines, PassedLine)
 	}
@@ -273,7 +276,9 @@ func (u *UseCase) checkStamp(r *Report) (string, bool) {
 
 // checkAgents requires, for each distinct runtime, every spec agent in the
 // directory its runtime skill declares, with a version line x.y.z equal to
-// the stamp when the stamp is valid (checkAgentVersion).
+// the stamp when the stamp is valid (checkAgentVersion), and each agent
+// file, also the main-session agent, built for the runtime of its directory
+// (checkAgentEngine).
 func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasStamp bool) error {
 	checkVersionsComparable(r, hasStamp)
 	catalog, err := fs.Sub(u.project, CatalogDir)
@@ -310,6 +315,17 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 					return err
 				}
 				u.checkAgentName(r, id, rt, path.Join(dir, name))
+				if err := u.checkAgentEngine(r, rt, path.Join(dir, name)); err != nil {
+					return err
+				}
+			}
+		}
+		if m := spec.MainSession; m != nil {
+			for _, name := range files[m.ID] {
+				u.checkAgentName(r, m.ID, rt, path.Join(dir, name))
+				if err := u.checkAgentEngine(r, rt, path.Join(dir, name)); err != nil {
+					return err
+				}
 			}
 		}
 	}

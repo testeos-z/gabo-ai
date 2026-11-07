@@ -3,6 +3,8 @@ package check
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
+	"regexp"
 	"strings"
 
 	"github.com/pelletier/go-toml/v2"
@@ -174,4 +176,33 @@ func checkAgentMeta(r *Report, rt string, meta runtimeMeta) {
 		return
 	}
 	r.warn("runtime " + rt + ": " + skill + " declares no metadata.agent_skills; per-agent skill and name checks skipped for " + rt + " (flexible tier)")
+}
+
+// engineLineRE finds the engine an agent file was built for (intent 0013
+// S6, D3), in a frontmatter, a TOML comment or an HTML comment, as
+// versionLineRE finds the version; an unfilled {{engine}} does not match.
+var engineLineRE = regexp.MustCompile(`(?m)gabo-engine:[ \t]*["']?([A-Za-z0-9][A-Za-z0-9._-]*)`)
+
+// builtFor returns the filled engine of the agent file's gabo-engine line,
+// or "" when it has none.
+func builtFor(b []byte) string {
+	if m := engineLineRE.FindSubmatch(b); m != nil {
+		return string(m[1])
+	}
+	return ""
+}
+
+// checkAgentEngine fails an agent file whose filled engine differs from rt,
+// the engine of the agent directory it was found in (intent 0013 S6). A file
+// with no engine line passes: builds before the {{engine}} slot carry none,
+// and the version line already asks for their rebuild.
+func (u *UseCase) checkAgentEngine(r *Report, rt, file string) error {
+	b, err := fs.ReadFile(u.project, file)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", file, err)
+	}
+	if v := builtFor(b); v != "" && v != rt {
+		r.fail(fmt.Sprintf("✗ %s: built for %s, not %s", file, v, rt), NextRebuild)
+	}
+	return nil
 }

@@ -132,6 +132,7 @@ func TestClaudeBuiltSetPassesCheck(t *testing.T) {
 	t.Parallel()
 	r := run(t, claudeBuilt(t, "1.2.3"), configFiles{projectFile: validConfig}, Settings{})
 	wantPassed(t, r, PassedLine)
+	noLineWith(t, r, "declares no name")
 }
 
 // Spec 0009 D4: the main-session agent file beside the spec agents is no

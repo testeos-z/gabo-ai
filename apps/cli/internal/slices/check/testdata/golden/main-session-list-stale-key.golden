@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ opencode.json: gabo assistant entry for opencode, but runtimes.assistant is claude, pi
+next: run gabo init (it removes "default_agent": "gabo-assistant" from opencode.json), then rerun gabo check

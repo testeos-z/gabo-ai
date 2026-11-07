@@ -39,7 +39,8 @@ gate() {
     # Run outside any checkout: the script reads repo keys from the caller's
     # gabo.yaml, and the repository running these tests has its own.
     cd "$fx" || exit 1
-    bash "$skill/merge-head.sh" 7 "$sha" 2>&1 | tail -n 1 | cut -d' ' -f2-
+    bash "$skill/merge-head.sh" 7 "$sha" >"$fx/out.log" 2>&1
+    tail -n 1 "$fx/out.log" | cut -d' ' -f2-
   )
 }
 
@@ -72,5 +73,13 @@ echo "# reviewer.signing marker"
 expect_eq "MERGED #7 $sha" "$(G_MARKER=team-bot gate team REVIEWER_MARKER=team-bot)" "the configured marker signs the verdict"
 expect_match '^MERGE-SKIPPED .*no reviewer verdict comment' "$(gate default_marker REVIEWER_MARKER=team-bot)" \
   "a verdict with another marker never counts"
+
+echo "# review engine"
+# reviewer.sh resolves runtimes.reviewer session to its engine argument
+# before any child script runs; the merge gate refuses an unresolved session.
+gate session_engine REVIEWER_ENGINE=session >/dev/null
+expect_match "^PREFLIGHT-FAILED REVIEWER_ENGINE must be claude, codex, pi or opencode \(runtimes.reviewer\), got 'session'$" \
+  "$(cat "$work/session_engine/out.log")" "an unresolved session engine is refused"
+check "no merge call for an unresolved session engine" bash -c "! grep -q '^gh pr merge' '$work/session_engine/calls.log'"
 
 finish

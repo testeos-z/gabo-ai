@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -106,7 +107,7 @@ func TestRuntimeBuilderNamesTheRuntimeSkillShape(t *testing.T) {
 			t.Errorf("## Runtime Skill Shape: capability %s not named", c)
 		}
 	}
-	for _, s := range agentSlots {
+	for _, s := range append(slices.Clone(agentSlots), engineSlot) {
 		if !strings.Contains(shape, "`{{"+s+"}}`") {
 			t.Errorf("## Runtime Skill Shape: does not say how to fill {{%s}}", s)
 		}
@@ -185,4 +186,80 @@ func TestRuntimeBuilderTeachesTheMainSessionMetadata(t *testing.T) {
 		"Main-Session Entry", "`main_session.template`", "`main_session.block`",
 		"removes the gabo entry of every other full-tier engine",
 	)
+}
+
+// runtimeBuilderLine returns the first line of the builder skill that holds
+// marker, or fails the test.
+func runtimeBuilderLine(t *testing.T, marker string) string {
+	t.Helper()
+	for _, l := range strings.Split(runtimeBuilderDoc(t), "\n") {
+		if strings.Contains(l, marker) {
+			return l
+		}
+	}
+	t.Fatalf("%s: no line holds %q", runtimeBuilder, marker)
+	return ""
+}
+
+// intent 0010 S5, D4 A: gabo init writes the engine config keys of the
+// full-tier engines; a builder-written runtime skill keeps writing its own
+// main-session key for kind: agent, the one exception (flexible tier, PRD
+// R32, TRD D28), and never removes another engine's key, which gabo init
+// removes.
+func TestRuntimeBuilderKeepsTheFlexibleTierKeyWrite(t *testing.T) {
+	t.Parallel()
+	rule := runtimeBuilderLine(t, "Engine config (intent 0004 S8, D7)")
+	for _, s := range []string{
+		"`gabo init` writes the engine config keys of the full-tier engines (intent 0010 S5)",
+		"step 6",
+	} {
+		if !strings.Contains(rule, s) {
+			t.Errorf("engine-config rule: missing %q", s)
+		}
+	}
+	step := runtimeBuilderLine(t, "6. **Main-session entry.**")
+	for _, s := range []string{
+		"the one key merged into the first existing file of `config`",
+		"the one exception to \"`gabo init` writes every engine config key\"",
+		"flexible tier", "PRD R32", "TRD D28", "intent 0010 D4",
+		"never removes Claude Code's `agent` key or OpenCode's `default_agent` key: `gabo init` removes them",
+	} {
+		if !strings.Contains(step, s) {
+			t.Errorf("step 6: missing %q", s)
+		}
+	}
+}
+
+// intent 0013 S4, S6: a builder-written runtime skill fills {{engine}} with
+// its own engine, builds its main-session entry when its engine is listed in
+// runtimes.assistant (keeping its own key write, intent 0010 D4) and never
+// removes a listed engine's entry, so rebuilds in either order keep both.
+func TestRuntimeBuilderBuildsEveryListedEntry(t *testing.T) {
+	t.Parallel()
+	step5 := runtimeBuilderLine(t, "5. **Spec agents.**")
+	for _, s := range []string{
+		"`gabo-engine: <engine>`",
+		"without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them",
+	} {
+		if !strings.Contains(step5, s) {
+			t.Errorf("step 5: missing %q", s)
+		}
+	}
+	step6 := runtimeBuilderLine(t, "6. **Main-session entry.**")
+	for _, s := range []string{
+		"When `<engine>` is listed in `runtimes.assistant` (one engine or a list, intent 0013 S4)",
+		"every other full-tier engine not listed in `runtimes.assistant`",
+		"never removes the entry of another engine listed in `runtimes.assistant`",
+		"with `runtimes.assistant: [claude, <engine>]`, rebuilding either engine first leaves both entries",
+		"keeps writing its own key while `<engine>` is listed (intent 0010 D4)",
+	} {
+		if !strings.Contains(step6, s) {
+			t.Errorf("step 6: missing %q", s)
+		}
+	}
+	mustContain(t, runtimeBuilderDoc(t),
+		"`{{engine}}` as `<engine>`, the engine as written in `gabo.yaml`",
+		"the main-session entry when `<engine>` is listed in `runtimes.assistant` and the removal of every other full-tier engine's gabo entry not listed in `runtimes.assistant`",
+	)
+	mustLackIn(t, runtimeBuilder, runtimeBuilderDoc(t), "When `runtimes.assistant` is `<engine>`")
 }

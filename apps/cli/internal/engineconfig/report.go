@@ -56,3 +56,10 @@ func (r Report) Render() string {
 	}
 	return b.String()
 }
+
+// removedMainSessionLine is the report line of a removed gabo main-session
+// value: it names runtimes.assistant as listed, one engine as in intent 0010
+// S4, several joined with ", " (intent 0013 S3).
+func removedMainSessionLine(file, key, value string, in Input) string {
+	return "removed " + file + " " + key + ": " + quoteJSON(value) + " (runtimes.assistant is " + strings.Join(in.assistants(), ", ") + ")"
+}

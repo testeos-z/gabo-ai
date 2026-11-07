@@ -42,13 +42,13 @@
           }
         },
         "runtimes": {
-          "description": "Agent runtime per role.",
+          "description": "Agent runtime per role: coder and reviewer take one engine or session (the role runs in the main session, valid only with assistant set); assistant takes one engine or a non-empty list of distinct engines.",
           "type": ["object", "null"],
           "additionalProperties": false,
           "properties": {
-            "coder": { "$ref": "#/$defs/runtime" },
-            "reviewer": { "$ref": "#/$defs/runtime" },
-            "assistant": { "$ref": "#/$defs/runtime" }
+            "coder": { "$ref": "#/$defs/roleRuntime" },
+            "reviewer": { "$ref": "#/$defs/roleRuntime" },
+            "assistant": { "$ref": "#/$defs/assistant" }
           }
         },
         "coder": {
@@ -209,7 +209,7 @@
           "properties": {
             "coder": { "type": "string" },
             "reviewer": { "type": "string" },
-            "assistant": { "type": "string" }
+            "assistant": { "type": ["string", "array"] }
           }
         },
         "repo": {
@@ -248,8 +248,23 @@
         { "$ref": "#/$defs/complete" }
       ]
     },
+    "engine": {
+      "enum": ["claude", "codex", "pi", "opencode"]
+    },
     "runtime": {
       "enum": ["claude", "codex", "pi", "opencode", null]
+    },
+    "roleRuntime": {
+      "$comment": "if/then/else keeps one refusal line per bad value, the single-value line of 0.2.10.",
+      "if": { "const": "session" },
+      "then": true,
+      "else": { "$ref": "#/$defs/runtime" }
+    },
+    "assistant": {
+      "$comment": "if/then/else keeps one refusal line per bad value, the single-value line of 0.2.10.",
+      "if": { "type": "array" },
+      "then": { "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/engine" } },
+      "else": { "$ref": "#/$defs/runtime" }
     },
     "slot": {
       "type": "object",

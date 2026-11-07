@@ -18,7 +18,6 @@ const (
 
 var wantClaudeSteps = []string{
 	"trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply",
-	"while testeos-z/gabo-ai is private, give git credentials that can read it (Claude Code clones the marketplace from GitHub)",
 }
 
 func readTestdata(t *testing.T, name string) []byte {
@@ -209,5 +208,211 @@ func TestClaudeRuleRefusesNonObjects(t *testing.T) {
 		if len(res.Writes) != 0 || !slices.Equal(res.Section.Lines, want) {
 			t.Errorf("%q: writes %q lines %q, want none and %q", in, res.Writes, res.Section.Lines, want)
 		}
+	}
+}
+
+// integrationOnly is a settings file holding only the integration keys.
+const integrationOnly = `{
+  "extraKnownMarketplaces": {
+    "gabo-ai": {
+      "source": {
+        "source": "github",
+        "repo": "testeos-z/gabo-ai"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "gabo@gabo-ai": true
+  }
+}
+`
+
+const buildStep = "ask your agent to build the agents (the main session needs .claude/agents/gabo-assistant.md)"
+
+// S1, S4, S8: the top-level agent key follows runtimes.assistant. Claude
+// writes "gabo-assistant", another engine removes exactly that value, any
+// other value is the user's; no assistant leaves the key alone.
+func TestClaudeRuleAgentKey(t *testing.T) {
+	withAgent := strings.TrimSuffix(integrationOnly, "}\n") + "  \"agent\": \"gabo-assistant\"\n}\n"
+	withAgent = strings.Replace(withAgent, "    \"gabo@gabo-ai\": true\n  }\n", "    \"gabo@gabo-ai\": true\n  },\n", 1)
+	cases := []struct {
+		name      string
+		assistant string
+		in        *string // nil for a missing file
+		built     bool    // .claude/agents/gabo-assistant.md exists
+		out       string  // expected written bytes, "" for no write
+		lines     []string
+		steps     []string
+	}{
+		{
+			name: "claude adds agent and keeps every byte", assistant: "claude", in: ptr(integrationOnly),
+			out:   withAgent,
+			lines: []string{"wrote .claude/settings.json: added agent"},
+			steps: append(slices.Clone(wantClaudeSteps), buildStep),
+		},
+		{
+			name: "claude with agent built has no build step", assistant: "claude", in: ptr(integrationOnly), built: true,
+			out:   withAgent,
+			lines: []string{"wrote .claude/settings.json: added agent"},
+			steps: wantClaudeSteps,
+		},
+		{
+			name: "claude already set is unchanged", assistant: "claude", in: ptr(withAgent),
+			lines: []string{claudeUnchanged},
+			steps: append(slices.Clone(wantClaudeSteps), buildStep),
+		},
+		{
+			name: "claude keeps the user's agent", assistant: "claude", in: ptr(`{"agent": "my-agent", "enabledPlugins": {"gabo@gabo-ai": true}, "extraKnownMarketplaces": {"gabo-ai": {"source": {"source": "github", "repo": "testeos-z/gabo-ai"}}}}`),
+			lines: []string{`kept .claude/settings.json agent: "my-agent" (your setting; gabo leaves it)`},
+			steps: wantClaudeSteps,
+		},
+		{
+			name: "claude new file holds the integration keys and agent", assistant: "claude",
+			out:   withAgent,
+			lines: []string{`wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai", agent`},
+			steps: append(slices.Clone(wantClaudeSteps), buildStep),
+		},
+		{
+			name: "codex removes the gabo value and its comma", assistant: "codex", in: ptr(withAgent),
+			out:   integrationOnly,
+			lines: []string{`removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is codex)`},
+			steps: wantClaudeSteps,
+		},
+		{
+			name: "codex removes a first member and the comma after it", assistant: "codex",
+			in:    ptr("{\n  \"agent\": \"gabo-assistant\",\n" + strings.TrimPrefix(integrationOnly, "{\n")),
+			out:   integrationOnly,
+			lines: []string{`removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is codex)`},
+			steps: wantClaudeSteps,
+		},
+		{
+			name: "codex keeps the user's agent", assistant: "codex",
+			in:    ptr(strings.Replace(withAgent, `"gabo-assistant"`, `"my-agent"`, 1)),
+			lines: []string{claudeUnchanged},
+			steps: wantClaudeSteps,
+		},
+		{
+			name: "codex new file has no agent", assistant: "codex",
+			out:   integrationOnly,
+			lines: []string{claudeWrote},
+			steps: wantClaudeSteps,
+		},
+		{
+			name: "no assistant leaves the gabo value alone", in: ptr(withAgent),
+			lines: []string{claudeUnchanged},
+			steps: wantClaudeSteps,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			files := map[string][]byte{}
+			if c.in != nil {
+				files[ClaudeSettings] = []byte(*c.in)
+			}
+			if c.built {
+				files[ClaudeAgentFile] = []byte("---\nname: gabo-assistant\n---\n")
+			}
+			res := claudeRule(Input{Files: files, Version: "0.2.6", Assistants: []string{c.assistant}})
+			if !slices.Equal(res.Section.Lines, c.lines) {
+				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, c.lines)
+			}
+			if !slices.Equal(res.Section.Steps, c.steps) {
+				t.Errorf("steps =\n%q\nwant\n%q", res.Section.Steps, c.steps)
+			}
+			got, wrote := res.Writes[ClaudeSettings]
+			if c.out == "" {
+				if len(res.Writes) != 0 {
+					t.Fatalf("writes = %q, want none", res.Writes)
+				}
+				return
+			}
+			if !wrote || len(res.Writes) != 1 {
+				t.Fatalf("writes = %q, want only %s", res.Writes, ClaudeSettings)
+			}
+			if string(got) != c.out {
+				t.Fatalf("wrote\n%s\nwant\n%s", got, c.out)
+			}
+			// A second run on the output is byte-identical: nothing written.
+			files[ClaudeSettings] = got
+			if again := claudeRule(Input{Files: files, Assistants: []string{c.assistant}}); len(again.Writes) != 0 {
+				t.Errorf("second run writes %q, want none", again.Writes)
+			}
+		})
+	}
+}
+
+// S1: a file gabo cannot read writes nothing and gets one ✗ line, also with
+// the Claude Code assistant.
+func TestClaudeRuleAgentRefusesUnreadableFiles(t *testing.T) {
+	for in, reason := range map[string]string{
+		`{"agent": `:       "invalid JSON (unexpected end of JSON input)",
+		`["agent"]`:        "the top level is not a JSON object",
+		`"gabo-assistant"`: "the top level is not a JSON object",
+	} {
+		for _, assistant := range []string{"claude", "codex"} {
+			res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{assistant}})
+			want := []string{"✗ .claude/settings.json: " + reason + "; fix it and run gabo init again"}
+			if len(res.Writes) != 0 || !slices.Equal(res.Section.Lines, want) {
+				t.Errorf("%s %q: writes %q lines %q, want none and %q", assistant, in, res.Writes, res.Section.Lines, want)
+			}
+		}
+	}
+}
+
+// S1: the added member keeps every earlier byte, in a compact file too.
+func TestClaudeRuleAgentKeepsEarlierBytes(t *testing.T) {
+	in := `{"permissions": {"allow": []}, "enabledPlugins": {"gabo@gabo-ai": true}, "extraKnownMarketplaces": {"gabo-ai": {"source": {"source": "github", "repo": "testeos-z/gabo-ai"}}}}`
+	res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{"claude"}})
+	want := strings.TrimSuffix(in, "}") + `, "agent": "gabo-assistant"}`
+	if got := string(res.Writes[ClaudeSettings]); got != want {
+		t.Errorf("wrote\n%s\nwant\n%s", got, want)
+	}
+}
+
+func ptr(s string) *string { return &s }
+
+// Intent 0013 S3, D7: runtimes.assistant may list several engines. Claude
+// Code listed with another engine writes agent like a single claude; Claude
+// Code not listed removes only the gabo value and the line names the list;
+// a listed Claude Code never loses its gabo value.
+func TestClaudeRuleAssistantList(t *testing.T) {
+	withAgent := strings.TrimSuffix(integrationOnly, "}\n") + "  \"agent\": \"gabo-assistant\"\n}\n"
+	withAgent = strings.Replace(withAgent, "    \"gabo@gabo-ai\": true\n  }\n", "    \"gabo@gabo-ai\": true\n  },\n", 1)
+	cases := []struct {
+		name       string
+		assistants []string
+		in, out    string // out "" for no write
+		lines      []string
+	}{
+		{"claude listed first adds agent", []string{Claude, Opencode}, integrationOnly, withAgent,
+			[]string{"wrote .claude/settings.json: added agent"}},
+		{"claude listed second adds agent", []string{Pi, Claude}, integrationOnly, withAgent,
+			[]string{"wrote .claude/settings.json: added agent"}},
+		{"claude listed keeps the gabo value", []string{Opencode, Claude}, withAgent, "",
+			[]string{claudeUnchanged}},
+		{"claude not listed removes the gabo value", []string{Opencode, Pi}, withAgent, integrationOnly,
+			[]string{`removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is opencode, pi)`}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			files := map[string][]byte{ClaudeSettings: []byte(c.in), ClaudeAgentFile: nil}
+			res := claudeRule(Input{Files: files, Version: "0.2.6", Assistants: c.assistants})
+			if !slices.Equal(res.Section.Lines, c.lines) {
+				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, c.lines)
+			}
+			if c.out == "" {
+				if len(res.Writes) != 0 {
+					t.Fatalf("writes = %q, want none", res.Writes)
+				}
+				return
+			}
+			if got := string(res.Writes[ClaudeSettings]); got != c.out || len(res.Writes) != 1 {
+				t.Fatalf("writes = %q, want only %s =\n%s", res.Writes, ClaudeSettings, c.out)
+			}
+			files[ClaudeSettings] = res.Writes[ClaudeSettings]
+			if again := claudeRule(Input{Files: files, Assistants: c.assistants}); len(again.Writes) != 0 {
+				t.Errorf("second run writes %q, want none", again.Writes)
+			}
+		})
 	}
 }

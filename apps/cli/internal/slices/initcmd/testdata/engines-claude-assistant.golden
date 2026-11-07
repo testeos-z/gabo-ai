@@ -1,0 +1,12 @@
+engine integration:
+  claude:
+    wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai", agent
+  codex:
+    wrote .codex/config.toml: added marketplaces.gabo-ai.source_type, marketplaces.gabo-ai.source, plugins."gabo@gabo-ai".enabled
+you still need to:
+  - claude: trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply
+  - claude: ask your agent to build the agents (the main session needs .claude/agents/gabo-assistant.md)
+  - codex: trust the project in Codex so it loads .codex/config.toml
+  - codex: trust both gabo hooks in /hooks
+  - codex: if Codex does not list the gabo plugin after trust, run: codex plugin marketplace add testeos-z/gabo-ai
+  - codex: if Codex does not list the gabo plugin after trust, run: codex plugin add gabo@gabo-ai

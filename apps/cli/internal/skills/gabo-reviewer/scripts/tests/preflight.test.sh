@@ -165,6 +165,96 @@ expect_match '^PREFLIGHT-FAILED no opencode binary \(REVIEWER_OPENCODE=gabo-test
   "$(oc_pre REVIEWER_OPENCODE=gabo-test-no-opencode bash "$skill/reviewer.sh" preflight)" "opencode missing from PATH is refused naming REVIEWER_OPENCODE"
 rm -rf "$fake_home/.config/gabo"
 
+echo "# engine argument (runtimes.reviewer: session, intent 0013 S11, D5)"
+# refused <label> <reason regex> [VAR=value...] <cmd...>: runs pre with a
+# fresh call log; expects PREFLIGHT-FAILED <reason>, exit 2, and no engine
+# run, no status or comment posted and no merge.
+refusals=0
+refused() {
+  local label="$1" want="$2" log out code=0
+  shift 2
+  refusals=$((refusals + 1))
+  log="$work/refused-$refusals.log"
+  : >"$log"
+  out="$(pre STUB_LOG="$log" "$@")" || code=$?
+  expect_match "^PREFLIGHT-FAILED $want" "$out" "$label"
+  expect_eq 2 "$code" "$label: exits 2"
+  check "$label: no engine runs, nothing is posted or merged" \
+    bash -c "! grep -qE '^(claude |pi |codex exec|opencode run|gh pr merge|gh api -X POST|STATUS )' '$log'"
+}
+O_REVIEWER=session O_ASSISTANT='[claude, pi]' make_origin "$work/origin-session.git"
+sess() { PRE_ORIGIN="$work/origin-session.git" PRE_STATE="$work/state-session" pre REVIEWER_PI="$work/bin/pi" "$@"; }
+s_refused() { PRE_ORIGIN="$work/origin-session.git" PRE_STATE="$work/state-session" refused "$@"; }
+expect_match '^PREFLIGHT-OK .* engine=pi ' "$(sess bash "$skill/reviewer.sh" preflight engine pi)" \
+  "session: engine pi listed in runtimes.assistant on the integration branch is accepted"
+expect_match '^PREFLIGHT-OK .* engine=claude ' "$(sess bash "$skill/reviewer.sh" preflight engine claude)" \
+  "session: engine claude listed in runtimes.assistant is accepted"
+expect_match '^PREFLIGHT-OK .* engine=claude ' "$(pre REVIEWER_ENGINE=session bash "$skill/reviewer.sh" preflight engine claude)" \
+  "REVIEWER_ENGINE=session stands in for runtimes.reviewer and takes a listed engine"
+expect_match '^PREFLIGHT-OK .* engine=claude ' "$(pre bash "$skill/reviewer.sh" preflight)" \
+  "a fixed runtimes.reviewer without an engine argument still passes"
+# (a) a fixed runtimes.reviewer refuses the argument.
+for m in preflight "head 7 $sha" "due 7 $sha" list-due once; do
+  # shellcheck disable=SC2086
+  refused "(a) runtimes.reviewer: claude refuses an engine argument ($m)" \
+    "the engine argument is accepted only when runtimes.reviewer is session; runtimes.reviewer on dev is claude$" \
+    bash "$skill/reviewer.sh" $m engine claude
+done
+out="$(pre bash "$skill/reviewer.sh" head 7 "$sha" engine pi)"
+expect_match "^VERDICT PR #7 head $sha verdict=error merge=none$" "$out" "(a) a refused head still ends with a VERDICT line"
+# (b) the engine must be listed in runtimes.assistant on the integration branch.
+s_refused "(b) session refuses engine codex not listed in runtimes.assistant [claude, pi]" \
+  "engine codex is not listed in runtimes.assistant on dev \(claude pi\)$" bash "$skill/reviewer.sh" preflight engine codex
+s_refused "(b) session refuses engine opencode not listed in runtimes.assistant" \
+  "engine opencode is not listed in runtimes.assistant on dev" bash "$skill/reviewer.sh" head 7 "$sha" engine opencode
+# (c) session without the argument fails in every mode.
+for m in preflight once list-due "due 7 $sha" "head 7 $sha"; do
+  # shellcheck disable=SC2086
+  s_refused "(c) session without an engine argument is refused ($m)" \
+    "runtimes.reviewer on dev is session: pass the engine of the requesting wave as engine <claude\|codex\|pi\|opencode>$" \
+    bash "$skill/reviewer.sh" $m
+done
+# (d) the value must be one of the four engines, a bare lowercase word,
+# checked before anything else runs (no state dir, no fetch).
+for v in gpt Claude 'pi;id' 'pi pi' ' pi' 'pi ' '$(touch '"$work"'/pwned)' '`touch '"$work"'/pwned`' ../pi pi/.. session '' $'pi\nclaude'; do
+  PRE_ORIGIN="$work/origin-session.git" PRE_STATE="$work/state-d" refused "(d) engine value $(printf '%q' "$v") is refused" \
+    "the engine argument must be " bash "$skill/reviewer.sh" preflight engine "$v"
+done
+PRE_ORIGIN="$work/origin-session.git" PRE_STATE="$work/state-d" refused "(d) engine with no value is refused" \
+  "the engine argument needs exactly one value" bash "$skill/reviewer.sh" preflight engine
+PRE_ORIGIN="$work/origin-session.git" PRE_STATE="$work/state-d" refused "(d) engine with two values is refused" \
+  "the engine argument needs exactly one value" bash "$skill/reviewer.sh" head 7 "$sha" engine pi claude
+check "(d) a bad value is never executed" bash -c "! test -e '$work/pwned'"
+check "(d) a bad value is refused before any use (no state dir, no fetch)" bash -c "! test -e '$work/state-d'"
+expect_match "^PREFLIGHT-FAILED the engine argument must be a bare lowercase word$" \
+  "$(PRE_STATE="$work/state-d" pre bash "$skill/reviewer.sh" preflight engine '$(id)')" "(d) the refusal never echoes a value that is not a bare word"
+expect_eq 2 "$(pre bash "$skill/reviewer.sh" preflight extra >/dev/null 2>&1; echo $?)" "any other extra argument is a usage error"
+# (e) is end to end in review.test.sh: session only on the PR head.
+# (f) REVIEWER_ENGINE set to a fixed engine closes the argument like (a), even
+# when runtimes.reviewer on the integration branch is session.
+s_refused "(f) REVIEWER_ENGINE=claude refuses an engine argument" \
+  "the engine argument is accepted only when runtimes.reviewer is session; REVIEWER_ENGINE is claude$" \
+  REVIEWER_ENGINE=claude bash "$skill/reviewer.sh" preflight engine pi
+s_refused "(f) REVIEWER_ENGINE=pi refuses an engine argument (head)" \
+  "the engine argument is accepted only when runtimes.reviewer is session; REVIEWER_ENGINE is pi$" \
+  REVIEWER_ENGINE=pi bash "$skill/reviewer.sh" head 7 "$sha" engine pi
+# (g) the isolation pass marker applies to the resolved engine.
+O_REVIEWER=session O_ASSISTANT='[claude, codex, opencode]' make_origin "$work/origin-session-codex.git"
+rm -rf "$fake_home/.config/gabo"
+PRE_ORIGIN="$work/origin-session-codex.git" PRE_STATE="$work/state-session-codex" refused \
+  "(g) session with listed engine codex and no isolation pass marker is refused, naming the isolation test" \
+  "runtimes.reviewer session \(engine codex\) has no isolation test pass for codex-cli 0.163.0: no marker $marks/codex; run the gabo-reviewer-config isolation test \(isolation-test.sh codex\)$" \
+  REVIEWER_CODEX="$work/bin/codex" bash "$skill/reviewer.sh" preflight engine codex
+PRE_ORIGIN="$work/origin-session-codex.git" PRE_STATE="$work/state-session-codex" refused \
+  "(g) session with listed engine opencode and no isolation pass marker is refused (head)" \
+  "runtimes.reviewer session \(engine opencode\) has no isolation test pass .*isolation-test.sh opencode\)$" \
+  REVIEWER_OPENCODE="$work/bin/opencode" bash "$skill/reviewer.sh" head 7 "$sha" engine opencode
+mkdir -p "$marks" && echo "codex-cli 0.163.0" >"$marks/codex"
+expect_match '^PREFLIGHT-OK .* engine=codex ' \
+  "$(PRE_ORIGIN="$work/origin-session-codex.git" PRE_STATE="$work/state-session-codex" pre REVIEWER_CODEX="$work/bin/codex" bash "$skill/reviewer.sh" preflight engine codex)" \
+  "(g) with a matching marker the listed codex engine passes"
+rm -rf "$fake_home/.config/gabo"
+
 echo "# placement"
 O_PLACEMENT=github-actions make_origin "$work/origin-gha.git"
 expect_match '^PREFLIGHT-FAILED reviewer.placement github-actions is planned for a later release; only local runs here' \
@@ -250,5 +340,52 @@ check "a head with a verdict comment by the bot login is found" helpers "has_ver
 check "another head has no verdict comment" helpers "! has_verdict_comment '$comments' fedcba9876543210fedcba9876543210fedcba98"
 check "another login's marker is not a verdict" \
   env HOME="$fake_home" REVIEWER_BOT_LOGIN=stranger bash -c "source '$skill/common.sh'; ! has_verdict_comment \"\$1\" $sha" _ "$comments"
+
+
+echo "# engine set"
+# A copy of the rows of engineSetRows in
+# apps/cli/internal/engineconfig/engines_test.go (intent 0013 S2, D2):
+# coder|reviewer|assistant|the set in role order. declared_agent_dirs
+# mirrors engineconfig.Engines: each engine of the set gives its agent dir,
+# session gives none. Every runtime skill, session's too, declares
+# .<engine>/agents so a stray engine shows up.
+engine_rows=(
+  "session|opencode|[claude, pi]|opencode claude pi"
+  "claude|session|[claude, pi]|claude pi"
+  "session|session|[pi]|pi"
+  "pi|pi|[codex, claude]|pi codex claude"
+  "claude|claude|claude|claude"
+  "pi|claude|claude|pi claude"
+  "codex|claude|pi|codex claude pi"
+  "codex|opencode||codex opencode"
+)
+# engine_base <dir> <coder> <reviewer> <assistant>: a reviewer checkout of
+# the integration branch with that runtimes block and every runtime skill.
+engine_base() {
+  local e
+  mkdir -p "$1"
+  {
+    echo "runtimes:"
+    echo "  coder: $2"
+    echo "  reviewer: $3"
+    [[ -z "$4" ]] || echo "  assistant: $4"
+  } >"$1/gabo.yaml"
+  for e in claude codex opencode pi session; do
+    mkdir -p "$1/.gabo/skills/gabo-runtime-$e"
+    printf -- '---\nname: gabo-runtime-%s\nmetadata:\n  agent_dir: .%s/agents\n---\n' "$e" "$e" >"$1/.gabo/skills/gabo-runtime-$e/SKILL.md"
+  done
+}
+agent_dirs() { HOME="$fake_home" bash -c "source '$skill/common.sh'; BASE_DIR='$1'; declared_agent_dirs | paste -sd' ' -"; }
+i=0
+for row in "${engine_rows[@]}"; do
+  i=$((i + 1))
+  IFS='|' read -r coder reviewer assistant set <<<"$row"
+  engine_base "$work/engines-$i" "$coder" "$reviewer" "$assistant"
+  want="$(for e in $set; do echo ".$e/agents/"; done | sort -u | paste -sd' ' -)"
+  expect_eq "$want" "$(agent_dirs "$work/engines-$i")" "engine set of coder $coder, reviewer $reviewer, assistant ${assistant:-none}"
+done
+engine_base "$work/engines-block" session opencode ""
+printf '  assistant:\n    - claude\n    - pi\n' >>"$work/engines-block/gabo.yaml"
+expect_eq ".claude/agents/ .opencode/agents/ .pi/agents/" "$(agent_dirs "$work/engines-block")" "a block list of assistants"
 
 finish

@@ -106,6 +106,9 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"pi reviewer with env":    with("runtimes: {reviewer: pi}\nreview: {pi_credential_env: ANTHROPIC_API_KEY}"),
 		"codex in every role":     with("runtimes: {coder: codex, reviewer: codex, assistant: codex}"),
 		"opencode in every role":  with("runtimes: {coder: opencode, reviewer: opencode, assistant: opencode}"),
+		"assistant list":          with("runtimes: {coder: session, reviewer: pi, assistant: [claude, pi]}"),
+		"one-item assistant list": with("runtimes: {assistant: [opencode]}"),
+		"reviewer session":        with("runtimes: {reviewer: session}"),
 		"claude reviewer env":     with("review: {pi_credential_env: ANTHROPIC_API_KEY}"),
 		"bot coder login":         with("coder: {login: 'gabo-coder[bot]'}"),
 		"state dir":               with("review: {state_dir: /data/gabo/reviewer}"),
@@ -134,6 +137,13 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"null runtimes.coder":         with("runtimes: {coder: null}"),
 		"empty runtimes.coder":        with(`runtimes: {coder: ""}`),
 		"unknown runtime":             with("runtimes: {assistant: foo}"),
+		"empty assistant list":        with("runtimes: {assistant: []}"),
+		"duplicate assistant":         with("runtimes: {assistant: [pi, pi]}"),
+		"unknown assistant in list":   with("runtimes: {assistant: [claude, gpt]}"),
+		"session assistant":           with("runtimes: {assistant: session}"),
+		"session in assistant list":   with("runtimes: {assistant: [claude, session]}"),
+		"assistant mapping":           with("runtimes: {assistant: {engine: claude}}"),
+		"coder session no assistant":  strings.Replace(string(without(t, "runtimes.assistant")), "coder: claude", "coder: session", 1),
 		"unknown top-level key":       with("colour: blue"),
 		"unknown nested key":          with("repo: {url: x}"),
 		"former cloud key":            with("server: {railway: {project_id: x}}"),
@@ -313,10 +323,10 @@ func TestUserSchema(t *testing.T) {
 		}
 	}
 	for doc, key := range map[string]string{
-		"nickname: Leo\n":            "nickname",
-		"interaction_level: max\n":   "interaction_level",
-		"runtimes: {coder: foo}\n": "runtimes.coder",
-		"users: {orca: {uid: 1}}\n":  "users",
+		"nickname: Leo\n":           "nickname",
+		"interaction_level: max\n":  "interaction_level",
+		"runtimes: {coder: foo}\n":  "runtimes.coder",
+		"users: {orca: {uid: 1}}\n": "users",
 	} {
 		err := ValidateSchema(SchemaUser, []byte(doc))
 		if err == nil || !strings.Contains(err.Error(), key) {
@@ -432,5 +442,32 @@ func TestSchemaClosingNamesMatchTheirDefinitions(t *testing.T) {
 	}
 	if got := keys(project, "$defs", "layer", "properties"); !slices.Equal(got, allKeys) {
 		t.Errorf("layer closes %v, want %v", got, allKeys)
+	}
+}
+
+// The layer schema runs before the Go validation in gabo check, so each
+// refused runtimes shape gives exactly one schema line naming its key, and a
+// bad single value keeps its 0.2.10 line (intent 0013 S1).
+func TestSchemaRuntimeRefusalsAreOneLine(t *testing.T) {
+	t.Parallel()
+	const oldEnum = ": value must be one of 'claude', 'codex', 'pi', 'opencode', <nil>"
+	for name, tt := range map[string]struct{ doc, key, want string }{
+		"empty list":       {"runtimes: {assistant: []}", "runtimes.assistant", "runtimes.assistant: minItems: got 0, want 1"},
+		"duplicate":        {"runtimes: {assistant: [pi, pi]}", "runtimes.assistant", "runtimes.assistant: items at 0 and 1 are equal"},
+		"unknown in list":  {"runtimes: {assistant: [claude, gpt]}", "runtimes.assistant", "runtimes.assistant.1: value must be one of 'claude', 'codex', 'pi', 'opencode'"},
+		"session":          {"runtimes: {assistant: session}", "runtimes.assistant", "runtimes.assistant" + oldEnum},
+		"scalar assistant": {"runtimes: {assistant: foo}", "runtimes.assistant", "runtimes.assistant" + oldEnum},
+		"scalar coder":     {"runtimes: {coder: foo}", "runtimes.coder", "runtimes.coder" + oldEnum},
+		"scalar reviewer":  {"runtimes: {reviewer: foo}", "runtimes.reviewer", "runtimes.reviewer" + oldEnum},
+	} {
+		err := ValidateSchema(SchemaLayer, []byte(tt.doc))
+		if got := linesNaming(err, tt.key); len(got) != 1 || got[0] != tt.want {
+			t.Errorf("%s: lines naming %s = %q, want [%q]", name, tt.key, got, tt.want)
+		}
+	}
+	for _, doc := range []string{"runtimes: {coder: session, reviewer: session, assistant: [codex, opencode]}", "runtimes: {assistant: null}"} {
+		if err := ValidateSchema(SchemaLayer, []byte(doc)); err != nil {
+			t.Errorf("%s: error = %v, want valid", doc, err)
+		}
 	}
 }

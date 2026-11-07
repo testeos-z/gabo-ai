@@ -4,7 +4,7 @@ description: "Trigger: agent host, agent_host adapter, cloud agents, Railway ser
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.0"
+  version: "1.1"
 ---
 ## Activation Contract
 
@@ -51,11 +51,19 @@ The Orca environment is saved once by the owner with `orca environment add` and 
 
 Write the role's prompt to a file in a `mktemp -d` dir on the owner's machine, never inside a worktree, filling `<task id>`, `<worktree>`, `<branch>` and `<pr>`:
 
-| role | agent cli | prompt |
+| role | agent cli (Engine Resolution) | prompt |
 |---|---|---|
-| coder | `claude` (from `runtimes.coder`) | `You are gabo-coder for task <task id>. Worktree <worktree>, branch <branch>, PR base dev. Follow the gabo-coder skill. Never merge, never force-push, never post the reviewer marker.` |
-| reviewer | `pi` or `claude` (from `runtimes.reviewer`) | `You are gabo-reviewer. Review PR #<pr> head <sha> with the user-level gabo-reviewer scripts and return their VERDICT line. Do not edit, comment or merge yourself.` |
-| assistant | `claude` (from `runtimes.assistant`) | `You are gabo-assistant for this project. Follow the gabo-assistant skill.` |
+| coder | the resolved coder engine | `You are gabo-coder for task <task id>. Worktree <worktree>, branch <branch>, PR base dev. Follow the gabo-coder skill. Never merge, never force-push, never post the reviewer marker.` |
+| reviewer | the resolved reviewer engine | `You are gabo-reviewer. Review PR #<pr> head <sha> with the user-level gabo-reviewer scripts and return their VERDICT line. Do not edit, comment or merge yourself.` |
+| assistant | the requested engine, listed in `runtimes.assistant` | `You are gabo-assistant for this project. Follow the gabo-assistant skill.` |
+
+## Engine Resolution
+
+Resolve the role's engine from `gabo.yaml` before `start agent session` (intent 0013 S10), the same way as `gabo-agent-host-local`; the engine is the agent cli of the terminal. A refusal starts nothing and is reported instead of a handle:
+
+- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the agent that loaded this adapter (for example `gabo-cycle` or `gabo-assistant`). A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
+- `coder` and `reviewer`: `runtimes.coder` or `runtimes.reviewer` `session` resolves to the calling session's engine; a fixed `runtimes.coder` is that engine, and a fixed `runtimes.reviewer` is that engine.
+- Start an `assistant` only on an engine listed in `runtimes.assistant` (one engine or a list, intent 0013 S4): the engine the caller asks for, or the calling session's engine when it names none. Refuse any other with `refused: <engine> is not listed in runtimes.assistant (<value>)`, `<value>` as written in `gabo.yaml`.
 
 ## Operations
 
@@ -71,7 +79,7 @@ orca terminal wait --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --
 orca terminal send --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --text "$(cat <prompt file>)" --enter --wait-submit 10 --json
 ```
 
-`railway status --json` runs with `RAILWAY_TOKEN` set and the directory linked to `GABO_RAILWAY_PROJECT_ID`, `GABO_RAILWAY_ENVIRONMENT_ID` and `GABO_RAILWAY_SERVICE_ID`; with the Railway MCP, read the latest deployment status of the same service instead. The deployment must be running. Fields read: the Railway ids, `GABO_ORCA_ENVIRONMENT`, the role's agent cli and prompt. The handle returned by `terminal create` is the session handle. Confirm with `orca terminal list --environment "$GABO_ORCA_ENVIRONMENT" --worktree path:<worktree> --json`: the handle is listed.
+`railway status --json` runs with `RAILWAY_TOKEN` set and the directory linked to `GABO_RAILWAY_PROJECT_ID`, `GABO_RAILWAY_ENVIRONMENT_ID` and `GABO_RAILWAY_SERVICE_ID`; with the Railway MCP, read the latest deployment status of the same service instead. The deployment must be running. Fields read: the Railway ids, `GABO_ORCA_ENVIRONMENT`, `runtimes.*` for Engine Resolution, the role's agent cli and prompt. The handle returned by `terminal create` is the session handle. Confirm with `orca terminal list --environment "$GABO_ORCA_ENVIRONMENT" --worktree path:<worktree> --json`: the handle is listed.
 
 ### stop agent session
 
@@ -94,4 +102,4 @@ Report: host Railway service `GABO_RAILWAY_SERVICE_ID` in project `GABO_RAILWAY_
 
 ## Output Contract
 
-Return the host (Railway service id and Orca environment name), each session's handle, role, title and worktree, the commands run with their JSON result, and the final state (`open`, `closed` or `still open`). Report the host unavailable with its error instead of a handle. Never include a secret value.
+Return the host (Railway service id and Orca environment name), each session's handle, role, resolved engine, title and worktree, the commands run with their JSON result, and the final state (`open`, `closed` or `still open`). Report the host unavailable with its error, or the refusal line, instead of a handle. Never include a secret value.

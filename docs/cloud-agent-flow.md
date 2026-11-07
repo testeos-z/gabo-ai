@@ -100,6 +100,6 @@ The Engram cross-check of `audit` and pairing helpers for local Orca are not aut
 - Railway service variables are visible to every process in the container — never put a GitHub or model token there.
 - `claude -p` loads a project's hooks and MCP servers unless started with `--setting-sources user --strict-mcp-config`; `--bare` ignores `CLAUDE_CODE_OAUTH_TOKEN`.
 - Cross-session messaging is per OS user.
-- GitHub Free private repos have 2,000 Actions minutes per month and a $0 default spending limit; failed check runs block client-side merge gates.
+- Standard GitHub-hosted runners are free in public repositories ([GitHub Actions billing](https://docs.github.com/en/billing/concepts/product-billing/github-actions)); failed check runs block client-side merge gates.
 - Fine-grained PATs cannot access an org repo for an outside collaborator.
 - The owner's local vulcam guard hook blocks commits on any branch named `main`/`dev`, even in other repos.

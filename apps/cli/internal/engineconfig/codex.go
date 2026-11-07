@@ -215,5 +215,5 @@ func codexSteps() []string {
 			"if Codex does not list the gabo plugin after trust, run: codex plugin add gabo@gabo-ai",
 		)
 	}
-	return append(steps, "while testeos-z/gabo-ai is private, set up git credentials that can read it")
+	return steps
 }

@@ -1,0 +1,12 @@
+exit 1
+error: ""
+--- stdout
+✗ agent alpha (claude): skill sk-b missing
+why: .claude/agents/alpha.md
+next: ask your agent to rebuild the agents, then rerun gabo check
+✗ agent alpha (claude): skill sk-a listed twice
+why: .claude/agents/alpha.md
+next: ask your agent to rebuild the agents, then rerun gabo check
+✗ agent alpha (claude): skill sk-x not in the agent spec
+why: .claude/agents/alpha.md
+next: ask your agent to rebuild the agents, then rerun gabo check

@@ -115,3 +115,18 @@ func TestLeftoverRuleSkippedOnUpgradePR(t *testing.T) {
 	noLineWith(t, r, "gabo link left")
 	wantLines(t, r, UpgradePRLine)
 }
+
+// Intent 0013 S5: the former skill dir of every listed assistant engine is
+// read; session is no engine.
+func TestLeftoverInEveryListedAssistantFormerDirFails(t *testing.T) {
+	t.Parallel()
+	piFormer := strings.Replace(piLinkedSkill, "  skill_dir: .claude/skills\n", "  skill_dir: .claude/skills\n  former_skill_dir: .legacy/skills\n", 1)
+	p := with(listedProject(), map[string]string{
+		".gabo/skills/gabo-runtime-pi/SKILL.md": piFormer,
+		".gabo/skills/gabo-pm/SKILL.md":         "# PM\n",
+	})
+	p[".legacy/skills/gabo-pm"] = symlink("../../.gabo/skills/gabo-pm")
+	r := run(t, p, configFiles{projectFile: withRuntimes(t, linkedConfig, sessionRuntimes)}, Settings{CI: true})
+	wantFailed(t, r, leftoverLine, NextRebuild)
+	noLineWith(t, r, "runtime session")
+}

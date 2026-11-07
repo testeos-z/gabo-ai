@@ -9,5 +9,6 @@
   },
   "enabledPlugins": {
     "gabo@gabo-ai": true
-  }
+  },
+  "agent": "gabo-assistant"
 }
