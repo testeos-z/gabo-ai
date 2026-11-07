@@ -86,10 +86,11 @@ Anyone with write access to this repository can push to `pi/pkg-up` and so start
 
 The owner accepts this risk (2026-11-04, verbatim: "acepto ese riesgo") because:
 
-- only the owner account `leomerida15` has write access to the repository; every other collaborator is read-only;
-- branch protection and GitHub Environments are not available on this private repository's plan, so the branch and the secret cannot be locked down further today.
+- only the owner account `leomerida15` has write access to the repository; every other collaborator is read-only.
 
-Mitigation path: move to npm trusted publishing (OIDC), which removes the stored token; if the plan changes, put the publish job behind a GitHub Environment with required reviewers that holds `NPM_TOKEN`, and protect `pi/pkg-up`. Revisit this decision whenever a second account gets write access.
+The repository is public, so branch protection and GitHub Environments are available, but neither is configured: `pi/pkg-up` is not protected and the repository has no environment (checked 2026-11-06). Locking down the branch and the secret is a later change.
+
+Mitigation path: move to npm trusted publishing (OIDC), which removes the stored token; put the publish job behind a GitHub Environment with required reviewers that holds `NPM_TOKEN`, and protect `pi/pkg-up`. Revisit this decision whenever a second account gets write access.
 
 ## Development
 

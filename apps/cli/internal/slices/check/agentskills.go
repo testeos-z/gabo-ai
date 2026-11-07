@@ -43,20 +43,35 @@ type expectedSkill struct{ name, alt string }
 
 // compareSkills matches the skills an agent file lists against want as a set
 // with no duplicates: missing holds each wanted name listed under neither
-// name, extra each listed skill that matches no wanted one still unmatched
-// (so a second copy is extra), both in their list order.
-func compareSkills(want []expectedSkill, got []string) (missing, extra []string) {
+// name; duplicate each wanted entry listed more than once (by its name or
+// alt), once, as its first extra copy writes it; extra each listed skill that
+// matches no wanted entry, every copy (spec 0014 S2). All three keep list
+// order.
+func compareSkills(want []expectedSkill, got []string) (missing, duplicate, extra []string) {
 	matched := make([]bool, len(want))
+	reported := make([]bool, len(want))
 	for _, s := range got {
-		found := false
+		first, free := -1, -1
 		for i, w := range want {
-			if !matched[i] && (w.name == s || (w.alt != "" && w.alt == s)) {
-				matched[i], found = true, true
+			if w.name != s && (w.alt == "" || w.alt != s) {
+				continue
+			}
+			if first < 0 {
+				first = i
+			}
+			if !matched[i] {
+				free = i
 				break
 			}
 		}
-		if !found {
+		switch {
+		case free >= 0:
+			matched[free] = true
+		case first < 0:
 			extra = append(extra, s)
+		case !reported[first]:
+			reported[first] = true
+			duplicate = append(duplicate, s)
 		}
 	}
 	for i, w := range want {
@@ -64,7 +79,7 @@ func compareSkills(want []expectedSkill, got []string) (missing, extra []string)
 			missing = append(missing, w.name)
 		}
 	}
-	return missing, extra
+	return missing, duplicate, extra
 }
 
 // checkAgentSkills requires the agent file to list exactly the spec skills of
@@ -100,9 +115,12 @@ func (u *UseCase) checkAgentSkills(r *Report, cfg config.Config, rt string, spec
 	for _, l := range templateLinks(tmpl) {
 		add(expectedSkill{name: l.name, alt: u.adapterName(cfg, l.slot, l.name)})
 	}
-	missing, extra := compareSkills(want, meta.AgentSkills.skills(b))
+	missing, duplicate, extra := compareSkills(want, meta.AgentSkills.skills(b))
 	for _, s := range missing {
 		r.fail(fmt.Sprintf("✗ agent %s (%s): skill %s missing", id, rt, s), "why: "+file, NextRebuild)
+	}
+	for _, s := range duplicate {
+		r.fail(fmt.Sprintf("✗ agent %s (%s): skill %s listed twice", id, rt, s), "why: "+file, NextRebuild)
 	}
 	for _, s := range extra {
 		r.fail(fmt.Sprintf("✗ agent %s (%s): skill %s not in the agent spec", id, rt, s), "why: "+file, NextRebuild)

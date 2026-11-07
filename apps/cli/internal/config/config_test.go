@@ -4,6 +4,7 @@ import (
 	"errors"
 	"io/fs"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -245,5 +246,116 @@ func TestParseParallelism(t *testing.T) {
 	}
 	if _, err := Parse([]byte(with("parallelism: -1\n"))); err == nil || !strings.Contains(err.Error(), "parallelism") {
 		t.Fatalf("negative parallelism: error = %v", err)
+	}
+}
+
+// runtimesDoc returns minimal with its runtimes block replaced by block.
+func runtimesDoc(block string) string {
+	return strings.Replace(minimal, "runtimes:\n  coder: claude\n  reviewer: claude\n  assistant: claude\n", "runtimes:\n"+block, 1)
+}
+
+// linesNaming returns the lines of err that name key.
+func linesNaming(err error, key string) []string {
+	var out []string
+	if err == nil {
+		return nil
+	}
+	for _, l := range strings.Split(err.Error(), "\n") {
+		if strings.Contains(l, key) {
+			out = append(out, l)
+		}
+	}
+	return out
+}
+
+// Intent 0013 S1, D1: runtimes.assistant takes one engine or a list, and
+// runtimes.coder and runtimes.reviewer take one engine or session.
+func TestParseAcceptsAssistantListAndSession(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(runtimesDoc("  assistant: [claude, pi]\n  coder: session\n  reviewer: pi\n")))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	want := Runtimes{Coder: RuntimeSession, Reviewer: RuntimePi, Assistant: RuntimeList{RuntimeClaude, RuntimePi}}
+	if !reflect.DeepEqual(cfg.Runtimes, want) {
+		t.Fatalf("runtimes = %+v, want %+v", cfg.Runtimes, want)
+	}
+	cfg, err = Parse([]byte(runtimesDoc("  assistant: [opencode]\n  coder: claude\n  reviewer: session\n")))
+	if err != nil || cfg.Runtimes.Reviewer != RuntimeSession {
+		t.Fatalf("reviewer session: runtimes = %+v, %v", cfg.Runtimes, err)
+	}
+}
+
+// A scalar assistant decodes to a one-item list.
+func TestParseScalarAssistantIsOneItemList(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(cfg.Runtimes.Assistant, RuntimeList{RuntimeClaude}) {
+		t.Fatalf("assistant = %#v, want [claude]", cfg.Runtimes.Assistant)
+	}
+	if got := cfg.Runtimes.Assistant.Single(); got != RuntimeClaude {
+		t.Errorf("Single() = %q, want claude", got)
+	}
+	if got := (RuntimeList{RuntimeClaude, RuntimePi}).Single(); got != "" {
+		t.Errorf("Single() of a list = %q, want empty", got)
+	}
+}
+
+// Each refused assistant shape gives exactly one failure line naming
+// runtimes.assistant, with its next step.
+func TestParseRefusesBadAssistantList(t *testing.T) {
+	t.Parallel()
+	for name, tt := range map[string]struct{ block, want string }{
+		"empty list": {"  coder: claude\n  reviewer: claude\n  assistant: []\n",
+			`runtimes.assistant: must list at least one engine; next: set one of "claude", "codex", "pi", "opencode" or a list of them`},
+		"duplicate": {"  coder: claude\n  reviewer: claude\n  assistant: [pi, pi]\n",
+			`runtimes.assistant: "pi" is listed more than once; next: list each engine once`},
+		"unknown engine": {"  coder: claude\n  reviewer: claude\n  assistant: [claude, gpt]\n",
+			`runtimes.assistant: entry "gpt" must be one of "claude", "codex", "pi", "opencode"; next: replace or remove it`},
+		"session": {"  coder: claude\n  reviewer: claude\n  assistant: session\n",
+			`runtimes.assistant: "session" is valid only in runtimes.coder and runtimes.reviewer; next: set the engine of the main session`},
+	} {
+		_, err := Parse([]byte(runtimesDoc(tt.block)))
+		if got := linesNaming(err, "runtimes.assistant"); len(got) != 1 || got[0] != tt.want {
+			t.Errorf("%s: lines naming runtimes.assistant = %q, want [%q]", name, got, tt.want)
+		}
+	}
+}
+
+// A single value keeps its 0.2.10 meaning and messages.
+func TestParseSingleValueMessagesUnchanged(t *testing.T) {
+	t.Parallel()
+	for _, role := range []string{"coder", "reviewer", "assistant"} {
+		_, err := Parse([]byte(strings.Replace(minimal, role+": claude", role+": foo", 1)))
+		want := `runtimes.` + role + `: must be one of "claude", "codex", "pi", "opencode", got "foo"`
+		if got := linesNaming(err, "runtimes."+role); len(got) != 1 || got[0] != want {
+			t.Errorf("%s foo: lines = %q, want [%q]", role, got, want)
+		}
+	}
+	_, err := Parse([]byte(strings.Replace(minimal, "assistant: claude", `assistant: ""`, 1)))
+	if got := linesNaming(err, "runtimes.assistant"); len(got) != 1 || got[0] != "✗ runtimes.assistant missing" {
+		t.Errorf(`assistant "": lines = %q, want the missing line`, got)
+	}
+}
+
+// Marshal writes a one-item assistant as a scalar and an unset one as null,
+// so a round trip keeps the single-value shape and the missing key.
+func TestMarshalAssistantShapes(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		in   RuntimeList
+		want string
+	}{
+		{RuntimeList{RuntimeClaude}, "assistant: claude\n"},
+		{RuntimeList{RuntimeClaude, RuntimePi}, "assistant:\n        - claude\n        - pi\n"},
+		{nil, "assistant: null\n"},
+	} {
+		b, err := Config{Runtimes: Runtimes{Assistant: tt.in}}.Marshal()
+		if err != nil || !strings.Contains(string(b), tt.want) {
+			t.Errorf("Marshal(%q) = %s, %v; want it to contain %q", tt.in, b, err, tt.want)
+		}
 	}
 }

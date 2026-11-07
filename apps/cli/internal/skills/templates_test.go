@@ -67,6 +67,8 @@ var templates = map[string]struct {
 			"| id | requirement | acceptance criteria | verification |",
 			"| id | decision | options considered | choice | consequences |",
 			"| surface | entry points | primary action | empty and error states |",
+			"| component | level | states | stories | used by |",
+			"| case | what happened | why | what to do next |",
 			"| order | file | purpose | rollback |",
 			"| policy | conflict | resolution |",
 			"| # | question | status |",
@@ -138,22 +140,33 @@ var templates = map[string]struct {
 			"## Open questions",
 		},
 	},
-	// Global styles only (S5); UX and app flow live in each spec.
+	// Design norms (intent 0012 S1, S3): one rules table per area, exceptions
+	// and a changelog; UX and app flow and the component inventory live in each
+	// spec section 3 (D2).
 	"gabo-frontend/templates/DESIGN.md": {
 		columns: []string{
 			"| field | value |",
-			"| token | custom property | value | use |",
-			"| component | level | states | used by |",
-			"| case | what happened | why | what to do next |",
+			"| id | rule | level | rationale | verification | examples | source |",
+			"| rule id | exception | reason | owner | date |",
+			"| date | rule ids | change | decision |",
 		},
 		headings: []string{
-			"# Design",
-			"## 1. Principles",
-			"## 2. Design tokens",
-			"## 3. Component inventory",
-			"## 4. Accessibility",
-			"## 5. Messages and errors",
-			"## 6. Open questions",
+			"# Design norms",
+			"## 1. Principles and sources",
+			"## 2. Tokens",
+			"## 3. Color and themes",
+			"## 4. Typography",
+			"## 5. Layout and responsive behavior",
+			"## 6. Shape and density",
+			"## 7. Motion and state",
+			"## 8. Icons",
+			"## 9. Accessibility",
+			"## 10. Content and writing",
+			"## 11. Forms",
+			"## 12. Components",
+			"## 13. Exceptions",
+			"## 14. Changelog",
+			"## 15. Open questions",
 		},
 	},
 }
@@ -211,6 +224,93 @@ func TestPlanTemplateAsksForGaboCheckImpact(t *testing.T) {
 	}
 }
 
+// Intent 0012 S1, S2, S3: the design norms template states how rules are
+// written and governed, fits the per-change model and keeps no concrete
+// messages table (those live in each spec section 3).
+func TestDesignNormsTemplateRulesAndPerChangeFit(t *testing.T) {
+	t.Parallel()
+	const p = "gabo-frontend/templates/DESIGN.md"
+	doc := embeddedByPath(t)[p]
+	qs, err := fixedQuestions(doc)
+	if err != nil {
+		t.Fatalf("%s: %v", p, err)
+	}
+	if len(qs) != 14 {
+		t.Errorf("%s: %d fixed questions, want 14", p, len(qs))
+	}
+	for _, s := range []string{
+		"A rule that cannot state its verification is a SHOULD at most.",
+		"stable and never reused",
+		"An exception is a row in section 13",
+		"every rule change is a row in section 14",
+		"UX and app flow of each change live in section 3 of that intent's `spec.md`, which cites rule ids instead of repeating rules.",
+		"A product without a GUI marks the visual sections",
+		`"not applicable" with the reason`,
+		"conversation or CLI conventions under sections 1 and 10",
+		"(docs/product/PRD.md)", "(docs/product/TRD.md)", "(docs/product/intents/)",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", p, s)
+		}
+	}
+	for _, s := range []string{"UX_UI", "APP_FLOW", "| case | what happened |", "| component | level |", "shared component inventory"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: has %q", p, s)
+		}
+	}
+	// Intent 0012 S3, D2: section 12 keeps only the K component rules, and
+	// Q12 asks for those rules instead of the list of components.
+	const k12, k13 = "## 12. Components", "## 13. Exceptions"
+	i, j := strings.Index(doc, k12), strings.Index(doc, k13)
+	if i < 0 || j < i {
+		t.Fatalf("%s: section 12 not found between %q and %q", p, k12, k13)
+	}
+	if !strings.Contains(doc[i:j], "| K1 |") {
+		t.Errorf("%s: section 12 missing the K1 rules row", p)
+	}
+	want := [3]string{"Q12", "Which component rules apply: atomic levels, required states, and how stories and examples are kept?", "12. Components"}
+	if !slices.Contains(qs, want) {
+		t.Errorf("%s: fixed questions %v, want row %v", p, qs, want)
+	}
+}
+
+// Intent 0012 S3: spec section 3 holds the change's concrete messages and
+// links the design norms instead of repeating tokens, accessibility or
+// wording rules; product-specific keyboard paths stay in the journey.
+func TestSpecTemplateSection3HoldsMessagesAndLinksNorms(t *testing.T) {
+	t.Parallel()
+	const p = "gabo-pm/templates/spec.md"
+	doc := embeddedByPath(t)[p]
+	const start, end = "## 3. UX and app flow (optional)", "## 4. DB migration steps (optional)"
+	i, j := strings.Index(doc, start), strings.Index(doc, end)
+	if i < 0 || j < i {
+		t.Fatalf("%s: section 3 not found between %q and %q", p, start, end)
+	}
+	section := doc[i:j]
+	for _, s := range []string{
+		"| case | what happened | why | what to do next |",
+		"[`DESIGN.md`](../../DESIGN.md) sections 2-3 (tokens, color)",
+		"section 9 (accessibility)",
+		"section 10 (wording)",
+		"Product-specific keyboard paths stay in the journey.",
+		"| component | level | states | stories | used by |",
+		"follow the `K` rules of `DESIGN.md` section 12",
+		"\"used by\" names the change's surfaces",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s: section 3 missing %q", p, s)
+		}
+	}
+	if !strings.Contains(doc, "Design norms stay in the repository `DESIGN.md`") {
+		t.Errorf("%s: missing the design norms guidance line", p)
+	}
+	for _, s := range []string{"| token |", "Global styles"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("%s: has %q", p, s)
+		}
+	}
+}
+
 func TestTemplatesKeepStableColumnsAndSections(t *testing.T) {
 	t.Parallel()
 	byPath := embeddedByPath(t)
@@ -226,6 +326,27 @@ func TestTemplatesKeepStableColumnsAndSections(t *testing.T) {
 				t.Errorf("%s: missing line %q", p, l)
 			}
 		}
+	}
+}
+
+// Intent 0012 S4, D2: in gabo-frontend's steps the component inventory is
+// written in the spec section 3 step (3), never in the DESIGN.md step (2).
+func TestFrontendSkillPutsTheInventoryInTheSpecStep(t *testing.T) {
+	t.Parallel()
+	const p = "gabo-frontend/SKILL.md"
+	steps := map[string]string{}
+	for _, l := range strings.Split(embeddedByPath(t)[p], "\n") {
+		for _, n := range []string{"2. ", "3. "} {
+			if strings.HasPrefix(l, n) {
+				steps[n] = l
+			}
+		}
+	}
+	if !strings.Contains(steps["3. "], "| component | level | states | stories | used by |") {
+		t.Errorf("%s: step 3 does not name the component inventory table: %q", p, steps["3. "])
+	}
+	if steps["2. "] == "" || strings.Contains(strings.ToLower(steps["2. "]), "inventory") {
+		t.Errorf("%s: step 2 missing or names an inventory: %q", p, steps["2. "])
 	}
 }
 
@@ -292,8 +413,20 @@ func TestDirectivaSkillsPointToTheirTemplates(t *testing.T) {
 			"templates/MIGRATIONS.md", "## Fixed questions", "config-only", "Persistence inventory",
 			"`## Conventions`",
 		},
+		// Intent 0012 S4, S6: the design norms, their rule shape, the spec
+		// section 3 messages and links, and the conversion rule.
 		"gabo-frontend/SKILL.md": {
 			"templates/DESIGN.md", "## 3. UX and app flow (optional)", "## Fixed questions",
+			"the design norms (from `templates/DESIGN.md`",
+			"one rules table per area", "an RFC 2119 level (MUST, SHOULD or MAY), a rationale, a verification, examples and a source",
+			"exceptions (section 13)", "a changelog (section 14)",
+			"messages table `| case | what happened | why | what to do next |`",
+			"links `DESIGN.md` sections 2-3 (tokens, color), 9 (accessibility) and 10 (wording)",
+			"component inventory table `| component | level | states | stories | used by |`",
+			"never rewrite an existing `DESIGN.md` in another shape silently",
+			"the next `DESIGN.md` update proposes the conversion", "to the owner in manual mode",
+			"as **Proposed (auto)** in auto mode", "keeps every existing rule with a new id",
+			"records the conversion as one changelog row",
 		},
 	} {
 		doc, ok := byPath[skill]
@@ -436,12 +569,19 @@ func TestPlanningSkillsOwnTheirIntentArtifacts(t *testing.T) {
 		"gabo-doc-guide/SKILL.md": {
 			"docs/product/PRD.md", "docs/product/TRD.md", "docs/product/DESIGN.md", "docs/product/MIGRATIONS.md",
 			"docs/product/intents/<NNNN-slug>/", "intent.md", "spec.md", "plan.md", "review findings",
+			"Which design norms apply", "How are the design norms",
 		},
 	} {
 		for _, s := range want {
 			if !strings.Contains(byPath[skill], s) {
 				t.Errorf("%s: missing %q", skill, s)
 			}
+		}
+	}
+	// Intent 0012 S4: `DESIGN.md` is the design norms, no longer global styles.
+	for _, skill := range []string{"gabo-frontend/SKILL.md", "gabo-doc-guide/SKILL.md"} {
+		if strings.Contains(strings.ToLower(byPath[skill]), "global styles") {
+			t.Errorf("%s: still describes DESIGN.md as global styles", skill)
 		}
 	}
 }

@@ -14,8 +14,9 @@ Isolated two-user mode (a separate reviewer user and identity) is another adapte
 
 ## Hard Rules
 
-- Accept only a request of exactly the form `PR #<n> head <40-hex sha>`; refuse anything else before running any command.
-- Run only the installed user-level copy of the scripts, `${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/` (installed by `gabo init`, T041), never a copy from a repository checkout, never edited, with no extra arguments or environment.
+- Accept only a request of exactly the form `PR #<n> head <40-hex sha>`, or `PR #<n> head <40-hex sha> engine <engine>` only when `runtimes.reviewer` is `session` in the main checkout's `gabo.yaml` (intent 0013 S11, D5; `<engine>` is the engine of the wave that requests the review). Anything else is refused: an `engine` field under a fixed `runtimes.reviewer`, a missing `engine` under `session`, extra words or any other shape; refuse it before running any command.
+- Pass the engine to the scripts as an argument, never as environment: append `engine <engine>` to the command only when the request carries it. The scripts check it again against the integration branch (bare lowercase word, listed in `runtimes.assistant`, isolation pass marker) and print `PREFLIGHT-FAILED <reason>` when it does not hold.
+- Run only the installed user-level copy of the scripts, `${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/` (installed by `gabo init`, T041), never a copy from a repository checkout, never edited, with no other arguments and no extra environment.
 - Run from the repository's main checkout (its `gabo.yaml` names `repo.name` and `repo.integration_branch`), never from a task worktree, and never through `sudo`.
 - One run per request: the scripts skip a head that moved or already has a verdict (R26); never retry in a loop.
 - The relaying agent never reviews, edits, comments, approves or merges itself, and never posts the reviewer marker; the scripts own the verdict comment and the merge gate.
@@ -25,10 +26,16 @@ Isolated two-user mode (a separate reviewer user and identity) is another adapte
 
 ### trigger review
 
-Validate the request, then run one command from the main checkout:
+Validate the request (read `runtimes.reviewer` from the main checkout's `gabo.yaml` to decide whether an `engine` field is allowed or required), then run one command from the main checkout. For `PR #<n> head <40-hex sha>`:
 
 ```bash
 bash "${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha>
+```
+
+For `PR #<n> head <40-hex sha> engine <engine>` under `session`, the same command with the engine as an argument:
+
+```bash
+bash "${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh" head <n> <sha> engine <engine>
 ```
 
 The output goes to stdout; its last line is the `VERDICT` line. The scripts work in their own state dir (`${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer`) with their own clone, home and cache, never in the caller's checkout.
@@ -41,7 +48,7 @@ Report one line:
 placement=local mode=single-user
 ```
 
-The preflight refuses any other `reviewer.placement` or `REVIEWER_MODE`, so every run that passed it ran here, as the owner, in single-user mode. To confirm the settings without reviewing, run `bash "${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh" preflight`; its `PREFLIGHT-OK` line shows `mode=` and `placement=`.
+The preflight refuses any other `reviewer.placement` or `REVIEWER_MODE`, so every run that passed it ran here, as the owner, in single-user mode. To confirm the settings without reviewing, run `bash "${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh" preflight` (with `engine <engine>` appended under `session`); its `PREFLIGHT-OK` line shows `mode=`, `engine=` and `placement=`.
 
 ### return verdict
 

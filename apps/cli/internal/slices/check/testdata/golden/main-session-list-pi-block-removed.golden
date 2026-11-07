@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ AGENTS.md: gabo assistant entry missing for pi
+next: ask your agent to rebuild the agents, then rerun gabo check

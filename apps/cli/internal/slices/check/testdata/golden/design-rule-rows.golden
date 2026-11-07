@@ -1,0 +1,9 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/DESIGN.md: section 1 row 2: no rule id
+✗ docs/product/DESIGN.md: rule P1 used twice
+✗ docs/product/DESIGN.md: rule C1: level "must" is not MUST, SHOULD or MAY
+✗ docs/product/DESIGN.md: rule S1: level SHOULD but the rule does not say SHOULD
+✗ docs/product/DESIGN.md: rule A1: a MUST rule states no verification
+next: fix docs/product/DESIGN.md above (gabo-frontend keeps it), then rerun gabo check

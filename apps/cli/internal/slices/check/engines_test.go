@@ -274,3 +274,18 @@ func TestEngineKeysGaboAiSettingsPass(t *testing.T) {
 	r := run(t, with(project(), map[string]string{".claude/settings.json": engineFixture(t, "gabo-ai-claude-settings.json")}), configFiles{projectFile: validConfig}, Settings{})
 	wantPassed(t, r, PassedLine)
 }
+
+// Intent 0013 S5: the engine keys of every listed assistant engine are
+// checked; session is no engine.
+func TestEngineKeysForEveryListedAssistant(t *testing.T) {
+	t.Parallel()
+	p := with(project(), map[string]string{".gabo/skills/gabo-runtime-pi/SKILL.md": strings.Replace(claudeSkill, "gabo-runtime-claude", "gabo-runtime-pi", 1)})
+	r := run(t, p, configFiles{projectFile: withRuntimes(t, validConfig, sessionRuntimes)}, Settings{})
+	wantFailed(t, r, piMissing)
+	wantEngineLines(t, r, piMissing)
+	noLineWith(t, r, "runtime session")
+
+	p[".pi/settings.json"] = file(piKeysJSON)
+	r = run(t, p, configFiles{projectFile: withRuntimes(t, validConfig, sessionRuntimes)}, Settings{})
+	wantPassed(t, r, PassedLine)
+}

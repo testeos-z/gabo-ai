@@ -85,7 +85,7 @@ func TestParseAcceptsPiReviewer(t *testing.T) {
 		}
 	}
 	cfg, err := Parse([]byte(strings.NewReplacer("coder: claude", "coder: pi", "assistant: claude", "assistant: pi").Replace(minimal)))
-	if err != nil || cfg.Runtimes.Coder != RuntimePi || cfg.Runtimes.Assistant != RuntimePi {
+	if err != nil || cfg.Runtimes.Coder != RuntimePi || cfg.Runtimes.Assistant.Single() != RuntimePi {
 		t.Fatalf("pi coder and assistant = %+v, %v; want accepted", cfg.Runtimes, err)
 	}
 }
@@ -97,7 +97,7 @@ func TestParseAcceptsEveryRuntimeInEveryRole(t *testing.T) {
 	for _, role := range []string{"coder", "reviewer", "assistant"} {
 		for _, rt := range []Runtime{RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode} {
 			cfg, err := Parse([]byte(strings.Replace(minimal, role+": claude", role+": "+string(rt), 1)))
-			got := map[string]Runtime{"coder": cfg.Runtimes.Coder, "reviewer": cfg.Runtimes.Reviewer, "assistant": cfg.Runtimes.Assistant}[role]
+			got := map[string]Runtime{"coder": cfg.Runtimes.Coder, "reviewer": cfg.Runtimes.Reviewer, "assistant": cfg.Runtimes.Assistant.Single()}[role]
 			if err != nil || got != rt {
 				t.Errorf("runtimes.%s: %s: Parse() = %q, %v; want accepted", role, rt, got, err)
 			}
@@ -112,6 +112,28 @@ func TestParseRejectsUnknownRuntime(t *testing.T) {
 	want := `runtimes.reviewer: must be one of "claude", "codex", "pi", "opencode", got "foo"`
 	if err == nil || !slices.Contains(strings.Split(err.Error(), "\n"), want) {
 		t.Fatalf("foo reviewer: error = %v, want the line %q", err, want)
+	}
+}
+
+// session in runtimes.coder or runtimes.reviewer needs runtimes.assistant
+// set (intent 0013 S1): without it, one failure names the role's key.
+func TestParseSessionNeedsAssistant(t *testing.T) {
+	t.Parallel()
+	for _, role := range []string{"coder", "reviewer"} {
+		var doc map[string]any
+		if err := yaml.Unmarshal(without(t, "runtimes.assistant"), &doc); err != nil {
+			t.Fatal(err)
+		}
+		doc["runtimes"].(map[string]any)[role] = "session"
+		b, err := yaml.Marshal(doc)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = Parse(b)
+		want := "runtimes." + role + `: "session" is valid only with runtimes.assistant set; next: set runtimes.assistant or name an engine for runtimes.` + role
+		if got := linesNaming(err, "runtimes."+role); len(got) != 1 || got[0] != want {
+			t.Errorf("%s session without assistant: lines = %q, want [%q]", role, got, want)
+		}
 	}
 }
 
@@ -156,7 +178,7 @@ func TestParseFillsNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := Config{
-		Runtimes:    Runtimes{Coder: RuntimeClaude, Reviewer: RuntimeClaude, Assistant: RuntimeClaude},
+		Runtimes:    Runtimes{Coder: RuntimeClaude, Reviewer: RuntimeClaude, Assistant: RuntimeList{RuntimeClaude}},
 		Repo:        Repo{Name: "cappy-lab/vulcam", IntegrationBranch: "dev"},
 		Review:      Review{Checks: []string{"go test ./..."}, HumanOnlyPaths: []string{".github/"}},
 		Parallelism: 3,

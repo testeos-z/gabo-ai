@@ -104,3 +104,15 @@ func TestReviewerRuleSkippedOnUpgradePR(t *testing.T) {
 	noLineWith(t, r, reviewerInProject)
 	wantLines(t, r, UpgradePRLine)
 }
+
+// Intent 0013 S5: with runtimes.reviewer session the isolation rule reads
+// the skill dir of every listed assistant engine; session is no engine.
+func TestReviewerInEveryListedAssistantSkillDirFails(t *testing.T) {
+	t.Parallel()
+	p := with(listedProject(), map[string]string{".gabo/skills/gabo-runtime-pi/SKILL.md": otherSkill})
+	p[".other/skills/gabo-reviewer/SKILL.md"] = file("# reviewer\n")
+	r := runReviewer(t, p, withRuntimes(t, linkedConfig, sessionRuntimes), Settings{})
+	wantFailed(t, r, "✗ .other/skills/gabo-reviewer"+reviewerInProject, reviewerNext)
+	noLineWith(t, r, claudeReviewerLine)
+	noLineWith(t, r, "runtime session")
+}

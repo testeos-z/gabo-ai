@@ -39,7 +39,7 @@ A conflict is `blocking`; a retryable failure or a refused preflight is `error`;
 
 ## Review engines
 
-`runtimes.reviewer` on the integration branch picks the engine (`REVIEWER_ENGINE` overrides it); anything other than `claude`, `codex`, `pi` or `opencode`, or a missing binary, fails the preflight. Every engine gets the same prompt (on stdin, or for OpenCode as an attached file) and must answer with the same verdict line, so the comment, the statuses and the once-per-head rule do not depend on the engine.
+`runtimes.reviewer` on the integration branch picks the engine (`REVIEWER_ENGINE` overrides it); anything other than `claude`, `codex`, `pi`, `opencode` or `session`, or a missing binary, fails the preflight. Under `session` every mode needs a trailing `engine <engine>` (the requesting wave's engine) listed in `runtimes.assistant` on the integration branch; a fixed engine refuses that argument (see `SKILL.md`). Every engine gets the same prompt (on stdin, or for OpenCode as an attached file) and must answer with the same verdict line, so the comment, the statuses and the once-per-head rule do not depend on the engine.
 
 - **Claude Code** (`REVIEWER_CLAUDE`, default `claude`): tools `Read`, `Grep`, `Glob` and `Bash` limited to `git diff/log/show/status`; only user settings, all hooks off, no MCP servers, no slash commands, no saved session. With `CLAUDE_CODE_OAUTH_TOKEN` it runs with an empty `HOME`; without it, with the owner's `HOME`, so the owner's Claude Code login is used.
 - **Pi** (`REVIEWER_PI`, default `pi`): `pi --mode json --no-session --no-approve --no-extensions --no-skills --no-prompt-templates --no-themes --no-context-files --no-mcp --tools read,grep,find,ls --exclude-tools 'bash,edit,write,mcp__*'` (plus `--model` from `REVIEWER_PI_MODEL`). No write or shell tool exists; `--no-approve` ignores the PR's `.pi/settings.json`, `.pi/mcp.json`, `.pi/extensions/` and the rest of its project files; the other flags keep the owner's user-level extensions, packages, skills and MCP servers out too, and `AGENTS.md`/`CLAUDE.md` are read only as data. The verdict is the text of Pi's last assistant message; any `stopReason` other than `stop` is an error (Pi exits 0 on a provider error).
@@ -72,7 +72,7 @@ Repository settings come from `gabo.yaml` on the integration branch; an environm
 | `review.human_only_paths` | `REVIEWER_HUMAN_ONLY_PATHS` (space-separated) | `.claude/ .github/ gabo.yaml AGENTS.md CLAUDE.md`; entries ending in `/` are prefixes, others file names in any directory |
 | `reviewer.signing.marker` | `REVIEWER_MARKER` | `gbai-reviewer-bot` |
 | `reviewer.placement` | `REVIEWER_PLACEMENT` | `local` (the only one implemented) |
-| `runtimes.reviewer` | `REVIEWER_ENGINE` | `claude`; `claude`, `codex`, `pi` or `opencode` |
+| `runtimes.reviewer` | `REVIEWER_ENGINE` | `claude`; `claude`, `codex`, `pi`, `opencode` or `session` (with the `engine` argument) |
 | `review.pi_credential_env` | `REVIEWER_PI_CREDENTIAL_ENV` | empty: a Pi review reuses the owner's Pi login |
 
 Script defaults: `scripts/config.env` (plain `KEY=value`, read as data, never executed; the environment wins):

@@ -65,9 +65,21 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for a runtime skill declaring metadata.agent_skills, each agent file lists\n" +
 			"    exactly the skills of its spec agent plus the fixed-name links its template\n" +
 			"    names, each once (or the slot adapter's own name for such a link);\n" +
+			"    a skill listed more than once fails with \"listed twice\";\n" +
 			"    a full-tier runtime skill without it fails, a flexible-tier one warns;\n" +
 			"  - for a runtime skill declaring metadata.agent_name, each agent file's\n" +
-			"    declared name equals its spec id (a file that declares none passes);\n" +
+			"    declared name equals its spec id, and a file that declares no name fails\n" +
+			"    with \"declares no name\", the main-session agent file gabo-assistant\n" +
+			"    included;\n" +
+			"  - each agent file's filled gabo-engine line names the engine of the agent\n" +
+			"    directory it is in (a file with no engine line passes);\n" +
+			"  - for a runtime skill declaring metadata.agent_tools and\n" +
+			"    metadata.agent_tool_requirements, each built agent file lists every tool its\n" +
+			"    spec capabilities require (a required mem_<x> is also met by\n" +
+			"    mcp__<server>__mem_<x> or mcp__<server>__*);\n" +
+			"  - for a runtime skill declaring metadata.agent_tools_unavailable, no built\n" +
+			"    agent file lists a tool a subagent never has (a trailing * matches a\n" +
+			"    prefix; only gabo-runtime-pi declares it, subagent_*);\n" +
 			"  - for a runtime skill declaring metadata.skill_dir, a link <skill_dir>/<name>\n" +
 			"    to " + CatalogDir + "/<name> for each skill a spec agent lists, and a link\n" +
 			"    <skill_dir>/gabo-<slot> to each slot adapter that is a skill folder;\n" +
@@ -81,21 +93,38 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in\n" +
 			"    the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json\n" +
 			"    and .opencode/opencode.jsonc (never ~/.config/opencode);\n" +
+			"    a missing or lower whole value names \"run gabo init (it sets\n" +
+			"    experimental.subagent_depth to 3 in <file>)\", any other value names setting\n" +
+			"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";\n" +
 			"  - for each of claude, codex and pi a role runs on, the keys gabo init writes:\n" +
 			"    .claude/settings.json extraKnownMarketplaces.\"gabo-ai\" and\n" +
 			"    enabledPlugins.\"gabo@gabo-ai\", the .codex/config.toml tables\n" +
 			"    [marketplaces.gabo-ai] and [plugins.\"gabo@gabo-ai\"], and a .pi/settings.json\n" +
 			"    packages entry for npm:@gabo-ai/pi (any version); a key set to another\n" +
 			"    value passes, and other engines' files are never read;\n" +
-			"  - the main-session entry against runtimes.assistant, from each runtime skill's\n" +
-			"    metadata.main_session: that engine's gabo-assistant link and its agent file\n" +
-			"    plus key, or exactly one scoped block; no other full-tier engine's entry\n" +
-			"    (a full-tier runtime skill without it fails, a flexible-tier one warns);\n" +
+			"  - the main-session entry of every engine listed in runtimes.assistant, from\n" +
+			"    each runtime skill's metadata.main_session: each listed engine's\n" +
+			"    gabo-assistant link and its agent file plus key, or exactly one scoped\n" +
+			"    block; no entry of a full-tier engine that is not listed, named as \"<file>:\n" +
+			"    gabo assistant entry for <engine>, but runtimes.assistant is <the listed\n" +
+			"    engines, joined with \", \">\"\n" +
+			"    (a full-tier runtime skill without it fails, a flexible-tier one warns).\n" +
+			"    For a full-tier engine the key is gabo init's: a missing key names \"run gabo\n" +
+			"    init (it merges \"<key>\": \"gabo-assistant\" into <file>)\", a key holding\n" +
+			"    another value fails as \"<file>: <key> is \"<value>\", not \"gabo-assistant\"\"\n" +
+			"    and names \"change <key> to \"gabo-assistant\" in <file>, or remove it and run\n" +
+			"    gabo init\", and another engine's key names \"run gabo init (it removes\n" +
+			"    \"<key>\": \"gabo-assistant\" from <file>)\"; every other piece, and a\n" +
+			"    flexible-tier engine's key, names asking your agent to rebuild the agents;\n" +
+			"    a file gabo init refuses names \"fix <file> (<its reason>)\", and a key gabo\n" +
+			"    init would leave as it is names setting or removing it by hand;\n" +
 			"  - every slots.<name>.adapter file against its contract skill (" + CatalogDir + "/):\n" +
 			"    a ### <operation> heading under ## Operations for each operation;\n" +
 			"  - " + StampFile + " against the CLI version: older warns, missing or newer fails.\n" +
 			"  - each " + IntentsDir + "/<NNNN-slug>/ folder: its name, intent.md, an accepted\n" +
 			"    spec.md before any plan.md, and the plan's task ids and dependency graph.\n" +
+			"  - " + DesignFile + " when present: its 15 sections, the rule-table columns,\n" +
+			"    the RFC 2119 level, MUST verification, the exceptions and the changelog.\n" +
 			"With GABO_UPGRADE_PR=1 only the config is validated.\n" +
 			"It writes nothing and never updates itself.\n" +
 			"Exit 0 when nothing fails, 1 on any failure, 2 on a usage or read error.\n" +

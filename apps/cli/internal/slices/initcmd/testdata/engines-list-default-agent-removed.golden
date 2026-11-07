@@ -1,0 +1,14 @@
+engine integration:
+  claude:
+    unchanged .claude/settings.json
+  pi:
+    wrote .pi/settings.json: added packages entry npm:@gabo-ai/pi@0.2.6
+    gabo refuses to build on Pi without a subagent package:
+    Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild.
+  opencode:
+    removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude, pi)
+you still need to:
+  - claude: trust this project folder in Claude Code so the gabo-ai marketplace and the gabo plugin apply
+  - claude: ask your agent to build the agents (the main session needs .claude/agents/gabo-assistant.md)
+  - pi: trust the project in Pi so it installs and loads @gabo-ai/pi from .pi/settings.json
+  - pi: install a subagent package (see the refusal above)
