@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0014-agent-name-and-duplicate-skill-checks |
-| status | Specified (spec awaiting the owner's acceptance) |
+| status | Accepted |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-07 |
@@ -24,7 +24,7 @@ Owners and agents who run `gabo check` after building or editing agents, on ever
 - `gabo check` fails an agent file that declares no name where the engine's runtime skill says where the name lives (owner 2026-11-07, verbatim, asked whether `gabo check` should fail when a Claude Code or Codex agent file declares no `name`: "que falle").
 - A skill listed twice in an agent file gets its own failure line saying it is listed twice, not the "not in the agent spec" line (owner 2026-11-07, accepting the proposal, verbatim: "si no la listo tomare tu propuesta para toda opcion no listada").
 - Everything else `gabo check` prints stays as it is.
-- The change ships in the next gabo release after 0.2.10. The version bump is not part of this intent.
+- The change ships in gabo 0.2.10 (owner, 2026-11-07, verbatim: "lo pasaremos en esta version tambioen."). The version bump is not part of this intent.
 
 ## Constraints
 
@@ -38,9 +38,9 @@ Owners and agents who run `gabo check` after building or editing agents, on ever
 
 | # | question | status |
 |---|---|---|
-| 1 | Do the name rules also cover the main-session agent file `gabo-assistant` (Claude Code), which today gets no name check? | carried to spec open question 1, passed to the owner |
-| 2 | Is a fixed-name link listed under both names (link name and its adapter's own name) "listed twice"? | carried to spec open question 2, passed to the owner |
-| 3 | Which line does a skill that is not in the spec get when it is listed twice? | carried to spec open question 3, passed to the owner |
+| 1 | Do the name rules also cover the main-session agent file `gabo-assistant` (Claude Code), which today gets no name check? | carried to spec open question 1; resolved 2026-11-07 (resolver: agent): yes, both name rules |
+| 2 | Is a fixed-name link listed under both names (link name and its adapter's own name) "listed twice"? | carried to spec open question 2; resolved 2026-11-07 (resolver: agent): yes, listed twice |
+| 3 | Which line does a skill that is not in the spec get when it is listed twice? | carried to spec open question 3; resolved 2026-11-07 (resolver: agent): keep today's `not in the agent spec` lines |
 
 ## Links
 
@@ -49,6 +49,6 @@ Owners and agents who run `gabo check` after building or editing agents, on ever
 | product card | [#171 Runtime integrations](https://github.com/testeos-z/gabo-ai/issues/171) |
 | intent issue | [#444 I0014: Agent name and duplicate skill checks](https://github.com/testeos-z/gabo-ai/issues/444) |
 | PRD | [PRD](../../PRD.md) R33 |
-| spec | [spec](spec.md) (awaiting the owner's acceptance) |
+| spec | [spec](spec.md) (accepted 2026-11-07) |
 | plan | not written yet (gabo-dev-lead, after acceptance) |
 | related intent | 0008-stricter-gabo-check (S1, S2, S6, S9, TRD 8.5), 0013-several-engines-in-parallel-in-one-project (engine set of `gabo check`) |
