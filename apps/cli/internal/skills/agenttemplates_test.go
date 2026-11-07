@@ -299,6 +299,42 @@ func TestMainSessionBlockIsScopedAndSmall(t *testing.T) {
 	}
 }
 
+// Intent 0013 S16, D8: the block, shared by Codex and Pi and copied as is,
+// names the session engine of both in one fixed line of its scope paragraph,
+// without a slot and without the `gabo-engine:` form of a built agent file.
+const blockEngineLine = "Session engine: loaded by Codex, this session's engine is `codex`; loaded by Pi, it is `pi`."
+
+func TestMainSessionBlockNamesTheCodexAndPiEngine(t *testing.T) {
+	t.Parallel()
+	doc := agentTemplates(t)[mainBlock]
+	inner := strings.TrimSuffix(strings.TrimPrefix(doc, blockStart+"\n"), blockEnd+"\n")
+	rule, _, ok := strings.Cut(inner, "\n\n")
+	if !ok {
+		t.Fatalf("%s: no blank line after the scope paragraph", mainBlock)
+	}
+	found := 0
+	for _, l := range strings.Split(rule, "\n") {
+		if l == blockEngineLine {
+			found++
+		}
+	}
+	if found != 1 {
+		t.Errorf("%s: scope paragraph holds %d lines %q, want exactly one", mainBlock, found, blockEngineLine)
+	}
+	n := 0
+	for _, l := range strings.Split(doc, "\n") {
+		if strings.Contains(l, "`codex`") || strings.Contains(l, "`pi`") {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("%s: %d lines name `codex` or `pi`, want exactly one", mainBlock, n)
+	}
+	if strings.Contains(doc, "gabo-engine:") || strings.Contains(doc, "{{") || strings.Contains(doc, "}}") {
+		t.Errorf("%s: the engine line is fixed text, with no slot and no `gabo-engine:` form", mainBlock)
+	}
+}
+
 // Spec 0009 S1 to S4, D4: the one table of each engine's main-session entry
 // lives in gabo-agent-templates and is built for every engine listed in
 // runtimes.assistant (intent 0013 S4).
@@ -312,6 +348,8 @@ func TestAgentTemplatesSkillHoldsTheMainSessionEntryTable(t *testing.T) {
 		"`.opencode/agents/gabo-assistant.md`", "`mode: primary`", "`default_agent: \"gabo-assistant\"`",
 		"`AGENTS.override.md`", "`AGENTS.md`", "`CLAUDE.md`", "`" + blockStart + "`", "`" + blockEnd + "`",
 		"2048 bytes", "| Claude Code |", "| OpenCode |", "| Codex |", "| Pi |",
+		// intent 0013 S16, D8.
+		"names the Codex and Pi session engine in one fixed line",
 	} {
 		if !strings.Contains(skill, s) {
 			t.Errorf("%s/SKILL.md: missing %q", agentspec.Dir, s)

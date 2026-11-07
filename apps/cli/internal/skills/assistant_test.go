@@ -61,8 +61,8 @@ func TestAssistantStartsWavesOnlyOnUnclaimedIntents(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
 	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
-		// its engine.
-		"Session engine (intent 0013 S6, S12)", "`gabo-engine:`", "`{{engine}}`",
+		// its engine (the heading and sources: TestAssistantResolvesItsEngineOnEveryEntry).
+		"`gabo-engine:`", "`{{engine}}`",
 		// unclaimed only, at start and when chaining.
 		"intent 0013 S8", "the earliest claim not followed by its own release holds the intent",
 		"An intent another session holds is not eligible",
@@ -98,4 +98,18 @@ func TestAssistantStartsWavesOnlyOnUnclaimedIntents(t *testing.T) {
 			t.Errorf("%s: missing %q", name, line)
 		}
 	}
+}
+
+// Intent 0013 S16, D8 (plan T17): Claude Code and OpenCode read the engine
+// from the agent file's `gabo-engine:` line, Codex and Pi from the block's
+// fixed line; a session with neither refuses.
+func TestAssistantResolvesItsEngineOnEveryEntry(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-assistant/SKILL.md")
+	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
+		"Session engine (intent 0013 S6, S12, S16)",
+		"Claude Code and OpenCode: the `gabo-engine:` line of your built agent file (`{{engine}}`)",
+		"Codex and Pi: the fixed session-engine line in the opening scope paragraph of the block (`codex` when Codex loaded it, `pi` when Pi loaded it)",
+		"`session engine unknown (rebuild the agents)`",
+	})
 }

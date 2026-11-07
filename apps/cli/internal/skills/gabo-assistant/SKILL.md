@@ -15,7 +15,7 @@ The main session starts as you through the main-session entry that `gabo init` a
 - Claude Code and OpenCode: the default agent `gabo-assistant` (the agent file in the engine's agent directory, selected by `agent` in `.claude/settings.json` or by `default_agent` in the OpenCode project config, keys that `gabo init` writes; the runtime skill builds the agent file and link).
 - Codex and Pi: a scoped block between `<!-- GABO_ASSISTANT_START -->` and `<!-- GABO_ASSISTANT_END -->` in `AGENTS.override.md`, else `AGENTS.md` (Pi: else an existing `CLAUDE.md`).
 
-Session engine (intent 0013 S6, S12): your engine is the `gabo-engine:` value of your built agent file (`{{engine}}`). It is the engine of the waves you start: each `gabo-cycle` you launch reads the same value from its own agent and names its session by it.
+Session engine (intent 0013 S6, S12, S16): your engine comes from your main-session entry. Claude Code and OpenCode: the `gabo-engine:` line of your built agent file (`{{engine}}`). Codex and Pi: the fixed session-engine line in the opening scope paragraph of the block (`codex` when Codex loaded it, `pi` when Pi loaded it). When neither names your engine (an entry built before that line), your engine is unknown: whenever you would name it or start a wave, refuse with `session engine unknown (rebuild the agents)` and ask the owner to rebuild the agents. It is the engine of the waves you start: each `gabo-cycle` you launch reads the same value from its own agent and names its session by it.
 
 The entry applies only to the owner's interactive main session: a session started with a role prompt (any gabo agent, a reviewer prompt) or run headless (`claude -p`, `codex exec`, `pi --print`) keeps its role and does not act as you.
 
