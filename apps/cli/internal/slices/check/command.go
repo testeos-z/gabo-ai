@@ -65,6 +65,7 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for a runtime skill declaring metadata.agent_skills, each agent file lists\n" +
 			"    exactly the skills of its spec agent plus the fixed-name links its template\n" +
 			"    names, each once (or the slot adapter's own name for such a link);\n" +
+			"    a skill listed more than once fails with \"listed twice\";\n" +
 			"    a full-tier runtime skill without it fails, a flexible-tier one warns;\n" +
 			"  - for a runtime skill declaring metadata.agent_name, each agent file's\n" +
 			"    declared name equals its spec id, and a file that declares no name fails\n" +
