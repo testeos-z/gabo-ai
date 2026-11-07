@@ -452,3 +452,16 @@ func TestRuntimePiNamesTheToolSources(t *testing.T) {
 		"`extensions/gentle-agents.ts`",
 	)
 }
+
+// Intent 0013 S18, D12 (plan T21): a Pi wave runs in the main session,
+// because gentle-pi subagents get no `subagent_*` tools.
+func TestRuntimePiSaysAPiWaveRunsInTheMainSession(t *testing.T) {
+	t.Parallel()
+	rules := piSection(t, runtimePiDoc(t), "## Hard Rules")
+	mustContainIn(t, "Hard Rules", rules,
+		"A wave started from a Pi main session runs in that main session (intent 0013 S18, D12)",
+		"gentle-pi subagents get no `subagent_*` tools",
+		"`gabo-assistant` loads the `gabo-cycle` skill itself",
+		"each coder is one first-level `subagent_run`",
+	)
+}

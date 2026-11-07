@@ -176,3 +176,34 @@ func TestCompatibilityPiNamesTheUserFilePermission(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0013 S18, D12 (plan T21; owner 2026-11-07: "In Pi only, the main
+// session loads the gabo-cycle skill itself and launches each coder directly
+// as a subagent; Claude Code, Codex and OpenCode keep gabo-cycle as a
+// subagent."): on a Pi main session Wave Start runs the cycle in its own
+// session and launches no `gabo-cycle` subagent; the other engines still
+// launch it.
+func TestAssistantRunsThePiWaveInItsOwnSession(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-assistant/SKILL.md")
+	_, start, ok := strings.Cut(doc, "## Wave Start (J3)")
+	if !ok {
+		t.Fatal("gabo-assistant/SKILL.md: no Wave Start section")
+	}
+	start, _, _ = strings.Cut(start, "\n## ")
+	requireIn(t, "gabo-assistant Wave Start", start, []string{
+		// the other engines keep the subagent.
+		"On a Claude Code, Codex or OpenCode main session, launch `gabo-cycle` as a plain in-process subagent with the wave id and mode",
+		// Pi: the cycle skill in this session, no cycle subagent.
+		"On a Pi main session (session engine `pi`, intent 0013 S18, D12), launch no `gabo-cycle` subagent",
+		"a gentle-pi subagent gets no `subagent_*` tools",
+		"load the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`) in your own session and run it with the same inputs",
+		"each coder is one first-level `subagent_run`",
+		"gentle-pi wakes this session with each finished coder's result, and the cycle continues from that outcome",
+	})
+	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
+		// the delegation table and the session engine say the same.
+		"on a Pi main session, load the `gabo-cycle` skill yourself (Wave Start)",
+		"on a Pi main session the cycle runs in your session and its session engine is the block line (`pi`)",
+	})
+}
