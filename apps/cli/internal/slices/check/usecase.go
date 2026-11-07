@@ -150,6 +150,9 @@ func (u *UseCase) Run() (Report, error) {
 	if err := u.checkIntents(&r); err != nil {
 		return Report{}, err
 	}
+	if err := u.checkDesign(&r); err != nil {
+		return Report{}, err
+	}
 	if !r.Failed {
 		r.Lines = append(r.Lines, PassedLine)
 	}

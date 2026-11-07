@@ -202,6 +202,23 @@ func TestCommandPreWriteUsageExitsTwo(t *testing.T) {
 	}
 }
 
+// Spec 0012 S7: the help names the design norms rule.
+func TestCommandHelpNamesTheDesignRule(t *testing.T) {
+	t.Parallel()
+	out, err := runCommand(t, project(), "--help")
+	if err != nil {
+		t.Fatalf("err = %v", err)
+	}
+	for _, want := range []string{
+		"  - docs/product/DESIGN.md when present: its 15 sections, the rule-table columns,",
+		"    the RFC 2119 level, MUST verification, the exceptions and the changelog.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("help lacks %q:\n%s", want, out)
+		}
+	}
+}
+
 func TestCommandHelpNamesThePreWriteFlag(t *testing.T) {
 	t.Parallel()
 	out, err := runCommand(t, project(), "--help")

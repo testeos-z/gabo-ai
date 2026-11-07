@@ -1,0 +1,7 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/DESIGN.md: exception for Z9: no such rule
+✗ docs/product/DESIGN.md: exception for T1: reason, owner and date (YYYY-MM-DD) required
+✗ docs/product/DESIGN.md: exception for M1: reason, owner and date (YYYY-MM-DD) required
+next: fix docs/product/DESIGN.md above (gabo-frontend keeps it), then rerun gabo check

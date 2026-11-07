@@ -1,0 +1,6 @@
+exit 1
+error: ""
+--- stdout
+✗ docs/product/DESIGN.md: missing section "## 7. Motion and state"
+✗ docs/product/DESIGN.md: missing section "## 15. Open questions"
+next: fix docs/product/DESIGN.md above (gabo-frontend keeps it), then rerun gabo check
