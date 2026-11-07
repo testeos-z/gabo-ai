@@ -21,8 +21,9 @@ metadata:
     tracker: [bash]
     repository-host: [bash]
     memory: [mem_search, mem_save, mem_update, mem_get_observation]
-    subagents: [subagent_run]
+    subagents: []
     web: []
+  agent_tools_unavailable: [subagent_*]
   main_session:
     kind: block
     files: [AGENTS.override.md, AGENTS.md, CLAUDE.md]
@@ -88,6 +89,7 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 - The `Skills:` line is the spec's `skills` written where Pi can see it (a Pi agent has no skill-list field; the body is its system prompt). Omit the line when the list is empty.
 - `tools`: map each spec capability, in spec order, dropping duplicates. List only tools the session really has: an unknown name fails the subagent at launch. List every tool the agent needs, extension tools included: gentle-pi starts a subagent as `pi --tools <its tools list>`, and `--tools` with plain names replaces the whole selection, so every tool the list does not name is not declared to the subagent, MCP and extension tools included (intent 0013 S17).
 - `metadata.agent_tools` above says where an agent file lists its tools (the frontmatter `tools`), and `metadata.agent_tool_requirements` the tools each spec capability requires; `gabo check` reads both (intent 0013 D11). A required `mem_<x>` is also met by `mcp__<server>__mem_<x>` or a `mcp__<server>__*` entry.
+- `metadata.agent_tools_unavailable` the tools a subagent never has (`subagent_*`, a trailing `*` matching a prefix): every `.pi/agents` file runs as a gentle-pi subagent, so `gabo check` fails an agent file that lists one with `✗ <agent file>: tools a subagent never has: <names>` (intent 0013 S20).
 
 | capability | Pi tool |
 |---|---|
@@ -97,7 +99,7 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 | `shell`, `git`, `tracker`, `repository-host` | `bash` |
 | `memory` | `bash`, `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` when `pi list` shows `npm:gentle-engram`; else `bash`, `mcp__<server>__mem_search`, `mcp__<server>__mem_save`, `mcp__<server>__mem_update`, `mcp__<server>__mem_get_observation` when Pi's MCP config has an Engram server named `<server>`; neither: `bash` only, omit the memory tools and report it |
 | `web` | the web tools of an installed package (pi-web-access: `web_search`, `fetch_content`); none: omit and report |
-| `subagents` | gentle-pi: `subagent_run`, `subagent_status`, `subagent_result`, `subagent_continue`, `subagent_reply`, `subagent_cancel`, `subagent_list_agents`; another package: its own names.; a gentle-pi subagent gets no `subagent_*` tools (gentle-pi registers them only in the primary session) |
+| `subagents` | gentle-pi: no tool, because every `.pi/agents` file runs as a gentle-pi subagent and a gentle-pi subagent gets no `subagent_*` tools (gentle-pi registers them only in the primary session); the Pi main session, which has them, is the Main-session entry block, not an agent file (intent 0013 S20); another package: its own names, only when its docs confirm a subagent has them |
 
 Slots:
 
@@ -107,6 +109,14 @@ Slots:
 | `{{adapter:<slot>}}` | `gabo-<slot>` with `_` written `-` (for example `gabo-repository-host`) |
 | `{{engine}}` | `pi` (intent 0013 S6) |
 | `{{reviewer_script}}` | `${GENTLE_PI_AGENT_HOME:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}}/skills/gabo-reviewer/scripts/reviewer.sh` (expanded by `bash` inside the template's double quotes, so the committed file holds no personal path; standalone `gentle-shell` sets both variables to its home) |
+
+### Coder review
+
+A gentle-pi subagent cannot launch `gabo-reviewer`, so the Pi coder gets its review by running the user-level reviewer script itself (intent 0013 S20, D14, D15). In `.pi/agents/gabo-coder.md`, write the bullet below in place of the template's bullet that starts `- The only agent you launch is `gabo-reviewer``, with `{{engine}}` and `{{reviewer_script}}` filled from the Slots table; every other line of the body stays the template's. Its two patterns are the ones of `gabo-agent-templates/agents/gabo-reviewer.md`, so the Pi coder accepts exactly what the relay accepts. Build `gabo-reviewer.md` anyway, like every spec entry.
+
+```markdown
+- You launch no agent: as a gentle-pi subagent you have no `subagent_*` tools, so you run the reviewer script yourself. After every push build the request `PR #<n> head <40-hex sha>`; only when `runtimes.reviewer` in `gabo.yaml` is `session`, `PR #<n> head <40-hex sha> engine {{engine}}` instead. Validate it before running anything: it must match exactly `^PR #([1-9][0-9]*) head ([0-9a-f]{40})( ready for review)?$`, or, only under `session`, `^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`; an `engine` field under a fixed `runtimes.reviewer`, or none under `session`, does not match. On a mismatch report `REJECTED: expected "PR #<n> head <40-hex sha>"` and run nothing. Then run exactly one command through `bash`, allowing it up to 10 minutes, with no extra arguments or environment: `bash "{{reviewer_script}}" head <n> <sha>`, or for the engine form `bash "{{reviewer_script}}" head <n> <sha> engine <engine>`. Take the last line of its output that starts with `VERDICT `. If it carries `verdict=retry`, run the same command exactly once more and take that run's line instead; never rerun for any other reason. No such line (the script failed or timed out): report `NO VERDICT: <exit code or "timeout"> <last stderr line>` and never invent or edit a VERDICT line. Then act on the `VERDICT` line exactly as on the `gabo-reviewer` relay's reply.
+```
 
 ### Skills and fixed-name links
 

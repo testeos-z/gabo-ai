@@ -67,6 +67,49 @@ func parseToolDeclaration(tools, reqs yaml.Node) (agentPlace, []toolRequirement,
 	return place, out, nil
 }
 
+// parseUnavailableTools reads metadata.agent_tools_unavailable, the tools
+// a subagent of the engine never has, in declaration order (intent 0013
+// S20). Absent is not declared; it needs the agent_tools declaration
+// (declared) to know where an agent file lists its tools.
+func parseUnavailableTools(node yaml.Node, declared bool) ([]string, error) {
+	if node.Kind == 0 {
+		return nil, nil
+	}
+	if !declared {
+		return nil, errors.New("metadata.agent_tools_unavailable: needs metadata.agent_tools and metadata.agent_tool_requirements")
+	}
+	if node.Kind != yaml.SequenceNode {
+		return nil, errors.New("metadata.agent_tools_unavailable: want a list of tool names")
+	}
+	out := []string{}
+	for _, item := range node.Content {
+		name := strings.TrimSpace(item.Value)
+		if item.Kind != yaml.ScalarNode || name == "" {
+			return nil, errors.New("metadata.agent_tools_unavailable: want a list of tool names")
+		}
+		out = append(out, name)
+	}
+	return out, nil
+}
+
+// unavailableListed returns the tools of listed that match a pattern of
+// unavailable (a trailing * is a prefix match), in file order, each once.
+func unavailableListed(unavailable, listed []string) []string {
+	var out []string
+	for _, l := range listed {
+		if slices.Contains(out, l) {
+			continue
+		}
+		for _, p := range unavailable {
+			if prefix, ok := strings.CutSuffix(p, "*"); l == p || ok && strings.HasPrefix(l, prefix) {
+				out = append(out, l)
+				break
+			}
+		}
+	}
+	return out
+}
+
 // declaresTools reports whether the runtime skill declares both tool keys
 // well formed.
 func (m runtimeMeta) declaresTools() bool {
@@ -116,8 +159,11 @@ func missingTools(reqs []toolRequirement, capabilities, listed []string) []strin
 // checkAgentTools fails, for a runtime skill that declares
 // metadata.agent_tools and metadata.agent_tool_requirements, each built spec
 // agent whose file lacks a tool its spec capabilities require, with one line
-// per file (intent 0013 S17, D11). A malformed declaration fails once with
-// NextRestoreCatalog; a runtime without the declaration is not checked.
+// per file (intent 0013 S17, D11); for one that also declares
+// metadata.agent_tools_unavailable, each built agent file that lists a tool
+// a subagent never has, with one line per file (S20). A malformed
+// declaration fails once with NextRestoreCatalog; a runtime without the
+// declaration is not checked.
 func (u *UseCase) checkAgentTools(r *Report, rt string, meta runtimeMeta, spec agentspec.Spec) error {
 	if meta.ToolsErr != nil {
 		r.fail("✗ runtime "+rt+": gabo-runtime-"+rt+" "+meta.ToolsErr.Error(), NextRestoreCatalog)
@@ -138,8 +184,12 @@ func (u *UseCase) checkAgentTools(r *Report, rt string, meta runtimeMeta, spec a
 			if err != nil {
 				return fmt.Errorf("read %s: %w", file, err)
 			}
-			if missing := missingTools(meta.ToolRequirements, a.Tools, meta.AgentTools.skills(b)); len(missing) > 0 {
+			listed := meta.AgentTools.skills(b)
+			if missing := missingTools(meta.ToolRequirements, a.Tools, listed); len(missing) > 0 {
 				r.fail("✗ "+file+": tools missing for its spec capabilities: "+strings.Join(missing, ", "), NextRebuild)
+			}
+			if never := unavailableListed(meta.UnavailableTools, listed); len(never) > 0 {
+				r.fail("✗ "+file+": tools a subagent never has: "+strings.Join(never, ", "), NextRebuild)
 			}
 		}
 	}

@@ -70,6 +70,13 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    declared name equals its spec id (a file that declares none passes);\n" +
 			"  - each agent file's filled gabo-engine line names the engine of the agent\n" +
 			"    directory it is in (a file with no engine line passes);\n" +
+			"  - for a runtime skill declaring metadata.agent_tools and\n" +
+			"    metadata.agent_tool_requirements, each built agent file lists every tool its\n" +
+			"    spec capabilities require (a required mem_<x> is also met by\n" +
+			"    mcp__<server>__mem_<x> or mcp__<server>__*);\n" +
+			"  - for a runtime skill declaring metadata.agent_tools_unavailable, no built\n" +
+			"    agent file lists a tool a subagent never has (a trailing * matches a\n" +
+			"    prefix; only gabo-runtime-pi declares it, subagent_*);\n" +
 			"  - for a runtime skill declaring metadata.skill_dir, a link <skill_dir>/<name>\n" +
 			"    to " + CatalogDir + "/<name> for each skill a spec agent lists, and a link\n" +
 			"    <skill_dir>/gabo-<slot> to each slot adapter that is a skill folder;\n" +

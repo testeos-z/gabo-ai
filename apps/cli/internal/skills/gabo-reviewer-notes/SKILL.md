@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use when an agent needs to understand or explain a review result. Agents never run or influence the reviewer-side gate themselves; they only ask the `gabo-reviewer` subagent for one.
+Use when an agent needs to understand or explain a review result. Agents never run or influence the reviewer-side gate themselves; they only ask the `gabo-reviewer` subagent for one, except the Pi coder below.
 
 ## Review layers
 
@@ -26,6 +26,7 @@ Use when an agent needs to understand or explain a review result. Agents never r
 ### Reviewer-side gate (mandatory)
 
 - The `gabo-reviewer` subagent only validates `PR #<n> head <40-hex sha>` (or `PR #<n> head <40-hex sha> engine <engine>`, see Review engine), runs the scripts of the user-level `gbai-reviewer` skill (`~/.claude/skills/gbai-reviewer/scripts/`) and relays their final `VERDICT` line (D20). It never reviews, edits, comments or merges itself.
+- Pi exception (intent 0013 S20, D14): On Pi a coder runs as a gentle-pi subagent with no `subagent_*` tools, so it cannot launch `gabo-reviewer`; it validates the request with the relay's patterns and runs the reviewer script itself through `bash` (the user-level script through the Pi agent-home link), with the relay's rules, and acts on its `VERDICT` line. It still never reviews, edits, comments or merges as the reviewer. Claude Code, Codex and OpenCode coders launch `gabo-reviewer`.
 - The scripts live outside every repository, so PR code cannot modify the code that reviews it. They refuse to run when they are not under the user-level skills dir or are writable by others.
 - Each run has two parts: the repository checks (`review.checks` in `gabo.yaml`) and an agent review of the diff. Both must pass for a clean verdict.
 

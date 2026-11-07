@@ -405,6 +405,7 @@ func TestRuntimePiDeclaresToolRequirements(t *testing.T) {
 		Metadata struct {
 			AgentTools       string              `yaml:"agent_tools"`
 			ToolRequirements map[string][]string `yaml:"agent_tool_requirements"`
+			Unavailable      []string            `yaml:"agent_tools_unavailable"`
 		} `yaml:"metadata"`
 	}
 	if err := yaml.Unmarshal(front, &fm); err != nil {
@@ -423,8 +424,13 @@ func TestRuntimePiDeclaresToolRequirements(t *testing.T) {
 		"tracker":         {"bash"},
 		"repository-host": {"bash"},
 		"memory":          {"mem_search", "mem_save", "mem_update", "mem_get_observation"},
-		"subagents":       {"subagent_run"},
+		"subagents":       {},
 		"web":             {},
+	}
+	// intent 0013 S20 (plan T22): every .pi/agents file runs as a gentle-pi
+	// subagent, which never has a subagent_* tool.
+	if strings.Join(fm.Metadata.Unavailable, ",") != "subagent_*" {
+		t.Errorf("metadata.agent_tools_unavailable = %q, want [subagent_*]", fm.Metadata.Unavailable)
 	}
 	got := fm.Metadata.ToolRequirements
 	if len(got) != len(want) {
@@ -464,4 +470,77 @@ func TestRuntimePiSaysAPiWaveRunsInTheMainSession(t *testing.T) {
 		"`gabo-assistant` loads the `gabo-cycle` skill itself",
 		"each coder is one first-level `subagent_run`",
 	)
+}
+
+// Intent 0013 S20 (plan T22): the subagents capability maps to no tool on
+// gentle-pi, because every .pi/agents file runs as a gentle-pi subagent.
+func TestRuntimePiMapsSubagentsToNoTool(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	row := piCapabilityRow(t, doc, "`subagents`")
+	mustContainIn(t, "subagents row", row,
+		"gentle-pi: no tool",
+		"every `.pi/agents` file runs as a gentle-pi subagent",
+	)
+	mustLackIn(t, "subagents row", row, "`subagent_run`, `subagent_status`")
+	mustContainIn(t, "## Build", doc,
+		"`metadata.agent_tools_unavailable` the tools a subagent never has",
+	)
+}
+
+// reviewerPatterns returns the backticked ^...$ patterns of the
+// gabo-reviewer relay template, in order.
+func reviewerPatterns(t *testing.T) []string {
+	t.Helper()
+	tmpl := readCatalog(t, "gabo-agent-templates/agents/gabo-reviewer.md")
+	var out []string
+	for _, part := range strings.Split(tmpl, "`")[1:] {
+		if strings.HasPrefix(part, "^PR #") && strings.HasSuffix(part, "$") {
+			out = append(out, part)
+		}
+	}
+	if len(out) != 2 {
+		t.Fatalf("gabo-reviewer.md: %d request patterns, want 2: %q", len(out), out)
+	}
+	return out
+}
+
+// Intent 0013 S20, D14, D15 (plan T22): on Pi the coder validates the
+// review request with the relay's own patterns and runs the reviewer script
+// itself; the Build writes that bullet into gabo-coder.md in place of the
+// template's launch bullet.
+func TestRuntimePiWritesTheCoderReviewBullet(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	section := piSection(t, doc, "### Coder review")
+	mustContainIn(t, "### Coder review", section,
+		"`.pi/agents/gabo-coder.md`",
+		"in place of the template's bullet that starts `- The only agent you launch is `gabo-reviewer``",
+		"every other line of the body stays the template's",
+		"`{{reviewer_script}}`",
+	)
+	_, bullet, ok := strings.Cut(section, "```markdown\n")
+	if !ok {
+		t.Fatalf("%s ### Coder review: no markdown block", runtimePi)
+	}
+	bullet, _, _ = strings.Cut(bullet, "```")
+	for _, p := range reviewerPatterns(t) {
+		if !strings.Contains(bullet, "`"+p+"`") {
+			t.Errorf("Pi review bullet: missing the relay pattern %q", p)
+		}
+	}
+	mustContainIn(t, "Pi review bullet", bullet,
+		"`PR #<n> head <40-hex sha>`",
+		"only when `runtimes.reviewer` in `gabo.yaml` is `session`, `PR #<n> head <40-hex sha> engine {{engine}}`",
+		"report `REJECTED: expected \"PR #<n> head <40-hex sha>\"` and run nothing",
+		"allowing it up to 10 minutes, with no extra arguments or environment",
+		"`bash \"{{reviewer_script}}\" head <n> <sha>`",
+		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
+		"the last line of its output that starts with `VERDICT `",
+		"If it carries `verdict=retry`, run the same command exactly once more",
+		"never rerun for any other reason",
+		"`NO VERDICT: <exit code or \"timeout\"> <last stderr line>`",
+		"act on the `VERDICT` line exactly as on the `gabo-reviewer` relay's reply",
+	)
+	mustLackIn(t, "Pi review bullet", bullet, "The only agent you launch is")
 }

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"maps"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -528,6 +529,45 @@ func TestParseRuntimeMetaKeepsAMalformedToolDeclaration(t *testing.T) {
 				t.Fatalf("ToolsErr = %v, want an error naming the key", m.ToolsErr)
 			}
 			if m.declaresTools() || m.AgentDir != ".x/agents" || !m.AgentSkills.declared() {
+				t.Fatalf("meta = %+v", m)
+			}
+		})
+	}
+}
+
+// Intent 0013 S20 (plan T22): parseRuntimeMeta reads
+// metadata.agent_tools_unavailable, the tools a subagent never has, in
+// declaration order; absent, it declares none.
+func TestParseRuntimeMetaReadsUnavailableTools(t *testing.T) {
+	t.Parallel()
+	decl := []string{"  agent_tools: frontmatter:tools", "  agent_tool_requirements:", "    memory: [mem_save]"}
+	m, err := parseRuntimeMeta(runtimeDoc(append(slices.Clone(decl), "  agent_tools_unavailable: [subagent_*, task]")...))
+	if err != nil || m.ToolsErr != nil {
+		t.Fatalf("parseRuntimeMeta() error = %v, %v", err, m.ToolsErr)
+	}
+	if strings.Join(m.UnavailableTools, ",") != "subagent_*,task" || !m.declaresTools() {
+		t.Fatalf("agent_tools_unavailable = %q, declared %v", m.UnavailableTools, m.declaresTools())
+	}
+	m, err = parseRuntimeMeta(runtimeDoc(decl...))
+	if err != nil || m.ToolsErr != nil || m.UnavailableTools != nil {
+		t.Fatalf("no declaration: %q, err %v, %v", m.UnavailableTools, err, m.ToolsErr)
+	}
+	for name, meta := range map[string][]string{
+		"not a list":          append(slices.Clone(decl), "  agent_tools_unavailable: subagent_*"),
+		"empty name":          append(slices.Clone(decl), `  agent_tools_unavailable: [""]`),
+		"name not a scalar":   append(slices.Clone(decl), "  agent_tools_unavailable: [{a: b}]"),
+		"without agent_tools": {"  agent_tools_unavailable: [subagent_*]"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			m, err := parseRuntimeMeta(runtimeDoc(append([]string{"  agent_skills: frontmatter:skills"}, meta...)...))
+			if err != nil {
+				t.Fatalf("parseRuntimeMeta() error = %v, want the rest of the metadata read", err)
+			}
+			if m.ToolsErr == nil || !strings.Contains(m.ToolsErr.Error(), "metadata.agent_tools_unavailable") {
+				t.Fatalf("ToolsErr = %v, want an error naming the key", m.ToolsErr)
+			}
+			if m.declaresTools() || !m.AgentSkills.declared() {
 				t.Fatalf("meta = %+v", m)
 			}
 		})
