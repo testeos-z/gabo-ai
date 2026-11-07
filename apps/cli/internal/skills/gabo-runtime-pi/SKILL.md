@@ -10,6 +10,19 @@ metadata:
   former_skill_dir: .pi/skills
   agent_skills: "line:Skills:"
   agent_name: frontmatter:name
+  agent_tools: frontmatter:tools
+  agent_tool_requirements:
+    read: [read]
+    skills: [read]
+    search: [grep, find, ls]
+    edit: [edit, write]
+    shell: [bash]
+    git: [bash]
+    tracker: [bash]
+    repository-host: [bash]
+    memory: [mem_search, mem_save, mem_update, mem_get_observation]
+    subagents: [subagent_run]
+    web: []
   main_session:
     kind: block
     files: [AGENTS.override.md, AGENTS.md, CLAUDE.md]
@@ -72,7 +85,8 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 - `gabo-version: <version>` is the template's version line, moved into the frontmatter with the value of `.gabo/VERSION`; `gabo check` compares it with the stamp.
 - `gabo-engine: pi` is the template's engine line, moved into the frontmatter with `pi`, the engine as written in `gabo.yaml`; `gabo check` fails an agent file whose filled engine is not `pi` (intent 0013 S6).
 - The `Skills:` line is the spec's `skills` written where Pi can see it (a Pi agent has no skill-list field; the body is its system prompt). Omit the line when the list is empty.
-- `tools`: map each spec capability, in spec order, dropping duplicates. List only tools the session really has: an unknown name fails the subagent at launch.
+- `tools`: map each spec capability, in spec order, dropping duplicates. List only tools the session really has: an unknown name fails the subagent at launch. List every tool the agent needs, extension tools included: gentle-pi starts a subagent as `pi --tools <its tools list>`, and `--tools` with plain names replaces the whole selection, so every tool the list does not name is not declared to the subagent, MCP and extension tools included (intent 0013 S17).
+- `metadata.agent_tools` above says where an agent file lists its tools (the frontmatter `tools`), and `metadata.agent_tool_requirements` the tools each spec capability requires; `gabo check` reads both (intent 0013 D11). A required `mem_<x>` is also met by `mcp__<server>__mem_<x>` or a `mcp__<server>__*` entry.
 
 | capability | Pi tool |
 |---|---|
@@ -80,9 +94,9 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 | `search` | `grep`, `find`, `ls` |
 | `edit` | `edit`, `write` |
 | `shell`, `git`, `tracker`, `repository-host` | `bash` |
-| `memory` | `bash`; MCP memory tools (Engram) need no entry, Pi keeps MCP tools whatever `--tools` lists |
+| `memory` | `bash`, `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` when `pi list` shows `npm:gentle-engram`; else `bash`, `mcp__<server>__mem_search`, `mcp__<server>__mem_save`, `mcp__<server>__mem_update`, `mcp__<server>__mem_get_observation` when Pi's MCP config has an Engram server named `<server>`; neither: `bash` only, omit the memory tools and report it |
 | `web` | the web tools of an installed package (pi-web-access: `web_search`, `fetch_content`); none: omit and report |
-| `subagents` | gentle-pi: `subagent_run`, `subagent_status`, `subagent_result`, `subagent_continue`, `subagent_reply`, `subagent_cancel`, `subagent_list_agents`; another package: its own names |
+| `subagents` | gentle-pi: `subagent_run`, `subagent_status`, `subagent_result`, `subagent_continue`, `subagent_reply`, `subagent_cancel`, `subagent_list_agents`; another package: its own names.; a gentle-pi subagent gets no `subagent_*` tools (gentle-pi registers them only in the primary session) |
 
 Slots:
 
@@ -137,6 +151,8 @@ Checked 2026-11-03 against Pi 1.4.0 and gentle-pi 4.5.1 (installed packages and 
 | `pi list`, `pi install <source> [-l]`; npm packages under `<agent-home>/npm/`; git packages cloned to `<agent-home>/git/<host>/<path>` (user) and `.pi/git/<host>/<path>` (project, after trust) | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md; Pi 1.4.0 `dist/core/package-manager.js` `getGitInstallPath`, `getGitInstallRoot`; gentle-pi 4.5.1 `docs/readme-reference.md` (Git-managed `agent-home/git/github.com/Gentleman-Programming/gentle-pi`) |
 | agents in `<cwd>/.pi/agents/`, `<cwd>/.pi/subagents/` and the home's `agents/`, `subagents/` (project beats global); frontmatter `name`, `description`, `tools`; `subagent_*` tools; `subagents.json` owned by the package | gentle-pi 4.5.1 `docs/gentle-shell.md` (Subagents), `lib/agents-config.ts` |
 | Pi 1.4.0 loads only the first existing file per directory of its context files, in the order `AGENTS.override.md`, then `AGENTS.md`, then `CLAUDE.md`, into every Pi process in the project, `pi --print` included (the Main-session entry file order, intent 0009 D6) | Pi 1.4.0 `dist/core/resource-loader.js` (line 116), probed with `pi --print`: https://github.com/testeos-z/gabo-ai/issues/324#issuecomment-6690677042 |
+| a subagent starts as `pi --tools <its tools list>` (`childArguments`); `--tools` with plain names replaces the whole selection, so an unnamed tool, MCP or extension, is not declared; the `subagent_*` tools are registered only in the primary session, not in a child (`GENTLE_PI_AGENTS_CHILD=1`) | Pi 1.4.0 `docs/cli.md` (Tools), `docs/mcp.md`; gentle-pi 4.5.1 `lib/agents-runner.ts` `childArguments`, `extensions/gentle-agents.ts`; probe P2a: https://github.com/testeos-z/gabo-ai/issues/414#issuecomment-6701730785 |
+| the Engram tools `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` (with the other `mem_*` tools) registered by the gentle-engram Pi package | gentle-engram 0.4.2 `index.ts` `ENGRAM_TOOLS` |
 | agent home `GENTLE_PI_AGENT_HOME`, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`; `gentle-shell` home `~/.gentle-shell/agent`, `--link` | gentle-pi 4.5.1 `docs/gentle-shell.md`, `docs/readme-reference.md`, `lib/agent-home.ts` |
 
 Recheck these against `pi --version` and the installed gentle-pi when either is newer, and update this table.

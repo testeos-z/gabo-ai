@@ -345,3 +345,110 @@ func TestRuntimePiDeclaresMainSession(t *testing.T) {
 	t.Parallel()
 	wantMainSession(t, runtimePi, mainSessionMeta{Kind: "block", Files: []string{"AGENTS.override.md", "AGENTS.md", "CLAUDE.md"}})
 }
+
+// piCapabilityRow returns the Pi tool cell of the capability table row whose
+// first cell is cell.
+func piCapabilityRow(t *testing.T, doc, cell string) string {
+	t.Helper()
+	_, row, ok := strings.Cut(doc, "\n| "+cell+" | ")
+	if !ok {
+		t.Fatalf("%s: no capability row %s", runtimePi, cell)
+	}
+	row, _, _ = strings.Cut(row, "\n")
+	return row
+}
+
+// intent 0013 S17: gentle-pi starts a subagent as `pi --tools <its tools>`,
+// which declares no tool it does not name, so the memory row lists the four
+// Engram tools the memory adapter calls: plain names from gentle-engram, the
+// mcp__<server>__ form from a Pi MCP server, else omitted and reported.
+func TestRuntimePiListsTheMemoryToolsExplicitly(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	row := piCapabilityRow(t, doc, "`memory`")
+	mustContainIn(t, "memory row", row,
+		"`bash`, `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` when `pi list` shows `npm:gentle-engram`",
+		"`mcp__<server>__mem_search`, `mcp__<server>__mem_save`, `mcp__<server>__mem_update`, `mcp__<server>__mem_get_observation` when Pi's MCP config has an Engram server named `<server>`",
+		"neither: `bash` only, omit the memory tools and report it",
+	)
+	mustLackIn(t, runtimePi, doc, "need no entry", "Pi keeps MCP tools whatever `--tools` lists")
+	mustContainIn(t, "## Build", doc,
+		"gentle-pi starts a subagent as `pi --tools <its tools list>`",
+		"every tool the list does not name is not declared to the subagent, MCP and extension tools included",
+	)
+}
+
+// intent 0013 S17: gentle-pi registers the subagent_* tools only in the
+// primary session, so a subagent gets none of them.
+func TestRuntimePiSaysSubagentsGetNoSubagentTools(t *testing.T) {
+	t.Parallel()
+	row := piCapabilityRow(t, runtimePiDoc(t), "`subagents`")
+	mustContainIn(t, "subagents row", row,
+		"a gentle-pi subagent gets no `subagent_*` tools (gentle-pi registers them only in the primary session)",
+	)
+}
+
+// intent 0013 S17, D11: the frontmatter declares where a Pi agent file lists
+// its tools and the tools each spec capability requires, for gabo check (T19).
+func TestRuntimePiDeclaresToolRequirements(t *testing.T) {
+	t.Parallel()
+	b, err := fs.ReadFile(Catalog(), runtimePi)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rest, _ := bytes.CutPrefix(b, []byte("---\n"))
+	front, _, ok := bytes.Cut(rest, []byte("\n---\n"))
+	if !ok {
+		t.Fatalf("%s: no frontmatter", runtimePi)
+	}
+	var fm struct {
+		Metadata struct {
+			AgentTools       string              `yaml:"agent_tools"`
+			ToolRequirements map[string][]string `yaml:"agent_tool_requirements"`
+		} `yaml:"metadata"`
+	}
+	if err := yaml.Unmarshal(front, &fm); err != nil {
+		t.Fatalf("%s frontmatter: %v", runtimePi, err)
+	}
+	if fm.Metadata.AgentTools != "frontmatter:tools" {
+		t.Errorf("metadata.agent_tools = %q, want frontmatter:tools", fm.Metadata.AgentTools)
+	}
+	want := map[string][]string{
+		"read":            {"read"},
+		"skills":          {"read"},
+		"search":          {"grep", "find", "ls"},
+		"edit":            {"edit", "write"},
+		"shell":           {"bash"},
+		"git":             {"bash"},
+		"tracker":         {"bash"},
+		"repository-host": {"bash"},
+		"memory":          {"mem_search", "mem_save", "mem_update", "mem_get_observation"},
+		"subagents":       {"subagent_run"},
+		"web":             {},
+	}
+	got := fm.Metadata.ToolRequirements
+	if len(got) != len(want) {
+		t.Errorf("metadata.agent_tool_requirements has %d capabilities, want %d: %v", len(got), len(want), got)
+	}
+	for c, tools := range want {
+		g, ok := got[c]
+		if !ok {
+			t.Errorf("metadata.agent_tool_requirements: no %s", c)
+			continue
+		}
+		if strings.Join(g, ",") != strings.Join(tools, ",") {
+			t.Errorf("metadata.agent_tool_requirements.%s = %v, want %v", c, g, tools)
+		}
+	}
+}
+
+// intent 0013 S17: the sources of the tool facts.
+func TestRuntimePiNamesTheToolSources(t *testing.T) {
+	t.Parallel()
+	mustContainIn(t, "## Sources", piSection(t, runtimePiDoc(t), "## Sources"),
+		"gentle-engram 0.4.2 `index.ts` `ENGRAM_TOOLS`",
+		"Pi 1.4.0 `docs/cli.md` (Tools)",
+		"gentle-pi 4.5.1 `lib/agents-runner.ts` `childArguments`",
+		"`extensions/gentle-agents.ts`",
+	)
+}
