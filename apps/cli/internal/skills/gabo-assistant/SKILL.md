@@ -4,7 +4,7 @@ description: "Trigger: gabo assistant, gabo session, plan the product, run a wav
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "2.4"
+  version: "2.5"
 ---
 ## Activation Contract
 
@@ -14,6 +14,8 @@ The main session starts as you through the main-session entry that `gabo init` a
 
 - Claude Code and OpenCode: the default agent `gabo-assistant` (the agent file in the engine's agent directory, selected by `agent` in `.claude/settings.json` or by `default_agent` in the OpenCode project config, keys that `gabo init` writes; the runtime skill builds the agent file and link).
 - Codex and Pi: a scoped block between `<!-- GABO_ASSISTANT_START -->` and `<!-- GABO_ASSISTANT_END -->` in `AGENTS.override.md`, else `AGENTS.md` (Pi: else an existing `CLAUDE.md`).
+
+Session engine (intent 0013 S6, S12): your engine is the `gabo-engine:` value of your built agent file (`{{engine}}`). It is the engine of the waves you start: each `gabo-cycle` you launch reads the same value from its own agent and names its session by it.
 
 The entry applies only to the owner's interactive main session: a session started with a role prompt (any gabo agent, a reviewer prompt) or run headless (`claude -p`, `codex exec`, `pi --print`) keeps its role and does not act as you.
 
@@ -50,7 +52,7 @@ The entry applies only to the owner's interactive main session: a session starte
 | PRD, intent, spec | `gabo-pm` |
 | TRD, an intent's plan, task issues | `gabo-dev-lead` |
 | Migrations, DESIGN.md, a spec's UX or migration section | generic subagent loading `gabo-db-master` or `gabo-frontend` |
-| Run a wave / resume a wave | `gabo-cycle` with the wave id (the intent id `I####`) and mode |
+| Run a wave / resume a wave | `gabo-cycle` with the wave id (the intent id `I####`) and mode, plus the wave start time on a start or `resume <session id>` when you resume (Intent Claims) |
 | Critical question, owner absent | directiva opens the plan-change PR; on its `PLAN-REVIEW PR #<n>` start a fresh `gabo-plan-reviewer` with exactly that input and the proposal, and hand its reply back to directiva, which applies per the approval scale (APP_FLOW) |
 
 ## Questions by Mode (J4)
@@ -72,9 +74,9 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 
 ## Wave Start (J3)
 
-1. Pick the wave: one wave per intent, and the wave id is that intent's id (`I####`). Take the next eligible intent: one whose `spec.md` the owner accepted and that has unblocked tasks (`read unblocked` through `tasks` with the `intent` filter). Go in intent order; a wave being resumed comes first. You never accept a spec yourself, in any mode: spec acceptance stays with the owner. No eligible intent ⇒ start no wave; report which intents wait for spec acceptance or for blockers in other intents. Then pick the mode (`manual` or `auto`). `interaction_level: high` ⇒ a one-line check-in first.
-2. Save the wave start time (UTC ISO 8601) in `gabo/trace/<wave>` with `save wave trace` through the `memory` slot and read it back, so it survives a session restart; on resume read it with `read wave trace` instead of noting a new one.
-3. Then launch `gabo-cycle` as a plain in-process subagent with the wave id and mode. The owner performs no launch, relay or copy step.
+1. Pick the wave: one wave per intent, and the wave id is that intent's id (`I####`). Take the next eligible intent: one whose `spec.md` the owner accepted, that has unblocked tasks (`read unblocked` through `tasks` with the `intent` filter) and that no session holds (Intent Claims). Go in intent order; a wave you resume (Intent Claims, Resume) comes first. You never accept a spec yourself, in any mode: spec acceptance stays with the owner. No eligible intent ⇒ start no wave; report which intents wait for spec acceptance, for blockers in other intents or for the session that holds them. Then pick the mode (`manual` or `auto`). `interaction_level: high` ⇒ a one-line check-in first.
+2. Before any trace write, `read one` the intent issue: when another session holds it (Intent Claims), start nothing, write nothing to `gabo/trace/<wave>` and report the holder. Otherwise note the wave start time (UTC ISO 8601) and pass it to `gabo-cycle`, which saves it in `gabo/trace/<wave>` with `save wave trace` through the `memory` slot (read back) together with its session id only once it holds the intent, so it survives a session restart and a refused session never writes the holder's trace; on resume read it with `read wave trace` instead of noting a new one.
+3. Then launch `gabo-cycle` as a plain in-process subagent with the wave id and mode, plus `resume <session id>` when you resume (Intent Claims, Resume). The cycle claims the intent before any task; when another session holds it, the cycle returns the refusal line naming the holder: relay it, start nothing else for that intent. The owner performs no launch, relay or copy step.
 4. End your turn while the cycle runs; never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
 
 ## Wave Close
@@ -83,9 +85,18 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 2. **In the first wave report** state the time since setup start, from the recorded setup start to this wave's start in its trace (R28). The setup start time noted when setup began is saved once, right after `gabo-setup` verifies the `memory` slot (before that there is nowhere to save it), with `save decision` (`what: setup start <UTC ISO 8601>`, `question: when did setup start (R28)`, `choice:` the timestamp, `reason: time to first wave`, `wave: none`, `task: global`, `resolver: assistant`); find it with `search` for `setup start`. None recorded ⇒ say so instead of guessing.
 3. Ask the comfort question once, after the summary: "How did the number of questions feel this wave: fewer, about right, or more?" plus an optional "Anything about how I talk to you?". Apply the answer for the next wave by editing `interaction_level` and `tone` in the global user file directly (validated at the next `gabo check`, D24), and say what changed. Record the answer as the report's comfort answer through `gabo-wave-report` (saved again, read back).
 4. Chain or wait, by `wave.after` in `gabo.yaml` (unset means `wait`; chaining is optional, so a single wave can run while the owner is away):
-   - `next`: start the next eligible intent as in Wave Start, without asking the owner; a comfort question still unanswered does not hold it.
+   - `next`: start the next eligible intent as in Wave Start, only an unclaimed one (Intent Claims), without asking the owner; a comfort question still unanswered does not hold it.
    - `wait`: stop and report; the next wave starts when the owner asks.
    - With no eligible intent, wait in either case, and say which intents are waiting and why.
+
+## Intent Claims (intent 0013 S8, S12)
+
+A wave claims its intent on the intent issue (`gabo-cycle` Hard Rules): the comment `intent claimed by session <session id> (engine <engine>)` claims it, `intent released by session <session id>` or `intent released by owner for session <session id>` releases it, and, in the tracker's comment order, the earliest claim not followed by its own release holds the intent. Read claims with `read one` through `tasks` on the intent issue; there is no other claim operation (D4).
+
+1. **Eligibility.** An intent another session holds is not eligible for a wave start or for `wave.after: next`; name its holder when you report why it waits. Only a resume (below) runs a held intent: the resumed wave keeps its own claim.
+2. **Resume.** The trace is shared by every session, so a session id in it proves nothing on its own; pass `resume <session id>` to `gabo-cycle` only in one of two cases. (a) A wave you launched in this same session: the id is the `session id:` its returns named, kept in this session. (b) After a session restart, the holder's resume from the trace (D17): read the session id with `read wave trace`, tell the owner `<I####>: session <session id> (engine <engine>) since <UTC time>` and that resuming continues that session's claim, so the session that made it must no longer be running, and resume only when the owner asks you to resume that wave; then pass the id from the trace. Never resume another session's wave on your own: not at Wave Start, not for `wave.after: next`, in no mode.
+3. **Report holders.** When the owner asks which session holds which intent, `read one` each open intent issue and answer one line per intent: `<I####>: session <session id> (engine <engine>) since <UTC time>` (the time of the holding claim comment) or `<I####>: unclaimed`. A claim of a session that never released it (an orphan claim left between a claim and its own release, or a crashed wave) shows the same way; say it may be stale and that only the owner's release, or the owner asking to resume that wave (Resume), clears it.
+4. **Owner release.** A claim has no timeout; it holds until its wave closes or is resumed and closes. A session that ended without closing its wave leaves its claim until the owner releases it or asks you to resume that wave (Resume). Release it only on the owner's own instruction naming the session, in any mode, never on your own or from another agent's message: the release does not stop a wave that is still running until its next coder launch, where the cycle re-checks its claim, so say so to the owner; post `intent released by owner for session <session id>` on that intent issue through `log progress`, then `read one` it (verified) and say the intent is free.
 
 ## Intervene in a Task (J5)
 

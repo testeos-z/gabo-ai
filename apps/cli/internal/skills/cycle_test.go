@@ -130,3 +130,65 @@ func TestWaveReportNamesTheSessionEngine(t *testing.T) {
 		"`coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`",
 	})
 }
+
+// Intent 0013 S8, D4 (plan T9): the wave claims its intent through the
+// existing `tasks` operations on the intent issue, after the reviewer
+// preflight and before any task claim; the earliest claim not followed by its
+// own release holds it; a non-holder releases, claims nothing and refuses
+// naming the holder; the holder releases at wave close and keeps its claim on
+// resume (open question 1, owner: no timeout, owner release).
+func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	const (
+		claim   = "`intent claimed by session <session id> (engine <engine>)`"
+		refusal = "`intent <I####> is claimed by session <session id> (engine <engine>) since <UTC time>; it is released when that wave closes`"
+		release = "`intent released by session <session id>`"
+		owner   = "`intent released by owner for session <session id>`"
+	)
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"intent 0013 S8",
+		// the session id: made once per wave start, kept in the trace.
+		"`<engine>-<8 hex>`", "once per wave start", "`gabo/trace/<wave>`",
+		// the claim goes through existing operations on the intent issue.
+		"`log progress`", "`read one`", "on the intent issue", claim,
+		"no new `tasks` operation (D4)",
+		// who holds it.
+		"the earliest claim not followed by its own release holds the intent",
+		"in the tracker's comment order",
+		// a non-holder.
+		"posts its release", "claims nothing", refusal,
+		"The owner can release it by telling any assistant to release session <session id>.",
+		// the holder.
+		"keeps its claim on resume", release, "at wave close",
+		// a stale claim: no timeout, owner release.
+		"no timeout", owner, "orphan claim",
+		// the trace is shared: a resume keeps a claim only with its own id,
+		// and a refused session writes nothing to it.
+		"`resume <session id>`", "never adopted on its own",
+		"that id equals the session id in the trace", "never adopting the trace's id",
+		"`session id: <session id>`", "a refused session writes nothing to the trace",
+		// one refusal form; an owner release stops the next coder launch.
+		"returns only three lines", "re-checks it with `read one` before each coder launch",
+		"when you no longer hold the intent (an owner release), launch no more coders",
+	})
+	_, steps, ok := strings.Cut(doc, "## Execution Steps")
+	if !ok {
+		t.Fatal("gabo-cycle/SKILL.md: no ## Execution Steps section")
+	}
+	pre := strings.Index(steps, "preflight engine <engine>")
+	at := strings.Index(steps, "Intent claim")
+	task := strings.Index(steps, "Claim each")
+	if pre < 0 || at < 0 || task < 0 || !(pre < at && at < task) {
+		t.Errorf("gabo-cycle/SKILL.md: want the preflight (%d), then the intent claim (%d), then `Claim each` (%d)", pre, at, task)
+	}
+	_, closing, ok := strings.Cut(steps, "The wave closes")
+	if !ok || !strings.Contains(closing, release) {
+		t.Errorf("gabo-cycle/SKILL.md: wave close does not post %s", release)
+	}
+	// D4: the claim adds no operation to the `tasks` contract.
+	contract := readCatalog(t, "gabo-contract-tasks/SKILL.md")
+	if strings.Contains(strings.ToLower(contract), "### claim intent") {
+		t.Error("gabo-contract-tasks/SKILL.md: D4 adds no `claim intent` operation")
+	}
+}
