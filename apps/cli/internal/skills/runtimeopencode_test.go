@@ -144,7 +144,7 @@ func TestRuntimeOpenCodeWritesTheAgentShape(t *testing.T) {
 	if want := []string{"description", "mode", "permission"}; !slices.Equal(keys, want) {
 		t.Errorf("frontmatter keys = %v, want %v", keys, want)
 	}
-	for _, want := range []string{"description: \"<role>\"", "mode: subagent", "gabo-reviewer: deny"} {
+	for _, want := range []string{"description: \"<role>\"", "mode: subagent", "task: deny", "subagent: deny", "gabo-reviewer: deny"} {
 		if !strings.Contains(front, want) {
 			t.Errorf("frontmatter lacks %q:\n%s", want, front)
 		}
@@ -185,7 +185,6 @@ func TestRuntimeOpenCodeToolMap(t *testing.T) {
 		"memory":          {"`<server>_*`"},
 		"web":             {"`webfetch`", "`websearch`"},
 		"skills":          {"`skill`"},
-		"subagents":       {"`task`"},
 	}
 	for c, keys := range rows {
 		row := ""
@@ -208,6 +207,17 @@ func TestRuntimeOpenCodeToolMap(t *testing.T) {
 	if strings.Contains(s, "allow") {
 		t.Errorf("## Tool Map mentions allow (D3 is deny-only)")
 	}
+	// intent 0015 S6, D7: no capability maps to a launch tool.
+	for _, l := range strings.Split(s, "\n") {
+		if strings.HasPrefix(l, "|") && (strings.Contains(l, "`subagents`") || strings.Contains(l, "`task`") || strings.Contains(l, "`subagent`")) {
+			t.Errorf("## Tool Map has a launch-tool row: %s", l)
+		}
+	}
+	mustContainIn(t, "## Tool Map", s,
+		"No capability maps to a launch tool: every spec agent gets `task: deny` and `subagent: deny`, after the keys of the table and before `skill` (intent 0015 S6, D7)",
+		"The main session launches each spec agent and no agent launches another",
+		"`gabo-coder` runs `{{reviewer_script}}` through `shell`, which its spec lists, so `bash` stays at the owner's setting and no key is written for the run",
+	)
 	for _, want := range []string{"`deny`", "left at the owner's setting"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("## Tool Map: missing %q", want)
@@ -224,7 +234,7 @@ func TestRuntimeOpenCodeReviewerRules(t *testing.T) {
 		"Never place `gabo-reviewer` in the project",
 		"never create `.agents/skills/gabo-reviewer`",
 		"no reviewer link",
-		"every agent but `gabo-reviewer`",
+		"every spec agent sets `permission.skill` `gabo-reviewer: deny`",
 		"`gabo-reviewer: deny`",
 		"`${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh`, written literally",
 		"Never write under `~/.config/opencode`",
@@ -236,6 +246,49 @@ func TestRuntimeOpenCodeReviewerRules(t *testing.T) {
 	if strings.Contains(doc, "reviewer_link:") {
 		t.Errorf("%s: declares a reviewer_link", runtimeOpenCode)
 	}
+	// intent 0015 S6, D4: no agent is exempt, the reviewer agent is gone.
+	mustLackIn(t, runtimeOpenCode, doc,
+		"every agent but `gabo-reviewer`",
+		"the reviewer agent runs the user-level script",
+		"`gabo-reviewer` lacks `skills`",
+		"an agent that also lacks `skills` gets `\"*\": deny` first, then `gabo-reviewer: deny`",
+		"`skill: deny`",
+		"(the reviewer agent)",
+	)
+}
+
+// intent 0015 S6, D3, D4, D7, S8: six agents with no launch permission, the
+// whole main-session skill set linked, the former agent files removed on
+// every build and no read, requirement or report of the depth key.
+func TestRuntimeOpenCodeBuildsSixAgentsAndDropsTheDepthKey(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	steps := openCodeSection(t, doc, "Build Steps")
+	mustContainIn(t, "## Build Steps", steps,
+		"and link every other `main_session.skills` entry (`gabo-assistant`, `gabo-cycle` and `gabo-wave-report` in all, intent 0015 D3) the same way as `.agents/skills/<name>`, to `../../.gabo/skills/<name>`, under the shared-directory rule of step 3",
+		"Former agents (intent 0015 S6, D4): on every build remove `.opencode/agents/gabo-cycle.md` and `.opencode/agents/gabo-reviewer.md`, left by an earlier build, only when the file carries a `gabo-version:` line; a file without one: leave it and report it.",
+		"the `.agents/skills/<name>` link of every other `main_session.skills` entry",
+		"while another spec agent's `skills` lists it",
+	)
+	pre := openCodeSection(t, doc, "Prerequisites")
+	mustContainIn(t, "## Prerequisites", pre,
+		"`gabo init` writes `default_agent`, the only key it writes for OpenCode, into `<file>` (intent 0010 S4) and leaves an existing `experimental.subagent_depth` value alone (intent 0015 S8)",
+	)
+	for _, name := range []string{"Prerequisites", "Sources", "Output Contract"} {
+		sec := openCodeSection(t, doc, name)
+		for _, bad := range []string{"requires `experimental.subagent_depth`", "subagent_depth` read", "Nested subagents stop at"} {
+			if strings.Contains(sec, bad) {
+				t.Errorf("## %s: still carries %q", name, bad)
+			}
+		}
+		if name != "Prerequisites" && strings.Contains(sec, "subagent_depth") {
+			t.Errorf("## %s: still names the depth key", name)
+		}
+	}
+	mustContainIn(t, "## Output Contract", openCodeSection(t, doc, "Output Contract"),
+		"each former agent file removed or left with why",
+		"each `main_session.skills` link",
+	)
 }
 
 // The skill says how to fill every template slot.
@@ -354,7 +407,7 @@ func TestRuntimeOpenCodeReadsTheEngineConfigKeys(t *testing.T) {
 	mustContainIn(t, "## Prerequisites", pre,
 		"the first existing of `opencode.json`, `opencode.jsonc`, `.opencode/opencode.json`, `.opencode/opencode.jsonc` (OpenCode's own lookup order, the same one `gabo check` reads)",
 		"Call it `<file>`",
-		"`gabo init` writes `default_agent` into `<file>` (intent 0010 S4) and never writes or requires `experimental.subagent_depth` (intent 0015 S8); this skill only reads it and writes no key",
+		"`gabo init` writes `default_agent`, the only key it writes for OpenCode, into `<file>` (intent 0010 S4) and leaves an existing `experimental.subagent_depth` value alone (intent 0015 S8); this skill only reads `default_agent` and writes no key",
 		"report `run gabo init`",
 		"Never write `~/.config/opencode/` or `.opencode/package.json`",
 	)
@@ -373,7 +426,7 @@ func TestRuntimeOpenCodeReadsTheEngineConfigKeys(t *testing.T) {
 func TestRuntimeOpenCodeWriteList(t *testing.T) {
 	t.Parallel()
 	doc := runtimeOpenCodeDoc(t)
-	const list = "Write only `.opencode/agents/<id>.md` for spec ids and `.opencode/agents/gabo-assistant.md`, `.agents/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete and the removals of other engines' main-session entries of build step 9."
+	const list = "Write only `.opencode/agents/<id>.md` for spec ids and `.opencode/agents/gabo-assistant.md`, `.agents/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete, the former agent files of build step 3 and the removals of other engines' main-session entries of build step 9."
 	rules := openCodeSection(t, doc, "Hard Rules")
 	if !strings.Contains(rules, list) {
 		t.Errorf("## Hard Rules: missing the write list %q", list)
@@ -382,6 +435,7 @@ func TestRuntimeOpenCodeWriteList(t *testing.T) {
 		t.Errorf("%s: %d write lists, want exactly the one of S9", runtimeOpenCode, n)
 	}
 	for _, want := range []string{
+		"`.opencode/agents/gabo-cycle.md` and `.opencode/agents/gabo-reviewer.md` of build step 3 when the file carries a `gabo-version:` line",
 		"never write or remove a key of a project config",
 		"`gentle-orchestrator`",
 	} {
@@ -420,11 +474,11 @@ func TestRuntimeOpenCodeCoderWorktreeStep(t *testing.T) {
 	}
 }
 
-// The binary facts behind the depth rule and the worktree step are cited (S2).
+// The binary facts behind the worktree step are cited (S2).
 func TestRuntimeOpenCodeCitesPrerequisiteFacts(t *testing.T) {
 	t.Parallel()
 	s := openCodeSection(t, runtimeOpenCodeDoc(t), "Sources")
-	for _, want := range []string{"`experimental.subagent_depth`", "`opencode.session_move`", "`workdir`"} {
+	for _, want := range []string{"`opencode.session_move`", "`workdir`"} {
 		found := false
 		for _, l := range strings.Split(s, "\n") {
 			if strings.Contains(l, want) && strings.Contains(l, "(binary)") {
