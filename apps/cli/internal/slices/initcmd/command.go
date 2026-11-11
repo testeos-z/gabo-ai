@@ -20,7 +20,8 @@ func NewCommand(factory Factory) *cobra.Command {
 		Short: "Install the reviewer skill and copy the gabo skill catalog into this project",
 		Long: "Install the embedded gabo-reviewer skill and its scripts at user level, in\n" +
 			"${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer/, never in the repository;\n" +
-			"on every run it replaces a copy whose " + ReviewerStamp + " differs from the binary version.\n" +
+			"on every run it replaces a copy whose " + ReviewerStamp + " differs from the binary version, and a copy of\n" +
+			"the same version whose content differs from the embedded reviewer (" + ReviewerHashFile + ").\n" +
 			"Copy the embedded gabo skill catalog (without gabo-reviewer) into " + CatalogDir + "/\n" +
 			"and write the catalog version to " + StampFile + "; commit both.\n" +
 			"An older or missing stamp refreshes the catalog; a matching stamp changes nothing;\n" +

@@ -197,10 +197,14 @@ func (u *UseCase) copyCatalog(v version) error {
 	return nil
 }
 
-// contentHash is a stable digest of the embedded catalog: every path and
-// content, in path order.
-func (u *UseCase) contentHash() string {
-	files := slices.Clone(u.files)
+// contentHash is the digest of the embedded catalog (see digest).
+func (u *UseCase) contentHash() string { return digest(u.files) }
+
+// digest is a stable SHA-256 of a set of embedded files: every path and
+// content, in path order. The catalog (HashFile) and the user-level
+// reviewer (ReviewerHashFile) stamp it, so one function decides both (intent 0016 PD5).
+func digest(files []File) string {
+	files = slices.Clone(files)
 	slices.SortFunc(files, func(a, b File) int { return strings.Compare(a.Path, b.Path) })
 	h := sha256.New()
 	for _, f := range files {

@@ -53,6 +53,7 @@ func TestCommandHelpNamesTheEngineFiles(t *testing.T) {
 		`another value of "default_agent" is yours and kept`,
 		`With opencode not listed it removes that exact "default_agent" value from each of those files, also when opencode is no longer in runtimes`,
 		"init never writes experimental.subagent_depth and leaves an existing value as it is",
+		"on every run it replaces a copy whose VERSION differs from the binary version, and a copy of the same version whose content differs from the embedded reviewer (REVIEWER_HASH)",
 	} {
 		if !strings.Contains(help, s) {
 			t.Errorf("help is missing %q:\n%s", s, out.String())
