@@ -206,17 +206,6 @@ func TestCodexPiAndOpencodeShareOneSetOfLinks(t *testing.T) {
 	}
 }
 
-// depthLines returns the ✗ lines naming experimental.subagent_depth.
-func depthLines(r Report) []string {
-	var out []string
-	for _, l := range r.Lines {
-		if strings.HasPrefix(l, "✗ ") && strings.Contains(l, "experimental.subagent_depth") {
-			out = append(out, l)
-		}
-	}
-	return out
-}
-
 // Intent 0015 S8, D6: gabo no longer depends on an engine's nesting depth,
 // so gabo check prints no line naming experimental.subagent_depth whatever
 // the project's OpenCode config holds (missing, below 3, not a number, no

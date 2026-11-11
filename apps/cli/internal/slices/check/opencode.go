@@ -7,10 +7,6 @@ import (
 	"strconv"
 )
 
-// OpenCode's project config lookup order (spec 0004 S8); the first existing
-// file is the one gabo-runtime-opencode writes and the one checked.
-var opencodeConfigs = []string{"opencode.json", "opencode.jsonc", ".opencode/opencode.json", ".opencode/opencode.jsonc"}
-
 // parseJSONC parses a JSON object that may hold // and /* */ comments and
 // trailing commas, as OpenCode's .jsonc (and .json) configs may.
 func parseJSONC(b []byte) (map[string]any, error) {
