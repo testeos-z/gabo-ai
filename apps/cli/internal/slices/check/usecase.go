@@ -324,6 +324,9 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 				}
 			}
 		}
+		if err := u.checkFormerAgents(r, dir, files, spec); err != nil {
+			return err
+		}
 	}
 	return nil
 }

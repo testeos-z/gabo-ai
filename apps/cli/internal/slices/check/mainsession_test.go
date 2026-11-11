@@ -216,6 +216,11 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 		{"opencode no config", "opencode", func(_ *testing.T, p fstest.MapFS) { delete(p, ocConfig) },
 			[][2]string{{line("opencode.json or opencode.jsonc or .opencode/opencode.json or .opencode/opencode.jsonc", "incomplete", "opencode")[0],
 				initMerges("default_agent", ".opencode/opencode.json")}}},
+		// Intent 0015 S7: gabo-cycle and gabo-wave-report are main_session.skills.
+		{"claude cycle link", "claude", func(_ *testing.T, p fstest.MapFS) { delete(p, ".claude/skills/gabo-cycle") },
+			[][2]string{line(".claude/skills/gabo-cycle", "incomplete", "claude")}},
+		{"codex wave-report link", "codex", func(_ *testing.T, p fstest.MapFS) { delete(p, ".agents/skills/gabo-wave-report") },
+			[][2]string{line(".agents/skills/gabo-wave-report", "incomplete", "codex")}},
 		{"opencode link", "opencode", func(_ *testing.T, p fstest.MapFS) { delete(p, sharedLink) },
 			[][2]string{line(sharedLink, "incomplete", "opencode")}},
 		{"codex block", "codex", func(_ *testing.T, p fstest.MapFS) { p["AGENTS.md"] = file("# Project\n") },
