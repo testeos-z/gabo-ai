@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use when the owner or the assistant opens, drives, reads or closes a direct session. This adapter fills the `direct_sessions` slot contract (`gabo-contract-direct-sessions`, TRD 9.1; R14, R18, US-005) with the Orca CLI: one named Orca terminal per session running the agent CLI of the resolved coder engine (`claude` or `pi`, see Engine Resolution), driven through the terminal handle Orca returns. `send message` and `read state` also reach a session that `agent_host` started on a remote host, through its `host` and `handle` fields (see Handle). Point `slots.direct_sessions.adapter` at this skill's `SKILL.md`. Verified against Orca CLI 1.4.227 (`orca <command> --help`).
+Use when the owner or the assistant opens, drives, reads or closes a direct session. This adapter fills the `direct_sessions` slot contract (`gabo-contract-direct-sessions`, TRD 9.1; R14, R18, US-005) with the Orca CLI: one named Orca terminal per session running the agent CLI of the resolved coder engine (`claude` or `pi`, see Engine Resolution), driven through the terminal handle Orca returns. `send message` and `read state` also reach an Orca terminal session that `agent_host` started on a remote Orca host, through its `host` and `handle` fields (see Handle). Point `slots.direct_sessions.adapter` at this skill's `SKILL.md`. Verified against Orca CLI 1.4.227 (`orca <command> --help`); on that CLI `orca terminal show --help` and `orca terminal read --help` list `--environment`.
 
 ## Hard Rules
 
@@ -27,6 +27,7 @@ Use when the owner or the assistant opens, drives, reads or closes a direct sess
 - `host` is `local` for the local host, the literal that `gabo-contract-direct-sessions` names; it adds no `--environment`.
 - A remote `host` is the Orca environment name that `agent_host` reports for where the session runs (`report where agents run`: reached through Orca environment). The adapter reads that name from the env var `GABO_ORCA_ENVIRONMENT` and never a secret value.
 - `handle` is the terminal handle that Orca returned for the session.
+- This adapter drives Orca terminals only: a session that `gabo-agent-host-local` started is a background process with a pid and a session id, not an Orca terminal, so its handle is not reachable through this adapter and is refused before any `orca` command. Its `report where agents run` names the machine's hostname, which is an unknown host here.
 - A `host` that is neither `local` nor the Orca environment in `GABO_ORCA_ENVIRONMENT` is an unknown host: it is refused before any `orca` command, and nothing is sent or read.
 - A remote `host` must equal the value of `GABO_ORCA_ENVIRONMENT`; a mismatched `host` is refused before any `orca` command, so a handle of host B never runs against host A.
 - If `GABO_ORCA_ENVIRONMENT` is unset or empty, refuse before any `orca` command, name the missing variable, and send and read nothing.
@@ -78,7 +79,7 @@ A remote handle runs the same command with the environment flag after `orca term
 orca terminal send --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --text "<message>" --enter --wait-submit 10 --json
 ```
 
-It drives a terminal, so it works for a session of any engine, including a `codex` session that `agent_host` started. The result reports whether the input was accepted and submitted. After an ambiguous failure, reissue the exact command with the reported `--retry-request <id>`; never resend blindly.
+It drives an Orca terminal, so it works for an Orca terminal session of any engine, including a `codex` session that `agent_host` started on a remote Orca host. The result reports whether the input was accepted and submitted. After an ambiguous failure, reissue the exact command with the reported `--retry-request <id>`; never resend blindly.
 
 ### read state
 
@@ -96,7 +97,7 @@ orca terminal show --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --
 orca terminal read --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --screen --json
 ```
 
-`terminal show` gives the terminal metadata (an unknown handle means the session is gone: `finished`); `terminal read --screen` gives the rendered screen, which shows whether the agent is working or waiting for input. For new output since a previous read use `orca terminal read --terminal <handle> --cursor <nextCursor> --json`, with the environment flag as above for a remote handle. It drives a terminal, so it works for a session of any engine, including a `codex` session that `agent_host` started.
+`terminal show` gives the terminal metadata (an unknown handle means the session is gone: `finished`); `terminal read --screen` gives the rendered screen, which shows whether the agent is working or waiting for input. For new output since a previous read use `orca terminal read --terminal <handle> --cursor <nextCursor> --json`, with the environment flag as above for a remote handle. It drives an Orca terminal, so it works for an Orca terminal session of any engine, including a `codex` session that `agent_host` started on a remote Orca host.
 
 ### close session
 

@@ -31,8 +31,8 @@ func TestDirectSessionsOrcaTakesTheTwoHandleFields(t *testing.T) {
 // Intent 0019 S2, S4 (plan T2): a host that is neither local nor the Orca
 // environment in GABO_ORCA_ENVIRONMENT is refused before any orca command runs;
 // the host of a remote handle selects the target, so a mismatch or an unset or
-// empty variable sends and reads nothing (review of PR #547, findings 1 to 3).
-// The adapter is prose that an agent follows, so these tests pin the rule text.
+// empty variable sends and reads nothing. The adapter is prose that an agent
+// follows, so these tests pin the rule text.
 func TestDirectSessionsOrcaRefusesUnknownHosts(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, directSessions)
@@ -40,6 +40,7 @@ func TestDirectSessionsOrcaRefusesUnknownHosts(t *testing.T) {
 		"A `host` that is neither `local` nor the Orca environment in `GABO_ORCA_ENVIRONMENT` is an unknown host: it is refused before any `orca` command, and nothing is sent or read.",
 		"A remote `host` must equal the value of `GABO_ORCA_ENVIRONMENT`; a mismatched `host` is refused before any `orca` command, so a handle of host B never runs against host A.",
 		"If `GABO_ORCA_ENVIRONMENT` is unset or empty, refuse before any `orca` command, name the missing variable, and send and read nothing.",
+		"This adapter drives Orca terminals only: a session that `gabo-agent-host-local` started is a background process with a pid and a session id, not an Orca terminal, so its handle is not reachable through this adapter and is refused before any `orca` command.",
 	})
 }
 
@@ -105,7 +106,7 @@ func TestDirectSessionsOrcaSendAndReadWorkForAnyEngine(t *testing.T) {
 	doc := readCatalog(t, directSessions)
 	for _, op := range []string{"### send message", "### read state"} {
 		sectionRequire(t, op, contractSection(doc, op), []string{
-			"It drives a terminal, so it works for a session of any engine, including a `codex` session that `agent_host` started.",
+			"It drives an Orca terminal, so it works for an Orca terminal session of any engine, including a `codex` session that `agent_host` started on a remote Orca host.",
 		})
 	}
 	requireIn(t, directSessions, doc, []string{
