@@ -31,6 +31,7 @@ Owners and contributors who run `gabo init` on a build whose version matches the
 ## Constraints
 
 - PRD R32: `gabo init` refreshes the copied skill catalog and installs the user-level reviewer, and it never touches `gabo.yaml` or the user config. The Pi package check only reads (`pi list` writes nothing).
+- TRD 9.4 states the version-only rule today (line 479 "changes nothing" when the stamp matches; lines 402 and 661 for the reviewer; decision 14). This intent changes that rule for content differences; the TRD lines are amended when the owner accepts the spec.
 - PRD R33 and `gabo check` are out of scope (issue #463: `gabo check` impact none).
 - Output for every case this intent does not name stays byte-identical to the golden output in `apps/cli/internal/slices/initcmd/`.
 - Release: the next release after 0.2.10 (issue #463 label `release:next`).
@@ -41,7 +42,7 @@ Owners and contributors who run `gabo init` on a build whose version matches the
 | # | question | status |
 |---|---|---|
 | 1 | Do the P2a findings in the [#463 comment](https://github.com/testeos-z/gabo-ai/issues/463#issuecomment-6703389898) that are not init behavior join this intent? They are: (1) Pi waves under `pi --print` end after one turn; (2) gabo-cycle on Pi must register each task worktree with `session_worktree_register`; (3) gentle-pi asks before `git push` unless autonomous mode is on, and `gabo init` would have to write that mode; (5) small closure and PR-body bugs. | open. **Proposed (auto):** no; each gets its own intent. Findings (1), (2) and (5) change runtime skills, docs or gabo-cycle, and (3) turns off a gentle-pi confirmation guard for `git push`, which is a safety decision for the owner. |
-| 2 | On a same-version refresh, a hand edit inside `.gabo/skills/` is replaced by the embedded file. Is that acceptable? | open. **Proposed (auto):** yes, as spec D1; a version change already replaces the copied catalog, so the same-version refresh does not add a new kind of overwrite. |
+| 2 | On a same-version refresh, a local edit inside `.gabo/skills/` is replaced by the embedded file. Is that acceptable? | answered by the owner's decision of 2026-10-27 (PR #75, merged): a refresh replaces the catalog wholesale and overwrites local edits, because customization belongs in adapters. The spec applies it to same-version refreshes too. |
 
 ## Links
 
