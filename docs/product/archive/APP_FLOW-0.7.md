@@ -7,7 +7,7 @@
 | version | 0.7 |
 | date | 2026-10-29 |
 | linked docs | [PRD](PRD-0.10.md), [TRD](TRD-0.9.md), [DB_SCHEMA](DB_SCHEMA.md), [UX_UI](../UX_UI.md), [stories](stories/README.md) |
-| diagrams | [team-flow.html](../diagrams/team-flow.html), [configuration-flow.html](../diagrams/configuration-flow.html) |
+| diagrams | [team-flow.md](../diagrams/team-flow.md), [configuration-flow.html](../diagrams/configuration-flow.html) |
 
 gabo-ai has no graphical UI. Its "screens" are the surfaces where the owner meets the system: the assistant conversation, an optional direct session, the CLI and the tracker or PR. This document describes one journey per user story. It adds no product behavior: every step comes from the PRD, TRD or a story, and every gap this document had to fill is marked **Proposed (auto)**.
 
@@ -219,7 +219,7 @@ Proposed (auto) A2. Actors: **owner**, **assistant**, **directiva** (pm, dev-lea
 
 ## Flow
 
-Proposed (auto) A8. Detailed references: [team-flow.html](../diagrams/team-flow.html) (team, lanes and configurable points) and [configuration-flow.html](../diagrams/configuration-flow.html) (detect, propose, activate, verify).
+Proposed (auto) A8. Detailed references: [team-flow.md](../diagrams/team-flow.md) (team, lanes and configurable points) and [configuration-flow.html](../diagrams/configuration-flow.html) (detect, propose, activate, verify).
 
 ```mermaid
 flowchart TD
