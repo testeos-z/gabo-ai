@@ -69,6 +69,8 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 	// The main-session entry of spec 0009 S1, S2: link, primary agent and
 	// the default_agent key above.
 	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".agents/skills/gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[".agents/skills/gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	proj[".opencode/agents/"+assistantID+".md"] = file("---\ndescription: \"The gabo assistant\"\nmode: primary\n---\n" +
 		"<!-- gabo-version: " + version + " -->\n" + assistantBody(t))
 	return proj
@@ -141,11 +143,11 @@ func TestOpencodeAgentFromAnotherVersionFails(t *testing.T) {
 func TestOpencodeMissingLinkFails(t *testing.T) {
 	t.Parallel()
 	proj := opencodeBuilt(t, "1.2.3")
-	delete(proj, ".agents/skills/gabo-wave-report")
+	delete(proj, ".agents/skills/gabo-reviewer-notes")
 	delete(proj, ".agents/skills/gabo-agent-host")
 	rep := runOpencode(t, proj, "1.2.3")
 	wantFailed(t, rep,
-		"✗ skill link .agents/skills/gabo-wave-report missing",
+		"✗ skill link .agents/skills/gabo-reviewer-notes missing",
 		"✗ skill link .agents/skills/gabo-agent-host missing")
 }
 
@@ -272,16 +274,6 @@ func TestOpencodeBuiltAgentSkills(t *testing.T) {
 			wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-pm.md", tt.want)
 		})
 	}
-}
-
-// The agent with an empty spec list and no Skills: line passes.
-func TestOpencodeBuiltReviewerHasNoSkillsLine(t *testing.T) {
-	t.Parallel()
-	proj := opencodeBuilt(t, "1.2.3")
-	if strings.Contains(string(proj[".opencode/agents/gabo-reviewer.md"].Data), "\nSkills: ") {
-		t.Fatalf("gabo-reviewer has a Skills: line:\n%s", proj[".opencode/agents/gabo-reviewer.md"].Data)
-	}
-	wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-reviewer.md", nil)
 }
 
 // The directory the Skills: line names does not change the result.

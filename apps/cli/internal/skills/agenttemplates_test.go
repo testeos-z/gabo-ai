@@ -171,18 +171,46 @@ func TestEveryAgentTemplateNamesItsEngine(t *testing.T) {
 	}
 }
 
-func TestReviewerTemplateIsARelay(t *testing.T) {
+// Intent 0015 S2, D3, D7 (plan T6): six spec agents, all launched by the main
+// session and none with the launch capability; the cycle and relay templates
+// are gone.
+func TestCatalogHasSixAgentsLaunchedByTheMainSession(t *testing.T) {
 	t.Parallel()
-	doc := agentTemplates(t)[templatesPrefix+"gabo-reviewer.md"]
-	for _, s := range []string{
-		"`PR #<n> head <sha> ready for review`", "positive integer", "40-hex",
-		"`^PR #([1-9][0-9]*) head ([0-9a-f]{40})( ready for review)?$`",
-		"{{reviewer_script}}", "`verdict=retry`", "exactly once", "`VERDICT `",
-		"never review", "edit", "comment", "merge",
-	} {
-		if !strings.Contains(doc, s) {
-			t.Errorf("gabo-reviewer template: missing %q", s)
+	for _, gone := range []string{"gabo-cycle.md", "gabo-reviewer.md"} {
+		if _, ok := agentTemplates(t)[templatesPrefix+gone]; ok {
+			t.Errorf("%s%s still embedded", templatesPrefix, gone)
 		}
+	}
+	spec := embeddedByPath(t)[agentspec.Dir+"/agents.yaml"]
+	if n := strings.Count(spec, "\n  - id: "); n != 6 {
+		t.Errorf("agents.yaml: %d agents, want 6", n)
+	}
+	for _, s := range []string{"launched_by: main-session", "skills: [gabo-assistant, gabo-cycle, gabo-wave-report]"} {
+		if !strings.Contains(spec, s) {
+			t.Errorf("agents.yaml: missing %q", s)
+		}
+	}
+	for _, s := range []string{"launched_by: gabo-", "subagents", "id: gabo-cycle", "id: gabo-reviewer"} {
+		if strings.Contains(spec, s) {
+			t.Errorf("agents.yaml: still has %q", s)
+		}
+	}
+	if !strings.Contains(spec, "tracker, repository-host, memory, web, skills\n") {
+		t.Error("agents.yaml header: the tools list is not the ten capabilities")
+	}
+	skill := embeddedByPath(t)[agentspec.Dir+"/SKILL.md"]
+	for _, s := range []string{
+		"`read`, `search`, `edit`, `shell`, `git`, `tracker`, `repository-host`, `memory`, `web`, `skills` |",
+		"gets the link of every `main_session.skills` entry",
+		"a shared `.agents/skills` link stays while any listed engine uses that directory",
+		"the template that carries the slot is `gabo-coder`",
+	} {
+		if !strings.Contains(skill, s) {
+			t.Errorf("gabo-agent-templates/SKILL.md: missing %q", s)
+		}
+	}
+	if strings.Contains(skill, "`subagents`") {
+		t.Error("gabo-agent-templates/SKILL.md: still lists `subagents`")
 	}
 }
 

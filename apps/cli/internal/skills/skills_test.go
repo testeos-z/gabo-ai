@@ -701,8 +701,8 @@ func TestCatalogShipsTheAgentSpec(t *testing.T) {
 }
 
 // T061: the wave report format lives only in gabo-wave-report; the cycle and
-// the assistant reference it instead of repeating its fields, and the cycle
-// agent loads it.
+// the assistant reference it instead of repeating its fields, and the main
+// session loads it.
 func TestWaveReportFormatLivesInOneSkill(t *testing.T) {
 	t.Parallel()
 	files, err := Files()
@@ -719,8 +719,8 @@ func TestWaveReportFormatLivesInOneSkill(t *testing.T) {
 				}
 			}
 		case "gabo-agent-templates/agents.yaml":
-			if !strings.Contains(string(f.Data), "skills: [gabo-cycle, gabo-wave-report]") {
-				t.Errorf("%s: the gabo-cycle agent must load gabo-wave-report", f.Path)
+			if !strings.Contains(string(f.Data), "skills: [gabo-assistant, gabo-cycle, gabo-wave-report]") {
+				t.Errorf("%s: the main session must load gabo-cycle and gabo-wave-report", f.Path)
 			}
 		}
 	}

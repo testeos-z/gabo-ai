@@ -99,17 +99,16 @@ func TestCoderSendsTheEngineOnlyUnderSession(t *testing.T) {
 	})
 }
 
-// Intent 0013 S11 (plan T8): the reviewer relay and the reviewer notes
-// describe the optional engine field; the relay passes it as an argument.
+// Intent 0013 S11 (plan T8): the coder and the reviewer notes
+// describe the optional engine field; the coder passes it as an argument.
 func TestReviewerDescribesTheOptionalEngineField(t *testing.T) {
 	t.Parallel()
-	tmpl := agentTemplates(t)[templatesPrefix+"gabo-reviewer.md"]
-	requireIn(t, "gabo-reviewer template", tmpl, []string{
-		"`PR #<n> head <sha> engine <engine>`",
+	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	requireIn(t, "gabo-coder template", tmpl, []string{
+		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"`^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
-		"as an argument, never as environment",
 	})
 	notes := readCatalog(t, "gabo-reviewer-notes/SKILL.md")
 	requireIn(t, "gabo-reviewer-notes/SKILL.md", notes, []string{

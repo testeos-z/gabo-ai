@@ -220,7 +220,7 @@ func TestCheckFailureExitsOne(t *testing.T) {
 func TestCheckMissingLinksExitOne(t *testing.T) {
 	t.Setenv("CI", "")
 	project := checkProject(t, "1.2.3")
-	if err := os.Remove(filepath.Join(project, ".claude", "skills", "gabo-wave-report")); err != nil {
+	if err := os.Remove(filepath.Join(project, ".claude", "skills", "gabo-reviewer-notes")); err != nil {
 		t.Fatal(err)
 	}
 	reviewer := filepath.Join(os.Getenv("HOME"), ".claude", "skills", "gabo-reviewer")
@@ -229,7 +229,7 @@ func TestCheckMissingLinksExitOne(t *testing.T) {
 	}
 	out, err := runCheck(t, project, "1.2.3")
 	for _, want := range []string{
-		"✗ skill link .claude/skills/gabo-wave-report missing",
+		"✗ skill link .claude/skills/gabo-reviewer-notes missing",
 		"✗ reviewer link " + reviewer + " missing",
 	} {
 		if exitOf(err) != 1 || !strings.Contains(out, want) {
@@ -355,18 +355,22 @@ func TestCheckNewerCLIReadsTheProjectSpec(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	older, _, ok := strings.Cut(string(b), "  - id: gabo-reviewer\n")
+	head, rest, ok := strings.Cut(string(b), "  - id: gabo-coder\n")
 	if !ok {
-		t.Fatal("embedded spec has no gabo-reviewer entry to drop")
+		t.Fatal("embedded spec has no gabo-coder entry to drop")
 	}
-	if err := os.WriteFile(specPath, []byte(older), 0o644); err != nil {
+	_, tail, ok := strings.Cut(rest, "main_session:")
+	if !ok {
+		t.Fatal("embedded spec has no main_session entry")
+	}
+	if err := os.WriteFile(specPath, []byte(head+"main_session:"+tail), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Remove(filepath.Join(project, ".claude", "agents", "gabo-reviewer.md")); err != nil {
+	if err := os.Remove(filepath.Join(project, ".claude", "agents", "gabo-coder.md")); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runCheck(t, project, "1.4.0")
-	if exitOf(err) != 0 || strings.Contains(out, "gabo-reviewer") {
+	if exitOf(err) != 0 || strings.Contains(out, "gabo-coder") {
 		t.Fatalf("exit %d: %v\n%s", exitOf(err), err, out)
 	}
 }

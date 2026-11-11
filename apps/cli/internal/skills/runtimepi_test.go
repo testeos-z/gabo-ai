@@ -488,21 +488,14 @@ func TestRuntimePiMapsSubagentsToNoTool(t *testing.T) {
 	)
 }
 
-// reviewerPatterns returns the backticked ^...$ patterns of the
-// gabo-reviewer relay template, in order.
+// reviewerPatterns are the two request patterns the coder validates, pinned
+// as literals (they were compared with the removed gabo-reviewer template).
 func reviewerPatterns(t *testing.T) []string {
 	t.Helper()
-	tmpl := readCatalog(t, "gabo-agent-templates/agents/gabo-reviewer.md")
-	var out []string
-	for _, part := range strings.Split(tmpl, "`")[1:] {
-		if strings.HasPrefix(part, "^PR #") && strings.HasSuffix(part, "$") {
-			out = append(out, part)
-		}
+	return []string{
+		`^PR #([1-9][0-9]*) head ([0-9a-f]{40})( ready for review)?$`,
+		`^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`,
 	}
-	if len(out) != 2 {
-		t.Fatalf("gabo-reviewer.md: %d request patterns, want 2: %q", len(out), out)
-	}
-	return out
 }
 
 // Intent 0015 D5 (plan T5, supersedes intent 0013 D15): the Pi coder body is
