@@ -1,6 +1,6 @@
 ---
 name: gabo-setup
-description: "Trigger: gabo setup, first setup, configure gabo, setup prompt, change slot adapter or runtime, rebuild agents after gabo upgrade. Guides setup: ask, adapters, config, build agents, gabo check, slot smoke test, per-change product model."
+description: "Trigger: gabo setup, first setup, configure gabo, setup prompt, sync config, change slot adapter or runtime, rebuild agents after gabo upgrade. Guides setup: ask, adapters, config, build agents, gabo check, slot smoke test, per-change product model."
 license: Apache-2.0
 metadata:
   author: gabo-ai
@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-codex`, `gabo-runtime-opencode`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
+Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), sync config (Sync config), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-codex`, `gabo-runtime-opencode`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
 
 ## Hard Rules
 
@@ -78,6 +78,19 @@ Run after a gabo upgrade (TRD 9.4), or when `gabo check` prints one of these lin
 1. `gabo init` refreshes the catalog copy `.gabo/skills/` and the stamp `.gabo/VERSION` and reinstalls the user-level `gabo-reviewer` skill, and writes the engine config keys for `runtimes.*` (the main-session key included); it never touches the config files `gabo.yaml` and the global user file, so ask no setup question again.
 2. For each engine of the engine set (step 4), rebuild every agent through its runtime skill, which rewrites each agent's `gabo-version` line, and the runtime skill of each engine listed in `runtimes.assistant` builds the agent file and link of the main-session entry (or its block); `gabo init` writes the main-session key.
 3. Then rerun `gabo check` and fix what fails until it passes, as in step 5.
+
+## Sync config
+
+Run when the owner asks to sync the config ("sync config"). It reads a work-style source, never a repository the owner did not name, and writes nothing in this part.
+
+1. **Source.** Ask one question: "local or remote". Local is the default: local is the source when the owner does not answer. Remote means another repository; ask for it in step 3.
+2. **Local.** Read the profile `profile.yaml` in the user config folder: `$XDG_CONFIG_HOME/gabo/profile.yaml` when `XDG_CONFIG_HOME` is an absolute path, else `~/.config/gabo/profile.yaml` (the user file's path rule). If it is missing, report `no profile at <path>`, offer the remote source or the normal setup above, and write nothing.
+3. **Remote.** Ask which repository, by local path or by GitHub URL. Read only one file, `gabo.yaml`, read-only, without cloning, and it stores nothing from it:
+   - local path: read `<path>/gabo.yaml`;
+   - GitHub URL: run `gh api -H "Accept: application/vnd.github.raw+json" repos/<owner>/<repo>/contents/gabo.yaml` with the owner's existing `gh` login, adding `?ref=<ref>` only when the URL names a branch (`/blob/<ref>/...` or `/tree/<ref>`); no credential is stored or asked for;
+   - another host than GitHub: the remote cannot be read here; ask for a local path instead.
+   - An unreadable or missing file (a path that does not exist, a non-200 result, a file that does not parse) reports the reason and changes nothing.
+4. **Report.** Name the source (path or URL) and the keys it holds, then stop: this part reads the source and writes no key.
 
 ## Output Contract
 
