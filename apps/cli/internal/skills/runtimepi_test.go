@@ -378,13 +378,16 @@ func TestRuntimePiListsTheMemoryToolsExplicitly(t *testing.T) {
 	)
 }
 
-// intent 0013 S17: gentle-pi registers the subagent_* tools only in the
-// primary session, so a subagent gets none of them.
-func TestRuntimePiSaysSubagentsGetNoSubagentTools(t *testing.T) {
+// intent 0015 S7 d: the `subagents` capability is gone (no spec agent has it),
+// and the sentence on subagents getting no `subagent_*` tools stays with
+// `agent_tools_unavailable`.
+func TestRuntimePiHasNoSubagentsCapability(t *testing.T) {
 	t.Parallel()
-	row := piCapabilityRow(t, runtimePiDoc(t), "`subagents`")
-	mustContainIn(t, "subagents row", row,
-		"a gentle-pi subagent gets no `subagent_*` tools (gentle-pi registers them only in the primary session)",
+	doc := runtimePiDoc(t)
+	mustLackIn(t, runtimePi, doc, "| `subagents` |", "    subagents: []")
+	mustContainIn(t, "## Build", doc,
+		"`metadata.agent_tools_unavailable` the tools a subagent never has",
+		"every `.pi/agents` file runs as a gentle-pi subagent",
 	)
 }
 
@@ -424,7 +427,6 @@ func TestRuntimePiDeclaresToolRequirements(t *testing.T) {
 		"tracker":         {"bash"},
 		"repository-host": {"bash"},
 		"memory":          {"mem_search", "mem_save", "mem_update", "mem_get_observation"},
-		"subagents":       {},
 		"web":             {},
 	}
 	// intent 0013 S20 (plan T22): every .pi/agents file runs as a gentle-pi
@@ -459,32 +461,60 @@ func TestRuntimePiNamesTheToolSources(t *testing.T) {
 	)
 }
 
-// Intent 0013 S18, D12 (plan T21): a Pi wave runs in the main session,
-// because gentle-pi subagents get no `subagent_*` tools.
-func TestRuntimePiSaysAPiWaveRunsInTheMainSession(t *testing.T) {
+// Intent 0015 S1, D7 (plan T9): the Pi-only wave rule is gone because the main
+// session runs the wave on every engine.
+func TestRuntimePiHasNoPiOnlyWaveRule(t *testing.T) {
 	t.Parallel()
-	rules := piSection(t, runtimePiDoc(t), "## Hard Rules")
-	mustContainIn(t, "Hard Rules", rules,
-		"A wave started from a Pi main session runs in that main session (intent 0013 S18, D12)",
-		"gentle-pi subagents get no `subagent_*` tools",
-		"`gabo-assistant` loads the `gabo-cycle` skill itself",
-		"each coder is one first-level `subagent_run`",
+	doc := runtimePiDoc(t)
+	mustLackIn(t, runtimePi, doc,
+		"A wave started from a Pi main session runs in that main session",
+		"Build the `gabo-cycle` agent anyway",
+		"loads the `gabo-cycle` skill itself instead of launching",
+		"Build `gabo-reviewer.md` anyway",
 	)
 }
 
-// Intent 0013 S20 (plan T22): the subagents capability maps to no tool on
-// gentle-pi, because every .pi/agents file runs as a gentle-pi subagent.
-func TestRuntimePiMapsSubagentsToNoTool(t *testing.T) {
+// Owner order 2026-11-11 (plan T9): on Pi the main session launches each coder
+// as one first-level `subagent_run` of `gabo-coder` and resumes it with
+// `subagent_continue`; the run id is the handle. No depth concept.
+func TestRuntimePiSaysHowTheMainSessionLaunchesAndResumesCoders(t *testing.T) {
 	t.Parallel()
 	doc := runtimePiDoc(t)
-	row := piCapabilityRow(t, doc, "`subagents`")
-	mustContainIn(t, "subagents row", row,
-		"gentle-pi: no tool",
-		"every `.pi/agents` file runs as a gentle-pi subagent",
+	sec := piSection(t, doc, "## Launching Agents")
+	mustContainIn(t, "## Launching Agents", sec,
+		"the main session launches each coder as one first-level `subagent_run` of `gabo-coder`",
+		"resumes it with `subagent_continue`",
+		"the run id is the handle",
 	)
-	mustLackIn(t, "subagents row", row, "`subagent_run`, `subagent_status`")
+	mustLackIn(t, runtimePi+" ## Launching Agents", sec, "depth", "nest")
+}
+
+// intent 0015 S6, D3: every main_session.skills entry is linked while pi is
+// listed, and goes with the entry when pi is not listed.
+func TestRuntimePiLinksEveryMainSessionSkill(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	sec := piSection(t, doc, "### Main-session entry")
+	mustContainIn(t, "### Main-session entry", sec,
+		"every other `main_session.skills` entry",
+		"`.agents/skills/<name>`", "`../../.gabo/skills/<name>`",
+		"`gabo-assistant`, `gabo-cycle` and `gabo-wave-report`",
+		"the `.agents/skills/<name>` link of every other `main_session.skills` entry",
+		"while another spec agent's `skills` lists it",
+	)
 	mustContainIn(t, "## Build", doc,
-		"`metadata.agent_tools_unavailable` the tools a subagent never has",
+		"also keep every `main_session.skills` link while `runtimes.assistant` names an engine that uses `.agents/skills`")
+}
+
+// intent 0015 S6, D4: the two former agent files go on every build, only with
+// a gabo-version line.
+func TestRuntimePiRemovesTheFormerAgentFiles(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	mustContainIn(t, "", doc,
+		"`.pi/agents/gabo-cycle.md` and `.pi/agents/gabo-reviewer.md`",
+		"only when the file carries a `gabo-version:` line",
+		"a file without one: leave it and report it",
 	)
 }
 
@@ -505,5 +535,5 @@ func TestRuntimePiDoesNotRewriteTheCoderReviewBullet(t *testing.T) {
 	t.Parallel()
 	doc := runtimePiDoc(t)
 	mustLackIn(t, runtimePi, doc, "### Coder review", "in place of the template's bullet", "The only agent you launch is")
-	mustContainIn(t, "Slots table", doc, "`{{reviewer_script}}`", "the Pi coder body is the template")
+	mustContainIn(t, "Slots table", doc, "`{{reviewer_script}}`", "the Pi coder body is the template", "filled in `gabo-coder`, the only template that carries the slot")
 }
