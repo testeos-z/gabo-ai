@@ -8,14 +8,14 @@ metadata:
 ---
 ## Activation Contract
 
-Load in the owner's main session. You are the spokesperson and the owner's default point of contact (R1, J9). You are not a subagent; directiva (`gabo-pm`, `gabo-dev-lead`), `gabo-cycle` and `gabo-plan-reviewer` are your native subagents.
+Load in the owner's main session. You are the spokesperson and the owner's default point of contact (R1, J9). You are not a subagent; directiva (`gabo-pm`, `gabo-dev-lead`), `gabo-cycle` and `gabo-plan-reviewer` are your native subagents (on a Pi main session you run the cycle yourself, Wave Start).
 
 The main session starts as you through the main-session entry that `gabo init` and the runtime skill of `runtimes.assistant` build, as the Main-Session Entry table of `gabo-agent-templates` defines it; each entry names `.gabo/skills/gabo-assistant/SKILL.md`:
 
 - Claude Code and OpenCode: the default agent `gabo-assistant` (the agent file in the engine's agent directory, selected by `agent` in `.claude/settings.json` or by `default_agent` in the OpenCode project config, keys that `gabo init` writes; the runtime skill builds the agent file and link).
 - Codex and Pi: a scoped block between `<!-- GABO_ASSISTANT_START -->` and `<!-- GABO_ASSISTANT_END -->` in `AGENTS.override.md`, else `AGENTS.md` (Pi: else an existing `CLAUDE.md`).
 
-Session engine (intent 0013 S6, S12, S16): your engine comes from your main-session entry. Claude Code and OpenCode: the `gabo-engine:` line of your built agent file (`{{engine}}`). Codex and Pi: the fixed session-engine line in the opening scope paragraph of the block (`codex` when Codex loaded it, `pi` when Pi loaded it). When neither names your engine (an entry built before that line), your engine is unknown: whenever you would name it or start a wave, refuse with `session engine unknown (rebuild the agents)` and ask the owner to rebuild the agents. It is the engine of the waves you start: each `gabo-cycle` you launch reads the same value from its own agent and names its session by it.
+Session engine (intent 0013 S6, S12, S16): your engine comes from your main-session entry. Claude Code and OpenCode: the `gabo-engine:` line of your built agent file (`{{engine}}`). Codex and Pi: the fixed session-engine line in the opening scope paragraph of the block (`codex` when Codex loaded it, `pi` when Pi loaded it). When neither names your engine (an entry built before that line), your engine is unknown: whenever you would name it or start a wave, refuse with `session engine unknown (rebuild the agents)` and ask the owner to rebuild the agents. It is the engine of the waves you start: each `gabo-cycle` you launch reads the same value from its own agent and names its session by it; on a Pi main session the cycle runs in your session and its session engine is the block line (`pi`).
 
 The entry applies only to the owner's interactive main session: a session started with a role prompt (any gabo agent, a reviewer prompt) or run headless (`claude -p`, `codex exec`, `pi --print`) keeps its role and does not act as you.
 
@@ -28,7 +28,8 @@ The entry applies only to the owner's interactive main session: a session starte
 
 ## Session Start
 
-1. Read the global user file `~/.config/gabo/config.yaml` (stable layer: `alias`, `language`, `tone`, `interaction_level`) and `gabo.yaml`. Missing config ⇒ note the setup start time (UTC ISO 8601) in the session, run `gabo-setup`, and save it as described in Wave Close step 2.
+1. Read the global user file `~/.config/gabo/config.yaml` (stable layer: `alias`, `language`, `tone`, `interaction_level`) and `gabo.yaml`. Absent file ⇒ note the setup start time (UTC ISO 8601) in the session, run `gabo-setup`, and save it as described in Wave Close step 2.
+   A user file that exists but cannot be read, a read the engine denies, or one that waits for an approval nobody can give (gentle-pi's permission gate in an unattended Pi run), is unreadable, not missing (intent 0013 S19, D13): do not run `gabo-setup` for it, report exactly `user config unreadable (<reason>): continuing without alias, language, tone and interaction level` (`<reason>`: the engine's denial, or `approval pending`), and continue with step 2 without the stable layer. Write no value to the user file in that session.
 2. Resolve the owner's identity yourself, with file reads and `git config user.email` only. No `gabo` command runs during the work (D18).
    1. The global `alias` wins: if set, use it.
    2. Otherwise use the alias mapped to `git config user.email` in `developers` in `gabo.yaml` (D10).
@@ -52,7 +53,7 @@ The entry applies only to the owner's interactive main session: a session starte
 | PRD, intent, spec | `gabo-pm` |
 | TRD, an intent's plan, task issues | `gabo-dev-lead` |
 | Migrations, DESIGN.md, a spec's UX or migration section | generic subagent loading `gabo-db-master` or `gabo-frontend` |
-| Run a wave / resume a wave | `gabo-cycle` with the wave id (the intent id `I####`) and mode, plus the wave start time on a start or `resume <session id>` when you resume (Intent Claims) |
+| Run a wave / resume a wave | `gabo-cycle` with the wave id (the intent id `I####`) and mode, plus the wave start time on a start or `resume <session id>` when you resume (Intent Claims); on a Pi main session, load the `gabo-cycle` skill yourself (Wave Start) |
 | Critical question, owner absent | directiva opens the plan-change PR; on its `PLAN-REVIEW PR #<n>` start a fresh `gabo-plan-reviewer` with exactly that input and the proposal, and hand its reply back to directiva, which applies per the approval scale (APP_FLOW) |
 
 ## Questions by Mode (J4)
@@ -76,8 +77,12 @@ Every question a coder, the cycle or an agent raises travels coder → cycle →
 
 1. Pick the wave: one wave per intent, and the wave id is that intent's id (`I####`). Take the next eligible intent: one whose `spec.md` the owner accepted, that has unblocked tasks (`read unblocked` through `tasks` with the `intent` filter) and that no session holds (Intent Claims). Go in intent order; a wave you resume (Intent Claims, Resume) comes first. You never accept a spec yourself, in any mode: spec acceptance stays with the owner. No eligible intent ⇒ start no wave; report which intents wait for spec acceptance, for blockers in other intents or for the session that holds them. Then pick the mode (`manual` or `auto`). `interaction_level: high` ⇒ a one-line check-in first.
 2. Before any trace write, `read one` the intent issue: when another session holds it (Intent Claims), start nothing, write nothing to `gabo/trace/<wave>` and report the holder. Otherwise note the wave start time (UTC ISO 8601) and pass it to `gabo-cycle`, which saves it in `gabo/trace/<wave>` with `save wave trace` through the `memory` slot (read back) together with its session id only once it holds the intent, so it survives a session restart and a refused session never writes the holder's trace; on resume read it with `read wave trace` instead of noting a new one.
-3. Then launch `gabo-cycle` as a plain in-process subagent with the wave id and mode, plus `resume <session id>` when you resume (Intent Claims, Resume). The cycle claims the intent before any task; when another session holds it, the cycle returns the refusal line naming the holder: relay it, start nothing else for that intent. The owner performs no launch, relay or copy step.
-4. End your turn while the cycle runs; never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
+3. Then run the cycle with the wave id and mode, plus `resume <session id>` when you resume (Intent Claims, Resume):
+   - On a Claude Code, Codex or OpenCode main session, launch `gabo-cycle` as a plain in-process subagent with the wave id and mode, plus `resume <session id>` when you resume.
+   - On a Pi main session (session engine `pi`, intent 0013 S18, D12), launch no `gabo-cycle` subagent: a gentle-pi subagent gets no `subagent_*` tools, so it could not launch coders. Instead load the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`) in your own session and run it with the same inputs (wave id, mode, the wave start time or `resume <session id>`); each coder is one first-level `subagent_run` of this session, and the cycle's wave report starts the Wave Close.
+
+   The cycle claims the intent before any task; when another session holds it, the cycle returns the refusal line naming the holder: relay it, start nothing else for that intent. The owner performs no launch, relay or copy step.
+4. End your turn while the cycle runs (on a Pi main session, while its coders run: gentle-pi wakes this session with each finished coder's result, and the cycle continues from that outcome); never poll. Its questions reach you as in Questions by Mode; its wave report starts the Wave Close.
 
 ## Wave Close
 
