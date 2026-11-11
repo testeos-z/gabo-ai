@@ -138,3 +138,54 @@ func TestDirectSessionsContractReadStateNamesUnreturnedReplies(t *testing.T) {
 		"never returns an empty output as if the agent were silent",
 	})
 }
+
+// interveneSection returns the Intervene in a Task (J5) section of the
+// gabo-assistant skill, up to the next level-2 heading.
+func interveneSection(t *testing.T) string {
+	t.Helper()
+	doc := readCatalog(t, "gabo-assistant/SKILL.md")
+	_, inter, found := strings.Cut(doc, "\n## Intervene in a Task (J5)\n")
+	if !found {
+		t.Fatal("gabo-assistant/SKILL.md: missing the Intervene in a Task (J5) section")
+	}
+	inter, _, _ = strings.Cut(inter, "\n## ")
+	return inter
+}
+
+// Intent 0019 S5, D4 (plan T3): before the assistant closes a direct session it
+// persists what matters: a decision or answer reached in the session is posted
+// on the task issue through tasks as soon as it is reached, and a decision is
+// also saved through memory, so nothing that matters is left only in a session.
+func TestAssistantInterveneSavesWhatMattersBeforeClosing(t *testing.T) {
+	t.Parallel()
+	inter := interveneSection(t)
+	requireIn(t, "gabo-assistant Intervene persistence", inter, []string{
+		"post each decision or answer reached in the session as a comment on the task issue through the `tasks` adapter",
+		"post it as soon as it is reached, since a session that drops takes unposted answers with it",
+		"save each decision through the `memory` slot",
+		"Nothing that matters is left only in a session",
+		"persist before you run `close session`",
+	})
+	persistAt := strings.Index(inter, "persist before you run `close session`")
+	closeAt := strings.Index(inter, "Then run `close session`")
+	if persistAt < 0 || closeAt < 0 || persistAt > closeAt {
+		t.Errorf("gabo-assistant Intervene: persistence must come before `close session` (persist at %d, close at %d)", persistAt, closeAt)
+	}
+}
+
+// Intent 0019 plan T3: the existing Intervene rules keep holding after the
+// persistence step: mediation by default (Case A), one offer of a direct session
+// after three mediated exchanges (Case B), Orca unavailable keeps mediating, and
+// the R18 terminal rule.
+func TestAssistantInterveneKeepsMediationOfferAndTerminalRules(t *testing.T) {
+	t.Parallel()
+	inter := interveneSection(t)
+	requireIn(t, "gabo-assistant Intervene existing rules", inter, []string{
+		"**Case A, mediate by default.** Stay in this one session and relay between the owner and that task's coder",
+		"One instruction plus the coder's reply is one mediated exchange; count them per task.",
+		"**Case B, offer a direct session once (APP_FLOW A5).** After three mediated exchanges on the same task without resolution, offer a direct session once",
+		"Do not offer it again for that task in this session, accepted or declined; the owner can still ask for one at any time.",
+		"**If Orca is unavailable** (no `direct_sessions` adapter configured, or `open session` reports Orca unavailable or the worktree unknown), open nothing, keep mediating in Case A and say why, quoting the error.",
+		"**Terminals (R18).** By default only your own terminal is open; the direct session is the one extra terminal, opened only after the owner accepts it, and any further terminal opens only on the owner's request.",
+	})
+}
