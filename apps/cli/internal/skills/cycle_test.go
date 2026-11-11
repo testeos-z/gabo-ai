@@ -327,8 +327,8 @@ func TestCycleSweepKeepsOpenTasks(t *testing.T) {
 	sweep := lineWith(t, doc, "fallback sweep) runs only")
 	requireIn(t, "gabo-cycle sweep rule", sweep, []string{
 		"only for entries no coder could close, only after `repository_host` shows the PR merged",
-		"never removes the worktree or the branch of a task whose issue is still open, even when its PR is merged",
-		"it takes an entry only after its task is DONE or BLOCKED; a BLOCKED task's entries are swept only when its PR is merged, as before",
+		"never removes the worktree or the branch of a task that is neither DONE nor BLOCKED, even when its PR is merged (its issue is open and a coder can still close it, step 3)",
+		"so it takes an entry only after its task is DONE or BLOCKED; a BLOCKED task's issue stays open, and its entries are swept only when its PR is merged, as before",
 	})
 	step7 := lineWith(t, doc, "7. The wave closes when")
 	requireIn(t, "gabo-cycle step 7", step7, []string{
