@@ -37,7 +37,7 @@ The [per-change SDLC flow](docs/product/diagrams/sdlc-flow.md) is a Mermaid char
 | 2. Spec | PM agent (with frontend and DB agents when needed) | `spec.md`: requirements, acceptance criteria, UX flow, data changes | — |
 | 3. Accept | **you** | your acceptance, recorded in the spec | `gabo check` blocks a plan without it |
 | 4. Plan | dev lead agent | `plan.md` and one task issue per task, with blocked-by links | — |
-| 5. Wave | `gabo-cycle` | worktrees and coders for the intent's unblocked tasks | one intent per wave |
+| 5. Wave | assistant (main session, `gabo-cycle` skill) | worktrees and coders for the intent's unblocked tasks | one intent per wave |
 | 6. Build | coders | one PR per task, test-first | — |
 | 7. Review | independent reviewer | checks on the merged tree and a `VERDICT` on the PR | merges only clean PRs, only into `dev` |
 | 8. Release | **you** | the `dev` → `main` merge | agents never merge into `main` |
@@ -75,11 +75,11 @@ After setup, open your agent in the project and talk to the assistant, your sing
 
 1. Describe a change. The PM agent writes its intent and spec.
 2. Read the spec and accept it. The dev lead writes the plan and the task issues.
-3. Ask for the wave. `gabo-cycle` claims the intent on its issue, then its unblocked tasks, creates worktrees and launches coders, up to `parallelism`.
+3. Ask for the wave. The assistant runs the `gabo-cycle` skill in your main session: it claims the intent on its issue, then its unblocked tasks, creates worktrees and launches coders, up to `parallelism`.
 4. Each PR goes through the reviewer, which merges clean ones into `dev`.
 5. You get a wave report. When the work is ready, merge `dev` into `main`.
 
-Coder questions travel through the cycle to the assistant. In `manual` mode it asks you one question at a time; in `auto` mode it decides and records each decision with its reason. See the [app flow](docs/product/APP_FLOW.md#j3-run-a-wave-without-watching-r4-r5-r15).
+Coder questions travel straight to the assistant, which runs the cycle in the main session. In `manual` mode it asks you one question at a time; in `auto` mode it decides and records each decision with its reason. See the [app flow](docs/product/APP_FLOW.md#j3-run-a-wave-without-watching-r4-r5-r15).
 
 **Several engines at once.** With `runtimes.assistant: [claude, pi]` you can open a main session on each listed engine and run one wave per intent in each, at the same time. A wave claims its intent before any task, and the assistant starts waves only on unclaimed intents. A second session asked for a claimed intent claims nothing and returns `intent <I####> is claimed by session <session id> (engine <engine>) since <UTC time>; it is released when that wave closes`. A claim has no timeout: it holds until that wave closes, or until you tell any assistant to release that session. Each wave keeps its own ledger and its worktrees under `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, and cleans only its own resources. Task ids repeat across waves, so to keep a worktree, list its absolute path in `worktree.keep`.
 
@@ -89,7 +89,7 @@ Coder questions travel through the cycle to the assistant. In `manual` mode it a
 |---|---|
 | **Assistant** | The agent you talk to. It delegates everything else. |
 | **Directiva** | The planning agents: PM (PRD, intents, specs), dev lead (TRD, plans, task issues), DB master (data changes and the [migrations log](docs/product/MIGRATIONS.md)) and frontend (UX and flow in the spec). |
-| **gabo-cycle, coders, reviewer** | The wave runner, the agents that implement one task each, and the independent merge gate. The reviewer never reads the shared memory. |
+| **gabo-cycle skill, coders, reviewer** | The wave runner (a skill the main session runs, not an agent), the agents that implement one task each, and the independent merge gate. The reviewer never reads the shared memory. |
 | **Runtimes** | The engine each role runs in: `runtimes.coder`, `runtimes.reviewer`, `runtimes.assistant`. `runtimes.assistant` takes one engine or a list without duplicates, such as `[claude, pi]`: each listed engine gets its own main-session entry. `runtimes.coder` and `runtimes.reviewer` take one engine or `session`, the engine of the main session that starts the wave (valid only with `runtimes.assistant` set). A fixed `runtimes.reviewer`, such as `pi`, reviews the waves of every engine. |
 | **Slots and adapters** | Each pluggable part (`tasks`, `repository_host`, `memory`, `methodology`, `reviewer_placement`, `agent_host`, and optional `notifications`, `direct_sessions`) has a contract. An adapter is a Markdown skill that explains how to meet it with your tool. No tool-specific behavior is compiled code. |
 | **Integration branch** | `repo.integration_branch`, for example `dev`. Agents merge only there; `main` is yours. |

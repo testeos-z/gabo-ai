@@ -61,7 +61,7 @@ Write the role's prompt to a file in a `mktemp -d` dir on the owner's machine, n
 
 Resolve the role's engine from `gabo.yaml` before `start agent session` (intent 0013 S10), the same way as `gabo-agent-host-local`; the engine is the agent cli of the terminal. A refusal starts nothing and is reported instead of a handle:
 
-- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the agent that loaded this adapter (for example `gabo-cycle` or `gabo-assistant`). A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
+- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the main session (the assistant running the `gabo-cycle` skill) that loaded this adapter. A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
 - `coder` and `reviewer`: `runtimes.coder` or `runtimes.reviewer` `session` resolves to the calling session's engine; a fixed `runtimes.coder` is that engine, and a fixed `runtimes.reviewer` is that engine.
 - Start an `assistant` only on an engine listed in `runtimes.assistant` (one engine or a list, intent 0013 S4): the engine the caller asks for, or the calling session's engine when it names none. Refuse any other with `refused: <engine> is not listed in runtimes.assistant (<value>)`, `<value>` as written in `gabo.yaml`.
 

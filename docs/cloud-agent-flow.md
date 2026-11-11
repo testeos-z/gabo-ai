@@ -38,7 +38,7 @@ Long-lived agent sessions (Orca terminals, user `orca`, started by `gabo session
 
 - **gabo-coder** — coordinator. Computes eligible roadmap issues, launches up to 4 short coder sessions in parallel (one per issue, each in its own git worktree) following the `gabo-cycle` and `gabo-coder` skills.
 - **gabo-reviewer** — reviewer-side session; the review itself runs in detached terminals opened by `gabo review request`.
-- **gabo-assistant** — planning orchestrator (`gabo-assistant` skill) that keeps the six product docs current.
+- **gabo-assistant** — planning orchestrator (`gabo-assistant` skill) that keeps the six product docs current and runs the wave in its main session with the `gabo-cycle` skill (there is no `gabo-cycle` agent; each coder is a first-level subagent of that session).
 
 Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`), never through terminal handles. Messages are notifications only.
 
