@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0019-talk-to-cloud-agent-sessions |
-| status | Draft (spec written when the owner picks this intent) |
+| status | Specified |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |
@@ -40,10 +40,10 @@ The owner, whenever agents run off the owner's machine (a cloud session or a rem
 
 | # | question | status |
 |---|---|---|
-| 1 | Does the owner want an evaluation first (a written comparison of the options), or the evaluation and the first adapter together? | open (owner) |
-| 2 | Widen `direct_sessions`, or add a new slot? | carried to spec (assistant proposes widening) |
-| 3 | Which adapter comes first: Orca, Claude sessions or SSH with tmux? | open (owner) |
-| 4 | Is the Claude cloud-session behavior (receives messages, cannot reply) confirmed by the engine's documentation? | carried to spec (needs a source) |
+| 1 | Does the owner want an evaluation first (a written comparison of the options), or the evaluation and the first adapter together? | answered: the evaluation, the contract widening and the update of the Orca adapter together; Claude-sessions and SSH-with-tmux adapters come later (spec D2). Recorded decision (resolver: agent, rule of the owner). |
+| 2 | Widen `direct_sessions`, or add a new slot? | answered: widen `direct_sessions` (spec D1). Recorded decision (resolver: agent, rule of the owner). |
+| 3 | Which adapter comes first: Orca, Claude sessions or SSH with tmux? | answered: Orca (spec D3). Recorded decision (resolver: agent, rule of the owner). |
+| 4 | Is the Claude cloud-session behavior (receives messages, cannot reply) confirmed by the engine's documentation? | answered: yes; the Claude Code documentation says the command queues the message and exits without waiting for a reply (spec evidence base and S6). |
 
 ## Links
 
@@ -53,6 +53,6 @@ The owner, whenever agents run off the owner's machine (a cloud session or a rem
 | intent issue | [#494 I0019: Talk to cloud agent sessions](https://github.com/testeos-z/gabo-ai/issues/494) (sub-issue of #492) |
 | PRD | [PRD](../../PRD.md), R21 |
 | contract | `.gabo/skills/gabo-contract-direct-sessions/SKILL.md`, `.gabo/skills/gabo-contract-agent-host/SKILL.md` |
-| spec | — (written when the owner picks this intent) |
+| spec | [spec](spec.md) |
 | plan | — |
 | related intent | — |
