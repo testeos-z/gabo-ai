@@ -34,6 +34,7 @@ Load in a `gabo-coder` subagent launched by the main session (the assistant that
 | VERDICT | Action |
 |---|---|
 | `verdict=clean merge=merged` | Run the Task Close now. |
+| `verdict=clean merge=skipped`, PR `CONFLICTING` | Read the PR status through `repository_host` (read PR status): `mergeable` is `CONFLICTING`. Then merge `origin/dev` into the task branch in the worktree (never a rebase, never a force-push), resolve the conflict, run the task's checks, push, and request a new review for the new head; it counts as one fix round. A merge you cannot resolve ends BLOCKED with the question, never HANDED. |
 | `verdict=clean` other merge | Report "needs human merge"; HANDED. You are resumed with `PR #<n> merged` once it merges. |
 | `verdict=blocking` | Fix round: read the latest marker comment, fix, push, request review for the new head. |
 | `verdict=error` | Request once more; a second error ⇒ BLOCKED. |

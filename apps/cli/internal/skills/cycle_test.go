@@ -282,3 +282,17 @@ func TestWaveReportLoadsInTheMainSession(t *testing.T) {
 		t.Error("gabo-wave-report/SKILL.md: still loads in `gabo-cycle`")
 	}
 }
+
+// Intent 0015 S3, S5, PD10 (plan T15): a wave that returns with HANDED tasks
+// says that it keeps its intent claim.
+func TestCycleReturnWithHandedTasksKeepsTheClaim(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"A wave that returns with HANDED tasks says that it keeps its intent claim and that the claim ends with the wave close or the owner's release.",
+	})
+	// the rule it states already holds.
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"The wave closes when every task of that intent is DONE or BLOCKED",
+	})
+}

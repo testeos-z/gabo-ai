@@ -57,3 +57,67 @@ func TestCoderRunsTheReviewerScriptOnEveryEngine(t *testing.T) {
 	mustLackIn(t, "gabo-reviewer-notes/SKILL.md", notes,
 		"Pi exception", "subagent only validates", "relays their final", "ask the `gabo-reviewer` subagent", "The relay passes")
 }
+
+// decisionGateRow returns the row of the `## Decision Gates` table that starts
+// with the given verdict cell.
+func decisionGateRow(t *testing.T, doc, cell string) string {
+	t.Helper()
+	_, gates, ok := strings.Cut(doc, "## Decision Gates")
+	if !ok {
+		t.Fatal("gabo-coder/SKILL.md: no ## Decision Gates section")
+	}
+	gates, _, _ = strings.Cut(gates, "\n## ")
+	for _, line := range strings.Split(gates, "\n") {
+		if strings.HasPrefix(line, "| "+cell+" |") {
+			return line
+		}
+	}
+	t.Fatalf("gabo-coder/SKILL.md: no Decision Gates row for %s", cell)
+	return ""
+}
+
+// Intent 0015 S3, S5, PD10 (plan T15): a clean verdict whose merge was skipped
+// because the PR is CONFLICTING is one fix round: merge origin/dev, push, ask
+// for a new review.
+func TestCoderMergesDevOnACleanVerdictWithAConflictingPR(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-coder/SKILL.md")
+	row := decisionGateRow(t, doc, "`verdict=clean merge=skipped`, PR `CONFLICTING`")
+	for _, s := range []string{
+		"read PR status", "`mergeable`", "`CONFLICTING`",
+		"merge `origin/dev` into the task branch in the worktree",
+		"never a rebase, never a force-push",
+		"resolve the conflict", "run the task's checks", "push",
+		"request a new review for the new head",
+		"one fix round",
+		"cannot resolve", "BLOCKED with the question, never HANDED",
+	} {
+		if !strings.Contains(row, s) {
+			t.Errorf("gabo-coder/SKILL.md: the merge=skipped row lacks %q", s)
+		}
+	}
+	if !strings.Contains(doc, "Max 4 fix rounds; then label the issue `needs-user`, report BLOCKED with the question.") {
+		t.Error("gabo-coder/SKILL.md: the Max 4 fix rounds line changed")
+	}
+	// the new row precedes the other-merge row.
+	if strings.Index(doc, "`verdict=clean merge=skipped`, PR `CONFLICTING`") > strings.Index(doc, "| `verdict=clean` other merge |") {
+		t.Error("gabo-coder/SKILL.md: the merge=skipped row must come before the other-merge row")
+	}
+}
+
+// Intent 0015 S3, S5, PD10 (plan T15): the other rows keep their text.
+func TestCoderDecisionGateRowsKeepTheirText(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-coder/SKILL.md")
+	for cell, want := range map[string]string{
+		"`verdict=clean merge=merged`": "Run the Task Close now.",
+		"`verdict=clean` other merge":  "Report \"needs human merge\"; HANDED. You are resumed with `PR #<n> merged` once it merges.",
+		"`verdict=blocking`":           "Fix round: read the latest marker comment, fix, push, request review for the new head.",
+		"`verdict=error`":              "Request once more; a second error ⇒ BLOCKED.",
+		"`verdict=skipped`":            "The head moved; request review for the current head.",
+	} {
+		if got := decisionGateRow(t, doc, cell); got != "| "+cell+" | "+want+" |" {
+			t.Errorf("gabo-coder/SKILL.md: row %s is %q", cell, got)
+		}
+	}
+}
