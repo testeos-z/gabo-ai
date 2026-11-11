@@ -63,7 +63,7 @@ You don't need to plan everything from zero before you start. Start with an idea
 | Codex | full | plugin `gabo@gabo-ai`, enabled by `gabo init` in `.codex/config.toml` | trust the project and its two hooks |
 | Pi | full | package `@gabo-ai/pi`, added by `gabo init` to `.pi/settings.json` | needs a subagent package, such as [gentle-pi](https://www.npmjs.com/package/gentle-pi) |
 | OpenCode | full | stage-gate plugin copied into the project by its runtime skill | no install step |
-| any other engine | flexible | gabo skills and configuration only: no plugin, no hooks | planned: `gabo.yaml` accepts only the four names above |
+| any other engine | flexible | gabo skills and configuration only: no plugin, no hooks | `gabo.yaml` accepts its name in `runtimes.coder` and `runtimes.assistant` once `gabo-runtime-builder` has written its runtime skill; `runtimes.reviewer` takes only the four |
 
 **Full** engines get hooks that run `gabo check` around every write, plus the integration `gabo init` sets up. All four can run every role, including the reviewer. `gabo init` writes only project-level config, never your global engine settings.
 
@@ -128,7 +128,7 @@ The project file overrides the user file key by key; unknown keys fail. Secrets 
 - **Install from a tag.** `gabo init` refuses a pseudo-version, such as the one Go installs from a branch. Release tags are named `apps/cli/vX.Y.Z` because the module lives in `apps/cli`. To build from source, pass the version yourself: `go -C apps/cli install -ldflags "-X main.buildVersion=<x.y.z>" ./cmd/gabo`.
 - **No self-update and no curl installer yet.** Without signed releases, `gabo init` prints the upgrade command instead of updating itself.
 - **Pi needs a subagent package.** Pi has no subagents of its own; gabo refuses to build agents without one. The recommended setup is the [Gentle AI framework](https://github.com/Gentleman-Programming/gentle-ai) (`gentle-ai install --agent pi`).
-- **Flexible tier.** Engines outside the four full ones are planned in [I0005 (#176)](https://github.com/testeos-z/gabo-ai/issues/176).
+- **Flexible tier.** `gabo-runtime-builder` adds an engine outside the four full ones without a Go change or a release. `gabo.yaml` accepts its name in `runtimes.coder` and `runtimes.assistant` once its runtime skill exists; `runtimes.reviewer` accepts only the four.
 
 ## Documentation
 
