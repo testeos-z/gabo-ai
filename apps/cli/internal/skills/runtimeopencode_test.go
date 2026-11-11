@@ -426,7 +426,7 @@ func TestRuntimeOpenCodeReadsTheEngineConfigKeys(t *testing.T) {
 func TestRuntimeOpenCodeWriteList(t *testing.T) {
 	t.Parallel()
 	doc := runtimeOpenCodeDoc(t)
-	const list = "Write only `.opencode/agents/<id>.md` for spec ids and `.opencode/agents/gabo-assistant.md`, `.agents/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete and the removals of other engines' main-session entries of build step 9."
+	const list = "Write only `.opencode/agents/<id>.md` for spec ids and `.opencode/agents/gabo-assistant.md`, `.agents/skills/` links, the stage-gate plugin `.opencode/plugins/gabo-stage-gate.js`, the probe files you delete, the former agent files of build step 3 and the removals of other engines' main-session entries of build step 9."
 	rules := openCodeSection(t, doc, "Hard Rules")
 	if !strings.Contains(rules, list) {
 		t.Errorf("## Hard Rules: missing the write list %q", list)
@@ -435,6 +435,7 @@ func TestRuntimeOpenCodeWriteList(t *testing.T) {
 		t.Errorf("%s: %d write lists, want exactly the one of S9", runtimeOpenCode, n)
 	}
 	for _, want := range []string{
+		"`.opencode/agents/gabo-cycle.md` and `.opencode/agents/gabo-reviewer.md` of build step 3 when the file carries a `gabo-version:` line",
 		"never write or remove a key of a project config",
 		"`gentle-orchestrator`",
 	} {
