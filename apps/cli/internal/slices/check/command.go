@@ -90,12 +90,6 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for the reviewer runtime's metadata.reviewer_link, a user-level link to\n" +
 			"    ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer holding\n" +
 			"    scripts/reviewer.sh (not checked with CI set);\n" +
-			"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in\n" +
-			"    the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json\n" +
-			"    and .opencode/opencode.jsonc (never ~/.config/opencode);\n" +
-			"    a missing or lower whole value names \"run gabo init (it sets\n" +
-			"    experimental.subagent_depth to 3 in <file>)\", any other value names setting\n" +
-			"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";\n" +
 			"  - for each of claude, codex and pi a role runs on, the keys gabo init writes:\n" +
 			"    .claude/settings.json extraKnownMarketplaces.\"gabo-ai\" and\n" +
 			"    enabledPlugins.\"gabo@gabo-ai\", the .codex/config.toml tables\n" +

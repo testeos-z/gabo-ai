@@ -186,7 +186,7 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 			[][2]string{{line(claudeKeys, "incomplete", "claude")[0],
 				"next: fix .claude/settings.json (invalid JSON (invalid character '/' looking for beginning of value)), then run gabo init and rerun gabo check"}}},
 		{"opencode key in a file gabo init refuses", "opencode", func(_ *testing.T, p fstest.MapFS) {
-			p[ocConfig] = file(`{"experimental": {"subagent_depth": 3}, "experimental": {"subagent_depth": 3}}`)
+			p[ocConfig] = file(`{"experimental": {}, "experimental": {}}`)
 		}, [][2]string{{line(ocConfig, "incomplete", "opencode")[0],
 			"next: fix " + ocConfig + " (experimental appears more than once), then run gabo init and rerun gabo check"}}},
 		{"claude user's own agent value", "claude", func(_ *testing.T, p fstest.MapFS) {
@@ -336,18 +336,17 @@ func TestMainSessionStaleClaudeKey(t *testing.T) {
 
 // Intent 0010 D7: with OpenCode in the engine set but not the assistant,
 // gabo init refuses every OpenCode change while one of its configs does not
-// parse, so the stale-key and depth lines both name that file to fix.
+// parse, so the stale-key line names that file to fix.
 func TestMainSessionHintNamesTheFileGaboInitRefuses(t *testing.T) {
 	t.Parallel()
 	proj := claudeBuilt(t, "1.2.3")
-	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 1}}`)
+	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant"}`)
 	proj[".opencode/opencode.jsonc"] = file("{")
 	cfg := strings.Replace(validConfig, "  coder: claude\n", "  coder: opencode\n", 1)
 	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
 	fix := "next: fix .opencode/opencode.jsonc ("
 	for _, l := range []string{
 		"✗ opencode.json: gabo assistant entry for opencode, but runtimes.assistant is claude",
-		"✗ experimental.subagent_depth must be 3 or more in opencode.json: it is 1",
 	} {
 		i := slices.Index(r.Lines, l)
 		if i < 0 || i+1 >= len(r.Lines) || !strings.HasPrefix(r.Lines[i+1], fix) {
