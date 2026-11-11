@@ -472,8 +472,48 @@ func TestSyncNeverCopiesRepositorySpecificOrPersonalKeys(t *testing.T) {
 	requireAll(t, step, []string{
 		"a slot adapter path",
 		"`repo.name` is detected from the target's git remote",
-		"or asked",
-		"The other repository-specific keys are asked one at a time, as step 1 asks them.",
+		"Each key of this list is skipped, not refused: its key path is reported under the table, and the sync continues with the other keys.",
+	})
+}
+
+// Owner decision 2026-11-11 (intent 0018 S5): a repository-specific key is
+// skipped and reported by key path; the sync never stops on it and never asks.
+func TestSyncSkipsRepositorySpecificKeysInsteadOfStopping(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 5)
+	requireAll(t, step, []string{
+		"Each key of this list is skipped, not refused",
+		"the sync continues with the other keys",
+	})
+	if strings.Contains(step, "asked one at a time") {
+		t.Errorf("%s step 5: repository-specific keys are skipped, not asked", setupSkill)
+	}
+}
+
+// Owner decision 2026-11-11 (intent 0018 S5, S6): a key ending in _env is
+// skipped and reported by key path, and the sync continues with the rest. The
+// name rule runs first, so a credential-named _env key still stops the sync.
+func TestSyncSkipsEnvKeysAndContinues(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 5)
+	requireAll(t, step, []string{
+		"a key whose last segment ends in `_env` is skipped, not refused",
+		"its key path is reported under the table, and the sync continues with the other keys",
+		"The name rule above runs first",
+		"`review.pi_credential_env`",
+		"still stops the sync",
+		"Every key and value of the source, including a skipped one, is checked for these before the proposal is built.",
+	})
+}
+
+// Owner decision 2026-11-11: the skipped keys (the _env and S5 skips) are
+// listed after the table by key path, one line each, and are not table rows.
+func TestSyncReportsSkippedKeysByKeyPath(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncStep(t, 5), []string{
+		"Skipped keys:",
+		"one line per key path",
+		"is not a row of the table",
 	})
 }
 
@@ -494,7 +534,7 @@ func TestSyncRefusesSecretLikeKeysAndValuesByKeyPath(t *testing.T) {
 	t.Parallel()
 	step := syncStep(t, 5)
 	gotKeys := lineTokens(t, step, "Secret-like key (PD5)")
-	wantKeys := []string{"token", "secret", "password", "passwd", "credential", "api_key", "_key", "_env", "_login", "login"}
+	wantKeys := []string{"token", "secret", "password", "passwd", "credential", "api_key", "_key", "_login", "login"}
 	if !sameList(gotKeys, wantKeys) {
 		t.Errorf("%s step 5: the secret-like key rule is %q, want exactly %q", setupSkill, gotKeys, wantKeys)
 	}
@@ -504,7 +544,7 @@ func TestSyncRefusesSecretLikeKeysAndValuesByKeyPath(t *testing.T) {
 		t.Errorf("%s step 5: the secret-like value prefixes are %q, want exactly %q", setupSkill, gotValues, wantValues)
 	}
 	requireAll(t, step, []string{
-		"Every key and value of the source is checked for these before the proposal is built.",
+		"Every key and value of the source, including a skipped one, is checked for these before the proposal is built.",
 		"name the key path only, never the value, and write nothing",
 	})
 }
