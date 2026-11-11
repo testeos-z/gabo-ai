@@ -26,14 +26,16 @@ func piSource(version string) string { return "npm:" + PiPackage + "@" + version
 // pinned to the binary version (S7). Existing bytes are kept; only the
 // missing entry, or the missing packages key, is inserted (D5). An entry
 // for PiPackage with any other version or form is kept (S4). A source
-// build writes nothing.
+// build writes nothing. The refusal of a missing subagent package is printed
+// only when the package check found none (intent 0016 S1, S2, D1).
 func piRule(in Input) Result {
 	res := pi(in)
+	res.Section.Steps = append(res.Section.Steps, "trust the project in Pi so it installs and loads "+PiPackage+" from "+PiSettings)
+	if in.PiPackage {
+		return res
+	}
 	res.Section.Lines = append(res.Section.Lines, "gabo refuses to build on Pi without a subagent package:", SubagentRefusal)
-	res.Section.Steps = append(res.Section.Steps,
-		"trust the project in Pi so it installs and loads "+PiPackage+" from "+PiSettings,
-		"install a subagent package (see the refusal above)",
-	)
+	res.Section.Steps = append(res.Section.Steps, "install a subagent package (see the refusal above)")
 	return res
 }
 
@@ -88,6 +90,37 @@ func pi(in Input) Result {
 		return Result{Section: Section{Lines: []string{"kept " + PiSettings + " packages entry " + src + " by the user's choice (this gabo is " + version + ")"}}}
 	}
 	return wrote(arr.insert(data, `"`+want+`"`))
+}
+
+// PiListNamesPackage reports whether the output of `pi list` names a
+// subagent package of gentle-pi (intent 0016 PD4, the rule of
+// gabo-runtime-pi step 2): a listed source that is npm:gentle-pi, with or
+// without @<version>, or a git: source of gentle-pi. Any other package, such
+// as npm:@gabo-ai/pi or a git source whose name only contains gentle-pi,
+// does not count.
+func PiListNamesPackage(list []byte) bool {
+	for _, line := range strings.Split(string(list), "\n") {
+		if fields := strings.Fields(line); len(fields) > 0 && namesGentlePi(fields[0]) {
+			return true
+		}
+	}
+	return false
+}
+
+// namesGentlePi reports whether one listed source is gentle-pi: an npm
+// source named gentle-pi, or a git source whose last path segment, without
+// an @<ref> and a .git suffix, is gentle-pi.
+func namesGentlePi(src string) bool {
+	if rest, ok := strings.CutPrefix(src, "npm:gentle-pi"); ok {
+		return rest == "" || strings.HasPrefix(rest, "@")
+	}
+	rest, ok := strings.CutPrefix(src, "git:")
+	if !ok {
+		return false
+	}
+	name := rest[strings.LastIndex(rest, "/")+1:]
+	name, _, _ = strings.Cut(name, "@")
+	return strings.TrimSuffix(name, ".git") == "gentle-pi"
 }
 
 // isRelease reports whether version is a plain x.y.z release; anything else

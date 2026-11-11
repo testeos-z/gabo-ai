@@ -71,6 +71,10 @@ type Input struct {
 	Files      map[string][]byte
 	Version    string
 	Assistants []string
+	// PiPackage reports that the Pi subagent-package check found a package
+	// (intent 0016 S1, D1); piRule then omits the refusal. Unset means no
+	// package, which prints the refusal (S2).
+	PiPackage bool
 }
 
 // assistants returns the listed assistant engines, trimmed, without empty

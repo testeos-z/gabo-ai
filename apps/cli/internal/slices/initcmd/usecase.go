@@ -42,6 +42,9 @@ type Settings struct {
 	ProjectDir  string
 	Version     string
 	SetupPrompt string
+	// Pi is the subagent-package probe of the Pi section; nil means no
+	// package is found (intent 0016 S2).
+	Pi PiProbe
 }
 
 // Output is the human-readable report.
