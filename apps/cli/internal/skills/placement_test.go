@@ -96,3 +96,19 @@ func TestReviewerPlacementNamesTheCoderAsCaller(t *testing.T) {
 		}
 	}
 }
+
+// The coder runs the script from its task worktree: the placement adapter
+// states why that is safe (the settings come from the integration branch).
+func TestReviewerPlacementLocalStatesWhyTheWorktreeIsSafe(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-reviewer-placement-local/SKILL.md")
+	for _, want := range []string{
+		"the coder runs it from its task worktree",
+		"read only `repo.name` and `repo.integration_branch` from the caller's `gabo.yaml`",
+		"take `review.checks` and every other setting from `gabo.yaml` in their own clean checkout of the integration branch, never from the PR head",
+	} {
+		if !strings.Contains(doc, want) {
+			t.Errorf("gabo-reviewer-placement-local/SKILL.md: missing %q", want)
+		}
+	}
+}
