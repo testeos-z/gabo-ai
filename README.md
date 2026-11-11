@@ -29,9 +29,7 @@ From then on, open your agent and talk to the assistant: describe a change, acce
 
 Each change is one **intent**. There is no big upfront plan: the tracker is the global view, and each intent moves through the same lifecycle.
 
-![gabo-ai per-change SDLC flow: owner, memory, assistant, development wave, repository, directiva and team tasks, from intent and spec to reviewed PRs, merge and release](docs/product/diagrams/sdlc-flow.png)
-
-*Per-change SDLC flow, exported from the [archify diagram](docs/product/diagrams/sdlc-flow.html) (labels in Spanish). Open it for the legend, the floating-questions path and the plan-change loop.*
+The [per-change SDLC flow](docs/product/diagrams/sdlc-flow.md) is a Mermaid chart: owner, assistant, directiva, the wave with one coder per task, the reviewer script, merge and release. It also shows the floating-questions path and the plan-change loop. The [team flow](docs/product/diagrams/team-flow.md) shows the single subagent layer.
 
 | step | who | produces | gate |
 |---|---|---|---|
