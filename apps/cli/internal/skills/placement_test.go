@@ -97,18 +97,16 @@ func TestReviewerPlacementNamesTheCoderAsCaller(t *testing.T) {
 	}
 }
 
-// The coder runs the script from its task worktree: the placement adapter
-// states why that is safe (the settings come from the integration branch).
-func TestReviewerPlacementLocalStatesWhyTheWorktreeIsSafe(t *testing.T) {
+// The caller's gabo.yaml sets the integration branch the review trusts, so the
+// coder runs the script from the main checkout, never from its worktree.
+func TestReviewerRunsFromTheMainCheckout(t *testing.T) {
 	t.Parallel()
-	doc := readCatalog(t, "gabo-reviewer-placement-local/SKILL.md")
-	for _, want := range []string{
-		"the coder runs it from its task worktree",
-		"read only `repo.name` and `repo.integration_branch` from the caller's `gabo.yaml`",
-		"take `review.checks` and every other setting from `gabo.yaml` in their own clean checkout of the integration branch, never from the PR head",
-	} {
-		if !strings.Contains(doc, want) {
-			t.Errorf("gabo-reviewer-placement-local/SKILL.md: missing %q", want)
-		}
-	}
+	local := readCatalog(t, "gabo-reviewer-placement-local/SKILL.md")
+	requireIn(t, "gabo-reviewer-placement-local/SKILL.md", local, []string{
+		"Run from the repository's main checkout", "never from a task worktree", "then run one command from the main checkout",
+	})
+	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	requireIn(t, "gabo-coder template", tmpl, []string{
+		"the main checkout (the parent of `git -C <worktree> rev-parse --path-format=absolute --git-common-dir`) as the working directory and never the task worktree",
+	})
 }

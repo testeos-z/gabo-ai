@@ -43,7 +43,8 @@ func TestCoderRunsTheReviewerScriptOnEveryEngine(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-coder/SKILL.md")
 	requireIn(t, "gabo-coder/SKILL.md", doc, []string{
-		"After every push, run the user-level reviewer script yourself, exactly as your agent file says, and act on its `VERDICT` line",
+		"After every push, run the user-level reviewer script yourself from the main checkout, never from your worktree",
+		"exactly as your agent file says, and act on its `VERDICT` line",
 		"Questions go back to the assistant in your outcome",
 	})
 	mustLackIn(t, "gabo-coder/SKILL.md", doc,
