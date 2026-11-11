@@ -50,6 +50,25 @@ func TestStageGatePluginHoldsNoRule(t *testing.T) {
 	}
 }
 
+// OpenCode 2.2.6 refuses a V1 function export ("Plugin must export a default
+// definition with an id and an effect or setup function"), so the source is a
+// default definition and holds no V1 hook key (intent 0015 T17, probe on the
+// 2.2.6 binary).
+func TestStageGatePluginIsAV2Definition(t *testing.T) {
+	t.Parallel()
+	src := string(stageGateSource(t))
+	for _, want := range []string{"export default {", `id: "gabo-stage-gate"`, "async setup(ctx)", `ctx.tool.hook("execute.before"`} {
+		if !strings.Contains(src, want) {
+			t.Errorf("%s: missing %q", stageGatePlugin, want)
+		}
+	}
+	for _, bad := range []string{`"tool.execute.before"`, "export const", "output.args"} {
+		if strings.Contains(src, bad) {
+			t.Errorf("%s: still holds the V1 shape %q", stageGatePlugin, bad)
+		}
+	}
+}
+
 // The build copies the plugin to .opencode/plugins/ and writes no
 // package.json (S9, S10).
 func TestRuntimeOpenCodeInstallsTheStageGate(t *testing.T) {
@@ -60,6 +79,9 @@ func TestRuntimeOpenCodeInstallsTheStageGate(t *testing.T) {
 		"copy `.gabo/skills/gabo-runtime-opencode/plugins/gabo-stage-gate.js` byte for byte to `.opencode/plugins/gabo-stage-gate.js`",
 		"on every build",
 		"write no `package.json`",
+		"a default definition with an `id` and a `setup` function",
+		"`ctx.tool.hook(\"execute.before\", ...)`",
+		"`event.tool` and `event.input`",
 	} {
 		if !strings.Contains(steps, want) {
 			t.Errorf("## Build Steps: missing %q", want)
@@ -73,76 +95,28 @@ func TestRuntimeOpenCodeInstallsTheStageGate(t *testing.T) {
 	}
 }
 
-// stageGateDriver loads the plugin with a stubbed Bun `$` and calls its
-// tool.execute.before hook once. The stub runs commands without a shell,
-// expands an interpolated array into one argument per element, implements
-// Bun's `which` builtin, and answers a missing command like Bun does: exit 1
-// with "bun: command not found: <cmd>". It prints the outcome as JSON.
+// stageGateDriver loads the plugin like OpenCode 2.2.6 does: the default
+// export is a definition with an `id` and a `setup(ctx)` function; setup
+// registers its hook with ctx.tool.hook("execute.before", handler). The
+// driver calls the handler once with the event shape probed on the 2.2.6
+// binary ({tool, sessionID, agent, messageID, id, input}) and prints the
+// outcome as JSON. The plugin runs its real child process: the test puts a
+// fake gabo on PATH, or none.
 const stageGateDriver = `
-const { spawnSync } = await import("node:child_process");
-const fs = await import("node:fs");
-const path = await import("node:path");
 const [pluginPath, callJSON] = process.argv.slice(2);
 const call = JSON.parse(callJSON);
-
-function findOnPath(cmd) {
-  for (const dir of (process.env.PATH || "").split(":")) {
-    if (!dir) continue;
-    const p = path.join(dir, cmd);
-    try { fs.accessSync(p, fs.constants.X_OK); return p; } catch {}
-  }
-  return null;
-}
-
-function run(argv) {
-  if (argv[0] === "which") {
-    const p = findOnPath(argv[1]);
-    return p ? { exitCode: 0, stdout: Buffer.from(p + "\n"), stderr: Buffer.alloc(0) }
-             : { exitCode: 1, stdout: Buffer.from(argv[1] + " not found\n"), stderr: Buffer.alloc(0) };
-  }
-  const r = spawnSync(argv[0], argv.slice(1), { env: process.env });
-  if (r.error && r.error.code === "ENOENT") {
-    return { exitCode: 1, stdout: Buffer.alloc(0), stderr: Buffer.from("bun: command not found: " + argv[0] + "\n") };
-  }
-  return { exitCode: r.status, stdout: r.stdout, stderr: r.stderr };
-}
-
-function $(strings, ...values) {
-  const argv = [];
-  strings.forEach((s, i) => {
-    argv.push(...s.split(/\s+/).filter(Boolean));
-    if (i < values.length) {
-      const v = values[i];
-      if (Array.isArray(v)) argv.push(...v.map(String)); else argv.push(String(v));
-    }
-  });
-  let nothrow = false;
-  const shell = {
-    nothrow() { nothrow = true; return shell; },
-    quiet() { return shell; },
-    then(resolve, reject) {
-      const r = run(argv);
-      if (r.exitCode !== 0 && !nothrow) {
-        const e = new Error("ShellError: exit " + r.exitCode);
-        Object.assign(e, r);
-        return Promise.reject(e).then(resolve, reject);
-      }
-      return Promise.resolve(r).then(resolve, reject);
-    },
-  };
-  return shell;
-}
-
 const warnings = [];
 console.warn = (...a) => warnings.push(a.join(" "));
 const mod = await import(pluginPath);
-const out = { threw: false, message: "", warnings, plugins: Object.keys(mod).length };
-for (const make of Object.values(mod)) {
-  const hooks = await make({ $, directory: process.cwd(), worktree: process.cwd() });
-  const hook = hooks["tool.execute.before"];
-  if (!hook) continue;
+const def = mod.default;
+const out = { threw: false, message: "", warnings, id: def && def.id, setup: typeof (def && def.setup), hooks: [] };
+const handlers = {};
+const ctx = { location: { directory: process.cwd() }, tool: { hook(name, fn) { out.hooks.push(name); handlers[name] = fn; } } };
+await def.setup(ctx);
+const hook = handlers["execute.before"];
+if (hook) {
   try {
-    await hook({ tool: call.tool, sessionID: "s", callID: "c" }, { args: call.args });
+    await hook({ tool: call.tool, sessionID: "s", agent: "build", messageID: "m", id: "c", input: call.args });
   } catch (e) {
     out.threw = true;
     out.message = String(e && e.message);
@@ -164,7 +138,9 @@ type stageGateRun struct {
 	Threw    bool     `json:"threw"`
 	Message  string   `json:"message"`
 	Warnings []string `json:"warnings"`
-	Plugins  int      `json:"plugins"`
+	ID       string   `json:"id"`
+	Setup    string   `json:"setup"`
+	Hooks    []string `json:"hooks"`
 	calls    [][]string
 }
 
@@ -210,8 +186,11 @@ func runStageGate(t *testing.T, node string, call map[string]any, withGabo bool,
 	if err := json.Unmarshal(stdout, &r); err != nil {
 		t.Fatalf("driver output %q: %v", stdout, err)
 	}
-	if r.Plugins == 0 {
-		t.Fatalf("%s exports no plugin function", stageGatePlugin)
+	if r.ID != "gabo-stage-gate" || r.Setup != "function" {
+		t.Fatalf("%s default export has id %q and setup %q, want a V2 definition (id gabo-stage-gate, setup function)", stageGatePlugin, r.ID, r.Setup)
+	}
+	if !slices.Equal(r.Hooks, []string{"execute.before"}) {
+		t.Fatalf("%s registers hooks %q, want [execute.before]", stageGatePlugin, r.Hooks)
 	}
 	if b, err := os.ReadFile(log); err == nil {
 		var cur []string
@@ -236,7 +215,7 @@ func requireNode(t *testing.T) string {
 	return node
 }
 
-// tool.execute.before passes each target path of an edit, write or patch
+// the execute.before hook passes each target path of an edit, write or patch
 // call to gabo check --pre-write, throws with gabo's output on exit 1, and
 // on exit 2 or no gabo on PATH lets the call run with one warning; other
 // tools never call gabo (S10, D10).
