@@ -549,8 +549,9 @@ func TestSyncSaveWritesTheProfileAtTheStepTwoPath(t *testing.T) {
 	}
 }
 
-// Intent 0018 S7 and D4: the saved keys are exactly the S4 keys of step 5, in
-// the same order, and no other key of the target is saved.
+// Intent 0018 S7, S4 and D4: the saved keys are exactly the S4 keys of step 5,
+// in the same order, plus review.human_only_paths, whose generic entries the
+// save step keeps under the same rule as the proposal. No other key is saved.
 func TestSyncSaveKeysAreExactlyTheS4Keys(t *testing.T) {
 	t.Parallel()
 	step := syncStep(t, 8)
@@ -559,15 +560,32 @@ func TestSyncSaveKeysAreExactlyTheS4Keys(t *testing.T) {
 		"mode", "runtimes.coder", "runtimes.reviewer", "runtimes.assistant",
 		"slots.<name>.adapter", "parallelism", "wave.after", "plan_change.scope",
 		"plan_change.global_without_owner", "review.auto_merge", "reviewer.placement",
+		"review.human_only_paths",
 	}
 	if !sameList(got, want) {
 		t.Errorf("%s step 8: the saved keys are %q, want exactly %q", setupSkill, got, want)
 	}
 	s5 := lineTokens(t, syncStep(t, 5), "exactly these (S4):")
-	if !sameList(got, s5) {
+	if !sameList(got, append(append([]string{}, s5...), "review.human_only_paths")) {
 		t.Errorf("%s step 8: the saved keys %q differ from the proposal keys of step 5 %q", setupSkill, got, s5)
 	}
 	requireAll(t, step, []string{"No other key of the target is saved."})
+}
+
+// Intent 0018 S4 and D4: the save step saves the generic review.human_only_paths
+// entries and no other entry, the same seven entries the proposal of step 5
+// holds.
+func TestSyncSaveHumanOnlyPathsAreTheGenericEntries(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 8)
+	got := lineTokens(t, step, "D4) are exactly these:")
+	want := lineTokens(t, syncStep(t, 5), "D4) are exactly these:")
+	if !sameList(got, want) || len(got) != 7 {
+		t.Errorf("%s step 8: the saved human-only entries are %q, want exactly the step 5 generic entries %q", setupSkill, got, want)
+	}
+	requireAll(t, step, []string{
+		"Any other entry of the configured repository is not saved.",
+	})
 }
 
 // Intent 0018 S5 and S6: the save never writes a repository-specific, personal
