@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0015-one-subagent-layer-on-every-engine |
-| status | Specified (spec awaiting the owner's acceptance) |
+| status | Accepted |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-11 |
@@ -55,9 +55,9 @@ So every wave pays for two extra agent sessions whose only job is to pass messag
 
 | # | question | status |
 |---|---|---|
-| 1 | Which release carries this change? | carried to spec (open question 1) |
-| 2 | After an upgrade, what happens to the `gabo-cycle` and `gabo-reviewer` agent files an older build left in the project? | carried to spec (open question 2) |
-| 3 | Does gabo stop writing and requiring the OpenCode `experimental.subagent_depth` key once one layer is enough? | carried to spec (open question 3) |
+| 1 | Which release carries this change? | answered by the owner on 2026-11-11: the next release after 0.2.10, as one release (spec open question 1) |
+| 2 | After an upgrade, what happens to the `gabo-cycle` and `gabo-reviewer` agent files an older build left in the project? | answered by the owner on 2026-11-11: a rebuild removes them and `gabo check` fails a leftover one (spec open question 2, D4) |
+| 3 | Does gabo stop writing and requiring the OpenCode `experimental.subagent_depth` key once one layer is enough? | answered by the owner on 2026-11-11: yes, and an existing value stays untouched (spec open question 3, D6) |
 
 ## Links
 
@@ -67,6 +67,6 @@ So every wave pays for two extra agent sessions whose only job is to pass messag
 | intent issue | [#474 I0015: One subagent layer on every engine](https://github.com/testeos-z/gabo-ai/issues/474) |
 | PRD | [PRD](../../PRD.md) R1, R3, R4, R9, R10, R13, R22, R33 |
 | spec | [spec](spec.md) |
-| plan | not written yet (gabo-dev-lead, after the owner accepts the spec) |
+| plan | not written yet (gabo-dev-lead; the spec was accepted on 2026-11-11) |
 | review findings | the owner's session of 2026-11-11 (questions quoted above and the approved graph) |
 | related intent | 0013-several-engines-in-parallel-in-one-project (S18, S20, D12, D14, D15: the Pi path this intent makes the only path), 0010-gabo-init-writes-the-main-session-key (the OpenCode `experimental.subagent_depth` key), 0009-main-session-defaults-to-the-gabo-assistant (the main-session entry), 0008-stricter-gabo-check (TRD 8.5) |

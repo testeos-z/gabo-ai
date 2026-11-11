@@ -49,7 +49,7 @@ While a proposal is debated or waits, only the affected task is BLOCKED (operati
 
 ## Journeys
 
-Actors: **owner**, **assistant**, **directiva** (pm, dev-lead, db-master, frontend), **cycle** (gabo-cycle), **coders**, **reviewer**, **plan-change reviewer**. Each journey: trigger, steps, outcome, failure and escalation. Amended (proposed, awaiting the owner's acceptance of [spec 0015](intents/0015-one-subagent-layer-on-every-engine/spec.md); graph approved by the owner 2026-11-11), S1 to S4: the **cycle** is the wave skill the assistant runs in its own main session, not a separate agent, and the **reviewer** is the reviewer script each coder starts; wherever a journey says "the cycle", the assistant's main session does that step.
+Actors: **owner**, **assistant**, **directiva** (pm, dev-lead, db-master, frontend), **cycle** (gabo-cycle), **coders**, **reviewer**, **plan-change reviewer**. Each journey: trigger, steps, outcome, failure and escalation. Amended (owner 2026-11-11, [intent 0015](intents/0015-one-subagent-layer-on-every-engine/spec.md)), S1 to S4: the **cycle** is the wave skill the assistant runs in its own main session, not a separate agent, and the **reviewer** is the reviewer script each coder starts; wherever a journey says "the cycle", the assistant's main session does that step.
 
 ### J1 Configure the team (R8, R12, R16, R31–R36)
 
@@ -98,7 +98,7 @@ Amended (owner 2026-11-03, per-change-sdlc): a wave is one intent.
 ### J4 Resolve questions by mode (R5, R6, R17)
 
 - **Trigger.** A coder or agent raises a question.
-- **Steps.** The question travels coder → cycle → assistant (Amended (proposed, awaiting acceptance of spec 0015 S4): coder → assistant). A critical one becomes a plan-change proposal (J6). Otherwise, in manual mode the assistant asks the owner one question at a time; in auto mode it decides, or asks directiva for a researched answer, and records the decision with its reason. At wave close the comfort answer adjusts `interaction_level` and `tone`.
+- **Steps.** The question travels coder → cycle → assistant (Amended (owner 2026-11-11, intent 0015 S4): coder → assistant). A critical one becomes a plan-change proposal (J6). Otherwise, in manual mode the assistant asks the owner one question at a time; in auto mode it decides, or asks directiva for a researched answer, and records the decision with its reason. At wave close the comfort answer adjusts `interaction_level` and `tone`.
 - **Outcome.** Every question closed with answer and resolver; preferences updated.
 - **Failure and escalation.** A4.
 
@@ -130,7 +130,7 @@ Amended (owner 2026-11-03, per-change-sdlc): a wave is one intent.
 ### J8 Trust what gets merged (R9, R10)
 
 - **Trigger.** A coder opens or updates a PR.
-- **Steps** ([TRD 5.2](TRD.md#52-review-r9)): optional coder-side review per methodology; the coder asks the reviewer agent for a review of the PR head; the reviewer script, in its own clone, home and cache, test-merges, runs the checks and an independent agent review once per head, comments the verdict and applies the merge gate (never main); the reviewer agent relays the `VERDICT` line; the coder fixes or reports HANDED. Amended (proposed, awaiting acceptance of spec 0015 S3): the coder validates the request, starts the reviewer script itself and reads its `VERDICT` line; there is no reviewer agent.
+- **Steps** ([TRD 5.2](TRD.md#52-review-r9)): optional coder-side review per methodology; the coder asks the reviewer agent for a review of the PR head; the reviewer script, in its own clone, home and cache, test-merges, runs the checks and an independent agent review once per head, comments the verdict and applies the merge gate (never main); the reviewer agent relays the `VERDICT` line; the coder fixes or reports HANDED. Amended (owner 2026-11-11, intent 0015 S3): the coder validates the request, starts the reviewer script itself and reads its `VERDICT` line; there is no reviewer agent.
 - **Outcome.** Only validated PRs merge; the task shows status and PR.
 - **Failure and escalation.** After 4 fix rounds the task is BLOCKED and escalated (PRD 8.1, rule 3).
 
