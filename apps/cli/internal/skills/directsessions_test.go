@@ -84,7 +84,7 @@ func TestDirectSessionsContractTakesAnyAgentHostSessionHandle(t *testing.T) {
 	}
 	sectionRequire(t, "### open session", contractSection(doc, "### open session"), []string{
 		"Start an agent session in one task worktree with a brief.",
-		"Return a session handle.",
+		"Return a session handle as the two fields of `## Handle`: `host` and `handle`.",
 	})
 }
 

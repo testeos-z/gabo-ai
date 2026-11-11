@@ -32,7 +32,7 @@ Load when writing, checking or using the adapter of the `direct_sessions` slot (
 
 ### open session
 
-Start an agent session in one task worktree with a brief. Return a session handle.
+Start an agent session in one task worktree with a brief. Return a session handle as the two fields of `## Handle`: `host` and `handle`.
 
 ### send message
 
