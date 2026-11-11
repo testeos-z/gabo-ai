@@ -3,12 +3,10 @@
 | field | value |
 |---|---|
 | intent | [0017-any-runtime-engine-without-a-go-change](intent.md) |
-| status | Draft (conditional: awaits the owner's decision on need, then owner acceptance) |
+| status | Draft (awaits owner acceptance) |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-11 |
-
-**Condition.** Owner, verbatim (2026-11-11): "config.go sigue con la lista fija de motores. Es necesario solo si quieres agregar motores sin tocar Go; si no, es prioridad baja." The requirements in section 1 apply only if the owner says yes (open question 1 in section 6). If the owner says no, nothing in this spec is planned.
 
 Mode is `auto`: the decisions marked **Proposed (auto)** are gabo-pm's proposals for the owner's one-pass approval.
 
@@ -20,9 +18,11 @@ Evidence base (checked 2026-11-11 on `origin/dev` at `0fd848e`):
 - **Reviewer engines.** TRD D27 and the owner decision of 2026-11-03 (intent 0002, 0004): the reviewer scripts run `claude`, `codex`, `pi` and `opencode`.
 - **Flexible tier.** PRD section 6 and TRD D28 (owner 2026-11-04): an engine outside the four is flexible tier; intent 0006 S8 and S11 define its `gabo init` line and its engine-neutral `gabo check`.
 
-## 1. Requirements
+## Log
 
-Conditional on the owner's decision (section 6, question 1).
+- 2026-11-11, owner decision: yes, engines must be accepted without a Go change. This closes the question of need. Requirements S1 to S6 are firm. The spec is still awaiting the owner's acceptance, and section 7 stays empty.
+
+## 1. Requirements
 
 | id | requirement | acceptance criteria | verification |
 |---|---|---|---|
@@ -56,7 +56,7 @@ Not applicable: `gabo.yaml` keys and their meaning stay the same, and no stored 
 
 | policy | conflict | resolution |
 |---|---|---|
-| PRD R35 and TRD 2 | Today's code contradicts them: a new engine needs a Go change and a release. | resolved by this spec if the owner says yes. Until then the conflict stays open, and R35 and TRD 2 stay as written. |
+| PRD R35 and TRD 2 | Today's code contradicts them: a new engine needs a Go change and a release. | resolved by this spec on acceptance. Until the change lands, R35 and TRD 2 stay as written. |
 | TRD D27 | The reviewer engines are fixed to the scripts' engines. | none: S3 keeps the four engines. |
 | TRD D28 and PRD section 6 | An accepted builder engine is flexible tier, without a plugin and hooks. | none: S4. |
 | PRD R33 | `gabo check` stays read-only. | none: D1 runs no probe and D4 keeps config pure. |
@@ -66,7 +66,7 @@ Not applicable: `gabo.yaml` keys and their meaning stay the same, and no stored 
 
 | # | question | status |
 |---|---|---|
-| 1 | Does the owner want engines accepted without a Go change? | open, owner decision. The requirements S1 to S6 apply only on yes. |
+| 1 | Does the owner want engines accepted without a Go change? | answered: yes (owner decision 2026-11-11, see Log) |
 | 2 | Is a runtime skill valid with the checks in D1 (a), or does it also need a recorded probe result (D1 b)? | open. **Proposed (auto):** D1 (a). |
 | 3 | Does the schema pattern in D2 (a) keep editor suggestions acceptable, or should the owner keep an explicit list? | open. **Proposed (auto):** D2 (a). |
 | 4 | Should `runtimes.reviewer` accept builder engines once the scripts report their supported engines? | open. **Proposed (auto):** no, D3 (a). |
@@ -74,7 +74,7 @@ Not applicable: `gabo.yaml` keys and their meaning stay the same, and no stored 
 
 ## 7. Acceptance
 
-Filled by a human only. Open before acceptance: question 1 of section 6 (does the owner want engines accepted without a Go change?). If the answer is no, this spec is not planned.
+Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
