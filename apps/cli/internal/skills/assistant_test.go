@@ -234,3 +234,31 @@ func TestAssistantRunsTheWaveInItsOwnSession(t *testing.T) {
 		"between coder rounds end your turn and never poll",
 	})
 }
+
+// Intent 0015 S5, PD11 (plan T16): the assistant resumes a coder that can be
+// resumed and otherwise runs the cycle's new-coder rule; no task is left open.
+func TestAssistantReplacesACoderThatCannotBeResumed(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-assistant/SKILL.md")
+	merge := lineWith(t, doc, "After every merge the coder did not see itself")
+	requireIn(t, "gabo-assistant merge rule", merge, []string{
+		"resume the owning coder by its handle (wave report or ledger) with `PR #<n> merged` so it closes its task (D23)",
+		"If it cannot be resumed (no transcript after a session close or restart), launch a new `gabo-coder` on the ledger worktree and branch (`gabo-cycle` step 3) with `PR #<n> merged`; it closes the task, and you never write DONE",
+	})
+	if strings.Contains(merge, "the task stays open") || strings.Contains(merge, "leave its resources to the `gabo-cycle` fallback sweep") {
+		t.Errorf("gabo-assistant merge rule still leaves the task open: %q", merge)
+	}
+	resume := lineWith(t, doc, "5. **Resume from the traces.**")
+	requireIn(t, "gabo-assistant Intervene resume", resume, []string{
+		"A coder that cannot be resumed is replaced by a new `gabo-coder` as in Hard Rules",
+	})
+	if strings.Contains(resume, "is reported to the owner") {
+		t.Errorf("gabo-assistant Intervene resume still only reports it: %q", resume)
+	}
+	res := lineWith(t, doc, "2. **Resume.**")
+	requireIn(t, "gabo-assistant Resume", res, []string{
+		"Never resume another session's wave on your own",
+		"resume only when the owner asks you to resume that wave",
+		"When the holder cannot resume a ledger coder, the cycle's step 3 launches a new `gabo-coder` for it",
+	})
+}

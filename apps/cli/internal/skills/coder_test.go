@@ -121,3 +121,16 @@ func TestCoderDecisionGateRowsKeepTheirText(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0015 S5, PD11 (plan T16): a new coder launched after a session
+// restart can run the Task Close when its worktree or branch is already gone.
+func TestCoderTaskCloseWithoutAWorktree(t *testing.T) {
+	t.Parallel()
+	want := "If your worktree or branch is already gone (a new coder launched after a session restart), run steps 1 and 2 from the main checkout without `git -C <wt>`, skip steps 3 and 4 for what is gone, and list nothing as a leftover for it."
+	doc := readCatalog(t, "gabo-coder/SKILL.md")
+	_, closing, _ := strings.Cut(doc, "## Task Close")
+	closing, _, _ = strings.Cut(closing, "## Output Contract")
+	requireIn(t, "gabo-coder Task Close", closing, []string{want})
+	tpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	requireIn(t, "gabo-coder template", tpl, []string{"already gone", "from the main checkout without `git -C <wt>`"})
+}
