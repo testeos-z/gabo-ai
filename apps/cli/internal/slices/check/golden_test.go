@@ -128,6 +128,16 @@ func TestCommandGolden(t *testing.T) {
 			".claude/skills/gabo-wave-report": "../../.gabo/skills/gabo-wave-report",
 		}},
 	)
+	// Intent 0017 S1, S2 and S3: a builder engine as coder and as assistant
+	// with its runtime skill in .gabo/runtimes, a name with no skill, and a
+	// reviewer name the reviewer scripts do not run.
+	cases = append(cases,
+		tc{name: "builder-engine-coder", cfg: roleConfig("coder", "foo"), edit: builderEdit(RuntimesDir)},
+		tc{name: "builder-engine-assistant", cfg: roleConfig("assistant", "foo"), edit: builderEdit(CatalogDir)},
+		tc{name: "builder-engine-no-skill", cfg: roleConfig("coder", "bar")},
+		tc{name: "builder-engine-reviewer-refused", cfg: strings.Replace(validConfig, "reviewer: claude", "reviewer: bar", 1),
+			edit: map[string]string{".gabo/runtimes/gabo-runtime-bar/SKILL.md": engineSkill("bar")}},
+	)
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
 	}
