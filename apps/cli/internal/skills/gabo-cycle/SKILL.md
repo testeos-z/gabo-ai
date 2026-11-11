@@ -45,4 +45,4 @@ Load in the main session, on every engine: `gabo-assistant` loads this skill the
 
 ## Output Contract
 
-The wave report (TRD 9.2) in the format of `gabo-wave-report`, with its comfort answer `pending`, and the save as `verified` or `unverified`. A wave that does not hold its intent returns only the refusal line, the owner-release sentence and its `session id: <session id>` line (step 2); every other return also ends with that line.
+The wave report (TRD 9.2) in the format of `gabo-wave-report`, with its comfort answer `pending`, and the save as `verified` or `unverified`. A wave that does not hold its intent returns only the refusal line, the owner-release sentence and its `session id: <session id>` line (step 2); every other return also ends with that line. A wave that returns with HANDED tasks says that it keeps its intent claim and that the claim ends with the wave close or the owner's release.

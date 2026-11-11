@@ -534,3 +534,20 @@ func TestCoderTemplateRunsTheReviewerScript(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0015 S3, S5, PD10 (plan T15): the built coder does not end HANDED on a
+// clean verdict whose merge was skipped by a CONFLICTING PR.
+func TestCoderTemplateMergesDevOnAConflictingCleanPR(t *testing.T) {
+	t.Parallel()
+	doc := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	for _, s := range []string{
+		"After a clean review that is not yet merged, end HANDED and stay resumable; never poll.",
+		"except `verdict=clean merge=skipped` with the PR `CONFLICTING`",
+		"merge `origin/dev` into the task branch (never a rebase, never a force-push), resolve the conflict, run the task's checks, push and request a new review for the new head, as one fix round",
+		"a conflict you cannot resolve ends BLOCKED with the question, never HANDED",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-coder template: missing %q", s)
+		}
+	}
+}
