@@ -74,7 +74,7 @@ func TestRuntimeClaudeMapsEveryCapability(t *testing.T) {
 		mapped[m[1]] = true
 	}
 	need := map[string]bool{}
-	for _, c := range []string{"read", "search", "edit", "shell", "git", "tracker", "repository-host", "memory", "web", "skills", "subagents"} {
+	for _, c := range []string{"read", "search", "edit", "shell", "git", "tracker", "repository-host", "memory", "web", "skills"} {
 		need[c] = true
 	}
 	spec, err := agentspec.Load(Catalog())
@@ -90,6 +90,14 @@ func TestRuntimeClaudeMapsEveryCapability(t *testing.T) {
 		if !mapped[c] {
 			t.Errorf("capability %s has no row in ## Tool Map", c)
 		}
+	}
+	// intent 0015 S6, D7: no capability maps to a launch tool, and no built
+	// agent lists `Agent` in `tools`.
+	if mapped["subagents"] {
+		t.Errorf("%s: ## Tool Map still has a subagents row", runtimeClaude)
+	}
+	if strings.Contains(section, "| Agent") || strings.Contains(section, ", Agent") {
+		t.Errorf("%s: ## Tool Map still maps a capability to the Agent tool", runtimeClaude)
 	}
 }
 
@@ -473,4 +481,55 @@ func assertRemovalRulesSayNotListed(t *testing.T, name, body string) {
 			t.Errorf("%s: removal rule does not say \"not listed in `runtimes.assistant`\": %.100s", name, l)
 		}
 	}
+}
+
+// intent 0015 S6, D3: every main_session.skills entry (gabo-assistant,
+// gabo-cycle, gabo-wave-report) is linked while claude is listed, step 3 never
+// removes one, and they go with the entry when claude is not listed.
+func TestRuntimeClaudeLinksEveryMainSessionSkill(t *testing.T) {
+	t.Parallel()
+	section := mainSessionSection(t)
+	mustContainIn(t, runtimeClaude+" Main-Session Entry", section,
+		"every other `main_session.skills` entry",
+		"`.claude/skills/<name>`", "`../../.gabo/skills/<name>`",
+		"`gabo-assistant`, `gabo-cycle` and `gabo-wave-report`",
+		"Step 3 never removes them",
+		"the `.claude/skills/<name>` symlink of every other `main_session.skills` entry",
+	)
+}
+
+// intent 0015 S6, D4: on every build the two former agent files go, only with
+// a gabo-version line.
+func TestRuntimeClaudeRemovesTheFormerAgentFiles(t *testing.T) {
+	t.Parallel()
+	doc := runtimeClaudeDoc(t)
+	mustContainIn(t, runtimeClaude, doc,
+		"`.claude/agents/gabo-cycle.md` and `.claude/agents/gabo-reviewer.md`",
+		"only when the file carries a `gabo-version:` line",
+		"leave it and report it",
+	)
+	mustLackIn(t, runtimeClaude, doc, "the reviewer agent", "for example the reviewer agent file")
+}
+
+// intent 0015 S6: the coder fills {{reviewer_script}} with the value the
+// relay used to get, and the skill grants no launch tool.
+func TestRuntimeClaudeFillsTheReviewerScriptInTheCoder(t *testing.T) {
+	t.Parallel()
+	doc := runtimeClaudeDoc(t)
+	mustContainIn(t, runtimeClaude, doc,
+		"| `{{reviewer_script}}` | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer/scripts/reviewer.sh`",
+		"in `gabo-coder`",
+		"Never grant an agent the `Agent` tool",
+	)
+}
+
+// intent 0015 S6: the probe launches a spec agent from the main session and
+// expects no agent to launch another.
+func TestRuntimeClaudeProbeLaunchesFromTheMainSession(t *testing.T) {
+	t.Parallel()
+	doc := runtimeClaudeDoc(t)
+	mustContainIn(t, runtimeClaude, doc,
+		"launch it once from the main session",
+		"no agent launches another",
+	)
 }

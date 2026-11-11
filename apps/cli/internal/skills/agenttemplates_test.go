@@ -171,18 +171,46 @@ func TestEveryAgentTemplateNamesItsEngine(t *testing.T) {
 	}
 }
 
-func TestReviewerTemplateIsARelay(t *testing.T) {
+// Intent 0015 S2, D3, D7 (plan T6): six spec agents, all launched by the main
+// session and none with the launch capability; the cycle and relay templates
+// are gone.
+func TestCatalogHasSixAgentsLaunchedByTheMainSession(t *testing.T) {
 	t.Parallel()
-	doc := agentTemplates(t)[templatesPrefix+"gabo-reviewer.md"]
-	for _, s := range []string{
-		"`PR #<n> head <sha> ready for review`", "positive integer", "40-hex",
-		"`^PR #([1-9][0-9]*) head ([0-9a-f]{40})( ready for review)?$`",
-		"{{reviewer_script}}", "`verdict=retry`", "exactly once", "`VERDICT `",
-		"never review", "edit", "comment", "merge",
-	} {
-		if !strings.Contains(doc, s) {
-			t.Errorf("gabo-reviewer template: missing %q", s)
+	for _, gone := range []string{"gabo-cycle.md", "gabo-reviewer.md"} {
+		if _, ok := agentTemplates(t)[templatesPrefix+gone]; ok {
+			t.Errorf("%s%s still embedded", templatesPrefix, gone)
 		}
+	}
+	spec := embeddedByPath(t)[agentspec.Dir+"/agents.yaml"]
+	if n := strings.Count(spec, "\n  - id: "); n != 6 {
+		t.Errorf("agents.yaml: %d agents, want 6", n)
+	}
+	for _, s := range []string{"launched_by: main-session", "skills: [gabo-assistant, gabo-cycle, gabo-wave-report]"} {
+		if !strings.Contains(spec, s) {
+			t.Errorf("agents.yaml: missing %q", s)
+		}
+	}
+	for _, s := range []string{"launched_by: gabo-", "subagents", "id: gabo-cycle", "id: gabo-reviewer"} {
+		if strings.Contains(spec, s) {
+			t.Errorf("agents.yaml: still has %q", s)
+		}
+	}
+	if !strings.Contains(spec, "tracker, repository-host, memory, web, skills\n") {
+		t.Error("agents.yaml header: the tools list is not the ten capabilities")
+	}
+	skill := embeddedByPath(t)[agentspec.Dir+"/SKILL.md"]
+	for _, s := range []string{
+		"`read`, `search`, `edit`, `shell`, `git`, `tracker`, `repository-host`, `memory`, `web`, `skills` |",
+		"gets the link of every `main_session.skills` entry",
+		"a shared `.agents/skills` link stays while any listed engine uses that directory",
+		"the template that carries the slot is `gabo-coder`",
+	} {
+		if !strings.Contains(skill, s) {
+			t.Errorf("gabo-agent-templates/SKILL.md: missing %q", s)
+		}
+	}
+	if strings.Contains(skill, "`subagents`") {
+		t.Error("gabo-agent-templates/SKILL.md: still lists `subagents`")
 	}
 }
 
@@ -216,7 +244,7 @@ const (
 var mainSessionContent = []string{
 	"the gabo assistant", "load the `gabo-assistant` skill", "follow its Session Start", "before your first reply",
 	"`.gabo/skills/gabo-assistant/SKILL.md`", "single point of contact", "never block on long work",
-	"`gabo-pm`", "`gabo-dev-lead`", "`gabo-cycle`", "`gabo-plan-reviewer`",
+	"`gabo-pm`", "`gabo-dev-lead`", "`gabo-plan-reviewer`",
 }
 
 func containsFold(doc, s string) bool {
@@ -450,6 +478,59 @@ func TestAgentTemplatesMainSessionEntryFollowsTheAssistantList(t *testing.T) {
 	for _, s := range []string{"only for `runtimes.assistant`", "is `runtimes.assistant`", "of each other engine"} {
 		if strings.Contains(sec, s) {
 			t.Errorf("%s/SKILL.md ## Main-Session Entry: still reads one assistant engine: %q", agentspec.Dir, s)
+		}
+	}
+}
+
+// Intent 0015 S1, S10 (plan T4): the main-session entries no longer list
+// `gabo-cycle` among the agents; they say the session runs the wave with the
+// `gabo-cycle` skill.
+func TestMainSessionEntriesRunTheWaveWithTheCycleSkill(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{mainTemplate, mainBlock} {
+		doc := agentTemplates(t)[name]
+		for _, s := range []string{
+			"Run the wave yourself with the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`)",
+			"`gabo-pm`, `gabo-dev-lead`, `gabo-plan-reviewer`, the coders",
+		} {
+			if !strings.Contains(doc, s) {
+				t.Errorf("%s: missing %q", name, s)
+			}
+		}
+		if strings.Contains(doc, "`gabo-dev-lead`, `gabo-cycle`") {
+			t.Errorf("%s: still lists `gabo-cycle` among the agents", name)
+		}
+	}
+}
+
+// Intent 0015 S3, S4, D5 (plan T5): one review step for every engine, the Pi
+// bullet of 0.2.10 without its Pi wording; the coder launches no agent.
+func TestCoderTemplateRunsTheReviewerScript(t *testing.T) {
+	t.Parallel()
+	doc := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	for _, s := range []string{
+		"an agent of the gabo assistant", "You launch no agent",
+		"report `REJECTED: expected \"PR #<n> head <40-hex sha>\"` and run nothing",
+		"allowing it up to 10 minutes, with no extra arguments or environment",
+		"`bash \"{{reviewer_script}}\" head <n> <sha>`",
+		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
+		"the last line of its output that starts with `VERDICT `",
+		"If it carries `verdict=retry`, run the same command exactly once more",
+		"never rerun for any other reason",
+		"`NO VERDICT: <exit code or \"timeout\"> <last stderr line>`",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-coder template: missing %q", s)
+		}
+	}
+	for _, s := range []string{"gabo-cycle", "launch it with", "The only agent you launch", "subagent_", "Pi"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("gabo-coder template: still says %q", s)
+		}
+	}
+	for _, p := range reviewerPatterns(t) {
+		if !strings.Contains(doc, "`"+p+"`") {
+			t.Errorf("gabo-coder template: missing the reviewer pattern %q", p)
 		}
 	}
 }

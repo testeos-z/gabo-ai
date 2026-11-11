@@ -86,7 +86,7 @@ func TestFreshProjectInstallsReviewerAtUserLevel(t *testing.T) {
 // user copy, so it is installed while the catalog stays untouched.
 func TestMatchingStampWithoutUserCopyInstallsReviewer(t *testing.T) {
 	t.Parallel()
-	files := map[string]string{config: cfgYAML, stamp: "1.2.3\n", setup: "edited", claudeFile: claudeIntegrated()}
+	files := map[string]string{config: cfgYAML, stamp: "1.2.3\n", hashFile: catalogHash(), setup: "edited", claudeFile: claudeIntegrated()}
 	block := strings.Join(claudeBlock(files), "\n")
 	s := newStore(files)
 	out, err := runInit(t, s, "1.2.3")
@@ -141,7 +141,7 @@ func TestDifferingUserCopyIsReplaced(t *testing.T) {
 
 func TestCurrentUserCopyIsUntouched(t *testing.T) {
 	t.Parallel()
-	s := newStore(map[string]string{stamp: "1.2.3\n", userStamp: "1.2.3\n", userSkill: "edited by hand"})
+	s := newStore(map[string]string{stamp: "1.2.3\n", hashFile: catalogHash(), userStamp: "1.2.3\n", userSkill: "edited by hand"})
 	before := maps.Clone(s.Files)
 	out, err := runInit(t, s, "v1.2.3")
 	if err != nil {

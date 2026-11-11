@@ -86,30 +86,29 @@ func TestCoderSendsTheEngineOnlyUnderSession(t *testing.T) {
 	t.Parallel()
 	skill := readCatalog(t, "gabo-coder/SKILL.md")
 	requireIn(t, "gabo-coder/SKILL.md", skill, []string{
-		"request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`",
+		"exactly `PR #<n> head <40-hex pushed sha>`",
 		"`PR #<n> head <40-hex pushed sha> engine <engine>`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 		"your session engine", "`gabo-engine:`",
 	})
 	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
 	requireIn(t, "gabo-coder template", tmpl, []string{
-		"launch it with exactly `PR #<n> head <40-hex sha>`",
+		"build the request `PR #<n> head <40-hex sha>`",
 		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 	})
 }
 
-// Intent 0013 S11 (plan T8): the reviewer relay and the reviewer notes
-// describe the optional engine field; the relay passes it as an argument.
+// Intent 0013 S11 (plan T8): the coder and the reviewer notes
+// describe the optional engine field; the coder passes it as an argument.
 func TestReviewerDescribesTheOptionalEngineField(t *testing.T) {
 	t.Parallel()
-	tmpl := agentTemplates(t)[templatesPrefix+"gabo-reviewer.md"]
-	requireIn(t, "gabo-reviewer template", tmpl, []string{
-		"`PR #<n> head <sha> engine <engine>`",
+	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	requireIn(t, "gabo-coder template", tmpl, []string{
+		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"`^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
-		"as an argument, never as environment",
 	})
 	notes := readCatalog(t, "gabo-reviewer-notes/SKILL.md")
 	requireIn(t, "gabo-reviewer-notes/SKILL.md", notes, []string{
@@ -239,32 +238,47 @@ func lineWith(t *testing.T, doc, s string) string {
 	return ""
 }
 
-// Intent 0013 S18, D12 (plan T21): on a Pi main session the assistant loads
-// this skill in that session; the session engine is the block line (S16) and
-// each coder is one first-level `subagent_run`.
-func TestCycleRunsInThePiMainSession(t *testing.T) {
+// Intent 0015 S1, S4, S5, D1 (plan T4; supersedes intent 0013 S18 for every
+// engine): the main session loads this skill on every engine; "return to the
+// assistant" means continuing with its Wave Close; each coder is one
+// first-level in-process subagent; no sentence names a `gabo-cycle` subagent
+// or agent file, and no rule on where the cycle runs names one engine.
+func TestCycleRunsInTheMainSession(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	_, act, _ := strings.Cut(doc, "## Activation Contract")
 	act, _, _ = strings.Cut(act, "\n## ")
 	requireIn(t, "gabo-cycle Activation Contract", act, []string{
-		"Load in the `gabo-cycle` subagent on Claude Code, Codex and OpenCode",
-		"on a Pi main session, in that main session itself",
-		"`gabo-assistant` loads this skill there and runs it with the same inputs",
-		"a gentle-pi subagent gets no `subagent_*` tools (intent 0013 S18, D12)",
+		"Load in the main session, on every engine: `gabo-assistant` loads this skill there and runs it with the same inputs",
+		"\"return to the assistant\" means continue with the assistant's Wave Close in the same session",
 	})
 	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
-		// session engine from the block line there.
-		"On a Pi main session your session engine is the block's fixed session-engine line (`pi`, intent 0013 S16), not an agent file",
-		// coders as first-level subagent runs.
-		"On a Pi main session each coder is one first-level `subagent_run` of that session",
-		// what wakes the session for steps 6 and 7.
-		"gentle-pi delivers each finished subagent's result to that session and wakes it (gentle-pi 4.5.1 completion notice)",
-		"a run in task mode returns only when the coder ends",
-		"each wake is the next outcome of step 6",
+		"the engine of your main-session entry: the `gabo-engine:` line of your built agent file (`{{engine}}`, intent 0013 S6) or the fixed session-engine line of the block",
+		"each coder is one first-level in-process subagent of the main session, and its handle goes to the ledger",
+		"never a named teammate in its own pane unless the owner asks",
+		"a compacted or restarted main session resumes the wave from the tracker, the ledger and the trace, without asking the owner to repeat anything",
+		"Between coders the session ends its turn and never polls",
 	})
+	for _, s := range []string{
+		"`gabo-cycle` subagent", "`gabo-cycle` agent", "subagent_run", "subagent_continue", "gentle-pi", "On a Pi main session",
+		"on a Pi main session", "Claude Code, Codex and OpenCode",
+	} {
+		if strings.Contains(doc, s) {
+			t.Errorf("gabo-cycle/SKILL.md: must not say %q", s)
+		}
+	}
 	step5 := lineWith(t, doc, "5. Per task:")
-	if !strings.Contains(step5, "on a Pi main session one first-level `subagent_run`") {
-		t.Error("gabo-cycle step 5: the coder launch does not name the Pi first-level `subagent_run`")
+	if !strings.Contains(step5, "launch `gabo-coder` as a first-level in-process subagent of this session") {
+		t.Error("gabo-cycle step 5: the coder launch does not name a first-level in-process subagent")
+	}
+}
+
+// Intent 0015 S1: the wave report loads in the main session.
+func TestWaveReportLoadsInTheMainSession(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
+	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{"Load in the main session when it runs the `gabo-cycle` skill"})
+	if strings.Contains(doc, "Load in `gabo-cycle`") {
+		t.Error("gabo-wave-report/SKILL.md: still loads in `gabo-cycle`")
 	}
 }

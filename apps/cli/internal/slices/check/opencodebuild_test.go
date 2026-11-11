@@ -69,6 +69,8 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 	// The main-session entry of spec 0009 S1, S2: link, primary agent and
 	// the default_agent key above.
 	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".agents/skills/gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[".agents/skills/gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	proj[".opencode/agents/"+assistantID+".md"] = file("---\ndescription: \"The gabo assistant\"\nmode: primary\n---\n" +
 		"<!-- gabo-version: " + version + " -->\n" + assistantBody(t))
 	return proj
@@ -98,8 +100,7 @@ func noLineWith(t *testing.T, r Report, part string) {
 }
 
 // S1, S3, S11: the built OpenCode project with every role on opencode
-// passes, with no runtime-value, agent, link, reviewer link or subagent
-// depth failure.
+// passes, with no runtime-value, agent, link or reviewer link failure.
 func TestOpencodeBuiltSetPassesCheck(t *testing.T) {
 	t.Parallel()
 	proj := opencodeBuilt(t, "1.2.3")
@@ -142,11 +143,11 @@ func TestOpencodeAgentFromAnotherVersionFails(t *testing.T) {
 func TestOpencodeMissingLinkFails(t *testing.T) {
 	t.Parallel()
 	proj := opencodeBuilt(t, "1.2.3")
-	delete(proj, ".agents/skills/gabo-wave-report")
+	delete(proj, ".agents/skills/gabo-reviewer-notes")
 	delete(proj, ".agents/skills/gabo-agent-host")
 	rep := runOpencode(t, proj, "1.2.3")
 	wantFailed(t, rep,
-		"✗ skill link .agents/skills/gabo-wave-report missing",
+		"✗ skill link .agents/skills/gabo-reviewer-notes missing",
 		"✗ skill link .agents/skills/gabo-agent-host missing")
 }
 
@@ -207,113 +208,35 @@ func TestCodexPiAndOpencodeShareOneSetOfLinks(t *testing.T) {
 	}
 }
 
-// depthLines returns the ✗ lines naming experimental.subagent_depth.
-func depthLines(r Report) []string {
-	var out []string
-	for _, l := range r.Lines {
-		if strings.HasPrefix(l, "✗ ") && strings.Contains(l, "experimental.subagent_depth") {
-			out = append(out, l)
-		}
-	}
-	return out
-}
-
-// S8, S11: with no project config, or experimental.subagent_depth below 3
-// (or missing, or unreadable) in the first existing file of the S8 order,
-// gabo check fails with one ✗ line naming the key, the value 3 and the file.
-// Intent 0010 S6: a missing key or a whole number below 3 is gabo init's fix,
-// so the hint names gabo init; a value gabo init refuses to merge keeps the
-// hint to set it by hand, and a file gabo init refuses names its reason.
-func TestOpencodeSubagentDepthBelowThreeFails(t *testing.T) {
+// Intent 0015 S8, D6: gabo no longer depends on an engine's nesting depth,
+// so gabo check prints no line naming experimental.subagent_depth whatever
+// the project's OpenCode config holds (missing, below 3, not a number, no
+// file at all, or 3), and the rest of the output is the built project's.
+func TestOpencodeSubagentDepthIsNotChecked(t *testing.T) {
 	t.Parallel()
-	const (
-		root   = "opencode.json"
-		rootC  = "opencode.jsonc"
-		nested = ".opencode/opencode.json"
-		jsonc  = ".opencode/opencode.jsonc"
-	)
 	for _, c := range []struct {
 		name  string
 		files map[string]string
-		file  string
-		why   string
-		init  bool
 	}{
-		{"no project config", nil, nested, "no project config", true},
-		{"below 3", map[string]string{jsonc: `{"experimental": {"subagent_depth": 2}}`}, jsonc, "it is 2", true},
-		{"negative", map[string]string{jsonc: `{"experimental": {"subagent_depth": -1}}`}, jsonc, "it is -1", true},
-		{"key missing", map[string]string{root: `{"theme": "x"}`}, root, "not set", true},
-		{"experimental without the key", map[string]string{root: `{"experimental": {}}`}, root, "not set", true},
-		{"experimental not an object", map[string]string{root: `{"experimental": true}`}, root, "experimental is not an object", false},
-		{"not a number", map[string]string{root: `{"experimental": {"subagent_depth": "3"}}`}, root, `it is "3"`, false},
-		{"not a whole number", map[string]string{root: `{"experimental": {"subagent_depth": 3.5}}`}, root, "it is 3.5", false},
-		{"does not parse", map[string]string{rootC: `{"experimental": {"subagent_depth": 3}`}, rootC, "the file does not parse", false},
-		// Only the first existing file counts, as in OpenCode's lookup order.
-		{"first file wins", map[string]string{rootC: `{"experimental": {"subagent_depth": 1}}`, nested: `{"experimental": {"subagent_depth": 3}}`}, rootC, "it is 1", true},
-		{"root before nested", map[string]string{root: `{}`, jsonc: `{"experimental": {"subagent_depth": 5}}`}, root, "not set", true},
-		// gabo init refuses a repeated key, so following its hint would loop.
-		{"repeated key", map[string]string{root: `{"experimental": {"subagent_depth": 1, "subagent_depth": 2}}`}, root, "it is 2", false},
-		{"repeated experimental", map[string]string{root: `{"experimental": {}, "experimental": {"subagent_depth": 1}}`}, root, "it is 1", false},
+		{"no project config", nil},
+		{"key missing", map[string]string{"opencode.json": `{"theme": "x"}`}},
+		{"below 3", map[string]string{".opencode/opencode.jsonc": `{"experimental": {"subagent_depth": 2}}`}},
+		{"not a number", map[string]string{"opencode.json": `{"experimental": {"subagent_depth": "3"}}`}},
+		{"3 as before", map[string]string{"opencode.json": `{"experimental": {"subagent_depth": 3}}`}},
 	} {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 			proj := opencodeBuilt(t, "1.2.3")
 			delete(proj, ".opencode/opencode.jsonc")
 			for k, v := range c.files {
-				proj[k] = file(v)
+				proj[k] = file(withJSONKey(v, "default_agent", assistantID))
 			}
 			rep := runOpencode(t, proj, "1.2.3")
-			want := "✗ experimental.subagent_depth must be 3 or more in " + c.file + ": " + c.why
-			got := depthLines(rep)
-			if len(got) != 1 || !strings.HasPrefix(got[0], want) {
-				t.Fatalf("depth lines %q, want one starting with %q:\n%s", got, want, joined(rep))
-			}
-			next := "next: set experimental.subagent_depth to 3 in " + c.file + ", then rerun gabo check"
-			if strings.HasPrefix(c.name, "repeated") {
-				what := map[bool]string{true: "experimental", false: "experimental.subagent_depth"}[c.name == "repeated experimental"]
-				next = "next: fix " + c.file + " (" + what + " appears more than once), then run gabo init and rerun gabo check"
-			}
-			if c.init {
-				next = "next: run gabo init (it sets experimental.subagent_depth to 3 in " + c.file + "), then rerun gabo check"
-			}
-			wantFailed(t, rep)
-			wantConsecutive(t, rep, got[0], next)
-		})
-	}
-}
-
-// S11: 3 or more in the first existing file passes, in any of the four
-// files, JSONC comments and trailing commas included.
-func TestOpencodeSubagentDepthThreeOrMorePasses(t *testing.T) {
-	t.Parallel()
-	for _, c := range []struct{ file, doc string }{
-		{"opencode.json", `{"experimental": {"subagent_depth": 3}}`},
-		{"opencode.jsonc", "// c\n{\"experimental\": {\"subagent_depth\": 4,},}\n"},
-		{".opencode/opencode.json", "\ufeff{\"experimental\": {\"subagent_depth\": 10}}"},
-		{".opencode/opencode.jsonc", readTestdata(t, "opencode.jsonc")},
-	} {
-		t.Run(c.file, func(t *testing.T) {
-			t.Parallel()
-			proj := opencodeBuilt(t, "1.2.3")
-			delete(proj, ".opencode/opencode.jsonc")
-			proj[c.file] = file(withJSONKey(c.doc, "default_agent", assistantID))
-			rep := runOpencode(t, proj, "1.2.3")
-			wantPassed(t, rep, PassedLine)
-			if got := depthLines(rep); len(got) != 0 {
-				t.Fatalf("depth lines %q", got)
+			noLineWith(t, rep, "subagent_depth")
+			if len(c.files) > 0 {
+				wantPassed(t, rep, PassedLine)
 			}
 		})
-	}
-}
-
-// A project without an opencode runtime never reads an OpenCode config.
-func TestSubagentDepthOnlyForOpencode(t *testing.T) {
-	t.Parallel()
-	proj := with(project(), map[string]string{"opencode.json": `{"experimental": {"subagent_depth": 1}}`})
-	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
-	wantPassed(t, r, PassedLine)
-	if got := depthLines(r); len(got) != 0 {
-		t.Fatalf("depth lines %q", got)
 	}
 }
 
@@ -353,16 +276,6 @@ func TestOpencodeBuiltAgentSkills(t *testing.T) {
 	}
 }
 
-// The agent with an empty spec list and no Skills: line passes.
-func TestOpencodeBuiltReviewerHasNoSkillsLine(t *testing.T) {
-	t.Parallel()
-	proj := opencodeBuilt(t, "1.2.3")
-	if strings.Contains(string(proj[".opencode/agents/gabo-reviewer.md"].Data), "\nSkills: ") {
-		t.Fatalf("gabo-reviewer has a Skills: line:\n%s", proj[".opencode/agents/gabo-reviewer.md"].Data)
-	}
-	wantSkillLines(t, runOpencode(t, proj, "1.2.3"), ".opencode/agents/gabo-reviewer.md", nil)
-}
-
 // The directory the Skills: line names does not change the result.
 func TestOpencodeBuiltAgentSkillsIgnoreTheDirectory(t *testing.T) {
 	t.Parallel()
@@ -382,8 +295,7 @@ func TestOpencodeBuiltAgentSkillsIgnoreTheDirectory(t *testing.T) {
 
 // Intent 0013 S5: a fixed reviewer engine beside listed assistants is in
 // the set: reviewer opencode with no OpenCode agents fails with the agents
-// line for opencode, and the OpenCode depth rule applies; session is no
-// engine.
+// line for opencode; session is no engine.
 func TestOpencodeReviewerBesideListedAssistantsNeedsItsAgents(t *testing.T) {
 	t.Parallel()
 	p := with(project(), map[string]string{
@@ -395,7 +307,4 @@ func TestOpencodeReviewerBesideListedAssistantsNeedsItsAgents(t *testing.T) {
 	r := run(t, p, configFiles{projectFile: cfg}, Settings{})
 	wantFailed(t, r, "✗ agent alpha missing", "why: no file named alpha in .opencode/agents (runtime opencode)")
 	noLineWith(t, r, "runtime session")
-	if !strings.Contains(joined(r), "✗ "+subagentDepthKey) {
-		t.Fatalf("no OpenCode depth line:\n%s", joined(r))
-	}
 }

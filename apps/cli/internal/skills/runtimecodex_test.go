@@ -398,3 +398,61 @@ func TestRuntimeCodexDeclaresMainSession(t *testing.T) {
 	t.Parallel()
 	wantMainSession(t, runtimeCodex, mainSessionMeta{Kind: "block", Files: []string{"AGENTS.override.md", "AGENTS.md"}})
 }
+
+// intent 0015 S6, D3: every main_session.skills entry is linked while codex
+// is listed, step 3 never removes one, and they go with the entry when codex
+// is not listed.
+func TestRuntimeCodexLinksEveryMainSessionSkill(t *testing.T) {
+	t.Parallel()
+	section := codexMainSession(t)
+	for _, s := range []string{
+		"every other `main_session.skills` entry",
+		"`.agents/skills/<name>`", "`../../.gabo/skills/<name>`",
+		"`gabo-assistant`, `gabo-cycle` and `gabo-wave-report`",
+		"the `.agents/skills/<name>` link of every other `main_session.skills` entry",
+		"while another spec agent's `skills` lists it",
+	} {
+		if !strings.Contains(section, s) {
+			t.Errorf("%s Main-Session Entry: missing %q", runtimeCodex, s)
+		}
+	}
+	mustContainIn2(t, runtimeCodex, runtimeCodexDoc(t),
+		"also keep every `main_session.skills` link while `runtimes.assistant` names an engine that uses `.agents/skills`")
+}
+
+// intent 0015 S6, D4: on every build the two former agent files go, only with
+// a gabo-version line (a TOML comment on Codex).
+func TestRuntimeCodexRemovesTheFormerAgentFiles(t *testing.T) {
+	t.Parallel()
+	doc := runtimeCodexDoc(t)
+	mustContainIn2(t, runtimeCodex, doc,
+		"`.codex/agents/gabo-cycle.toml` and `.codex/agents/gabo-reviewer.toml`",
+		"only when the file carries a `gabo-version` line (a TOML comment)",
+		"a file without one: leave it and report it",
+	)
+	mustLackIn(t, runtimeCodex, doc, "the reviewer agent", "for example the reviewer agent file", "`gabo-plan-reviewer` and `gabo-reviewer`")
+}
+
+// intent 0015 S6, D7: the coder fills {{reviewer_script}}, no built agent is
+// told to launch another, and the probe launches from the main session.
+func TestRuntimeCodexBuildsSixAgentsWithNoLaunch(t *testing.T) {
+	t.Parallel()
+	doc := runtimeCodexDoc(t)
+	mustContainIn2(t, runtimeCodex, doc,
+		"| `{{reviewer_script}}` | `$HOME/.agents/skills/gabo-reviewer/scripts/reviewer.sh`",
+		"filled in `gabo-coder`, the only template that carries the slot",
+		"No built agent's instructions tell it to launch an agent",
+		"launch it once from the main session",
+		"no agent launches another",
+	)
+	mustLackIn(t, runtimeCodex, doc, "Launch it once as a subagent")
+}
+
+func mustContainIn2(t *testing.T, name, doc string, want ...string) {
+	t.Helper()
+	for _, s := range want {
+		if !strings.Contains(doc, s) {
+			t.Errorf("%s: missing %q", name, s)
+		}
+	}
+}

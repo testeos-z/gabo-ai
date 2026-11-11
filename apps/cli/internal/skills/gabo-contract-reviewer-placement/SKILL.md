@@ -17,7 +17,7 @@ Load when writing, checking or using the adapter of the `reviewer_placement` slo
 - The adapter passes the engine to the scripts as an argument, never as environment; the scripts check it again against the integration branch and refuse with `PREFLIGHT-FAILED <reason>`.
 - The review runs the installed scripts of the user-level `gbai-reviewer` skill, never a copy from the repository under review (D20).
 - One verdict per pushed head (R26): a head that moved or already has a verdict is skipped.
-- The agent relaying the review never reviews, edits, comments, approves or merges itself, and never posts the reviewer marker.
+- The coder that runs the review never reviews, edits, comments, approves or merges itself, and never posts the reviewer marker.
 
 ## Operations
 

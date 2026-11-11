@@ -185,10 +185,10 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 		{"claude settings with a comment", "claude", func(_ *testing.T, p fstest.MapFS) { p[claudeKeys] = file("// mine\n" + claudeKeysJSON) },
 			[][2]string{{line(claudeKeys, "incomplete", "claude")[0],
 				"next: fix .claude/settings.json (invalid JSON (invalid character '/' looking for beginning of value)), then run gabo init and rerun gabo check"}}},
-		{"opencode key in a file gabo init refuses", "opencode", func(_ *testing.T, p fstest.MapFS) {
-			p[ocConfig] = file(`{"experimental": {"subagent_depth": 3}, "experimental": {"subagent_depth": 3}}`)
+		{"unparsable opencode config fails the check", "opencode", func(_ *testing.T, p fstest.MapFS) {
+			p[ocConfig] = file(`{"default_agent": `)
 		}, [][2]string{{line(ocConfig, "incomplete", "opencode")[0],
-			"next: fix " + ocConfig + " (experimental appears more than once), then run gabo init and rerun gabo check"}}},
+			"next: fix " + ocConfig + " (invalid JSONC (unexpected end of JSON input)), then run gabo init and rerun gabo check"}}},
 		{"claude user's own agent value", "claude", func(_ *testing.T, p fstest.MapFS) {
 			p[claudeKeys] = file(withJSONKey(claudeKeysJSON, "agent", "my-agent"))
 		}, [][2]string{{`✗ .claude/settings.json: agent is "my-agent", not "gabo-assistant"`, changeKey("agent", claudeKeys)}}},
@@ -196,10 +196,12 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 			p[claudeKeys] = file(strings.Replace(claudeKeysJSON, "{", "{\n  \"agent\": [\"<a>\"],", 1))
 		}, [][2]string{{`✗ .claude/settings.json: agent is ["<a>"], not "gabo-assistant"`, changeKey("agent", claudeKeys)}}},
 		{"claude nothing", "claude", func(_ *testing.T, p fstest.MapFS) {
-			delete(p, claudeLink)
+			for _, sk := range []string{"gabo-assistant", "gabo-cycle", "gabo-wave-report"} {
+				delete(p, ".claude/skills/"+sk)
+			}
 			delete(p, claudeAgent)
 			p[claudeKeys] = file(claudeKeysJSON)
-		}, [][2]string{line(claudeLink, "missing", "claude"), line(claudeAgent, "missing", "claude"), key(claudeKeys, "missing", "claude", "agent")}},
+		}, [][2]string{line(claudeLink, "missing", "claude"), line(".claude/skills/gabo-cycle", "missing", "claude"), line(".claude/skills/gabo-wave-report", "missing", "claude"), line(claudeAgent, "missing", "claude"), key(claudeKeys, "missing", "claude", "agent")}},
 		{"opencode agent file and key", "opencode", func(t *testing.T, p fstest.MapFS) {
 			delete(p, ocAgent)
 			p[ocConfig] = file(readTestdata(t, "opencode.jsonc"))
@@ -214,14 +216,21 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 		{"opencode no config", "opencode", func(_ *testing.T, p fstest.MapFS) { delete(p, ocConfig) },
 			[][2]string{{line("opencode.json or opencode.jsonc or .opencode/opencode.json or .opencode/opencode.jsonc", "incomplete", "opencode")[0],
 				initMerges("default_agent", ".opencode/opencode.json")}}},
+		// Intent 0015 S7: gabo-cycle and gabo-wave-report are main_session.skills.
+		{"claude cycle link", "claude", func(_ *testing.T, p fstest.MapFS) { delete(p, ".claude/skills/gabo-cycle") },
+			[][2]string{line(".claude/skills/gabo-cycle", "incomplete", "claude")}},
+		{"codex wave-report link", "codex", func(_ *testing.T, p fstest.MapFS) { delete(p, ".agents/skills/gabo-wave-report") },
+			[][2]string{line(".agents/skills/gabo-wave-report", "incomplete", "codex")}},
 		{"opencode link", "opencode", func(_ *testing.T, p fstest.MapFS) { delete(p, sharedLink) },
 			[][2]string{line(sharedLink, "incomplete", "opencode")}},
 		{"codex block", "codex", func(_ *testing.T, p fstest.MapFS) { p["AGENTS.md"] = file("# Project\n") },
 			[][2]string{line("AGENTS.md", "incomplete", "codex")}},
 		{"codex nothing", "codex", func(_ *testing.T, p fstest.MapFS) {
-			delete(p, sharedLink)
+			for _, sk := range []string{"gabo-assistant", "gabo-cycle", "gabo-wave-report"} {
+				delete(p, ".agents/skills/"+sk)
+			}
 			delete(p, "AGENTS.md")
-		}, [][2]string{line(sharedLink, "missing", "codex"), line("AGENTS.override.md or AGENTS.md", "missing", "codex")}},
+		}, [][2]string{line(sharedLink, "missing", "codex"), line(".agents/skills/gabo-cycle", "missing", "codex"), line(".agents/skills/gabo-wave-report", "missing", "codex"), line("AGENTS.override.md or AGENTS.md", "missing", "codex")}},
 		// The block must be in the first existing file of the order.
 		{"codex block below an override", "codex", func(_ *testing.T, p fstest.MapFS) { p["AGENTS.override.md"] = file("# Local\n") },
 			[][2]string{line("AGENTS.override.md", "incomplete", "codex")}},
@@ -300,6 +309,8 @@ func TestMainSessionStaleEntriesFail(t *testing.T) {
 	wantEntryLines(t, r, "✗ AGENTS.md: gabo assistant entry for codex, but runtimes.assistant is claude")
 
 	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".agents/skills/gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[".agents/skills/gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	proj[".opencode/agents/gabo-assistant.md"] = file("---\nmode: primary\n---\n<!-- gabo-version: 1.2.3 -->\nbody\n")
 	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant"}`)
 	proj["CLAUDE.md"] = file(block)
@@ -311,6 +322,8 @@ func TestMainSessionStaleEntriesFail(t *testing.T) {
 	// pieces keep the rebuild hint.
 	wantEntry(t, r,
 		[2]string{stale(".agents/skills/gabo-assistant", "codex"), NextRebuild},
+		[2]string{stale(".agents/skills/gabo-cycle", "codex"), NextRebuild},
+		[2]string{stale(".agents/skills/gabo-wave-report", "codex"), NextRebuild},
 		[2]string{stale("AGENTS.md", "codex"), NextRebuild},
 		[2]string{stale(".opencode/agents/gabo-assistant.md", "opencode"), NextRebuild},
 		[2]string{stale("opencode.json", "opencode"), initRemoves("default_agent", "opencode.json")},
@@ -336,18 +349,17 @@ func TestMainSessionStaleClaudeKey(t *testing.T) {
 
 // Intent 0010 D7: with OpenCode in the engine set but not the assistant,
 // gabo init refuses every OpenCode change while one of its configs does not
-// parse, so the stale-key and depth lines both name that file to fix.
+// parse, so the stale-key line names that file to fix.
 func TestMainSessionHintNamesTheFileGaboInitRefuses(t *testing.T) {
 	t.Parallel()
 	proj := claudeBuilt(t, "1.2.3")
-	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 1}}`)
+	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant"}`)
 	proj[".opencode/opencode.jsonc"] = file("{")
 	cfg := strings.Replace(validConfig, "  coder: claude\n", "  coder: opencode\n", 1)
 	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
 	fix := "next: fix .opencode/opencode.jsonc ("
 	for _, l := range []string{
 		"✗ opencode.json: gabo assistant entry for opencode, but runtimes.assistant is claude",
-		"✗ experimental.subagent_depth must be 3 or more in opencode.json: it is 1",
 	} {
 		i := slices.Index(r.Lines, l)
 		if i < 0 || i+1 >= len(r.Lines) || !strings.HasPrefix(r.Lines[i+1], fix) {

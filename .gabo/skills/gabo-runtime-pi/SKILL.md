@@ -10,6 +10,20 @@ metadata:
   former_skill_dir: .pi/skills
   agent_skills: "line:Skills:"
   agent_name: frontmatter:name
+  agent_tools: frontmatter:tools
+  agent_tool_requirements:
+    read: [read]
+    skills: [read]
+    search: [grep, find, ls]
+    edit: [edit, write]
+    shell: [bash]
+    git: [bash]
+    tracker: [bash]
+    repository-host: [bash]
+    memory: [mem_search, mem_save, mem_update, mem_get_observation]
+    subagents: []
+    web: []
+  agent_tools_unavailable: [subagent_*]
   main_session:
     kind: block
     files: [AGENTS.override.md, AGENTS.md, CLAUDE.md]
@@ -21,6 +35,7 @@ Load when a value of `runtimes.*` in `gabo.yaml` is `pi` and the gabo agents mus
 ## Hard Rules
 
 - Pi core has no subagents. Build nothing until a subagent package is present (Prerequisite); then refuse and say what to install.
+- A wave started from a Pi main session runs in that main session (intent 0013 S18, D12): gentle-pi subagents get no `subagent_*` tools, so `gabo-assistant` loads the `gabo-cycle` skill itself instead of launching the `gabo-cycle` agent, and each coder is one first-level `subagent_run`. Build the `gabo-cycle` agent anyway, like every spec entry.
 - Engine config (intent 0004 S8, D7): gabo writes only the engine keys it needs to operate, at project level only, merged with the existing project config (every unrelated key kept), reports what it wrote, and has the value verified by `gabo check`; never the user's global engine config: no write to `settings.json`, `models.json`, `mcp.json` or anything under the agent home except the one `skills/gabo-reviewer` link. `gabo init` writes every engine config key (intent 0010 S5); this skill writes none, no Pi config included, and never runs `pi install`. Never edit `subagents.json`: the subagent package owns it. Never run `pi install`, `pi config` or `npm i` yourself; the user installs.
 - Never place `gabo-reviewer` in the project, not as a copy and not as a link (D20): PR code must not reach the scripts that review it.
 - Read the spec, templates and version from the project copy (`.gabo/`), never from memory or the binary. Fill only the template slots (`gabo-agent-templates`); invent no rule, tool or skill.
@@ -72,7 +87,9 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 - `gabo-version: <version>` is the template's version line, moved into the frontmatter with the value of `.gabo/VERSION`; `gabo check` compares it with the stamp.
 - `gabo-engine: pi` is the template's engine line, moved into the frontmatter with `pi`, the engine as written in `gabo.yaml`; `gabo check` fails an agent file whose filled engine is not `pi` (intent 0013 S6).
 - The `Skills:` line is the spec's `skills` written where Pi can see it (a Pi agent has no skill-list field; the body is its system prompt). Omit the line when the list is empty.
-- `tools`: map each spec capability, in spec order, dropping duplicates. List only tools the session really has: an unknown name fails the subagent at launch.
+- `tools`: map each spec capability, in spec order, dropping duplicates. List only tools the session really has: an unknown name fails the subagent at launch. List every tool the agent needs, extension tools included: gentle-pi starts a subagent as `pi --tools <its tools list>`, and `--tools` with plain names replaces the whole selection, so every tool the list does not name is not declared to the subagent, MCP and extension tools included (intent 0013 S17).
+- `metadata.agent_tools` above says where an agent file lists its tools (the frontmatter `tools`), and `metadata.agent_tool_requirements` the tools each spec capability requires; `gabo check` reads both (intent 0013 D11). A required `mem_<x>` is also met by `mcp__<server>__mem_<x>` or a `mcp__<server>__*` entry.
+- `metadata.agent_tools_unavailable` the tools a subagent never has (`subagent_*`, a trailing `*` matching a prefix): every `.pi/agents` file runs as a gentle-pi subagent, so `gabo check` fails an agent file that lists one with `✗ <agent file>: tools a subagent never has: <names>` (intent 0013 S20).
 
 | capability | Pi tool |
 |---|---|
@@ -80,9 +97,9 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 | `search` | `grep`, `find`, `ls` |
 | `edit` | `edit`, `write` |
 | `shell`, `git`, `tracker`, `repository-host` | `bash` |
-| `memory` | `bash`; MCP memory tools (Engram) need no entry, Pi keeps MCP tools whatever `--tools` lists |
+| `memory` | `bash`, `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` when `pi list` shows `npm:gentle-engram`; else `bash`, `mcp__<server>__mem_search`, `mcp__<server>__mem_save`, `mcp__<server>__mem_update`, `mcp__<server>__mem_get_observation` when Pi's MCP config has an Engram server named `<server>`; neither: `bash` only, omit the memory tools and report it |
 | `web` | the web tools of an installed package (pi-web-access: `web_search`, `fetch_content`); none: omit and report |
-| `subagents` | gentle-pi: `subagent_run`, `subagent_status`, `subagent_result`, `subagent_continue`, `subagent_reply`, `subagent_cancel`, `subagent_list_agents`; another package: its own names |
+| `subagents` | gentle-pi: no tool, because every `.pi/agents` file runs as a gentle-pi subagent and a gentle-pi subagent gets no `subagent_*` tools (gentle-pi registers them only in the primary session); the Pi main session, which has them, is the Main-session entry block, not an agent file (intent 0013 S20); another package: its own names, only when its docs confirm a subagent has them |
 
 Slots:
 
@@ -92,6 +109,14 @@ Slots:
 | `{{adapter:<slot>}}` | `gabo-<slot>` with `_` written `-` (for example `gabo-repository-host`) |
 | `{{engine}}` | `pi` (intent 0013 S6) |
 | `{{reviewer_script}}` | `${GENTLE_PI_AGENT_HOME:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}}/skills/gabo-reviewer/scripts/reviewer.sh` (expanded by `bash` inside the template's double quotes, so the committed file holds no personal path; standalone `gentle-shell` sets both variables to its home) |
+
+### Coder review
+
+A gentle-pi subagent cannot launch `gabo-reviewer`, so the Pi coder gets its review by running the user-level reviewer script itself (intent 0013 S20, D14, D15). In `.pi/agents/gabo-coder.md`, write the bullet below in place of the template's bullet that starts `- The only agent you launch is `gabo-reviewer``, with `{{engine}}` and `{{reviewer_script}}` filled from the Slots table; every other line of the body stays the template's. Its two patterns are the ones of `gabo-agent-templates/agents/gabo-reviewer.md`, so the Pi coder accepts exactly what the relay accepts. Build `gabo-reviewer.md` anyway, like every spec entry.
+
+```markdown
+- You launch no agent: as a gentle-pi subagent you have no `subagent_*` tools, so you run the reviewer script yourself. After every push build the request `PR #<n> head <40-hex sha>`; only when `runtimes.reviewer` in `gabo.yaml` is `session`, `PR #<n> head <40-hex sha> engine {{engine}}` instead. Validate it before running anything: it must match exactly `^PR #([1-9][0-9]*) head ([0-9a-f]{40})( ready for review)?$`, or, only under `session`, `^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`; an `engine` field under a fixed `runtimes.reviewer`, or none under `session`, does not match. On a mismatch report `REJECTED: expected "PR #<n> head <40-hex sha>"` and run nothing. Then run exactly one command through `bash`, allowing it up to 10 minutes, with no extra arguments or environment: `bash "{{reviewer_script}}" head <n> <sha>`, or for the engine form `bash "{{reviewer_script}}" head <n> <sha> engine <engine>`. Take the last line of its output that starts with `VERDICT `. If it carries `verdict=retry`, run the same command exactly once more and take that run's line instead; never rerun for any other reason. No such line (the script failed or timed out): report `NO VERDICT: <exit code or "timeout"> <last stderr line>` and never invent or edit a VERDICT line. Then act on the `VERDICT` line exactly as on the `gabo-reviewer` relay's reply.
+```
 
 ### Skills and fixed-name links
 
@@ -137,6 +162,8 @@ Checked 2026-11-03 against Pi 1.4.0 and gentle-pi 4.5.1 (installed packages and 
 | `pi list`, `pi install <source> [-l]`; npm packages under `<agent-home>/npm/`; git packages cloned to `<agent-home>/git/<host>/<path>` (user) and `.pi/git/<host>/<path>` (project, after trust) | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md; Pi 1.4.0 `dist/core/package-manager.js` `getGitInstallPath`, `getGitInstallRoot`; gentle-pi 4.5.1 `docs/readme-reference.md` (Git-managed `agent-home/git/github.com/Gentleman-Programming/gentle-pi`) |
 | agents in `<cwd>/.pi/agents/`, `<cwd>/.pi/subagents/` and the home's `agents/`, `subagents/` (project beats global); frontmatter `name`, `description`, `tools`; `subagent_*` tools; `subagents.json` owned by the package | gentle-pi 4.5.1 `docs/gentle-shell.md` (Subagents), `lib/agents-config.ts` |
 | Pi 1.4.0 loads only the first existing file per directory of its context files, in the order `AGENTS.override.md`, then `AGENTS.md`, then `CLAUDE.md`, into every Pi process in the project, `pi --print` included (the Main-session entry file order, intent 0009 D6) | Pi 1.4.0 `dist/core/resource-loader.js` (line 116), probed with `pi --print`: https://github.com/testeos-z/gabo-ai/issues/324#issuecomment-6690677042 |
+| a subagent starts as `pi --tools <its tools list>` (`childArguments`); `--tools` with plain names replaces the whole selection, so an unnamed tool, MCP or extension, is not declared; the `subagent_*` tools are registered only in the primary session, not in a child (`GENTLE_PI_AGENTS_CHILD=1`) | Pi 1.4.0 `docs/cli.md` (Tools), `docs/mcp.md`; gentle-pi 4.5.1 `lib/agents-runner.ts` `childArguments`, `extensions/gentle-agents.ts`; probe P2a: https://github.com/testeos-z/gabo-ai/issues/414#issuecomment-6701730785 |
+| the Engram tools `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` (with the other `mem_*` tools) registered by the gentle-engram Pi package | gentle-engram 0.4.2 `index.ts` `ENGRAM_TOOLS` |
 | agent home `GENTLE_PI_AGENT_HOME`, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`; `gentle-shell` home `~/.gentle-shell/agent`, `--link` | gentle-pi 4.5.1 `docs/gentle-shell.md`, `docs/readme-reference.md`, `lib/agent-home.ts` |
 
 Recheck these against `pi --version` and the installed gentle-pi when either is newer, and update this table.

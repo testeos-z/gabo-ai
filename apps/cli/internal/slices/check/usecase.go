@@ -2,8 +2,7 @@
 // 9.4), engine-neutral except for the full-tier engine files: the config files, every agent of the neutral
 // agent spec in each runtime's declared agent directory, each agent's
 // version line, the skill and reviewer links a runtime skill declares
-// (metadata.skill_dir, metadata.reviewer_link), OpenCode's project-level
-// experimental.subagent_depth when a role runs on OpenCode, the engine
+// (metadata.skill_dir, metadata.reviewer_link), the engine
 // integration keys gabo init writes for claude, codex and pi, every slot adapter's
 // contract coverage, the catalog version stamp and the stage of each
 // intent folder under docs/product/intents/.
@@ -132,9 +131,6 @@ func (u *UseCase) Run() (Report, error) {
 		}
 		u.checkLeftovers(&r, cfg)
 		if err := u.checkReviewerIsolation(&r, cfg); err != nil {
-			return Report{}, err
-		}
-		if err := u.checkSubagentDepth(&r, cfg); err != nil {
 			return Report{}, err
 		}
 		if err := u.checkEngineKeys(&r, cfg); err != nil {
@@ -327,6 +323,9 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 					return err
 				}
 			}
+		}
+		if err := u.checkFormerAgents(r, dir, files, spec); err != nil {
+			return err
 		}
 	}
 	return nil

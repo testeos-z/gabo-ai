@@ -378,13 +378,16 @@ func TestRuntimePiListsTheMemoryToolsExplicitly(t *testing.T) {
 	)
 }
 
-// intent 0013 S17: gentle-pi registers the subagent_* tools only in the
-// primary session, so a subagent gets none of them.
-func TestRuntimePiSaysSubagentsGetNoSubagentTools(t *testing.T) {
+// intent 0015 S7 d: the `subagents` capability is gone (no spec agent has it),
+// and the sentence on subagents getting no `subagent_*` tools stays with
+// `agent_tools_unavailable`.
+func TestRuntimePiHasNoSubagentsCapability(t *testing.T) {
 	t.Parallel()
-	row := piCapabilityRow(t, runtimePiDoc(t), "`subagents`")
-	mustContainIn(t, "subagents row", row,
-		"a gentle-pi subagent gets no `subagent_*` tools (gentle-pi registers them only in the primary session)",
+	doc := runtimePiDoc(t)
+	mustLackIn(t, runtimePi, doc, "| `subagents` |", "    subagents: []")
+	mustContainIn(t, "## Build", doc,
+		"`metadata.agent_tools_unavailable` the tools a subagent never has",
+		"every `.pi/agents` file runs as a gentle-pi subagent",
 	)
 }
 
@@ -424,7 +427,6 @@ func TestRuntimePiDeclaresToolRequirements(t *testing.T) {
 		"tracker":         {"bash"},
 		"repository-host": {"bash"},
 		"memory":          {"mem_search", "mem_save", "mem_update", "mem_get_observation"},
-		"subagents":       {},
 		"web":             {},
 	}
 	// intent 0013 S20 (plan T22): every .pi/agents file runs as a gentle-pi
@@ -459,88 +461,79 @@ func TestRuntimePiNamesTheToolSources(t *testing.T) {
 	)
 }
 
-// Intent 0013 S18, D12 (plan T21): a Pi wave runs in the main session,
-// because gentle-pi subagents get no `subagent_*` tools.
-func TestRuntimePiSaysAPiWaveRunsInTheMainSession(t *testing.T) {
-	t.Parallel()
-	rules := piSection(t, runtimePiDoc(t), "## Hard Rules")
-	mustContainIn(t, "Hard Rules", rules,
-		"A wave started from a Pi main session runs in that main session (intent 0013 S18, D12)",
-		"gentle-pi subagents get no `subagent_*` tools",
-		"`gabo-assistant` loads the `gabo-cycle` skill itself",
-		"each coder is one first-level `subagent_run`",
-	)
-}
-
-// Intent 0013 S20 (plan T22): the subagents capability maps to no tool on
-// gentle-pi, because every .pi/agents file runs as a gentle-pi subagent.
-func TestRuntimePiMapsSubagentsToNoTool(t *testing.T) {
+// Intent 0015 S1, D7 (plan T9): the Pi-only wave rule is gone because the main
+// session runs the wave on every engine.
+func TestRuntimePiHasNoPiOnlyWaveRule(t *testing.T) {
 	t.Parallel()
 	doc := runtimePiDoc(t)
-	row := piCapabilityRow(t, doc, "`subagents`")
-	mustContainIn(t, "subagents row", row,
-		"gentle-pi: no tool",
-		"every `.pi/agents` file runs as a gentle-pi subagent",
-	)
-	mustLackIn(t, "subagents row", row, "`subagent_run`, `subagent_status`")
-	mustContainIn(t, "## Build", doc,
-		"`metadata.agent_tools_unavailable` the tools a subagent never has",
+	mustLackIn(t, runtimePi, doc,
+		"A wave started from a Pi main session runs in that main session",
+		"Build the `gabo-cycle` agent anyway",
+		"loads the `gabo-cycle` skill itself instead of launching",
+		"Build `gabo-reviewer.md` anyway",
 	)
 }
 
-// reviewerPatterns returns the backticked ^...$ patterns of the
-// gabo-reviewer relay template, in order.
+// Owner order 2026-11-11 (plan T9): on Pi the main session launches each coder
+// as one first-level `subagent_run` of `gabo-coder` and resumes it with
+// `subagent_continue`; the run id is the handle. No depth concept.
+func TestRuntimePiSaysHowTheMainSessionLaunchesAndResumesCoders(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	sec := piSection(t, doc, "## Launching Agents")
+	mustContainIn(t, "## Launching Agents", sec,
+		"the main session launches each coder as one first-level `subagent_run` of `gabo-coder`",
+		"resumes it with `subagent_continue`",
+		"the run id is the handle",
+	)
+	mustLackIn(t, runtimePi+" ## Launching Agents", sec, "depth", "nest")
+}
+
+// intent 0015 S6, D3: every main_session.skills entry is linked while pi is
+// listed, and goes with the entry when pi is not listed.
+func TestRuntimePiLinksEveryMainSessionSkill(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	sec := piSection(t, doc, "### Main-session entry")
+	mustContainIn(t, "### Main-session entry", sec,
+		"every other `main_session.skills` entry",
+		"`.agents/skills/<name>`", "`../../.gabo/skills/<name>`",
+		"`gabo-assistant`, `gabo-cycle` and `gabo-wave-report`",
+		"the `.agents/skills/<name>` link of every other `main_session.skills` entry",
+		"while another spec agent's `skills` lists it",
+	)
+	mustContainIn(t, "## Build", doc,
+		"also keep every `main_session.skills` link while `runtimes.assistant` names an engine that uses `.agents/skills`")
+}
+
+// intent 0015 S6, D4: the two former agent files go on every build, only with
+// a gabo-version line.
+func TestRuntimePiRemovesTheFormerAgentFiles(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	mustContainIn(t, "", doc,
+		"`.pi/agents/gabo-cycle.md` and `.pi/agents/gabo-reviewer.md`",
+		"only when the file carries a `gabo-version:` line",
+		"a file without one: leave it and report it",
+	)
+}
+
+// reviewerPatterns are the two request patterns the coder validates, pinned
+// as literals (they were compared with the removed gabo-reviewer template).
 func reviewerPatterns(t *testing.T) []string {
 	t.Helper()
-	tmpl := readCatalog(t, "gabo-agent-templates/agents/gabo-reviewer.md")
-	var out []string
-	for _, part := range strings.Split(tmpl, "`")[1:] {
-		if strings.HasPrefix(part, "^PR #") && strings.HasSuffix(part, "$") {
-			out = append(out, part)
-		}
+	return []string{
+		`^PR #([1-9][0-9]*) head ([0-9a-f]{40})( ready for review)?$`,
+		`^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`,
 	}
-	if len(out) != 2 {
-		t.Fatalf("gabo-reviewer.md: %d request patterns, want 2: %q", len(out), out)
-	}
-	return out
 }
 
-// Intent 0013 S20, D14, D15 (plan T22): on Pi the coder validates the
-// review request with the relay's own patterns and runs the reviewer script
-// itself; the Build writes that bullet into gabo-coder.md in place of the
-// template's launch bullet.
-func TestRuntimePiWritesTheCoderReviewBullet(t *testing.T) {
+// Intent 0015 D5 (plan T5, supersedes intent 0013 D15): the Pi coder body is
+// the template, so the Build no longer rewrites the coder's review bullet;
+// the {{reviewer_script}} row of the Slots table stays.
+func TestRuntimePiDoesNotRewriteTheCoderReviewBullet(t *testing.T) {
 	t.Parallel()
 	doc := runtimePiDoc(t)
-	section := piSection(t, doc, "### Coder review")
-	mustContainIn(t, "### Coder review", section,
-		"`.pi/agents/gabo-coder.md`",
-		"in place of the template's bullet that starts `- The only agent you launch is `gabo-reviewer``",
-		"every other line of the body stays the template's",
-		"`{{reviewer_script}}`",
-	)
-	_, bullet, ok := strings.Cut(section, "```markdown\n")
-	if !ok {
-		t.Fatalf("%s ### Coder review: no markdown block", runtimePi)
-	}
-	bullet, _, _ = strings.Cut(bullet, "```")
-	for _, p := range reviewerPatterns(t) {
-		if !strings.Contains(bullet, "`"+p+"`") {
-			t.Errorf("Pi review bullet: missing the relay pattern %q", p)
-		}
-	}
-	mustContainIn(t, "Pi review bullet", bullet,
-		"`PR #<n> head <40-hex sha>`",
-		"only when `runtimes.reviewer` in `gabo.yaml` is `session`, `PR #<n> head <40-hex sha> engine {{engine}}`",
-		"report `REJECTED: expected \"PR #<n> head <40-hex sha>\"` and run nothing",
-		"allowing it up to 10 minutes, with no extra arguments or environment",
-		"`bash \"{{reviewer_script}}\" head <n> <sha>`",
-		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
-		"the last line of its output that starts with `VERDICT `",
-		"If it carries `verdict=retry`, run the same command exactly once more",
-		"never rerun for any other reason",
-		"`NO VERDICT: <exit code or \"timeout\"> <last stderr line>`",
-		"act on the `VERDICT` line exactly as on the `gabo-reviewer` relay's reply",
-	)
-	mustLackIn(t, "Pi review bullet", bullet, "The only agent you launch is")
+	mustLackIn(t, runtimePi, doc, "### Coder review", "in place of the template's bullet", "The only agent you launch is")
+	mustContainIn(t, "Slots table", doc, "`{{reviewer_script}}`", "the Pi coder body is the template", "filled in `gabo-coder`, the only template that carries the slot")
 }

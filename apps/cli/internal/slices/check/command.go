@@ -83,6 +83,11 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for a runtime skill declaring metadata.skill_dir, a link <skill_dir>/<name>\n" +
 			"    to " + CatalogDir + "/<name> for each skill a spec agent lists, and a link\n" +
 			"    <skill_dir>/gabo-<slot> to each slot adapter that is a skill folder;\n" +
+			"  - no agent file left by an older build for an agent the spec no longer lists\n" +
+			"    (gabo-cycle, gabo-reviewer): a file with a gabo-version line fails as\n" +
+			"    \"<file>: agent <id> is no longer in the agent spec\" and names asking your\n" +
+			"    agent to rebuild the agents; a file without that line is yours; a catalog\n" +
+			"    copy that still lists the agent is not checked for it;\n" +
 			"  - no gabo-reviewer in the project: no <skill_dir>/gabo-reviewer entry and no\n" +
 			"    agent file listing it among its skills;\n" +
 			"  - for a runtime skill declaring metadata.former_skill_dir, no gabo-* link left\n" +
@@ -90,12 +95,6 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for the reviewer runtime's metadata.reviewer_link, a user-level link to\n" +
 			"    ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer holding\n" +
 			"    scripts/reviewer.sh (not checked with CI set);\n" +
-			"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in\n" +
-			"    the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json\n" +
-			"    and .opencode/opencode.jsonc (never ~/.config/opencode);\n" +
-			"    a missing or lower whole value names \"run gabo init (it sets\n" +
-			"    experimental.subagent_depth to 3 in <file>)\", any other value names setting\n" +
-			"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";\n" +
 			"  - for each of claude, codex and pi a role runs on, the keys gabo init writes:\n" +
 			"    .claude/settings.json extraKnownMarketplaces.\"gabo-ai\" and\n" +
 			"    enabledPlugins.\"gabo@gabo-ai\", the .codex/config.toml tables\n" +
@@ -104,7 +103,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    value passes, and other engines' files are never read;\n" +
 			"  - the main-session entry of every engine listed in runtimes.assistant, from\n" +
 			"    each runtime skill's metadata.main_session: each listed engine's\n" +
-			"    gabo-assistant link and its agent file plus key, or exactly one scoped\n" +
+			"    link of every main-session skill (gabo-assistant, gabo-cycle and\n" +
+			"    gabo-wave-report) and its agent file plus key, or exactly one scoped\n" +
 			"    block; no entry of a full-tier engine that is not listed, named as \"<file>:\n" +
 			"    gabo assistant entry for <engine>, but runtimes.assistant is <the listed\n" +
 			"    engines, joined with \", \">\"\n" +

@@ -78,7 +78,7 @@ func TestEngineStepAllFourEnginesGolden(t *testing.T) {
 		t.Fatalf("failed:\n%s", r.Render())
 	}
 	golden(t, "engines-all.golden", r.Render())
-	if want := slices.Sorted(slices.Values([]string{claudeFile, codexFile, opencodeNew, piFile})); !slices.Equal(slices.Sorted(slices.Values(s.Writes)), want) {
+	if want := slices.Sorted(slices.Values([]string{claudeFile, codexFile, piFile})); !slices.Equal(slices.Sorted(slices.Values(s.Writes)), want) {
 		t.Fatalf("writes = %v, want %v", s.Writes, want)
 	}
 	if _, ok := s.Files[stageGate]; ok {
@@ -407,7 +407,7 @@ func TestEngineStepOpencodeAssistantGolden(t *testing.T) {
 		t.Fatalf("failed:\n%s", r.Render())
 	}
 	golden(t, "engines-opencode-assistant.golden", r.Render())
-	if got := s.Files[opencodeNew]; got != "{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n" {
+	if got := s.Files[opencodeNew]; got != "{\n  \"default_agent\": \"gabo-assistant\"\n}\n" {
 		t.Fatalf("%s =\n%s", opencodeNew, got)
 	}
 	s.Files[opencodeAgent] = "---\nname: gabo-assistant\n---\n"
@@ -434,8 +434,8 @@ func TestEngineStepOpencodeDefaultAgent(t *testing.T) {
 		failed bool
 	}{
 		{"jsonc with comments", map[string]string{opencodeJSONC: jsonc, opencodeNew: "{}\n"}, nil, opencodeJSONC,
-			"{\n  // mine\n  \"model\": \"x\", /* pinned */\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n",
-			[]string{"wrote opencode.jsonc: experimental.subagent_depth unset → 3; added default_agent", "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
+			"{\n  // mine\n  \"model\": \"x\", /* pinned */\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			[]string{"wrote opencode.jsonc: added default_agent", "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
 		{"user's value", map[string]string{opencodeRootCfg: `{"default_agent": "gentle-orchestrator", "experimental": {"subagent_depth": 3}}`}, nil, opencodeRootCfg,
 			`{"default_agent": "gentle-orchestrator", "experimental": {"subagent_depth": 3}}`,
 			[]string{`kept opencode.json default_agent: "gentle-orchestrator" (your setting; gabo leaves it)`, "no .opencode/plugins/gabo-stage-gate.js yet; nothing written"}, false},
@@ -531,44 +531,56 @@ func TestEngineStepRemovesTheGaboDefaultAgent(t *testing.T) {
 	})
 }
 
-// Intent 0010 S3, S8: with opencode in runtimes.* initcmd raises
-// experimental.subagent_depth in the first existing OpenCode config, keeps
-// its comments, reports the old and new value, and no step names the key.
-func TestEngineStepOpencodeSubagentDepth(t *testing.T) {
+// Intent 0015 S8, D6: gabo init neither writes nor requires
+// experimental.subagent_depth. With OpenCode a listed assistant engine the
+// config gains only default_agent and the report has no depth line; with
+// OpenCode not listed and no config file none is created; a file holding
+// the key, whatever its value, is byte-identical and gets no line and no
+// refusal for it; a second run writes nothing.
+func TestEngineStepOpencodeLeavesSubagentDepthAlone(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name   string
-		files  map[string]string
-		target string
-		want   string
-		line   string
-		failed bool
+		name       string
+		files      map[string]string
+		assistants []string
+		target     string
+		want       string // "" with a missing file means none is created
+		writes     bool
 	}{
-		{"absent key in a new file", map[string]string{}, opencodeNew,
-			"{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  }\n}\n", "wrote .opencode/opencode.json: experimental.subagent_depth unset → 3", false},
-		{"1 becomes 3", map[string]string{opencodeJSONC: "{\n  // mine\n  \"experimental\": {\"subagent_depth\": 1}\n}\n", opencodeNew: "{}\n"}, opencodeJSONC,
-			"{\n  // mine\n  \"experimental\": {\"subagent_depth\": 3}\n}\n", "wrote opencode.jsonc: experimental.subagent_depth 1 → 3", false},
-		{"5 is kept", map[string]string{opencodeRootCfg: `{"experimental": {"subagent_depth": 5}}`}, opencodeRootCfg,
-			`{"experimental": {"subagent_depth": 5}}`, "no .opencode/plugins/gabo-stage-gate.js yet; nothing written", false},
-		{"experimental not an object", map[string]string{opencodeRootCfg: `{"experimental": 3}`}, opencodeRootCfg,
-			`{"experimental": 3}`, "✗ opencode.json: experimental is not a JSON object; fix it and run gabo init again", true},
+		{"new file holds only default_agent", map[string]string{}, []string{"opencode"}, opencodeNew,
+			"{\n  \"default_agent\": \"gabo-assistant\"\n}\n", true},
+		{"OpenCode not listed creates no file", map[string]string{}, []string{"claude"}, opencodeNew, "", false},
+		{"3 is byte-identical", map[string]string{opencodeRootCfg: `{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 3}}`}, []string{"opencode"}, opencodeRootCfg,
+			`{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 3}}`, false},
+		{"1 is byte-identical", map[string]string{opencodeRootCfg: `{"experimental": {"subagent_depth": 1}}`}, []string{"claude"}, opencodeRootCfg,
+			`{"experimental": {"subagent_depth": 1}}`, false},
+		{"a value that is not a number is byte-identical", map[string]string{opencodeRootCfg: `{"experimental": {"subagent_depth": "deep"}}`}, []string{"claude"}, opencodeRootCfg,
+			`{"experimental": {"subagent_depth": "deep"}}`, false},
+		{"1 beside a new default_agent is kept", map[string]string{opencodeJSONC: "{\n  \"experimental\": {\"subagent_depth\": 1}\n}\n"}, []string{"opencode"}, opencodeJSONC,
+			"{\n  \"experimental\": {\"subagent_depth\": 1},\n  \"default_agent\": \"gabo-assistant\"\n}\n", true},
+		{"experimental not an object is no refusal", map[string]string{opencodeRootCfg: `{"default_agent": "gabo-assistant", "experimental": 3}`}, []string{"opencode"}, opencodeRootCfg,
+			`{"default_agent": "gabo-assistant", "experimental": 3}`, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			s := newStore(maps.Clone(tt.files))
-			r := engineStep(s, engineconfig.Set("claude", "opencode")...)
-			if got := s.Files[tt.target]; got != tt.want {
-				t.Fatalf("%s =\n%s\nwant\n%s", tt.target, got, tt.want)
+			files := maps.Clone(tt.files)
+			s := newStore(files)
+			r := engineStepList(s, tt.assistants, engineconfig.Set("claude", "opencode")...)
+			got, exists := s.Files[tt.target]
+			if tt.want == "" && exists || tt.want != "" && got != tt.want {
+				t.Fatalf("%s = %q (exists %v), want %q", tt.target, got, exists, tt.want)
 			}
-			if got := sectionOf(t, r, "opencode").Lines; got[0] != tt.line {
-				t.Fatalf("lines = %q, want %q first", got, tt.line)
+			if wrote := slices.Contains(s.Writes, tt.target); wrote != tt.writes {
+				t.Fatalf("wrote %s = %v, writes %v", tt.target, wrote, s.Writes)
 			}
-			if r.Failed() != tt.failed || (tt.failed && slices.Contains(s.Writes, tt.target)) {
-				t.Fatalf("Failed() = %v, writes %v", r.Failed(), s.Writes)
+			if r.Failed() || strings.Contains(r.Render(), "subagent_depth") {
+				t.Fatalf("report:\n%s", r.Render())
 			}
-			if _, steps, _ := strings.Cut(r.Render(), "you still need to:"); strings.Contains(steps, "subagent_depth") {
-				t.Fatalf("a step names subagent_depth:\n%s", r.Render())
+			s.Writes = nil
+			again := engineStepList(s, tt.assistants, engineconfig.Set("claude", "opencode")...)
+			if len(s.Writes) != 0 || again.Failed() || s.Files[tt.target] != got {
+				t.Fatalf("second run writes %v:\n%s", s.Writes, again.Render())
 			}
 		})
 	}
@@ -673,8 +685,12 @@ func TestInitIntegratesEveryListedAssistant(t *testing.T) {
 	if strings.Contains(text, "\n  session:") {
 		t.Fatalf("session reported as an engine:\n%s", text)
 	}
-	if !slices.Contains(s.Writes, claudeFile) || !slices.Contains(s.Writes, piFile) || !slices.Contains(s.Writes, opencodeNew) {
+	if !slices.Contains(s.Writes, claudeFile) || !slices.Contains(s.Writes, piFile) {
 		t.Fatalf("writes = %v", s.Writes)
+	}
+	// OpenCode is a role engine but not listed: no config is created for it (intent 0015 S8).
+	if _, ok := s.Files[opencodeNew]; ok || slices.Contains(s.Writes, opencodeNew) {
+		t.Fatalf("%s created, writes = %v", opencodeNew, s.Writes)
 	}
 	// claude is listed, so its main-session key is written (intent 0013 S3).
 	if !strings.Contains(s.Files[claudeFile], `"agent": "gabo-assistant"`) {

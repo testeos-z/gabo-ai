@@ -102,11 +102,20 @@ func TestRuntimeBuilderNamesTheRuntimeSkillShape(t *testing.T) {
 			t.Errorf("## Runtime Skill Shape: missing %s", s)
 		}
 	}
-	for _, c := range []string{"read", "search", "edit", "shell", "git", "tracker", "repository-host", "memory", "web", "skills", "subagents"} {
+	for _, c := range []string{"read", "search", "edit", "shell", "git", "tracker", "repository-host", "memory", "web", "skills"} {
 		if !strings.Contains(shape, "`"+c+"`") {
 			t.Errorf("## Runtime Skill Shape: capability %s not named", c)
 		}
 	}
+	// intent 0015 S6, D7: ten capability rows, none mapped to a launch tool.
+	mustContainIn(t, runtimeBuilder+" Runtime Skill Shape", shape,
+		"one row per capability, `read`, `search`, `edit`, `shell`, `git`, `tracker`, `repository-host`, `memory`, `web`, `skills` (ten rows)",
+		"maps none to a launch tool",
+		"`<agent_dir>/gabo-cycle.<ext>` and `<agent_dir>/gabo-reviewer.<ext>`",
+		"only when the file carries a `gabo-version` line",
+		"every `main_session.skills` entry",
+	)
+	mustLackIn(t, runtimeBuilder+" Runtime Skill Shape", shape, "`web`, `skills`, `subagents`")
 	for _, s := range append(slices.Clone(agentSlots), engineSlot) {
 		if !strings.Contains(shape, "`{{"+s+"}}`") {
 			t.Errorf("## Runtime Skill Shape: does not say how to fill {{%s}}", s)
@@ -262,4 +271,16 @@ func TestRuntimeBuilderBuildsEveryListedEntry(t *testing.T) {
 		"the main-session entry when `<engine>` is listed in `runtimes.assistant` and the removal of every other full-tier engine's gabo entry not listed in `runtimes.assistant`",
 	)
 	mustLackIn(t, runtimeBuilder, runtimeBuilderDoc(t), "When `runtimes.assistant` is `<engine>`")
+}
+
+// intent 0015 S6, D7: how the main session launches an agent is an engine
+// fact for the refusal and the probe, not a capability row.
+func TestRuntimeBuilderKeepsLaunchOutOfTheCapabilities(t *testing.T) {
+	t.Parallel()
+	doc := runtimeBuilderDoc(t)
+	mustContainIn(t, runtimeBuilder, doc,
+		"how the main session launches an agent",
+		"is an engine fact for the refusal and the probe, not a capability row",
+	)
+	mustLackIn(t, runtimeBuilder, doc, "the `subagents` row and the probe")
 }

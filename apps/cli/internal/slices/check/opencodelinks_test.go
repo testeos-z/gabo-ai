@@ -61,6 +61,8 @@ func opencodeLinkedByRules(t *testing.T, version string) fstest.MapFS {
 	// The main-session skill, linked while opencode is runtimes.assistant
 	// (spec 0009 S1).
 	proj[dir+"gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[dir+"gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[dir+"gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	return proj
 }
 

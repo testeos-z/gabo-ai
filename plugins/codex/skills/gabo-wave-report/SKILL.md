@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load in `gabo-cycle` when it builds the wave report (J3) and in the assistant when it presents the summary at Wave Close. This skill owns the TRD 9.2 wave report format; the cycle and assistant skills reference it instead of repeating it. It uses only the `memory` slot adapter.
+Load in the main session when it runs the `gabo-cycle` skill and builds the wave report (J3) and in the assistant when it presents the summary at Wave Close. This skill owns the TRD 9.2 wave report format; the cycle and assistant skills reference it instead of repeating it. It uses only the `memory` slot adapter.
 
 ## Hard Rules
 
@@ -19,7 +19,7 @@ Load in `gabo-cycle` when it builds the wave report (J3) and in the assistant wh
 
 ## Report Format (TRD 9.2)
 
-1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`, and the line `session engine: <engine>`, the engine the wave ran on (intent 0013 S7; `unknown (rebuild the agents)` when the cycle's agent has no engine line). When `runtimes.coder` is a fixed engine other than the session engine, also the line `coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`.
+1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`, and the line `session engine: <engine>`, the engine the wave ran on (intent 0013 S7; `unknown (rebuild the agents)` when the main-session entry has no engine line). When `runtimes.coder` is a fixed engine other than the session engine, also the line `coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`.
 2. **Tasks**: one line per task: task id, status (DONE, HANDED, BLOCKED), PR, last verdict, fix rounds, coder handle. A BLOCKED task adds its reason.
 3. **Questions**: each question raised with its answer and resolver (R5), and whether it was a manual answer or an auto decision record.
 4. **Interactions**: interaction count with the reasons for each interaction with the owner (R29).

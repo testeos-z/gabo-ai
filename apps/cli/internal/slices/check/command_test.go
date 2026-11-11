@@ -78,6 +78,9 @@ func TestCommandHelpNamesTheStricterRules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("err = %v", err)
 	}
+	if strings.Contains(out, "subagent_depth") {
+		t.Errorf("help names subagent_depth")
+	}
 	for _, want := range []string{
 		"  - each agent's gabo-version line, a version x.y.z, against " + StampFile + "; a",
 		"    missing line fails, and without a valid stamp the versions are reported",
@@ -90,6 +93,13 @@ func TestCommandHelpNamesTheStricterRules(t *testing.T) {
 		"    declared name equals its spec id, and a file that declares no name fails",
 		"    with \"declares no name\", the main-session agent file gabo-assistant",
 		"    included;",
+		"    link of every main-session skill (gabo-assistant, gabo-cycle and",
+		"    gabo-wave-report) and its agent file plus key, or exactly one scoped",
+		"  - no agent file left by an older build for an agent the spec no longer lists",
+		"    (gabo-cycle, gabo-reviewer): a file with a gabo-version line fails as",
+		"    \"<file>: agent <id> is no longer in the agent spec\" and names asking your",
+		"    agent to rebuild the agents; a file without that line is yours; a catalog",
+		"    copy that still lists the agent is not checked for it;",
 		"  - no gabo-reviewer in the project: no <skill_dir>/gabo-reviewer entry and no",
 		"    agent file listing it among its skills;",
 		"  - for a runtime skill declaring metadata.former_skill_dir, no gabo-* link left",
@@ -109,9 +119,6 @@ func TestCommandHelpNamesTheGaboInitHints(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 	for _, want := range []string{
-		"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in",
-		"    a missing or lower whole value names \"run gabo init (it sets",
-		"    experimental.subagent_depth to 3 in <file>)\", any other value names setting",
 		"    (a full-tier runtime skill without it fails, a flexible-tier one warns).",
 		"    For a full-tier engine the key is gabo init's: a missing key names \"run gabo",
 		"    init (it merges \"<key>\": \"gabo-assistant\" into <file>)\", a key holding",
@@ -120,7 +127,6 @@ func TestCommandHelpNamesTheGaboInitHints(t *testing.T) {
 		"    gabo init\", and another engine's key names \"run gabo init (it removes",
 		"    \"<key>\": \"gabo-assistant\" from <file>)\"; every other piece, and a",
 		"    flexible-tier engine's key, names asking your agent to rebuild the agents;",
-		"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";",
 		"    a file gabo init refuses names \"fix <file> (<its reason>)\", and a key gabo",
 		"    init would leave as it is names setting or removing it by hand;",
 	} {

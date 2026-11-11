@@ -36,22 +36,24 @@ func TestCoderClosesOnlyItsOwnWaveResources(t *testing.T) {
 	}
 }
 
-// Intent 0013 S20, D14 (plan T22): on Pi the coder runs the reviewer script
-// itself as its agent file says; on the other engines it launches
-// gabo-reviewer. gabo-reviewer-notes names the same exception.
-func TestCoderNamesThePiReviewException(t *testing.T) {
+// Intent 0015 S3, S4, D5 (plan T5): the coder runs the reviewer script itself
+// on every engine; its catalog skill has one review rule and no Pi exception,
+// and neither it nor the notes send the coder to a relay agent.
+func TestCoderRunsTheReviewerScriptOnEveryEngine(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-coder/SKILL.md")
 	requireIn(t, "gabo-coder/SKILL.md", doc, []string{
-		"On Pi (`gabo-engine: pi`) you run as a gentle-pi subagent with no `subagent_*` tools",
-		"validate the request and run the reviewer script yourself, exactly as your agent file says",
-		"on every other engine you launch the `gabo-reviewer` subagent",
-		"intent 0013 S20, D14",
+		"After every push, run the user-level reviewer script yourself from the main checkout, never from your worktree",
+		"exactly as your agent file says, and act on its `VERDICT` line",
+		"Questions go back to the assistant in your outcome",
 	})
+	mustLackIn(t, "gabo-coder/SKILL.md", doc,
+		"Pi exception", "gabo-reviewer` subagent", "launched by `gabo-cycle`", "back to the cycle", "intent 0013 S20")
 	notes := readCatalog(t, "gabo-reviewer-notes/SKILL.md")
 	requireIn(t, "gabo-reviewer-notes/SKILL.md", notes, []string{
-		"On Pi a coder runs as a gentle-pi subagent with no `subagent_*` tools",
-		"validates the request with the relay's patterns and runs the reviewer script itself",
-		"intent 0013 S20, D14",
+		"the coder runs the scripts of the user-level `gbai-reviewer` skill itself",
+		"validates `PR #<n> head <40-hex sha>`",
 	})
+	mustLackIn(t, "gabo-reviewer-notes/SKILL.md", notes,
+		"Pi exception", "subagent only validates", "relays their final", "ask the `gabo-reviewer` subagent", "The relay passes")
 }
