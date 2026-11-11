@@ -26,6 +26,7 @@ Load when `runtimes.coder` or `runtimes.reviewer` in `gabo.yaml` is `claude`, or
 - Build every agent of `.gabo/skills/gabo-agent-templates/agents.yaml`, each as `.claude/agents/<id>.md`, whatever runtime each agent plays: `gabo check` requires all of them in `.claude/agents`.
 - Read the spec, the templates and `.gabo/VERSION` from the project; never build from memory. A missing or empty `.gabo/VERSION` or catalog: stop and tell the user to run `gabo init`.
 - Fill only the template slots, as below, and invent nothing: no frontmatter key, tool, skill, model or rule the spec and template do not give.
+- Never grant an agent the `Agent` tool, and never write a built agent's `tools` with it.
 - Never place `gabo-reviewer` in the project: no `.claude/skills/gabo-reviewer`, no copy of its scripts, and never in an agent's `skills`. Only link the user-level copy that `gabo init` installs (D20).
 - Overwrite only the agent files named after a spec id, the links this skill makes, the main-session entry below and the probe file it writes. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
 - Make every link of steps 2 to 4 on every build, also when the agent files are already current, and run the probe of step 8; a build that skips one is not finished.
@@ -68,11 +69,12 @@ The spec's engine-neutral capabilities become these Claude Code tools. Write the
 | `memory` | `mcp__<server>__*` for each MCP server (from `claude mcp list`) whose tools the memory adapter names; Bash when it names none, reported as unwired |
 | `web` | WebFetch, WebSearch |
 | `skills` | Skill |
-| `subagents` | Agent |
+
+No capability maps to a launch tool: never grant an agent the `Agent` tool (intent 0015 S6, D7). The main session launches each spec agent; no agent launches another.
 
 ## Fixed-Name Links
 
-Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/SKILL.md` gets one link `.claude/skills/gabo-<name>` (underscores become hyphens) to `<folder>`, as a relative symlink: `gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory` and so on. An adapter that is not a skill folder (for example the reviewer agent file) gets no link: report it. When the adapter folder already is `.claude/skills/gabo-<name>`, there is nothing to link.
+Each slot of `gabo.yaml` (`slots.<name>.adapter`) whose adapter is a `<folder>/SKILL.md` gets one link `.claude/skills/gabo-<name>` (underscores become hyphens) to `<folder>`, as a relative symlink: `gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory` and so on. An adapter that is not a skill folder gets no link: report it. When the adapter folder already is `.claude/skills/gabo-<name>`, there is nothing to link.
 
 ## Main-Session Entry
 
@@ -80,7 +82,7 @@ The owner's main session runs as the gabo assistant (spec 0009 S1, S2, S4). `run
 
 When `claude` is listed in `runtimes.assistant`, on every build:
 
-1. Link `.claude/skills/gabo-assistant` as a relative symlink to `../../.gabo/skills/gabo-assistant` (the catalog folder `.gabo/skills/gabo-assistant`), as build step 2 links a catalog skill (the same keep, replace and report rules). Step 3 never removes it.
+1. Link `.claude/skills/gabo-assistant` as a relative symlink to `../../.gabo/skills/gabo-assistant` (the catalog folder `.gabo/skills/gabo-assistant`), as build step 2 links a catalog skill (the same keep, replace and report rules), and link every other `main_session.skills` entry (`gabo-assistant`, `gabo-cycle` and `gabo-wave-report` in all, intent 0015 D3) the same way as `.claude/skills/<name>`, to `../../.gabo/skills/<name>`. Step 3 never removes them.
 2. Write `.claude/agents/gabo-assistant.md`: fill `main_session.template` as build step 5 fills a spec template, then write the frontmatter below and the filled body without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them. The body is the short assistant prompt (spec 0009 D2 A: the agent's `skills` do not preload in a main session), never an empty body; it names `.gabo/skills/gabo-assistant/SKILL.md`. Keys, in this order and no others; omit `tools`, so the main session keeps every tool:
 
    ```yaml
@@ -98,7 +100,7 @@ When `claude` is listed in `runtimes.assistant`, on every build:
 
 `gabo init` writes the `agent` key of `.claude/settings.json` (intent 0010 S4); this skill only reads it and never writes it. When `.claude/settings.json` is missing, is not valid JSON or has no `agent` key, report `run gabo init`: the main session does not run as the assistant until `gabo init` writes the key. When it holds a user's own `agent` value (any value but `gabo-assistant`), keep it and report it: the main session then does not run as the assistant.
 
-When `claude` is not listed in `runtimes.assistant`, on every build remove the Claude Code entry, recognized only by its gabo identity: the `.claude/skills/gabo-assistant` symlink and `.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line. Anything else at those paths: leave it and report it.
+When `claude` is not listed in `runtimes.assistant`, on every build remove the Claude Code entry, recognized only by its gabo identity: the `.claude/skills/gabo-assistant` symlink, the `.claude/skills/<name>` symlink of every other `main_session.skills` entry and `.claude/agents/gabo-assistant.md` when it carries a `gabo-version:` line. Anything else at those paths: leave it and report it. Keep a `main_session.skills` link while another spec agent's `skills` lists it.
 
 On every build, also remove the gabo entry of every other full-tier engine of the table that is not listed in `runtimes.assistant`, recognized only by its gabo identity, and never a piece the entry of a listed engine also uses: keep the shared `.agents/skills/gabo-assistant` link while Codex, OpenCode or Pi is listed in `runtimes.assistant`, and a block in a file that Codex or Pi, when listed, uses (they share the block's file):
 
@@ -114,7 +116,7 @@ Report each piece written, kept or removed, and each one left.
 
 1. Recheck the sources. Read `gabo.yaml`, `.gabo/VERSION` and the spec.
 2. Catalog skills: for each skill in any agent's spec `skills`, make `.claude/skills/<name>` a relative symlink to `../../.gabo/skills/<name>`, so a later `gabo init` refresh reaches it. An entry that already resolves to that folder is kept. A symlink this skill made earlier to another folder (for example the CLI source `apps/cli/internal/skills/<name>`) is replaced; a real folder or file is left and reported.
-3. Fixed-name links as above. Then remove each `.claude/skills/gabo-*` symlink that no spec skill or slot asks for any more; never remove a real folder or file.
+3. Fixed-name links as above. Then remove each `.claude/skills/gabo-*` symlink that no spec skill or slot asks for any more; never remove a real folder or file. Former agents (intent 0015 S6, D4): on every build remove `.claude/agents/gabo-cycle.md` and `.claude/agents/gabo-reviewer.md`, left by an earlier build, only when the file carries a `gabo-version:` line; a file without one: leave it and report it.
 4. Reviewer link: make `~/.claude/skills/gabo-reviewer` (with `CLAUDE_CONFIG_DIR` set: `$CLAUDE_CONFIG_DIR/skills/gabo-reviewer`) a symlink to `${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer` with the absolute path. That folder missing: stop and tell the user to run `gabo init`. An existing entry with another target: leave it and report it.
 5. For each spec agent, fill its template:
 
@@ -125,7 +127,7 @@ Report each piece written, kept or removed, and each one left.
    | `{{engine}}` | `claude`, the engine name as written in `gabo.yaml` |
    | `{{methodology}}` | `gabo-methodology` |
    | `{{adapter:tasks}}`, `{{adapter:repository_host}}`, `{{adapter:memory}}` | `gabo-tasks`, `gabo-repository-host`, `gabo-memory` |
-   | `{{reviewer_script}}` | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer/scripts/reviewer.sh`, written literally: the shell expands it on each machine |
+   | `{{reviewer_script}}` | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer/scripts/reviewer.sh`, written literally: the shell expands it on each machine; filled in `gabo-coder`, the only template that carries the slot |
 
    A slot whose link does not exist (its slot has no skill adapter) cannot be filled: skip that agent and report it.
 6. Write `.claude/agents/<id>.md`: the frontmatter below, then the filled body without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them (intent 0013 S6: the engine moves into the frontmatter, where `gabo check` reads it). Frontmatter keys, in this order and no others:
@@ -143,9 +145,9 @@ Report each piece written, kept or removed, and each one left.
    ---
    ```
 
-   Omit `skills` when the list is empty (the reviewer agent).
+   Omit `skills` when the list is empty.
 7. Verify: run `claude plugin validate .claude/agents`, then `gabo check`, which also checks every link of steps 2 to 4. Fix every failure this skill caused and rerun until `gabo check` passes, except the `✗ agent <id> missing` lines of agents you skipped and reported in step 5; report any other failure.
-8. Probe, on every build. When `.claude/agents` or `.claude/skills` did not exist when this Claude Code session started (you created it in this build), the session cannot see the new agent or links: skip the probe, change nothing, and report `probe not run: restart Claude Code and rebuild`. Otherwise write `.claude/agents/gabo-probe.md` in the same format, with `tools: Bash`, `skills:` listing every fixed-name link made in step 3, and the body: run `git rev-parse --show-toplevel` once and reply with its output, then one line per preloaded skill with the name it was listed under and its first Markdown heading. Launch it once, then delete the file whatever the result. It passes when it ran the command and every link shows its adapter's heading. Only a probe that ran in such a session can fail a link. A link that does not preload: in `skills:` and in its slot fill, use the adapter's frontmatter `name` instead of the link name, rebuild the affected agents, repeat step 7 and probe once more; still failing, stop and report the link. A `gabo-probe.md` that this skill did not write: leave it and report it, and report the probe as not run.
+8. Probe, on every build. When `.claude/agents` or `.claude/skills` did not exist when this Claude Code session started (you created it in this build), the session cannot see the new agent or links: skip the probe, change nothing, and report `probe not run: restart Claude Code and rebuild`. Otherwise write `.claude/agents/gabo-probe.md` in the same format, with `tools: Bash`, `skills:` listing every fixed-name link made in step 3, and the body: run `git rev-parse --show-toplevel` once and reply with its output, then one line per preloaded skill with the name it was listed under and its first Markdown heading. launch it once from the main session, the way spec agents are launched, and expect that no agent launches another; then delete the file whatever the result. It passes when it ran the command and every link shows its adapter's heading. Only a probe that ran in such a session can fail a link. A link that does not preload: in `skills:` and in its slot fill, use the adapter's frontmatter `name` instead of the link name, rebuild the affected agents, repeat step 7 and probe once more; still failing, stop and report the link. A `gabo-probe.md` that this skill did not write: leave it and report it, and report the probe as not run.
 
    Main-session check, when `claude` is listed in `runtimes.assistant` and the entry was written: from the project root run `claude --print` with no `--agent`, asking which agent the session runs as and what the `gabo-assistant` skill's Session Start asks first; it passes when the reply names `gabo-assistant` and follows that Session Start. Then run `claude --print --agent gabo-coder` asking which agent it runs as; it passes when it runs as `gabo-coder` (the flag overrides the `agent` key). Each runs once; a failure changes nothing and is reported as `main-session probe failed: <check> <reply>`. When the Main-Session Entry reported `run gabo init` or a user's own `agent` value: skip this check and report it. This check starts new processes, so it runs even when the probe above was skipped for a restart.
 
