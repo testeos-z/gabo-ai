@@ -188,7 +188,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"resume the owning coder", "PR #<n> merged", "D23", "close report",
 			// T026: J3 and J4 wave start and report, modes, decision records, comfort
 			// question and the personalization layers (D22).
-			"## Wave Start", "launch `gabo-cycle`", "## Wave Close", "UX 1.5",
+			"## Wave Start", "load the `gabo-cycle` skill", "## Wave Close", "UX 1.5",
 			"`Wave <n>: <done> done, <blocked> blocked`", "answer and resolver",
 			"one question at a time", "`interaction_level`", "`low`", "`balanced`", "`high`",
 			"never prompt", "save decision", "`what`, `question`, `choice`, `reason`, `mode`, `wave`, `task`",

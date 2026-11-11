@@ -216,7 +216,7 @@ const (
 var mainSessionContent = []string{
 	"the gabo assistant", "load the `gabo-assistant` skill", "follow its Session Start", "before your first reply",
 	"`.gabo/skills/gabo-assistant/SKILL.md`", "single point of contact", "never block on long work",
-	"`gabo-pm`", "`gabo-dev-lead`", "`gabo-cycle`", "`gabo-plan-reviewer`",
+	"`gabo-pm`", "`gabo-dev-lead`", "`gabo-plan-reviewer`",
 }
 
 func containsFold(doc, s string) bool {
@@ -450,6 +450,27 @@ func TestAgentTemplatesMainSessionEntryFollowsTheAssistantList(t *testing.T) {
 	for _, s := range []string{"only for `runtimes.assistant`", "is `runtimes.assistant`", "of each other engine"} {
 		if strings.Contains(sec, s) {
 			t.Errorf("%s/SKILL.md ## Main-Session Entry: still reads one assistant engine: %q", agentspec.Dir, s)
+		}
+	}
+}
+
+// Intent 0015 S1, S10 (plan T4): the main-session entries no longer list
+// `gabo-cycle` among the agents; they say the session runs the wave with the
+// `gabo-cycle` skill.
+func TestMainSessionEntriesRunTheWaveWithTheCycleSkill(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{mainTemplate, mainBlock} {
+		doc := agentTemplates(t)[name]
+		for _, s := range []string{
+			"Run the wave yourself with the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`)",
+			"`gabo-pm`, `gabo-dev-lead`, `gabo-plan-reviewer`, the coders",
+		} {
+			if !strings.Contains(doc, s) {
+				t.Errorf("%s: missing %q", name, s)
+			}
+		}
+		if strings.Contains(doc, "`gabo-dev-lead`, `gabo-cycle`") {
+			t.Errorf("%s: still lists `gabo-cycle` among the agents", name)
 		}
 	}
 }

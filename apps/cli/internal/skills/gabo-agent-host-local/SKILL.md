@@ -10,7 +10,7 @@ metadata:
 
 Use when an agent starts, stops or reports agent sessions that run on the owner's own machine. This adapter fills the `agent_host` slot contract (`gabo-contract-agent-host`, TRD 9.1; R8, R11, US-007) with the agent CLI of the role's resolved engine (`claude` or `pi`, see Engine Resolution) run as a local process inside the task worktree. Point `slots.agent_host.adapter` at this skill's `SKILL.md`. Verified against Claude Code 2.1.312 (`claude --help`) and pi 1.4.0 (`pi --help`).
 
-Subagents launched inside the owner's runtime session (for example `gabo-cycle` launching `gabo-coder`) need no agent host; use this adapter only when a role must run as its own session process.
+Subagents launched inside the owner's runtime session (for example the main session launching `gabo-coder`) need no agent host; use this adapter only when a role must run as its own session process.
 
 ## Hard Rules
 
@@ -41,7 +41,7 @@ The role's prompt comes from its built agent and the brief of the caller; the OS
 
 Resolve the role's engine from `gabo.yaml` before any check of `start agent session` (intent 0013 S10); a refusal starts nothing and is reported instead of a handle:
 
-- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the agent that loaded this adapter (for example `gabo-cycle` or `gabo-assistant`). A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
+- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the main session (the assistant running the `gabo-cycle` skill) that loaded this adapter. A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
 - Start a `coder` on the resolved coder engine: `runtimes.coder` `session` resolves to the calling session's engine, and a fixed `runtimes.coder` is that engine. Example: `coder: session` from a Pi session ⇒ `pi`.
 - Start an `assistant` only on an engine listed in `runtimes.assistant` (one engine or a list, intent 0013 S4): the engine the caller asks for, or the calling session's engine when it names none. Refuse any other with `refused: <engine> is not listed in runtimes.assistant (<value>)`, `<value>` as written in `gabo.yaml`. Example: with `assistant: [claude, pi]`: an `assistant` on `codex` ⇒ `refused: codex is not listed in runtimes.assistant ([claude, pi])`.
 - This adapter has start commands for `claude` and `pi` only: a resolved `codex` or `opencode` is refused with `refused: <engine> has no local start command in gabo-agent-host-local`.
