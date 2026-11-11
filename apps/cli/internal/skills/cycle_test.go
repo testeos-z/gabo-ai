@@ -86,14 +86,14 @@ func TestCoderSendsTheEngineOnlyUnderSession(t *testing.T) {
 	t.Parallel()
 	skill := readCatalog(t, "gabo-coder/SKILL.md")
 	requireIn(t, "gabo-coder/SKILL.md", skill, []string{
-		"request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`",
+		"exactly `PR #<n> head <40-hex pushed sha>`",
 		"`PR #<n> head <40-hex pushed sha> engine <engine>`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 		"your session engine", "`gabo-engine:`",
 	})
 	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
 	requireIn(t, "gabo-coder template", tmpl, []string{
-		"launch it with exactly `PR #<n> head <40-hex sha>`",
+		"build the request `PR #<n> head <40-hex sha>`",
 		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 	})

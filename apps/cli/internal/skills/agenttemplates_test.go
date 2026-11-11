@@ -474,3 +474,35 @@ func TestMainSessionEntriesRunTheWaveWithTheCycleSkill(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0015 S3, S4, D5 (plan T5): one review step for every engine, the Pi
+// bullet of 0.2.10 without its Pi wording; the coder launches no agent.
+func TestCoderTemplateRunsTheReviewerScript(t *testing.T) {
+	t.Parallel()
+	doc := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	for _, s := range []string{
+		"an agent of the gabo assistant", "You launch no agent",
+		"report `REJECTED: expected \"PR #<n> head <40-hex sha>\"` and run nothing",
+		"allowing it up to 10 minutes, with no extra arguments or environment",
+		"`bash \"{{reviewer_script}}\" head <n> <sha>`",
+		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
+		"the last line of its output that starts with `VERDICT `",
+		"If it carries `verdict=retry`, run the same command exactly once more",
+		"never rerun for any other reason",
+		"`NO VERDICT: <exit code or \"timeout\"> <last stderr line>`",
+	} {
+		if !strings.Contains(doc, s) {
+			t.Errorf("gabo-coder template: missing %q", s)
+		}
+	}
+	for _, s := range []string{"gabo-cycle", "launch it with", "The only agent you launch", "subagent_", "Pi"} {
+		if strings.Contains(doc, s) {
+			t.Errorf("gabo-coder template: still says %q", s)
+		}
+	}
+	for _, p := range reviewerPatterns(t) {
+		if !strings.Contains(doc, "`"+p+"`") {
+			t.Errorf("gabo-coder template: missing the reviewer pattern %q", p)
+		}
+	}
+}

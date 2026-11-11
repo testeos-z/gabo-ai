@@ -505,42 +505,12 @@ func reviewerPatterns(t *testing.T) []string {
 	return out
 }
 
-// Intent 0013 S20, D14, D15 (plan T22): on Pi the coder validates the
-// review request with the relay's own patterns and runs the reviewer script
-// itself; the Build writes that bullet into gabo-coder.md in place of the
-// template's launch bullet.
-func TestRuntimePiWritesTheCoderReviewBullet(t *testing.T) {
+// Intent 0015 D5 (plan T5, supersedes intent 0013 D15): the Pi coder body is
+// the template, so the Build no longer rewrites the coder's review bullet;
+// the {{reviewer_script}} row of the Slots table stays.
+func TestRuntimePiDoesNotRewriteTheCoderReviewBullet(t *testing.T) {
 	t.Parallel()
 	doc := runtimePiDoc(t)
-	section := piSection(t, doc, "### Coder review")
-	mustContainIn(t, "### Coder review", section,
-		"`.pi/agents/gabo-coder.md`",
-		"in place of the template's bullet that starts `- The only agent you launch is `gabo-reviewer``",
-		"every other line of the body stays the template's",
-		"`{{reviewer_script}}`",
-	)
-	_, bullet, ok := strings.Cut(section, "```markdown\n")
-	if !ok {
-		t.Fatalf("%s ### Coder review: no markdown block", runtimePi)
-	}
-	bullet, _, _ = strings.Cut(bullet, "```")
-	for _, p := range reviewerPatterns(t) {
-		if !strings.Contains(bullet, "`"+p+"`") {
-			t.Errorf("Pi review bullet: missing the relay pattern %q", p)
-		}
-	}
-	mustContainIn(t, "Pi review bullet", bullet,
-		"`PR #<n> head <40-hex sha>`",
-		"only when `runtimes.reviewer` in `gabo.yaml` is `session`, `PR #<n> head <40-hex sha> engine {{engine}}`",
-		"report `REJECTED: expected \"PR #<n> head <40-hex sha>\"` and run nothing",
-		"allowing it up to 10 minutes, with no extra arguments or environment",
-		"`bash \"{{reviewer_script}}\" head <n> <sha>`",
-		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
-		"the last line of its output that starts with `VERDICT `",
-		"If it carries `verdict=retry`, run the same command exactly once more",
-		"never rerun for any other reason",
-		"`NO VERDICT: <exit code or \"timeout\"> <last stderr line>`",
-		"act on the `VERDICT` line exactly as on the `gabo-reviewer` relay's reply",
-	)
-	mustLackIn(t, "Pi review bullet", bullet, "The only agent you launch is")
+	mustLackIn(t, runtimePi, doc, "### Coder review", "in place of the template's bullet", "The only agent you launch is")
+	mustContainIn(t, "Slots table", doc, "`{{reviewer_script}}`", "the Pi coder body is the template")
 }
