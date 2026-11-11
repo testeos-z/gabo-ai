@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0018-config-sync |
-| status | Draft (spec written when the owner picks this intent) |
+| status | Specified |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |
@@ -44,10 +44,10 @@ The owner, and anyone who sets up gabo on a new repository. It happens once per 
 
 | # | question | status |
 |---|---|---|
-| 1 | Does "remoto" mean another repository or another machine? | open (owner) |
-| 2 | Which keys count as work style, and which are repository-specific? | carried to spec (assistant's list above is a proposal) |
-| 3 | Should the same operation also save a configured repository's style as the local profile? | open (owner); recommended by the assistant |
-| 4 | Where does the local profile live: in the global user file, or in a file of its own? | carried to spec |
+| 1 | Does "remoto" mean another repository or another machine? | answered: another repository, by local path or GitHub URL (spec D2). Recorded decision (resolver: agent, rule of the owner). |
+| 2 | Which keys count as work style, and which are repository-specific? | answered in spec S4, S5 and D4. Recorded decision (resolver: agent, rule of the owner). |
+| 3 | Should the same operation also save a configured repository's style as the local profile? | answered: yes (spec S7). Recorded decision (resolver: agent, rule of the owner). |
+| 4 | Where does the local profile live: in the global user file, or in a file of its own? | answered: a file of its own, `profile.yaml` in the user config folder (spec D3). Recorded decision (resolver: agent, rule of the owner). |
 
 ## Links
 
@@ -57,6 +57,6 @@ The owner, and anyone who sets up gabo on a new repository. It happens once per 
 | intent issue | [#493 I0018: Config sync](https://github.com/testeos-z/gabo-ai/issues/493) (sub-issue of #492) |
 | PRD | [PRD](../../PRD.md), R21, R32, R33 |
 | TRD | [TRD](../../TRD.md), 9.3 (config layers), D11, D22 |
-| spec | — (written when the owner picks this intent) |
+| spec | [spec](spec.md) |
 | plan | — |
 | related intent | — |
