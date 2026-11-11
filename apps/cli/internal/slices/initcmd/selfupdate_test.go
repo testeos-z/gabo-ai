@@ -66,7 +66,7 @@ func TestUpdaterOnlyForNewerStamp(t *testing.T) {
 	for _, files := range []map[string]string{
 		{},
 		{config: cfgYAML},
-		{config: cfgYAML, stamp: "1.2.3\n"},
+		{config: cfgYAML, stamp: "1.2.3\n", hashFile: catalogHash()},
 		{config: cfgYAML, stamp: "1.0.0\n"},
 		{config: cfgYAML, stamp: "garbage\n"},
 	} {
