@@ -1,6 +1,7 @@
 package initcmd
 
 import (
+	"context"
 	"flag"
 	"io/fs"
 	"maps"
@@ -9,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
@@ -695,5 +697,140 @@ func TestInitIntegratesEveryListedAssistant(t *testing.T) {
 	// claude is listed, so its main-session key is written (intent 0013 S3).
 	if !strings.Contains(s.Files[claudeFile], `"agent": "gabo-assistant"`) {
 		t.Fatalf("%s =\n%s", claudeFile, s.Files[claudeFile])
+	}
+}
+
+// fakePi is a hand-written PiProbe: list is the output of `pi list` when
+// listed is true; shell is the gentle-shell PATH lookup; block makes
+// `pi list` wait until its deadline passes. calls counts the `pi list` runs.
+type fakePi struct {
+	list   []byte
+	listed bool
+	shell  bool
+	block  bool
+	calls  int
+}
+
+func (f *fakePi) PiList(ctx context.Context) ([]byte, bool) {
+	f.calls++
+	if f.block {
+		<-ctx.Done()
+		return nil, false
+	}
+	return f.list, f.listed
+}
+
+func (f *fakePi) GentleShellOnPath() bool { return f.shell }
+
+// engineStepPi runs the engine step with probe as the Pi probe (intent 0016
+// S1, S2).
+func engineStepPi(s *memStore, probe PiProbe, set ...string) engineconfig.Report {
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6", Pi: probe}).engineStep(set, nil, "0.2.6")
+}
+
+// piRefusalLines are the three lines today's Pi section prints without a
+// subagent package (S2, issue #463).
+var piRefusalLines = []string{"gabo refuses to build on Pi without a subagent package:", engineconfig.SubagentRefusal, "install a subagent package (see the refusal above)"}
+
+// S1: a subagent package found by `pi list` (npm:gentle-pi with or without a
+// version, or a git: source of gentle-pi), or gentle-shell on PATH, prints no
+// refusal and keeps the trust step.
+func TestEngineStepPiPackagePresentPrintsNoRefusal(t *testing.T) {
+	cases := []struct {
+		name  string
+		probe *fakePi
+	}{
+		{"npm", &fakePi{list: []byte("npm:gentle-pi\n"), listed: true}},
+		{"npm with version", &fakePi{list: []byte("npm:gentle-pi@1.2.3\n"), listed: true}},
+		{"git source", &fakePi{list: []byte("git:github.com/someone/gentle-pi\n"), listed: true}},
+		{"gentle-shell only", &fakePi{listed: false, shell: true}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newStore(map[string]string{})
+			sec := sectionOf(t, engineStepPi(s, c.probe, engineconfig.Pi), engineconfig.Pi)
+			for _, l := range piRefusalLines[:2] {
+				if slices.Contains(sec.Lines, l) {
+					t.Errorf("refusal line %q with a package present: %v", l, sec.Lines)
+				}
+			}
+			for _, step := range sec.Steps {
+				if strings.Contains(step, "install a subagent package") {
+					t.Errorf("install step with a package present: %v", sec.Steps)
+				}
+			}
+			if !slices.ContainsFunc(sec.Steps, func(step string) bool { return strings.HasPrefix(step, "trust the project in Pi") }) {
+				t.Errorf("trust step missing: %v", sec.Steps)
+			}
+		})
+	}
+}
+
+// S2, PD4, D1: no package, a `pi list` that exits 1, a `pi` that is not on
+// PATH and a `pi list` listing only @gabo-ai/pi each print today's three
+// lines exactly.
+func TestEngineStepPiNoPackagePrintsTodaysRefusal(t *testing.T) {
+	cases := []struct {
+		name  string
+		probe *fakePi
+	}{
+		{"no package", &fakePi{list: []byte("npm:@gabo-ai/pi\n"), listed: true}},
+		{"pi not on PATH", &fakePi{}},
+		{"pi list exits 1", &fakePi{list: []byte("npm:gentle-pi\n")}},
+		{"no probe", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newStore(map[string]string{})
+			var probe PiProbe
+			if c.probe != nil {
+				probe = c.probe
+			}
+			sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
+			if got := sec.Lines[len(sec.Lines)-2:]; !slices.Equal(got, piRefusalLines[:2]) {
+				t.Errorf("refusal lines = %q", got)
+			}
+			if got := sec.Steps[len(sec.Steps)-1]; got != piRefusalLines[2] {
+				t.Errorf("last step = %q", got)
+			}
+		})
+	}
+}
+
+// S2: a `pi list` that outlives the deadline (PD3) counts as no package.
+func TestEngineStepPiListTimeoutIsNoPackage(t *testing.T) {
+	saved := piListDeadline
+	piListDeadline = 20 * time.Millisecond
+	t.Cleanup(func() { piListDeadline = saved })
+	s := newStore(map[string]string{})
+	probe := &fakePi{block: true}
+	sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
+	if got := sec.Lines[len(sec.Lines)-2:]; !slices.Equal(got, piRefusalLines[:2]) {
+		t.Errorf("refusal lines after a timeout = %q", got)
+	}
+	if probe.calls != 1 {
+		t.Errorf("pi list ran %d times, want once", probe.calls)
+	}
+}
+
+// PD2, S3: pi list runs once per run, when pi is in the engine set, and
+// never when it is not; the check writes no project file of its own.
+func TestEngineStepPiListRunsOnlyForAPiSet(t *testing.T) {
+	t.Parallel()
+	s := newStore(map[string]string{})
+	probe := &fakePi{list: []byte("npm:gentle-pi\n"), listed: true}
+	engineStepPi(s, probe, engineconfig.Claude, engineconfig.Pi)
+	if probe.calls != 1 {
+		t.Errorf("pi list ran %d times with pi in the set, want once", probe.calls)
+	}
+	none := &fakePi{list: []byte("npm:gentle-pi\n"), listed: true}
+	engineStepPi(newStore(map[string]string{}), none, engineconfig.Claude, engineconfig.Codex)
+	if none.calls != 0 {
+		t.Errorf("pi list ran %d times without pi in the set, want none", none.calls)
+	}
+	for _, w := range s.Writes {
+		if !strings.HasPrefix(w, root+"/") || strings.Contains(w, "gentle-pi") {
+			t.Errorf("unexpected write %s", w)
+		}
 	}
 }

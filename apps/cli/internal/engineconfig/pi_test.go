@@ -156,3 +156,54 @@ func TestPiSectionHoldsTheRuntimePiRefusal(t *testing.T) {
 		}
 	}
 }
+
+// S1, D1: with a subagent package present the Pi section keeps the trust
+// step and drops the refusal line, the refusal text and the install step.
+func TestPiRuleOmitsTheRefusalWhenAPackageIsPresent(t *testing.T) {
+	res := piRule(Input{Version: "0.2.6", PiPackage: true})
+	for _, l := range res.Section.Lines {
+		if l == piTail[0] || l == SubagentRefusal || strings.Contains(l, "subagent package") {
+			t.Errorf("refusal line with a package present: %q", l)
+		}
+	}
+	if !slices.Equal(res.Section.Steps, piSteps[:1]) {
+		t.Errorf("steps = %q, want only the trust step", res.Section.Steps)
+	}
+	if string(res.Writes[PiSettings]) != string(golden(t, "missing.want.json")) {
+		t.Errorf("the package check changed the written file: %q", res.Writes[PiSettings])
+	}
+}
+
+// S2: without a package the refusal stays exactly as today.
+func TestPiRuleKeepsTheRefusalWithoutAPackage(t *testing.T) {
+	res := piRule(Input{Version: "0.2.6"})
+	if !slices.Equal(res.Section.Lines[len(res.Section.Lines)-2:], piTail) || !slices.Equal(res.Section.Steps, piSteps) {
+		t.Errorf("section = %+v, want the refusal tail and both steps", res.Section)
+	}
+}
+
+// S1, PD4: a line of `pi list` names a subagent package when its source is
+// npm:gentle-pi (with or without a version) or a git: source of gentle-pi;
+// npm:@gabo-ai/pi and other packages never count.
+func TestPiListNamesASubagentPackage(t *testing.T) {
+	cases := []struct {
+		list string
+		want bool
+	}{
+		{"npm:gentle-pi\n", true},
+		{"npm:gentle-pi@1.2.3\n", true},
+		{"  npm:gentle-pi  \n", true},
+		{"git:github.com/someone/gentle-pi\n", true},
+		{"git:https://example.com/gentle-pi.git@main\n", true},
+		{"npm:@gabo-ai/pi\n", false},
+		{"npm:@gabo-ai/pi@0.2.6\n", false},
+		{"npm:gentle-pi-extra\n", false},
+		{"git:github.com/someone/other\n", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		if got := PiListNamesPackage([]byte(c.list)); got != c.want {
+			t.Errorf("PiListNamesPackage(%q) = %v, want %v", c.list, got, c.want)
+		}
+	}
+}

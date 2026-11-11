@@ -1,12 +1,14 @@
 package initcmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -30,6 +32,9 @@ var engineFiles = map[string]string{
 	engineconfig.Codex:  engineconfig.CodexConfigPath,
 	engineconfig.Pi:     engineconfig.PiSettings,
 }
+
+// piListDeadline bounds `pi list` (intent 0016 PD3).
+var piListDeadline = 5 * time.Second
 
 // engineSet reads the engine set and the assistant engines from the
 // runtimes mapping of gabo.yaml (S1; intent 0010 D1): the set is
@@ -96,6 +101,9 @@ func (u *UseCase) integrateEngine(engine string, assistants []string, version st
 			return fail(fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err))
 		}
 	}
+	if engine == engineconfig.Pi {
+		in.PiPackage = u.piPackage()
+	}
 	if engine == engineconfig.Claude {
 		// The rule only needs to know whether the main session's agent is built (S8).
 		if _, err := u.store.Lstat(u.path(engineconfig.ClaudeAgentFile)); err == nil {
@@ -122,6 +130,22 @@ func (u *UseCase) integrateEngine(engine string, assistants []string, version st
 	section := report.Sections[0]
 	section.Lines = append(section.Lines, u.writeEngineFiles(writes, writable)...)
 	return section
+}
+
+// piPackage runs the subagent-package check of intent 0016 S1 and D1: `pi
+// list` under piListDeadline, then gentle-shell on PATH. A `pi list` that is
+// missing, fails or outlives the deadline counts as no package (S2); a
+// missing probe is no package too.
+func (u *UseCase) piPackage() bool {
+	if u.s.Pi == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), piListDeadline)
+	defer cancel()
+	if out, ok := u.s.Pi.PiList(ctx); ok && engineconfig.PiListNamesPackage(out) {
+		return true
+	}
+	return u.s.Pi.GentleShellOnPath()
 }
 
 // loadOpencodeConfigs reads the OpenCode configs the rule may change
