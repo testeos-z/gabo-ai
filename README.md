@@ -102,7 +102,7 @@ The CLI has four commands. Everything else is done by your agent through the ski
 
 | command | what it does |
 |---|---|
-| `gabo init` | Copies the skill catalog to `.gabo/skills/`, writes `.gabo/VERSION` and `.gabo/CATALOG_HASH` (a content hash, so a changed catalog at the same version is refreshed too), installs the reviewer skill at user level and, with a `gabo.yaml`, configures each declared engine at project level, including the main-session key (for OpenCode only `default_agent`; it never writes or edits `experimental.subagent_depth`). Never touches an existing config or your global engine config. |
+| `gabo init` | Copies the skill catalog to `.gabo/skills/`, writes `.gabo/VERSION` and `.gabo/CATALOG_HASH` (a content hash, so a changed catalog at the same version is refreshed too), installs the reviewer skill at user level, replacing a copy whose `VERSION` differs or whose content differs at the same version (`REVIEWER_HASH`), and, with a `gabo.yaml`, configures each declared engine at project level, including the main-session key (for OpenCode only `default_agent`; it never writes or edits `experimental.subagent_depth`). Never touches an existing config or your global engine config. |
 | `gabo check` | Validates, read-only, the config, the agents, slot coverage and the catalog version, and `docs/product/DESIGN.md` when present. Exits non-zero on any failure. |
 | `gabo version` | Prints the gabo version. |
 | `gabo prompt` | Prints the setup prompt again. |
