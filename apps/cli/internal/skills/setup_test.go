@@ -413,3 +413,21 @@ func TestSetupRebuildsEachEngineOfTheEngineSet(t *testing.T) {
 		t.Errorf("%s: still builds each engine named in `runtimes.*` instead of the engine set", setupSkill)
 	}
 }
+
+// Intent 0019 S1, S4 and S7 (T4): step 1 explains how the agents communicate.
+// Agents never talk to each other directly across hosts; the owner reaches a
+// session on another host through direct_sessions after authorizing that host.
+// The channels that already hold (tracker, memory, direct_sessions only if
+// configured) stay named in the same sentence.
+func TestSetupCommunicationReachesASessionOnAnotherHost(t *testing.T) {
+	t.Parallel()
+	step := setupStep(t, "**Ask.**", "\n2. ")
+	const channels = "through the tracker (issues, PRs and their comments), the shared `memory` slot and, only if configured, `direct_sessions`; "
+	const rule = "agents never talk to each other directly across hosts, and the owner can reach a session on another host through `direct_sessions` after authorizing that host."
+	requireAll(t, step, []string{
+		"how the agents communicate: " + channels + rule,
+	})
+	if stale := "agents on different hosts never talk directly"; strings.Contains(setupDoc(t), stale) {
+		t.Errorf("%s: still says %q", setupSkill, stale)
+	}
+}
