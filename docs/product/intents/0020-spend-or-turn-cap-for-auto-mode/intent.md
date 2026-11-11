@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0020-spend-or-turn-cap-for-auto-mode |
-| status | Draft (spec written when the owner picks this intent) |
+| status | Specified |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |
@@ -38,10 +38,10 @@ The owner, on every wave run in auto mode without the owner present.
 
 | # | question | status |
 |---|---|---|
-| 1 | What is capped: turns, spend, wall-clock time, or several? | open (owner) |
-| 2 | Which engines report turns or spend to a running session? | carried to spec (needs sources per engine) |
-| 3 | At the cap, does the wave stop and report, or pause and ask the owner? | open (owner) |
-| 4 | Does "a person approves the result at the end" change `review.auto_merge` for capped waves? | open (owner) |
+| 1 | What is capped: turns, spend, wall-clock time, or several? | answered: coder turns, coders launched per wave and fix rounds; spend is not capped by gabo (spec D1). Recorded decision (resolver: agent, rule of the owner). |
+| 2 | Which engines report turns or spend to a running session? | answered by the spec's table from the engines' current docs: Claude Code and OpenCode document a turn cap; Codex and Pi document none; no engine documents a spend cap from inside a wave. |
+| 3 | At the cap, does the wave stop and report, or pause and ask the owner? | answered: pause, report and ask continue or stop (spec D3). Recorded decision (resolver: agent, rule of the owner). |
+| 4 | Does "a person approves the result at the end" change `review.auto_merge` for capped waves? | answered: no; caps never change `review.auto_merge` or let auto mode merge more (spec S7). Recorded decision (resolver: agent, rule of the owner). |
 
 ## Links
 
@@ -51,6 +51,6 @@ The owner, on every wave run in auto mode without the owner present.
 | intent issue | [#495 I0020: Spend or turn cap for auto mode](https://github.com/testeos-z/gabo-ai/issues/495) (sub-issue of #492) |
 | PRD | [PRD](../../PRD.md), R21 |
 | skill | `.gabo/skills/gabo-cycle/SKILL.md` (rule 3, `parallelism`) |
-| spec | — (written when the owner picks this intent) |
+| spec | [spec](spec.md) |
 | plan | — |
 | related intent | 0022-measure-roles (records what a wave spends) |
