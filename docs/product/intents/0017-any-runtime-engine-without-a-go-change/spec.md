@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0017-any-runtime-engine-without-a-go-change](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-11 |
@@ -56,7 +56,7 @@ Not applicable: `gabo.yaml` keys and their meaning stay the same, and no stored 
 
 | policy | conflict | resolution |
 |---|---|---|
-| PRD R35 and TRD 2 | Today's code contradicts them: a new engine needs a Go change and a release. | resolved by this spec on acceptance. Until the change lands, R35 and TRD 2 stay as written. |
+| PRD R35 and TRD 2 | Today's code contradicts them: a new engine needs a Go change and a release. | resolved by this spec on acceptance, accepted by the owner on 2026-11-11. Until the change lands, R35 and TRD 2 stay as written. |
 | TRD D27 | The reviewer engines are fixed to the scripts' engines. | none: S3 keeps the four engines. |
 | TRD D28 and PRD section 6 | An accepted builder engine is flexible tier, without a plugin and hooks. | none: S4. |
 | PRD R33 | `gabo check` stays read-only. | none: D1 runs no probe and D4 keeps config pure. |
@@ -78,3 +78,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-11 | Accepted by the owner as the spec stands in PR #491 (head 012bf97), with its recorded decisions (resolver: agent, rule of the owner). Owner, verbatim, answering "¿aceptas los specs de 0016 y 0017?": "si a los 2". Relayed unedited by the assistant from the owner's own message in the session of 2026-11-11, after the owner read both specs in the PR #491 files page; recorded by gabo-pm. The owner reviews the PR before it merges. |

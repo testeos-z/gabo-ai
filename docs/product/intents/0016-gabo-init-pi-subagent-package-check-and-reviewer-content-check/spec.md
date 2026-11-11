@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0016-gabo-init-pi-subagent-package-check-and-reviewer-content-check](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-11 |
@@ -54,8 +54,8 @@ Not applicable: the change stores no data in a database. The stamped hash is a f
 | policy | conflict | resolution |
 |---|---|---|
 | PRD R32 | R32 says `gabo init` never touches `gabo.yaml` or the user config. | none: S3 and S4 keep both untouched; the reviewer step writes only the user-level reviewer skill folder that R32 already installs, and the Pi check only reads. |
-| TRD 9.4 line 490 and decision 14 (line 716): a same-version `gabo init` "Changes nothing" | Stale since 0015 T14 (PR #526, merged) made `gabo init` compare the catalog content; owner words of 2026-11-11 ("gabo init solo compara versiones, no contenido"). | **This spec keeps the amendment** (S5), written as `dev` behaves after T14, because the 0015 plan and spec do not carry it and PR #526 did not edit the TRD. Accepting this spec accepts the TRD change; gabo-dev-lead writes the text in this intent's plan. A TRD convention change, decided by the owner's acceptance. If a later 0015 task carries the catalog part, this row and that part of S5 are dropped. |
-| TRD 9.4 lines 413 and 499, risk rows 674 and 675 (the user-level reviewer is replaced when its own `VERSION` differs) | S4 adds a content comparison. | resolved by S4 and S5: those lines say content as well as `VERSION`; the same acceptance covers them. |
+| TRD 9.4 line 490 and decision 14 (line 716): a same-version `gabo init` "Changes nothing" | Stale since 0015 T14 (PR #526, merged) made `gabo init` compare the catalog content; owner words of 2026-11-11 ("gabo init solo compara versiones, no contenido"). | **This spec keeps the amendment** (S5), written as `dev` behaves after T14, because the 0015 plan and spec do not carry it and PR #526 did not edit the TRD. Accepting this spec accepts the TRD change, accepted by the owner on 2026-11-11 with this spec; gabo-dev-lead writes the text in this intent's plan. A TRD convention change, decided by the owner's acceptance. If a later 0015 task carries the catalog part, this row and that part of S5 are dropped. |
+| TRD 9.4 lines 413 and 499, risk rows 674 and 675 (the user-level reviewer is replaced when its own `VERSION` differs) | S4 adds a content comparison. | resolved by S4 and S5: those lines say content as well as `VERSION`; the owner's acceptance of 2026-11-11 covers them, and gabo-dev-lead writes the text in the plan. |
 | TRD 9.4 and D20 (`gabo check` does not look at the user copy, because CI has none) | A stamped hash in the user copy could tempt a check. | none: `gabo check` is not changed (S3). |
 | `gabo-runtime-pi` step 2 | The package rule exists in Go (S1) and in the runtime skill. | none: the same rule. A later change to the rule must update both; this is a maintenance note, not a conflict. |
 | PRD R33 | `gabo check` stays read-only and independent of the engine. | none: `gabo check` is not changed. |
@@ -75,3 +75,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-11 | Accepted by the owner as the spec stands in PR #491 (head 012bf97), with its proposals marked Proposed (auto) (the file name `REVIEWER_HASH` and the wording of the new line). Owner, verbatim, answering "¿aceptas los specs de 0016 y 0017?": "si a los 2". Relayed unedited by the assistant from the owner's own message in the session of 2026-11-11, after the owner read both specs in the PR #491 files page; recorded by gabo-pm. The owner reviews the PR before it merges. |
