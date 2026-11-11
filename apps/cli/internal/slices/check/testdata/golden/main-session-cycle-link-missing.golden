@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ .claude/skills/gabo-cycle: gabo assistant entry incomplete for claude
+next: ask your agent to rebuild the agents, then rerun gabo check

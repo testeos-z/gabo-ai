@@ -30,6 +30,8 @@ func TestCommandGolden(t *testing.T) {
 		cfg string
 		// edit changes project files; an empty value removes the file.
 		edit map[string]string
+		// links adds symlinks: link path to target.
+		links map[string]string
 	}
 	cases := []tc{
 		{name: "no-intents"},
@@ -108,6 +110,24 @@ func TestCommandGolden(t *testing.T) {
 	// Intent 0013 S6: a Claude Code agent copied into .pi/agents.
 	builtFor, builtForCfg := piCoder("---\nname: alpha\ngabo-version: 1.2.3\ngabo-engine: claude\n---\nbody\n")
 	cases = append(cases, tc{name: "agent-built-for-other-engine", cfg: builtForCfg, edit: mapFSEdit(builtFor)})
+	// Intent 0015 S7: a former agent file an older build left, and a
+	// main-session entry built without the gabo-cycle link.
+	cases = append(cases,
+		tc{name: "agent-former-left", edit: map[string]string{".claude/agents/gabo-cycle.md": "---\nname: gabo-cycle\ngabo-version: 1.2.3\n---\nbody\n"}},
+		tc{name: "main-session-cycle-link-missing", edit: mainSessionEdit(map[string]string{
+			".gabo/skills/gabo-agent-templates/agents.yaml": spec + "main_session:\n  id: gabo-assistant\n  role: assistant\n" +
+				"  skills: [gabo-assistant, gabo-cycle, gabo-wave-report]\n  template: agents/gabo-assistant.md\n  block: agents/gabo-assistant-block.md\n",
+			".gabo/skills/gabo-runtime-claude/SKILL.md": "---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n  skill_dir: .claude/skills\n" +
+				"  agent_skills: frontmatter:skills\n  main_session:\n    kind: agent\n    config: [.claude/settings.json]\n    key: agent\n---\nbody\n",
+			".gabo/skills/gabo-cycle/SKILL.md":       "---\nname: gabo-cycle\n---\n",
+			".gabo/skills/gabo-wave-report/SKILL.md": "---\nname: gabo-wave-report\n---\n",
+			".claude/agents/gabo-assistant.md":       "---\nname: gabo-assistant\ngabo-version: 1.2.3\n---\nbody\n",
+			".claude/settings.json":                  withJSONKey(claudeKeysJSON, "agent", "gabo-assistant"),
+		}), links: map[string]string{
+			".claude/skills/gabo-assistant":   "../../.gabo/skills/gabo-assistant",
+			".claude/skills/gabo-wave-report": "../../.gabo/skills/gabo-wave-report",
+		}},
+	)
 	for _, f := range fixtures {
 		cases = append(cases, tc{name: "intents-" + f.Name(), tree: f.Name()})
 	}
@@ -117,6 +137,9 @@ func TestCommandGolden(t *testing.T) {
 			proj := project()
 			if c.edit != nil {
 				proj = with(proj, c.edit)
+			}
+			for name, target := range c.links {
+				proj[name] = symlink(target)
 			}
 			if c.tree != "" {
 				proj = withTree(t, proj, c.tree)
