@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"maps"
-	"math"
-	"strconv"
 	"strings"
 )
 
@@ -42,11 +40,11 @@ const opencodeMainSessionStep = "ask your agent to build the agents (the main se
 
 // opencodeRule writes gabo's OpenCode keys into the S2 file, the first
 // existing config, else a new .opencode/opencode.json, keeping every other
-// byte and comment (intent 0010 S2, S3, S4): it raises
-// experimental.subagent_depth to at least 3; with OpenCode a listed
-// assistant engine it merges "default_agent": "gabo-assistant", with OpenCode
-// not listed it removes exactly that value from each config (intent 0013
-// S3, D7). Anything it cannot merge
+// byte and comment (intent 0010 S2, S4): with OpenCode a listed assistant
+// engine it merges "default_agent": "gabo-assistant" (creating the new file
+// only then), with OpenCode not listed it removes exactly that value from
+// each config (intent 0013 S3, D7). It never writes or reads
+// experimental.subagent_depth (intent 0015 S8, D6). Anything it cannot merge
 // without loss writes nothing and gets one ✗ line. Then it reports whether
 // the stage-gate plugin is in the project.
 func opencodeRule(in Input) Result {
@@ -67,14 +65,6 @@ func opencodeRule(in Input) Result {
 	}
 	return res
 }
-
-// The nested key gabo raises and its floor (intent 0010 S3, D5).
-const (
-	opencodeExperimental = "experimental"
-	opencodeDepthKey     = "subagent_depth"
-	opencodeDepthName    = opencodeExperimental + "." + opencodeDepthKey
-	opencodeMinDepth     = 3
-)
 
 // opencodeKeys decides every key before it writes, so a failure writes
 // nothing, and reports whether the main session runs gabo's agent.
@@ -100,39 +90,27 @@ func opencodeKeys(in Input) (Result, bool) {
 	}
 	var parts, kept []string
 	agentIsGabo := false
-	if !exists {
-		obj := jsonObj{{opencodeExperimental, jsonObj{{opencodeDepthKey, opencodeMinDepth}}}}
-		parts = append(parts, opencodeDepthName+" unset → "+strconv.Itoa(opencodeMinDepth))
-		if in.lists(Opencode) {
-			obj = append(obj, jsonKV{opencodeAgentKey, opencodeAgentValue})
+	switch {
+	case !in.lists(Opencode):
+	case !exists:
+		src = []byte(renderJSON(jsonObj{{opencodeAgentKey, opencodeAgentValue}}, "", "  ", true) + "\n")
+		parts = append(parts, "added "+opencodeAgentKey)
+		agentIsGabo = true
+	default:
+		out := src
+		top, reason := opencodeTop(out)
+		if reason != "" {
+			return fail(reason)
+		}
+		switch m, ok := top.member(out, opencodeAgentKey); {
+		case !ok:
+			out = insertMember(out, top, jsonKV{opencodeAgentKey, opencodeAgentValue}, indentUnit(out, top))
 			parts = append(parts, "added "+opencodeAgentKey)
 			agentIsGabo = true
-		}
-		src = []byte(renderJSON(obj, "", "  ", true) + "\n")
-	} else {
-		top, reason := opencodeTop(src)
-		if reason != "" {
-			return fail(reason)
-		}
-		out, part, reason := raiseDepth(src, top)
-		if reason != "" {
-			return fail(reason)
-		}
-		if part != "" {
-			parts = append(parts, part)
-		}
-		if in.lists(Opencode) {
-			top = scanObject(out, top.open)
-			switch m, ok := top.member(out, opencodeAgentKey); {
-			case !ok:
-				out = insertMember(out, top, jsonKV{opencodeAgentKey, opencodeAgentValue}, indentUnit(out, top))
-				parts = append(parts, "added "+opencodeAgentKey)
-				agentIsGabo = true
-			case sameJSON(out[m.valStart:m.valEnd], opencodeAgentValue):
-				agentIsGabo = true
-			default:
-				kept = append(kept, "kept "+file+" "+opencodeAgentKey+": "+compactJSON(out[m.valStart:m.valEnd])+" (your setting; gabo leaves it)")
-			}
+		case sameJSON(out[m.valStart:m.valEnd], opencodeAgentValue):
+			agentIsGabo = true
+		default:
+			kept = append(kept, "kept "+file+" "+opencodeAgentKey+": "+compactJSON(out[m.valStart:m.valEnd])+" (your setting; gabo leaves it)")
 		}
 		src = out
 	}
@@ -162,46 +140,6 @@ func opencodeConfig(in Input) string {
 		}
 	}
 	return OpencodeNewConfig
-}
-
-// raiseDepth makes experimental.subagent_depth at least 3 in src: it
-// returns the new bytes and the report part ("" when the value is already a
-// whole number of 3 or more), or why it cannot be merged without loss.
-func raiseDepth(src []byte, top spanObject) ([]byte, string, string) {
-	unset := opencodeDepthName + " unset → " + strconv.Itoa(opencodeMinDepth)
-	switch top.count(opencodeExperimental) {
-	case 0:
-		return insertMember(src, top, jsonKV{opencodeExperimental, jsonObj{{opencodeDepthKey, opencodeMinDepth}}}, indentUnit(src, top)), unset, ""
-	case 1: // merged below
-	default:
-		return nil, "", opencodeExperimental + " appears more than once"
-	}
-	exp, _ := top.member(src, opencodeExperimental)
-	if src[exp.valStart] != '{' {
-		return nil, "", opencodeExperimental + " is not a JSON object"
-	}
-	obj := scanObject(src, exp.valStart)
-	switch obj.count(opencodeDepthKey) {
-	case 0:
-		return insertMember(src, obj, jsonKV{opencodeDepthKey, opencodeMinDepth}, indentUnit(src, top)), unset, ""
-	case 1: // checked below
-	default:
-		return nil, "", opencodeDepthName + " appears more than once"
-	}
-	m, _ := obj.member(src, opencodeDepthKey)
-	raw := src[m.valStart:m.valEnd]
-	var v any
-	n, isNum := 0.0, false
-	if json.Unmarshal(raw, &v) == nil {
-		n, isNum = v.(float64)
-	}
-	switch {
-	case !isNum || n != math.Trunc(n):
-		return nil, "", opencodeDepthName + " is " + compactJSON(raw) + ", not a whole number"
-	case n >= opencodeMinDepth:
-		return src, "", ""
-	}
-	return replaceValue(src, m, opencodeMinDepth), opencodeDepthName + " " + compactJSON(raw) + " → " + strconv.Itoa(opencodeMinDepth), ""
 }
 
 // compactJSON renders a raw value on one line, as it is when it does not
