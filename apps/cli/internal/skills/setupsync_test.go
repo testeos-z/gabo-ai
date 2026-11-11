@@ -35,6 +35,9 @@ func TestSyncConfigIsNamedInTheActivationContract(t *testing.T) {
 	if !strings.Contains(desc, "sync config") {
 		t.Errorf("%s front matter description: missing %q", setupSkill, "sync config")
 	}
+	if !strings.Contains(desc, "poll-config") {
+		t.Errorf("%s front matter description: missing %q", setupSkill, "poll-config")
+	}
 	_, activation, ok := strings.Cut(doc, "## Activation Contract")
 	if !ok {
 		t.Fatalf("%s: no ## Activation Contract section", setupSkill)
@@ -42,6 +45,9 @@ func TestSyncConfigIsNamedInTheActivationContract(t *testing.T) {
 	activation, _, _ = strings.Cut(activation, "\n## ")
 	if !strings.Contains(activation, "sync config") {
 		t.Errorf("%s ## Activation Contract: missing %q", setupSkill, "sync config")
+	}
+	if !strings.Contains(activation, "poll-config") {
+		t.Errorf("%s ## Activation Contract: missing %q", setupSkill, "poll-config")
 	}
 }
 

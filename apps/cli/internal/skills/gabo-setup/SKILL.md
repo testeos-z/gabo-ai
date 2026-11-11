@@ -1,6 +1,6 @@
 ---
 name: gabo-setup
-description: "Trigger: gabo setup, first setup, configure gabo, setup prompt, sync config, change slot adapter or runtime, rebuild agents after gabo upgrade. Guides setup: ask, adapters, config, build agents, gabo check, slot smoke test, per-change product model."
+description: "Trigger: gabo setup, first setup, configure gabo, setup prompt, sync config, poll-config, change slot adapter or runtime, rebuild agents after gabo upgrade. Guides setup: ask, adapters, config, build agents, gabo check, slot smoke test."
 license: Apache-2.0
 metadata:
   author: gabo-ai
@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), sync config (Sync config), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-codex`, `gabo-runtime-opencode`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
+Load in the owner's agent (Claude Code, Pi or another engine) after the setup prompt (the only entry text, printed by `gabo init`) or when the owner asks it to configure gabo-ai, change a slot or a runtime (J1, J7), sync config or poll-config (Sync config), and after a gabo upgrade (Rebuild). This skill orders the work; the writing is done by the skills that own it: `gabo-adapter-writer` (adapters), `gabo-config-writer` (both config files), `gabo-agent-templates` with the runtime skill of each engine in use (`gabo-runtime-claude`, `gabo-runtime-codex`, `gabo-runtime-opencode`, `gabo-runtime-pi`, or one written first through `gabo-runtime-builder`). All of them are read from `.gabo/skills/`.
 
 ## Hard Rules
 
@@ -81,7 +81,7 @@ Run after a gabo upgrade (TRD 9.4), or when `gabo check` prints one of these lin
 
 ## Sync config
 
-Run when the owner asks to sync the config ("sync config"). It reads a work-style source, never a repository the owner did not name, and writes nothing in this part.
+Run when the owner asks to sync the config ("sync config" or "poll-config"). It reads a work-style source, never a repository the owner did not name, and writes nothing in this part.
 
 1. **Source.** Ask one question: "local or remote". Local is the default: local is the source when the owner does not answer. Remote means another repository; ask for it in step 3.
 2. **Local.** Read the profile `profile.yaml` in the user config folder: `$XDG_CONFIG_HOME/gabo/profile.yaml` when `XDG_CONFIG_HOME` is an absolute path, else `~/.config/gabo/profile.yaml` (the user file's path rule). If it is missing, report `no profile at <path>`, offer the remote source or the normal setup above, and write nothing.
