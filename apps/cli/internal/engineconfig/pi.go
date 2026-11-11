@@ -95,8 +95,9 @@ func pi(in Input) Result {
 // PiListNamesPackage reports whether the output of `pi list` names a
 // subagent package of gentle-pi (intent 0016 PD4, the rule of
 // gabo-runtime-pi step 2): a listed source that is npm:gentle-pi, with or
-// without @<version>, or a git: source with gentle-pi in it. Any other
-// package, npm:@gabo-ai/pi included, does not count.
+// without @<version>, or a git: source of gentle-pi. Any other package, such
+// as npm:@gabo-ai/pi or a git source whose name only contains gentle-pi,
+// does not count.
 func PiListNamesPackage(list []byte) bool {
 	for _, line := range strings.Split(string(list), "\n") {
 		if fields := strings.Fields(line); len(fields) > 0 && namesGentlePi(fields[0]) {
@@ -106,12 +107,20 @@ func PiListNamesPackage(list []byte) bool {
 	return false
 }
 
-// namesGentlePi reports whether one listed source is gentle-pi.
+// namesGentlePi reports whether one listed source is gentle-pi: an npm
+// source named gentle-pi, or a git source whose last path segment, without
+// an @<ref> and a .git suffix, is gentle-pi.
 func namesGentlePi(src string) bool {
 	if rest, ok := strings.CutPrefix(src, "npm:gentle-pi"); ok {
 		return rest == "" || strings.HasPrefix(rest, "@")
 	}
-	return strings.HasPrefix(src, "git:") && strings.Contains(src, "gentle-pi")
+	rest, ok := strings.CutPrefix(src, "git:")
+	if !ok {
+		return false
+	}
+	name := rest[strings.LastIndex(rest, "/")+1:]
+	name, _, _ = strings.Cut(name, "@")
+	return strings.TrimSuffix(name, ".git") == "gentle-pi"
 }
 
 // isRelease reports whether version is a plain x.y.z release; anything else

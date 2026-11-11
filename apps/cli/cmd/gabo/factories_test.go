@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -84,14 +85,23 @@ exit 1`}, true},
 // PD3: the adapter gives up on a `pi list` that outlives its context and
 // reports it as not listed.
 func TestPiProbeGivesUpAtTheDeadline(t *testing.T) {
-	_, _ = fakeTools(t, map[string]string{"pi": "sleep 30"})
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	// The real sleep is resolved before PATH is replaced: a fake that cannot
+	// start would exit at once and pass without waiting for the deadline.
+	sleep, err := exec.LookPath("sleep")
+	if err != nil {
+		t.Skip("no sleep binary to hold pi list open")
+	}
+	fakeTools(t, map[string]string{"pi": "exec '" + sleep + "' 30"})
+	const deadline = 100 * time.Millisecond
+	ctx, cancel := context.WithTimeout(context.Background(), deadline)
 	defer cancel()
 	start := time.Now()
-	if out, ok := (piProbe{}).PiList(ctx); ok || len(out) != 0 {
+	out, ok := (piProbe{}).PiList(ctx)
+	elapsed := time.Since(start)
+	if ok || len(out) != 0 {
 		t.Fatalf("PiList = %q, %v; want no output and not listed", out, ok)
 	}
-	if time.Since(start) > 5*time.Second {
-		t.Fatalf("PiList outlived its deadline by %v", time.Since(start))
+	if elapsed < deadline/2 || elapsed > 5*time.Second {
+		t.Fatalf("PiList returned after %v; want it to end at the %v deadline", elapsed, deadline)
 	}
 }
