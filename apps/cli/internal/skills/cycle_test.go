@@ -296,3 +296,67 @@ func TestCycleReturnWithHandedTasksKeepsTheClaim(t *testing.T) {
 		"The wave closes when every task of that intent is DONE or BLOCKED",
 	})
 }
+
+// Intent 0015 S5, PD11 (plan T16): a resumed holder launches a new coder for
+// a coder that cannot be resumed; the sweep keeps the entries of open tasks.
+func TestCycleResumeLaunchesANewCoderForAnUnresumableOne(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	step3 := lineWith(t, doc, "3. Resume (D17)")
+	requireIn(t, "gabo-cycle step 3", step3, []string{
+		"a coder handle that cannot be resumed (no transcript after a session close or restart)",
+		"launch a new `gabo-coder` on the ledger worktree and branch with the same input as a first launch (task, worktree path, branch, mode)",
+		"`PR #<n> merged` when `repository_host` shows the PR merged",
+		"when the PR is `CONFLICTING`, with the instruction to run the coder's `CONFLICTING` fix round (merge `origin/dev` into the task branch, never a rebase, never a force-push, resolve the conflict, run the task's checks, push, request a new review)",
+		"read the PR status and the latest reviewer comment and continue from them",
+		"When the worktree or the branch is already gone and the PR is merged, the new coder runs the Task Close from the main checkout (verify the merge through `repository_host`, close the issue with DONE via PR; nothing else to remove)",
+		"give it the main checkout path (your own working directory) in its input",
+		"the new coder recreates it in the main checkout with `git worktree add <worktree path> <branch>`",
+		"The new coder is the only writer of DONE",
+	})
+	coder := lineWith(t, doc, "The coder owns its task close")
+	if strings.Contains(coder, "its merged task stays open") || strings.Contains(coder, "leaves its entry to the fallback sweep") {
+		t.Errorf("gabo-cycle coder rule still leaves a merged task open: %q", coder)
+	}
+	requireIn(t, "gabo-cycle coder rule", coder, []string{"the holder launches a new `gabo-coder` for it (step 3)"})
+}
+
+// The sweep keeps its 0.2.10 rule (only entries no coder could close, only
+// after the PR is merged) and never takes the entry of a task still open.
+func TestCycleSweepKeepsOpenTasks(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	sweep := lineWith(t, doc, "fallback sweep) runs only")
+	requireIn(t, "gabo-cycle sweep rule", sweep, []string{
+		"only for entries no coder could close, only after `repository_host` shows the PR merged",
+		"never removes the worktree or the branch of a task that is neither DONE nor BLOCKED, even when its PR is merged (its issue is open and a coder can still close it, step 3)",
+		"so it takes an entry only after its task is DONE or BLOCKED; a BLOCKED task's issue stays open, and its entries are swept only when its PR is merged, as before",
+	})
+	step7 := lineWith(t, doc, "7. The wave closes when")
+	requireIn(t, "gabo-cycle step 7", step7, []string{
+		"The wave closes when every task of that intent is DONE or BLOCKED",
+		"skip the entries of a task that is neither DONE nor BLOCKED",
+	})
+}
+
+// Existing rules the T16 change must not touch.
+func TestCycleResumeRulesStayPinned(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"3. Resume (D17), only as the holder: read `gabo/trace/<wave>` and `gabo/ledger/<wave>`",
+		"The cycle skips DONE tasks (closed issues).",
+		"An open PR (`repository_host` read status) or a live ledger worktree ⇒ reattach: resume its coder by its handle, or launch a new coder on that worktree and branch.",
+		"When tracker, host and trace disagree (for example the trace says HANDED and the issue has no PR), record the disagreement in the report and leave that task alone; never guess.",
+		"The coder owns its task close and is the only writer of DONE (D23); the cycle never writes DONE. A coder that gets `merge=merged` closes on its own",
+		"a resume keeps a claim only when the assistant passes `resume <session id>` and that id equals the session id in the trace",
+		"The holder keeps its claim on resume",
+		"Skip `worktree.keep` entries. A removal that fails is REFUSED",
+	})
+	coder := readCatalog(t, "gabo-coder/SKILL.md")
+	requireIn(t, "gabo-coder/SKILL.md", coder, []string{
+		"`verdict=clean merge=skipped`, PR `CONFLICTING`",
+		"`verdict=clean merge=merged`",
+		"run it from the main checkout, the parent of",
+	})
+}
