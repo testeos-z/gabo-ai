@@ -28,13 +28,18 @@ func TestDirectSessionsOrcaTakesTheTwoHandleFields(t *testing.T) {
 	})
 }
 
-// Intent 0019 S2, S4 (plan T2): a host that is neither local nor an Orca
-// environment agent_host reported is refused before any orca command runs.
+// Intent 0019 S2, S4 (plan T2): a host that is neither local nor the Orca
+// environment in GABO_ORCA_ENVIRONMENT is refused before any orca command runs;
+// the host of a remote handle selects the target, so a mismatch or an unset or
+// empty variable sends and reads nothing (review of PR #547, findings 1 to 3).
+// The adapter is prose that an agent follows, so these tests pin the rule text.
 func TestDirectSessionsOrcaRefusesUnknownHosts(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, directSessions)
 	sectionRequire(t, "## Handle", contractSection(doc, "## Handle"), []string{
-		"A `host` that is neither `local` nor such an Orca environment is an unknown host: it is refused before any `orca` command, and nothing is sent or read.",
+		"A `host` that is neither `local` nor the Orca environment in `GABO_ORCA_ENVIRONMENT` is an unknown host: it is refused before any `orca` command, and nothing is sent or read.",
+		"A remote `host` must equal the value of `GABO_ORCA_ENVIRONMENT`; a mismatched `host` is refused before any `orca` command, so a handle of host B never runs against host A.",
+		"If `GABO_ORCA_ENVIRONMENT` is unset or empty, refuse before any `orca` command, name the missing variable, and send and read nothing.",
 	})
 }
 
@@ -87,6 +92,7 @@ func TestDirectSessionsOrcaRemoteUseNeedsAuthorization(t *testing.T) {
 	for _, op := range []string{"### send message", "### read state"} {
 		sectionRequire(t, op, contractSection(doc, op), []string{
 			"Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command.",
+			"For a remote `host`, check that it equals `GABO_ORCA_ENVIRONMENT` and that the variable is set and non-empty; otherwise refuse and run no command.",
 		})
 	}
 }

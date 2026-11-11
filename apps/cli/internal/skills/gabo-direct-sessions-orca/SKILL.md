@@ -27,7 +27,9 @@ Use when the owner or the assistant opens, drives, reads or closes a direct sess
 - `host` is `local` for the local host, the literal that `gabo-contract-direct-sessions` names; it adds no `--environment`.
 - A remote `host` is the Orca environment name that `agent_host` reports for where the session runs (`report where agents run`: reached through Orca environment). The adapter reads that name from the env var `GABO_ORCA_ENVIRONMENT` and never a secret value.
 - `handle` is the terminal handle that Orca returned for the session.
-- A `host` that is neither `local` nor such an Orca environment is an unknown host: it is refused before any `orca` command, and nothing is sent or read.
+- A `host` that is neither `local` nor the Orca environment in `GABO_ORCA_ENVIRONMENT` is an unknown host: it is refused before any `orca` command, and nothing is sent or read.
+- A remote `host` must equal the value of `GABO_ORCA_ENVIRONMENT`; a mismatched `host` is refused before any `orca` command, so a handle of host B never runs against host A.
+- If `GABO_ORCA_ENVIRONMENT` is unset or empty, refuse before any `orca` command, name the missing variable, and send and read nothing.
 
 ## Remote Use
 
@@ -64,7 +66,7 @@ orca terminal send --terminal <handle> --text "$(cat <brief file>)" --enter --wa
 
 ### send message
 
-Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command. A `local` handle:
+Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command. For a remote `host`, check that it equals `GABO_ORCA_ENVIRONMENT` and that the variable is set and non-empty; otherwise refuse and run no command. A `local` handle:
 
 ```bash
 orca terminal send --terminal <handle> --text "<message>" --enter --wait-submit 10 --json
@@ -80,7 +82,7 @@ It drives a terminal, so it works for a session of any engine, including a `code
 
 ### read state
 
-Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command. A `local` handle:
+Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command. For a remote `host`, check that it equals `GABO_ORCA_ENVIRONMENT` and that the variable is set and non-empty; otherwise refuse and run no command. A `local` handle:
 
 ```bash
 orca terminal show --terminal <handle> --json
