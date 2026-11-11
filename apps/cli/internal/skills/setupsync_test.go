@@ -110,3 +110,14 @@ func TestSyncConfigAsksForALocalPathOnAnotherHost(t *testing.T) {
 		"another host", "ask for a local path",
 	})
 }
+
+// Intent 0018 S3: a repository name or ref from the owner is checked before it
+// reaches the gh call, and each value is its own argument, never a shell string.
+func TestSyncConfigValidatesRemoteNamesBeforeGh(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncConfig(t), []string{
+		"[A-Za-z0-9._-]+",
+		"`..`",
+		"its own argument",
+	})
+}
