@@ -1,6 +1,6 @@
 # Team flow: one subagent layer
 
-The assistant runs the wave in the main session. Its only subagents are the directiva agents, the plan reviewer and one `gabo-coder` per task. No gabo agent launches another agent. Each coder starts the user-level reviewer script as a separate process in a clean clone of the repository. Intent 0015 (spec S1, S10) defines this graph.
+The assistant runs the wave in the main session. Its only subagents are the directiva agents, the plan reviewer and one `gabo-coder` per task. No gabo agent launches another agent. Each coder starts the user-level reviewer script as a separate process in a clean clone of the repository. Intent 0015 (spec in PR #475, not yet on `dev`) defines this graph.
 
 ```mermaid
 flowchart TD
