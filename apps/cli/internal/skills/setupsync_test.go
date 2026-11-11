@@ -1,6 +1,7 @@
 package skills
 
 import (
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -136,18 +137,55 @@ func TestSyncConfigIsNamedInTheActivationContract(t *testing.T) {
 
 // Intent 0018 S1 and D2: the mode asks "local or remote" first, takes local
 // when the owner does not answer, and the remote is another repository.
-func TestSyncConfigAsksLocalOrRemoteAndDefaultsToLocal(t *testing.T) {
+func TestSyncConfigAsksLocalOrRemoteAndAnnouncesTheDefault(t *testing.T) {
 	t.Parallel()
 	first := syncStep(t, 1)
-	if !strings.Contains(first, "\"local or remote? (default: local)\"") {
-		t.Errorf("%s ## Sync config step 1: the first question is not the local-or-remote question with local as default", setupSkill)
-	}
+	// The question names both answers, local is pre-selected, and one sentence
+	// announces the default and says how to switch to remote.
 	requireAll(t, first, []string{
-		"local is the source when the owner does not answer", "Remote means another repository",
+		"Ask one question at a time: \"local or remote?\", with local pre-selected and announced in one sentence:",
+		"\"I will use the local profile; say remote to use another repository; Enter or ok keeps local.\"",
+		"Enter or ok means local.",
+		"Remote means another repository",
 	})
 	requireAll(t, syncConfig(t), []string{
 		"which repository",
 	})
+}
+
+// Intent 0018 S1 and D2: the default is not silent and not an exception to
+// the owner-answer rule; nothing in the skill presents local as an answer the
+// owner did not give.
+func TestSyncConfigDefaultIsAnnouncedNotSilent(t *testing.T) {
+	t.Parallel()
+	rules := hardRules(t)
+	requireAll(t, rules, []string{
+		"Apply no value without the owner's answer.",
+		"A default is allowed only when it is announced, never silent",
+		"pre-selects local and says how to switch",
+	})
+	for _, bad := range []string{"exception", "does not answer"} {
+		if strings.Contains(rules, bad) || strings.Contains(syncStep(t, 1), bad) {
+			t.Errorf("%s: the default is still described as %q", setupSkill, bad)
+		}
+	}
+}
+
+// Intent 0018 D3: profile.yaml is its own file, not a config layer, and the
+// save step of the mode writes it; the example config names the same rule.
+func TestSyncConfigDefinesProfileYamlAsItsOwnFile(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncStep(t, 2), []string{
+		"`profile.yaml` is its own file in the same folder as `config.yaml`, not a config layer",
+		"the save step of this mode (T3 #501) writes it",
+	})
+	b, err := os.ReadFile("../../gabo.example.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(b), "(profile.yaml beside it is no layer: setup's sync mode reads it, not gabo)") {
+		t.Errorf("apps/cli/gabo.example.yaml: missing the profile.yaml comment next to the user-file rule")
+	}
 }
 
 // Intent 0018 S3 and D6: a remote source reads only one gabo.yaml, by local
@@ -267,19 +305,6 @@ func hardRules(t *testing.T) string {
 	}
 	sec, _, _ = strings.Cut(sec, "\n## ")
 	return sec
-}
-
-// Intent 0018 S1 and D2: the owner-answer rule of Hard Rules has exactly one
-// explicit exception, the sync source default; the sync question shows local
-// as its default, and nothing applies until the owner confirms the diff.
-func TestSyncConfigDefaultIsTheOneExceptionToTheOwnerAnswerRule(t *testing.T) {
-	t.Parallel()
-	requireAll(t, hardRules(t), []string{
-		"Apply no value without the owner's answer.",
-		"The one explicit exception is the sync source default (the Sync config section, step 1)",
-		"local is taken when the owner does not answer",
-		"because it is read-only and nothing applies until the owner confirms the diff",
-	})
 }
 
 // Intent 0018 S2, S4 and D5: the default source is read-only, so the local

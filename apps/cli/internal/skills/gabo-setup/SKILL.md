@@ -12,7 +12,7 @@ Load in the owner's agent (Claude Code, Pi or another engine) after the setup pr
 
 ## Hard Rules
 
-- **Owner answers only (R12).** Apply no value without the owner's answer. The one explicit exception is the sync source default (the Sync config section, step 1): local is taken when the owner does not answer, because it is read-only and nothing applies until the owner confirms the diff. Offer a recommendation with its reason, then wait. One question at a time, in a quick burst. In auto mode, only `gabo-config-writer`'s recorded-decision path may choose a value.
+- **Owner answers only (R12).** Apply no value without the owner's answer. A default is allowed only when it is announced, never silent: the sync source question (the Sync config section, step 1) pre-selects local and says how to switch. Offer a recommendation with its reason, then wait. One question at a time, in a quick burst. In auto mode, only `gabo-config-writer`'s recorded-decision path may choose a value.
 - **No secrets (R21).** Never ask for, accept or write a secret; a credential is configured by its env var name only.
 - **Four commands.** The CLI has only `gabo init`, `gabo check`, `gabo version` and `gabo prompt`. You may run `gabo prompt` to reprint the setup prompt (read-only, with or without a project). Use no other gabo command and no gabo MCP tool; config is still edited as YAML by `gabo-config-writer` and validated by `gabo check`.
 - **Recommended, not required.** Offer the gentle-ai stack (gentle-ai ODD and RDD for `methodology`, Engram for `memory`), and for Pi a subagent package (gentle-pi: `npm i -g gentle-pi` or `pi install npm:gentle-pi`; another package is acceptable), each as recommended, not required, with why; install it only if the owner accepts. Never edit gentle-ai's or gentle-pi's own configuration.
@@ -83,8 +83,8 @@ Run after a gabo upgrade (TRD 9.4), or when `gabo check` prints one of these lin
 
 Run when the owner asks to sync the config ("sync config", or "poll-config", the owner's own name for the same sync). It reads a work-style source (the keys the owner keeps the same across repositories, S4), never a repository the owner did not name, and writes nothing in this part.
 
-1. **Source.** Ask one question at a time, shown as "local or remote? (default: local)". Local is the default: local is the source when the owner does not answer, the one exception to the owner-answer rule in Hard Rules. Remote means another repository; ask for it in step 3.
-2. **Local.** Read the profile `profile.yaml` in the user config folder: `$XDG_CONFIG_HOME/gabo/profile.yaml` when `XDG_CONFIG_HOME` is an absolute path, else `~/.config/gabo/profile.yaml` (the user file's path rule). If it is missing, report `no profile at <path>`, offer the remote source or the normal setup above, and write nothing.
+1. **Source.** Ask one question at a time: "local or remote?", with local pre-selected and announced in one sentence: "I will use the local profile; say remote to use another repository; Enter or ok keeps local." Enter or ok means local. Remote means another repository; ask for it in step 3.
+2. **Local.** Read the profile `profile.yaml` in the user config folder: `$XDG_CONFIG_HOME/gabo/profile.yaml` when `XDG_CONFIG_HOME` is an absolute path, else `~/.config/gabo/profile.yaml` (the user file's path rule). `profile.yaml` is its own file in the same folder as `config.yaml`, not a config layer, and the save step of this mode (T3 #501) writes it. If it is missing, report `no profile at <path>`, offer the remote source or the normal setup above, and write nothing.
 3. **Remote.** Ask which repository, by local path or by GitHub URL. Read only one file, `gabo.yaml`, read-only, without cloning, and it stores nothing from it:
    - local path: read `<path>/gabo.yaml`;
    - GitHub URL: the accepted forms are exactly these three, and any other URL is refused and read nothing:
