@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0021-delegate-by-reason-not-by-default |
-| status | Draft (spec written when the owner picks this intent) |
+| status | Specified |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |
@@ -37,9 +37,9 @@ The owner, in every session and wave: delegation adds time and tokens to each st
 
 | # | question | status |
 |---|---|---|
-| 1 | Which reasons justify a delegation (for example parallel work, an independent context, a large exploration)? | carried to spec |
-| 2 | Does the change apply only to the assistant, or also to directiva and the cycle? | open (owner) |
-| 3 | In what order does it land relative to intent 0015 (one subagent layer on every engine)? | open (owner) |
+| 1 | Which reasons justify a delegation (for example parallel work, an independent context, a large exploration)? | answered: independent units with disjoint edit surfaces, a map that needs more than one bounded read batch, a long suite or build that would block the thread, and an independent verifier or reviewer; plus role ownership (spec D2, S1, S3). Recorded decision (resolver: agent, rule of the owner). |
+| 2 | Does the change apply only to the assistant, or also to directiva and the cycle? | answered: the assistant, and the cycle when the assistant runs it (spec D1). Recorded decision (resolver: agent, rule of the owner). |
+| 3 | In what order does it land relative to intent 0015 (one subagent layer on every engine)? | answered: after 0015 task T4 (#479), as a cross-intent blocker (spec D5, S7). Recorded decision (resolver: agent, rule of the owner). |
 
 ## Links
 
@@ -49,6 +49,6 @@ The owner, in every session and wave: delegation adds time and tokens to each st
 | intent issue | [#496 I0021: Delegate by reason, not by default](https://github.com/testeos-z/gabo-ai/issues/496) (sub-issue of #492) |
 | TRD | [TRD](../../TRD.md), D8 |
 | skill | `.gabo/skills/gabo-assistant/SKILL.md` |
-| spec | — (written when the owner picks this intent) |
+| spec | [spec](spec.md) |
 | plan | — |
 | related intent | 0015-one-subagent-layer-on-every-engine; 0022-measure-roles |
