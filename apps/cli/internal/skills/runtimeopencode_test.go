@@ -341,10 +341,10 @@ func TestRuntimeOpenCodeChecksOpenCodeFirst(t *testing.T) {
 	}
 }
 
-// intent 0010 S3, S5: gabo init writes experimental.subagent_depth, so the
-// Prerequisites keep only the opencode check; the skill reads the project
-// config in OpenCode's lookup order (the order gabo check reads) and
-// reports `run gabo init` when a key is missing or low.
+// intent 0010 S4, S5; intent 0015 S8: the Prerequisites keep only the
+// opencode check; the skill reads the project config in OpenCode's lookup
+// order (the order gabo check reads) and reports `run gabo init` when it is
+// missing or does not parse; gabo never writes or requires the depth key.
 func TestRuntimeOpenCodeReadsTheEngineConfigKeys(t *testing.T) {
 	t.Parallel()
 	pre := openCodeSection(t, runtimeOpenCodeDoc(t), "Prerequisites")
@@ -354,9 +354,8 @@ func TestRuntimeOpenCodeReadsTheEngineConfigKeys(t *testing.T) {
 	mustContainIn(t, "## Prerequisites", pre,
 		"the first existing of `opencode.json`, `opencode.jsonc`, `.opencode/opencode.json`, `.opencode/opencode.jsonc` (OpenCode's own lookup order, the same one `gabo check` reads)",
 		"Call it `<file>`",
-		"`gabo init` writes `experimental.subagent_depth` (at least 3) and `default_agent` into `<file>` (intent 0010 S3, S4); this skill only reads them and writes no key",
+		"`gabo init` writes `default_agent` into `<file>` (intent 0010 S4) and never writes or requires `experimental.subagent_depth` (intent 0015 S8); this skill only reads it and writes no key",
 		"report `run gabo init`",
-		"below 3",
 		"Never write `~/.config/opencode/` or `.opencode/package.json`",
 	)
 	mustLackIn(t, "## Prerequisites", pre,
@@ -613,7 +612,7 @@ func TestRuntimeOpenCodeLeavesEngineConfigKeysToGaboInit(t *testing.T) {
 	doc := runtimeOpenCodeDoc(t)
 	assertEngineConfigRule(t, runtimeOpenCode, doc)
 	mustContainIn(t, "## Hard Rules", openCodeSection(t, doc, "Hard Rules"),
-		"`gabo init` writes every engine config key (intent 0010 S5), `experimental.subagent_depth` and `default_agent` included; this skill writes none",
+		"`gabo init` writes every engine config key (intent 0010 S5), `default_agent` included, and never writes or edits `experimental.subagent_depth` (intent 0015 S8); this skill writes none",
 		"the stage-gate plugin",
 	)
 	assertKeyLinesNameGaboInit(t, runtimeOpenCode, skillBody(t, doc))

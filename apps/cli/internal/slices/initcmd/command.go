@@ -45,9 +45,7 @@ func NewCommand(factory Factory) *cobra.Command {
 			engineconfig.OpencodeNewConfig + ", comments kept; another value of \"default_agent\" is yours and kept.\n" +
 			"With opencode not listed it removes that exact \"default_agent\" value from each of those\n" +
 			"files, also when opencode is no longer in runtimes.\n" +
-			"With opencode in runtimes it also raises experimental.subagent_depth to 3 in the first existing\n" +
-			"of those files, else in a new " + engineconfig.OpencodeNewConfig + ", when it is unset or lower; a whole number\n" +
-			"of 3 or more is kept.\n" +
+			"init never writes experimental.subagent_depth and leaves an existing value as it is.\n" +
 			"init never creates or edits " + ConfigFile + " or the user config.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

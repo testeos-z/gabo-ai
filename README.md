@@ -102,7 +102,7 @@ The CLI has four commands. Everything else is done by your agent through the ski
 
 | command | what it does |
 |---|---|
-| `gabo init` | Copies the skill catalog to `.gabo/skills/`, writes `.gabo/VERSION`, installs the reviewer skill at user level and, with a `gabo.yaml`, configures each declared engine at project level, including the main-session key and OpenCode's `experimental.subagent_depth`. Never touches an existing config or your global engine config. |
+| `gabo init` | Copies the skill catalog to `.gabo/skills/`, writes `.gabo/VERSION`, installs the reviewer skill at user level and, with a `gabo.yaml`, configures each declared engine at project level, including the main-session key (for OpenCode only `default_agent`; it never writes or edits `experimental.subagent_depth`). Never touches an existing config or your global engine config. |
 | `gabo check` | Validates, read-only, the config, the agents, slot coverage and the catalog version, and `docs/product/DESIGN.md` when present. Exits non-zero on any failure. |
 | `gabo version` | Prints the gabo version. |
 | `gabo prompt` | Prints the setup prompt again. |
@@ -119,7 +119,7 @@ The project file overrides the user file key by key; unknown keys fail. Secrets 
 ## Upgrading
 
 1. Install the newer CLI (the `go install` command above, or `@vX.Y.Z` to pin a release).
-2. Run `gabo init` in the project, after every upgrade and after every change of `runtimes.*` in `gabo.yaml`. It refreshes the catalog and adds any missing engine key, keeping the ones you set. It is the writer of the engine config keys: the main-session key of each engine listed in `runtimes.assistant` (`agent` in `.claude/settings.json`, `default_agent` in the OpenCode project config) and OpenCode's `experimental.subagent_depth` (raised to 3). It removes the main-session key of an engine that is not listed and reports `removed <file> <key>: "gabo-assistant" (runtimes.assistant is <engines joined with ", ">)`; a listed engine's key is never removed.
+2. Run `gabo init` in the project, after every upgrade and after every change of `runtimes.*` in `gabo.yaml`. It refreshes the catalog and adds any missing engine key, keeping the ones you set. It is the writer of the engine config keys: the main-session key of each engine listed in `runtimes.assistant` (`agent` in `.claude/settings.json`, `default_agent` in the OpenCode project config). It never writes `experimental.subagent_depth` and leaves an existing value exactly as it is. It removes the main-session key of an engine that is not listed and reports `removed <file> <key>: "gabo-assistant" (runtimes.assistant is <engines joined with ", ">)`; a listed engine's key is never removed.
 3. Ask your agent to rebuild the agents of every engine named in `runtimes.*`. The runtime skills build the agent files, each stamped with the engine it was built for, the skill links and the Codex and Pi main-session block; they write no engine config key.
 4. Run `gabo check` until it passes. A `next: run gabo init (it merges …)` or `(it removes …)` hint means step 2 is the fix. `✗ <file>: gabo assistant entry for <engine>, but runtimes.assistant is <engines joined with ", ">` is an entry left for an engine that is not listed, and `✗ <file>: built for <value>, not <engine>` an agent file built for another engine; each line names its fix (step 2 for a key, step 3 for the rest).
 

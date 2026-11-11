@@ -185,10 +185,10 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 		{"claude settings with a comment", "claude", func(_ *testing.T, p fstest.MapFS) { p[claudeKeys] = file("// mine\n" + claudeKeysJSON) },
 			[][2]string{{line(claudeKeys, "incomplete", "claude")[0],
 				"next: fix .claude/settings.json (invalid JSON (invalid character '/' looking for beginning of value)), then run gabo init and rerun gabo check"}}},
-		{"opencode key in a file gabo init refuses", "opencode", func(_ *testing.T, p fstest.MapFS) {
-			p[ocConfig] = file(`{"experimental": {}, "experimental": {}}`)
+		{"unparsable opencode config fails the check", "opencode", func(_ *testing.T, p fstest.MapFS) {
+			p[ocConfig] = file(`{"default_agent": `)
 		}, [][2]string{{line(ocConfig, "incomplete", "opencode")[0],
-			"next: fix " + ocConfig + " (experimental appears more than once), then run gabo init and rerun gabo check"}}},
+			"next: fix " + ocConfig + " (invalid JSONC (unexpected end of JSON input)), then run gabo init and rerun gabo check"}}},
 		{"claude user's own agent value", "claude", func(_ *testing.T, p fstest.MapFS) {
 			p[claudeKeys] = file(withJSONKey(claudeKeysJSON, "agent", "my-agent"))
 		}, [][2]string{{`✗ .claude/settings.json: agent is "my-agent", not "gabo-assistant"`, changeKey("agent", claudeKeys)}}},
