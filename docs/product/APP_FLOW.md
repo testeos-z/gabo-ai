@@ -7,7 +7,7 @@
 | version | 0.8 |
 | date | 2026-11-03 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [UX_UI](UX_UI.md), intents [`docs/product/intents/`](intents/README.md), previous version [APP_FLOW 0.7](archive/APP_FLOW-0.7.md) |
-| diagrams | [team-flow.html](diagrams/team-flow.html), [configuration-flow.html](diagrams/configuration-flow.html) |
+| diagrams | [team-flow.md](diagrams/team-flow.md), [configuration-flow.html](diagrams/configuration-flow.html) |
 
 gabo-ai has no graphical UI. Its "screens" are the surfaces where the owner meets the system: the assistant conversation, an optional direct session, the CLI and the tracker or PR. This document holds only the global flows of gabo-ai itself. Amended (owner 2026-11-03, per-change-sdlc): under the per-change model the UX and flow of each change belong to its intent's `spec.md` (section 3), and global design norms belong to an optional `DESIGN.md`; this document keeps the journey ids J1–J11 and the rule ids A3–A7, because skills cite them. The auto-mode proposal history, the story links and the superseded steps are kept in [APP_FLOW 0.7](archive/APP_FLOW-0.7.md).
 
@@ -156,7 +156,7 @@ Amended (owner 2026-11-03, per-change-sdlc): a wave is one intent.
 
 ## Flow
 
-Detailed references: [team-flow.html](diagrams/team-flow.html) and [configuration-flow.html](diagrams/configuration-flow.html). Those diagrams predate the per-change model and still show one global plan; this chart is the current overview.
+Detailed references: [team-flow.md](diagrams/team-flow.md) and [configuration-flow.html](diagrams/configuration-flow.html). Those diagrams predate the per-change model and still show one global plan; this chart is the current overview.
 
 ```mermaid
 flowchart TD
