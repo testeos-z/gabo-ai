@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0022-measure-roles |
-| status | Draft (spec written when the owner picks this intent) |
+| status | Specified |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |
@@ -37,9 +37,9 @@ The owner, when deciding how gabo should be shaped; it affects the cost and time
 
 | # | question | status |
 |---|---|---|
-| 1 | Which engines report token counts to the session, and what is recorded when one does not? | carried to spec (needs sources per engine) |
-| 2 | Does the owner approve a trial wave with pm and dev-lead merged, and on which intent? | open (owner) |
-| 3 | What result keeps a role, and what result removes it? | open (owner) |
+| 1 | Which engines report token counts to the session, and what is recorded when one does not? | answered: only what an engine reports is recorded, with its source, else `unknown (<engine>: ...)`; Claude Code reports a session total through `/usage` and OpenTelemetry, not as a run total an agent can read; the other engines were not verified and the probe records them (spec D4, S4). Recorded decision (resolver: agent, rule of the owner). |
+| 2 | Does the owner approve a trial wave with pm and dev-lead merged, and on which intent? | answered: the trial runs only after the owner approves a named intent; none is named now (spec D5, S5). Recorded decision (resolver: agent, rule of the owner). |
+| 3 | What result keeps a role, and what result removes it? | answered: the role stays if the merged run is worse on fix rounds, traceability gaps or plan-change proposals; removing a role is the owner's decision; "worse" is Assumption A1, which the owner sets (spec D6, S6). |
 
 ## Links
 
@@ -49,6 +49,6 @@ The owner, when deciding how gabo should be shaped; it affects the cost and time
 | intent issue | [#497 I0022: Measure roles](https://github.com/testeos-z/gabo-ai/issues/497) (sub-issue of #492) |
 | PRD | [PRD](../../PRD.md), R21 |
 | skill | `.gabo/skills/gabo-cycle/SKILL.md` (trace, D17), `.gabo/skills/gabo-agent-templates/agents.yaml` (roles) |
-| spec | — (written when the owner picks this intent) |
+| spec | [spec](spec.md) |
 | plan | — |
-| related intent | 0020-spend-or-turn-cap-for-auto-mode; 0021-delegate-by-reason-not-by-default |
+| related intent | 0015-one-subagent-layer-on-every-engine (measurement protocol, S9: 0015/T1 and 0015/T12); 0020-spend-or-turn-cap-for-auto-mode; 0021-delegate-by-reason-not-by-default |
