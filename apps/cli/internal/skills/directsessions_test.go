@@ -152,24 +152,27 @@ func interveneSection(t *testing.T) string {
 	return inter
 }
 
-// Intent 0019 S5, D4 (plan T3): before the assistant closes a direct session it
-// persists what matters: a decision or answer reached in the session is posted
-// on the task issue through tasks as soon as it is reached, and a decision is
-// also saved through memory, so nothing that matters is left only in a session.
+// Intent 0019 S5, D4 (plan T3): the assistant persists what matters while the
+// session runs, not only at close: each decision or answer reached in the session
+// is appended to the task issue with log progress of tasks as soon as the
+// assistant learns of it, a decision is also saved through memory with every
+// field of the decision record, and a final sweep runs before close session, so
+// nothing that matters is left only in a session.
 func TestAssistantInterveneSavesWhatMattersBeforeClosing(t *testing.T) {
 	t.Parallel()
 	inter := interveneSection(t)
 	requireIn(t, "gabo-assistant Intervene persistence", inter, []string{
-		"post each decision or answer reached in the session as a comment on the task issue through the `tasks` adapter",
-		"post it as soon as it is reached, since a session that drops takes unposted answers with it",
-		"save each decision through the `memory` slot",
+		"each time `read state` or the owner's message shows a decision or answer reached in the session",
+		"append it to the task issue with `log progress` of the `tasks` adapter",
+		"as soon as you learn of it, since a session that drops takes unposted answers with it",
+		"a decision is also saved through the `memory` slot with every field of the decision record (`what`, `question`, `choice`, `reason`, `mode`, `wave`, `task` and `resolver`, see Questions by Mode)",
+		"sweep once more for anything not yet posted before you close it",
 		"Nothing that matters is left only in a session",
-		"persist before you run `close session`",
 	})
-	persistAt := strings.Index(inter, "persist before you run `close session`")
+	sweepAt := strings.Index(inter, "sweep once more for anything not yet posted")
 	closeAt := strings.Index(inter, "Then run `close session`")
-	if persistAt < 0 || closeAt < 0 || persistAt > closeAt {
-		t.Errorf("gabo-assistant Intervene: persistence must come before `close session` (persist at %d, close at %d)", persistAt, closeAt)
+	if sweepAt < 0 || closeAt < 0 || sweepAt > closeAt {
+		t.Errorf("gabo-assistant Intervene: the final sweep must come before `close session` (sweep at %d, close at %d)", sweepAt, closeAt)
 	}
 }
 
