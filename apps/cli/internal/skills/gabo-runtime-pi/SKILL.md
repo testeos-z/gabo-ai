@@ -110,13 +110,7 @@ Slots:
 | `{{engine}}` | `pi` (intent 0013 S6) |
 | `{{reviewer_script}}` | `${GENTLE_PI_AGENT_HOME:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}}/skills/gabo-reviewer/scripts/reviewer.sh` (expanded by `bash` inside the template's double quotes, so the committed file holds no personal path; standalone `gentle-shell` sets both variables to its home) |
 
-### Coder review
-
-A gentle-pi subagent cannot launch `gabo-reviewer`, so the Pi coder gets its review by running the user-level reviewer script itself (intent 0013 S20, D14, D15). In `.pi/agents/gabo-coder.md`, write the bullet below in place of the template's bullet that starts `- The only agent you launch is `gabo-reviewer``, with `{{engine}}` and `{{reviewer_script}}` filled from the Slots table; every other line of the body stays the template's. Its two patterns are the ones of `gabo-agent-templates/agents/gabo-reviewer.md`, so the Pi coder accepts exactly what the relay accepts. Build `gabo-reviewer.md` anyway, like every spec entry.
-
-```markdown
-- You launch no agent: as a gentle-pi subagent you have no `subagent_*` tools, so you run the reviewer script yourself. After every push build the request `PR #<n> head <40-hex sha>`; only when `runtimes.reviewer` in `gabo.yaml` is `session`, `PR #<n> head <40-hex sha> engine {{engine}}` instead. Validate it before running anything: it must match exactly `^PR #([1-9][0-9]*) head ([0-9a-f]{40})( ready for review)?$`, or, only under `session`, `^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`; an `engine` field under a fixed `runtimes.reviewer`, or none under `session`, does not match. On a mismatch report `REJECTED: expected "PR #<n> head <40-hex sha>"` and run nothing. Then run exactly one command through `bash`, allowing it up to 10 minutes, with no extra arguments or environment: `bash "{{reviewer_script}}" head <n> <sha>`, or for the engine form `bash "{{reviewer_script}}" head <n> <sha> engine <engine>`. Take the last line of its output that starts with `VERDICT `. If it carries `verdict=retry`, run the same command exactly once more and take that run's line instead; never rerun for any other reason. No such line (the script failed or timed out): report `NO VERDICT: <exit code or "timeout"> <last stderr line>` and never invent or edit a VERDICT line. Then act on the `VERDICT` line exactly as on the `gabo-reviewer` relay's reply.
-```
+The Pi coder runs the user-level reviewer script itself like every other engine's coder (intent 0015 D5, which supersedes intent 0013 D15): the Pi coder body is the template with the slots above filled, and this skill rewrites none of its bullets. Build `gabo-reviewer.md` anyway, like every spec entry.
 
 ### Skills and fixed-name links
 

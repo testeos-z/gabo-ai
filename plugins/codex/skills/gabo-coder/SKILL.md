@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. The cycle gives you the wave id, the task, the worktree, the branch and the mode; the worktree is `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, inside your wave's folder (intent 0013 S9, D6). Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
+Load in a `gabo-coder` subagent launched by the main session (the assistant that runs the `gabo-cycle` skill) for one task in one git worktree. The assistant gives you the wave id, the task, the worktree, the branch and the mode; the worktree is `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, inside your wave's folder (intent 0013 S9, D6). Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
 
 ## Hard Rules
 
@@ -16,10 +16,9 @@ Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git
 - Never post a comment, PR body or review containing the reviewer marker (`gbai-reviewer-bot`), even quoted: the reviewer posts with the same login and only its marker comment is the verdict.
 - Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Closes #<n>`. On a base that is not the default branch the keyword closes nothing; the Task Close does. Never force-push; delete only your own task branch, and only in the Task Close.
 - The PR body also holds one line `gabo check impact: <none, with the reason / updated in <file>>` (TRD 8.5): whether the change adds or alters something `gabo check` should verify (an agent file, a runtime skill, the neutral agent spec, a slot contract or a project file gabo writes) and where the check was updated, or why it needs no update.
-- After every push, request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`. Act on the `VERDICT` line it returns; the PR comment holds the findings.
-- Pi exception (intent 0013 S20, D14): On Pi (`gabo-engine: pi`) you run as a gentle-pi subagent with no `subagent_*` tools, so you cannot launch `gabo-reviewer`: validate the request and run the reviewer script yourself, exactly as your agent file says, and act on its `VERDICT` line as on the relay's reply; on every other engine you launch the `gabo-reviewer` subagent.
-- Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the reviewer refuses it.
-- Questions go back to the cycle in your outcome; never ask the owner directly.
+- After every push, run the user-level reviewer script yourself, exactly as your agent file says, and act on its `VERDICT` line; the request is exactly `PR #<n> head <40-hex pushed sha>` and the PR comment holds the findings.
+- Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the script refuses it.
+- Questions go back to the assistant in your outcome; never ask the owner directly.
 - You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
 
 ## Clean Worktree and Resources

@@ -76,3 +76,23 @@ func TestReviewerPlacementContractEngineField(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0015 S4 (plan T5): the coder is the caller of the reviewer
+// placement; no relay agent runs the scripts.
+func TestReviewerPlacementNamesTheCoderAsCaller(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]string{
+		"gabo-reviewer-placement-local":    "The coder runs the scripts itself",
+		"gabo-contract-reviewer-placement": "The coder that runs the review never reviews",
+	} {
+		doc := readCatalog(t, name+"/SKILL.md")
+		if !strings.Contains(doc, want) {
+			t.Errorf("%s/SKILL.md: missing %q", name, want)
+		}
+		for _, bad := range []string{"relaying agent", "agent relaying", "reviewer agent", "relay"} {
+			if strings.Contains(doc, bad) {
+				t.Errorf("%s/SKILL.md: still says %q", name, bad)
+			}
+		}
+	}
+}
