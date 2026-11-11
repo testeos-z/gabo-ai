@@ -310,6 +310,8 @@ func TestCycleResumeLaunchesANewCoderForAnUnresumableOne(t *testing.T) {
 		"when the PR is `CONFLICTING`, with the instruction to run the coder's `CONFLICTING` fix round (merge `origin/dev` into the task branch, never a rebase, never a force-push, resolve the conflict, run the task's checks, push, request a new review)",
 		"read the PR status and the latest reviewer comment and continue from them",
 		"When the worktree or the branch is already gone and the PR is merged, the new coder runs the Task Close from the main checkout (verify the merge through `repository_host`, close the issue with DONE via PR; nothing else to remove)",
+		"give it the main checkout path (your own working directory) in its input",
+		"the new coder recreates it in the main checkout with `git worktree add <worktree path> <branch>`",
 		"The new coder is the only writer of DONE",
 	})
 	coder := lineWith(t, doc, "The coder owns its task close")
