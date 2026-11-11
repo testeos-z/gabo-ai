@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0019-talk-to-cloud-agent-sessions](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-11 |
@@ -66,8 +66,8 @@ Not applicable: no stored data changes.
 
 | policy | conflict | resolution |
 |---|---|---|
-| `gabo-setup` step 1: "agents on different hosts never talk directly" | A session on another host is reached through `direct_sessions`. | resolved by scope: the rule is about agents' work traffic between themselves; this intent adds the owner's conversation with one agent through the assistant, which stays the single point of contact. When the owner accepts the spec, the sentence is amended to say agents never talk to each other directly across hosts, and the owner can reach a remote session through `direct_sessions` after authorizing it. |
-| TRD 9.1 row for `direct_sessions` ("open session in a worktree with a brief, send message, read state, close") | It does not say the handle may be a remote session reported by `agent_host`. | amended with the spec's acceptance: the row says send message and read state take any handle `agent_host` reports. A TRD convention change, decided by the owner's acceptance. |
+| `gabo-setup` step 1: "agents on different hosts never talk directly" | A session on another host is reached through `direct_sessions`. | resolved by scope: the rule is about agents' work traffic between themselves; this intent adds the owner's conversation with one agent through the assistant, which stays the single point of contact. The sentence is amended, accepted by the owner on 2026-11-11 with this spec, to say agents never talk to each other directly across hosts, and the owner can reach a remote session through `direct_sessions` after authorizing it; gabo-dev-lead writes the text in the plan. |
+| TRD 9.1 row for `direct_sessions` ("open session in a worktree with a brief, send message, read state, close") | It does not say the handle may be a remote session reported by `agent_host`. | amended with the spec's acceptance, accepted by the owner on 2026-11-11: the row says send message and read state take any handle `agent_host` reports. gabo-dev-lead writes the TRD text in the plan. A TRD convention change, decided by the owner's acceptance. |
 | PRD R14 and R18 (the assistant mediates by default; one Orca terminal opens by default) | A session on a server is a further terminal. | none: S7 keeps mediation by default and the owner's request as the trigger. |
 | `gabo-contract-agent-host` hard rule on authorization and R21 | `direct_sessions` reaches remote hosts. | none: S4 applies the same rule to the slot. |
 | TRD line 104 (direct sessions depend on Orca in the first release) | Other tools are named. | none: D3 keeps Orca as the first and only adapter built. |
@@ -90,3 +90,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-11 | Accepted by the owner as the spec stands in PR #498, with its recorded decisions (resolver: agent, rule of the owner). Owner, verbatim: "ok, apruebo e l0018 y 0019" (this sentence accepts intents 0018 and 0019). Relayed unedited by the assistant from the owner's own message in the session of 2026-11-11; recorded by gabo-pm. The owner reviews the PR before it merges. No platform statement is in this spec; the owner has not decided that point. |
