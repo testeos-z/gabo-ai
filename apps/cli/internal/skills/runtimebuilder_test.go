@@ -1,6 +1,8 @@
 package skills
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -283,4 +285,96 @@ func TestRuntimeBuilderKeepsLaunchOutOfTheCapabilities(t *testing.T) {
 		"is an engine fact for the refusal and the probe, not a capability row",
 	)
 	mustLackIn(t, runtimeBuilder, doc, "the `subagents` row and the probe")
+}
+
+// intent 0017 S1, S2, PD2 (plan T3): step 7 names the engine pattern, stops
+// only on the three rejections gabo check gives a builder engine (the name,
+// the role and the skill), and runs gabo check for every other failure as
+// before. It no longer says the installed gabo accepts only the runtimes its
+// message lists.
+func TestRuntimeBuilderStopsOnlyOnTheThreeRejections(t *testing.T) {
+	t.Parallel()
+	step7 := runtimeBuilderLine(t, "7. **Check.**")
+	mustContainIn(t, runtimeBuilder+" step 7", step7,
+		"`^[a-z][a-z0-9-]*$`",
+		"lower case letters, digits and `-`, starting with a letter",
+		"the same name as in `gabo.yaml` and in `gabo-runtime-<engine>`",
+		"rejects the name as malformed",
+		"rejects the role (`runtimes.reviewer` accepts only `claude`, `codex`, `pi` and `opencode`)",
+		"rejects the skill (its message names `gabo-runtime-<engine>`)",
+		"keep the agent files and links, delete the stub, and write no runtime skill",
+		"fix every failure this build caused and rerun until it passes",
+	)
+	mustLackIn(t, runtimeBuilder+" step 7", step7,
+		"the installed gabo accepts only the runtimes its message lists")
+}
+
+// readRepoDoc returns a file of the repository, relative to its root.
+func readRepoDoc(t *testing.T, rel string) string {
+	t.Helper()
+	b, err := os.ReadFile(filepath.Join(repoRoot, rel))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+// lineStartingWith returns the first line of doc that starts with prefix,
+// or fails the test.
+func lineStartingWith(t *testing.T, name, doc, prefix string) string {
+	t.Helper()
+	for _, l := range strings.Split(doc, "\n") {
+		if strings.HasPrefix(l, prefix) {
+			return l
+		}
+	}
+	t.Fatalf("%s: no line starts with %q", name, prefix)
+	return ""
+}
+
+// intent 0017 S1, S3, PD6 (plan T3): the user docs say a builder engine is
+// accepted without a release. runtimes.coder and runtimes.assistant accept any
+// engine name of the pattern that has a valid runtime skill, runtimes.reviewer
+// accepts only the four engines, and no user doc still defers the flexible tier
+// to intent 0005.
+func TestUserDocsSayBuilderEnginesAreAccepted(t *testing.T) {
+	t.Parallel()
+	compat := readRepoDoc(t, "docs/compatibility.md")
+	_, accepted, ok := strings.Cut(compat, "- **Accepted engine names.**")
+	if !ok {
+		t.Fatal("docs/compatibility.md: no Accepted engine names bullet")
+	}
+	accepted, _, _ = strings.Cut(accepted, "\n- **")
+	mustContainIn(t, "docs/compatibility.md Accepted engine names", accepted,
+		"`^[a-z][a-z0-9-]*$`",
+		"`runtimes.coder` and `runtimes.assistant` also accept any other engine name of the pattern", "that has a valid runtime skill in `.gabo/skills/` or `.gabo/runtimes/`",
+		"with no Go change and no gabo-ai release",
+		"`runtimes.reviewer` accepts only `claude`, `codex`, `pi` and `opencode`",
+		"`✗ runtime <engine> has no runtime skill gabo-runtime-<engine>`",
+	)
+	mustLackIn(t, "docs/compatibility.md Accepted engine names", accepted, "I0005", "(#176)")
+
+	flexible := lineStartingWith(t, "docs/compatibility.md", compat, "- **Flexible**:")
+	mustContainIn(t, "docs/compatibility.md Flexible bullet", flexible,
+		"`gabo.yaml` accepts its name in `runtimes.coder` and `runtimes.assistant` once its runtime skill exists",
+		"and not in `runtimes.reviewer`")
+	mustLackIn(t, "docs/compatibility.md Flexible bullet", flexible, "does not accept such an engine name yet")
+
+	row := lineStartingWith(t, "docs/compatibility.md", compat, "| any other engine | flexible |")
+	mustContainIn(t, "docs/compatibility.md engine table row", row, "| any other engine | flexible | yes | yes | no |")
+	mustLackIn(t, "docs/compatibility.md engine table row", row, "planned")
+
+	readme := readRepoDoc(t, "README.md")
+	rrow := lineStartingWith(t, "README.md", readme, "| any other engine | flexible |")
+	mustContainIn(t, "README.md engine table row", rrow,
+		"`gabo.yaml` accepts its name in `runtimes.coder` and `runtimes.assistant` once `gabo-runtime-builder` has written its runtime skill",
+		"`runtimes.reviewer` takes only the four")
+	mustLackIn(t, "README.md engine table row", rrow, "planned", "I0005")
+
+	bullet := lineStartingWith(t, "README.md", readme, "- **Flexible tier.**")
+	mustContainIn(t, "README.md Flexible tier bullet", bullet,
+		"without a Go change or a release",
+		"`gabo.yaml` accepts its name in `runtimes.coder` and `runtimes.assistant` once its runtime skill exists",
+		"`runtimes.reviewer` accepts only the four")
+	mustLackIn(t, "README.md Flexible tier bullet", bullet, "I0005", "planned")
 }
