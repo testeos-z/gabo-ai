@@ -108,6 +108,9 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"opencode in every role":  with("runtimes: {coder: opencode, reviewer: opencode, assistant: opencode}"),
 		"assistant list":          with("runtimes: {coder: session, reviewer: pi, assistant: [claude, pi]}"),
 		"one-item assistant list": with("runtimes: {assistant: [opencode]}"),
+		"well-formed coder name":  with("runtimes: {coder: foo}"),
+		"well-formed assistant":   with("runtimes: {assistant: foo}"),
+		"well-formed assistants":  with("runtimes: {assistant: [claude, gpt]}"),
 		"reviewer session":        with("runtimes: {reviewer: session}"),
 		"claude reviewer env":     with("review: {pi_credential_env: ANTHROPIC_API_KEY}"),
 		"bot coder login":         with("coder: {login: 'gabo-coder[bot]'}"),
@@ -133,13 +136,14 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"missing review.checks":       string(without(t, "review.checks")),
 		"missing human_only_paths":    string(without(t, "review.human_only_paths")),
 		"unknown reviewer runtime":    with("runtimes: {reviewer: foo}"),
+		"malformed coder name":        with(`runtimes: {coder: "Foo Bar"}`),
+		"malformed assistant name":    with(`runtimes: {assistant: "foo bar"}`),
+		"malformed assistant in list": with(`runtimes: {assistant: [claude, "gpt 5"]}`),
 		"null parallelism":            with("parallelism: null"),
 		"null runtimes.coder":         with("runtimes: {coder: null}"),
 		"empty runtimes.coder":        with(`runtimes: {coder: ""}`),
-		"unknown runtime":             with("runtimes: {assistant: foo}"),
 		"empty assistant list":        with("runtimes: {assistant: []}"),
 		"duplicate assistant":         with("runtimes: {assistant: [pi, pi]}"),
-		"unknown assistant in list":   with("runtimes: {assistant: [claude, gpt]}"),
 		"session assistant":           with("runtimes: {assistant: session}"),
 		"session in assistant list":   with("runtimes: {assistant: [claude, session]}"),
 		"assistant mapping":           with("runtimes: {assistant: {engine: claude}}"),
@@ -323,10 +327,10 @@ func TestUserSchema(t *testing.T) {
 		}
 	}
 	for doc, key := range map[string]string{
-		"nickname: Leo\n":           "nickname",
-		"interaction_level: max\n":  "interaction_level",
-		"runtimes: {coder: foo}\n":  "runtimes.coder",
-		"users: {orca: {uid: 1}}\n": "users",
+		"nickname: Leo\n":                  "nickname",
+		"interaction_level: max\n":         "interaction_level",
+		"runtimes: {coder: \"Foo Bar\"}\n": "runtimes.coder",
+		"users: {orca: {uid: 1}}\n":        "users",
 	} {
 		err := ValidateSchema(SchemaUser, []byte(doc))
 		if err == nil || !strings.Contains(err.Error(), key) {
@@ -398,7 +402,7 @@ func walkSchema(s map[string]any, path string, fn func(string, map[string]any)) 
 func TestLoadLayersValidatesEveryLayerAgainstItsSchema(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gabo/config.yaml": "runtimes: {coder: foo}\n",
+		"/home/o/.config/gabo/config.yaml": "runtimes: {coder: \"Foo Bar\"}\n",
 		"/src/p/gabo.yaml":                 minimal,
 	}
 	_, err := LoadLayers(r, twoLayers())
@@ -452,20 +456,19 @@ func TestSchemaRuntimeRefusalsAreOneLine(t *testing.T) {
 	t.Parallel()
 	const oldEnum = ": value must be one of 'claude', 'codex', 'pi', 'opencode', <nil>"
 	for name, tt := range map[string]struct{ doc, key, want string }{
-		"empty list":       {"runtimes: {assistant: []}", "runtimes.assistant", "runtimes.assistant: minItems: got 0, want 1"},
-		"duplicate":        {"runtimes: {assistant: [pi, pi]}", "runtimes.assistant", "runtimes.assistant: items at 0 and 1 are equal"},
-		"unknown in list":  {"runtimes: {assistant: [claude, gpt]}", "runtimes.assistant", "runtimes.assistant.1: value must be one of 'claude', 'codex', 'pi', 'opencode'"},
-		"session":          {"runtimes: {assistant: session}", "runtimes.assistant", "runtimes.assistant" + oldEnum},
-		"scalar assistant": {"runtimes: {assistant: foo}", "runtimes.assistant", "runtimes.assistant" + oldEnum},
-		"scalar coder":     {"runtimes: {coder: foo}", "runtimes.coder", "runtimes.coder" + oldEnum},
-		"scalar reviewer":  {"runtimes: {reviewer: foo}", "runtimes.reviewer", "runtimes.reviewer" + oldEnum},
+		"empty list":        {"runtimes: {assistant: []}", "runtimes.assistant", "runtimes.assistant: minItems: got 0, want 1"},
+		"duplicate":         {"runtimes: {assistant: [pi, pi]}", "runtimes.assistant", "runtimes.assistant: items at 0 and 1 are equal"},
+		"malformed in list": {`runtimes: {assistant: [claude, "gpt 5"]}`, "runtimes.assistant", "runtimes.assistant.1: 'gpt 5' does not match pattern '^[a-z][a-z0-9-]*$'"},
+		"session":           {"runtimes: {assistant: session}", "runtimes.assistant", "runtimes.assistant: 'not' failed"},
+		"malformed scalar":  {`runtimes: {assistant: "Foo Bar"}`, "runtimes.assistant", "runtimes.assistant: 'Foo Bar' does not match pattern '^[a-z][a-z0-9-]*$'"},
+		"scalar reviewer":   {"runtimes: {reviewer: foo}", "runtimes.reviewer", "runtimes.reviewer" + oldEnum},
 	} {
 		err := ValidateSchema(SchemaLayer, []byte(tt.doc))
 		if got := linesNaming(err, tt.key); len(got) != 1 || got[0] != tt.want {
 			t.Errorf("%s: lines naming %s = %q, want [%q]", name, tt.key, got, tt.want)
 		}
 	}
-	for _, doc := range []string{"runtimes: {coder: session, reviewer: session, assistant: [codex, opencode]}", "runtimes: {assistant: null}"} {
+	for _, doc := range []string{"runtimes: {coder: session, reviewer: session, assistant: [codex, opencode]}", "runtimes: {assistant: null}", "runtimes: {coder: foo, assistant: [claude, foo]}"} {
 		if err := ValidateSchema(SchemaLayer, []byte(doc)); err != nil {
 			t.Errorf("%s: error = %v, want valid", doc, err)
 		}
