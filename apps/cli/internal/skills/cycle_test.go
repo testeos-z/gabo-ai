@@ -307,8 +307,8 @@ func TestCycleResumeLaunchesANewCoderForAnUnresumableOne(t *testing.T) {
 		"a coder handle that cannot be resumed (no transcript after a session close or restart)",
 		"launch a new `gabo-coder` on the ledger worktree and branch with the same input as a first launch (task, worktree path, branch, mode)",
 		"`PR #<n> merged` when `repository_host` shows the PR merged",
-		"the T15 fix round when the PR is `CONFLICTING`",
-		"the usual resume otherwise",
+		"when the PR is `CONFLICTING`, with the instruction to run the coder's `CONFLICTING` fix round (merge `origin/dev` into the task branch, never a rebase, never a force-push, resolve the conflict, run the task's checks, push, request a new review)",
+		"read the PR status and the latest reviewer comment and continue from them",
 		"When the worktree or the branch is already gone and the PR is merged, the new coder runs the Task Close from the main checkout (verify the merge through `repository_host`, close the issue with DONE via PR; nothing else to remove)",
 		"The new coder is the only writer of DONE",
 	})
@@ -328,12 +328,12 @@ func TestCycleSweepKeepsOpenTasks(t *testing.T) {
 	requireIn(t, "gabo-cycle sweep rule", sweep, []string{
 		"only for entries no coder could close, only after `repository_host` shows the PR merged",
 		"never removes the worktree or the branch of a task whose issue is still open, even when its PR is merged",
-		"it takes an entry only after its task is DONE or BLOCKED",
+		"it takes an entry only after its task is DONE or BLOCKED; a BLOCKED task's entries are swept only when its PR is merged, as before",
 	})
 	step7 := lineWith(t, doc, "7. The wave closes when")
 	requireIn(t, "gabo-cycle step 7", step7, []string{
 		"The wave closes when every task of that intent is DONE or BLOCKED",
-		"skip the entries of a task whose issue is still open",
+		"skip the entries of a task that is neither DONE nor BLOCKED",
 	})
 }
 

@@ -243,14 +243,15 @@ func TestAssistantReplacesACoderThatCannotBeResumed(t *testing.T) {
 	merge := lineWith(t, doc, "After every merge the coder did not see itself")
 	requireIn(t, "gabo-assistant merge rule", merge, []string{
 		"resume the owning coder by its handle (wave report or ledger) with `PR #<n> merged` so it closes its task (D23)",
-		"If it cannot be resumed (no transcript after a session close or restart), launch a new `gabo-coder` on the ledger worktree and branch (`gabo-cycle` step 3) with `PR #<n> merged`; it closes the task, and you never write DONE",
+		"If it cannot be resumed (no transcript after a session close or restart), launch a new `gabo-coder` on the ledger worktree and branch (`gabo-cycle` step 3) with `PR #<n> merged`, only while this session holds the intent",
+		"when another session holds it or nobody does, launch nothing and report the task and the holder to the owner. The new coder closes the task, and you never write DONE",
 	})
 	if strings.Contains(merge, "the task stays open") || strings.Contains(merge, "leave its resources to the `gabo-cycle` fallback sweep") {
 		t.Errorf("gabo-assistant merge rule still leaves the task open: %q", merge)
 	}
 	resume := lineWith(t, doc, "5. **Resume from the traces.**")
 	requireIn(t, "gabo-assistant Intervene resume", resume, []string{
-		"A coder that cannot be resumed is replaced by a new `gabo-coder` as in Hard Rules",
+		"A coder that cannot be resumed is replaced by a new `gabo-coder` as in Hard Rules, under the same holder condition",
 	})
 	if strings.Contains(resume, "is reported to the owner") {
 		t.Errorf("gabo-assistant Intervene resume still only reports it: %q", resume)
