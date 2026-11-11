@@ -118,6 +118,8 @@ func TestSyncConfigValidatesRemoteNamesBeforeGh(t *testing.T) {
 	requireAll(t, syncConfig(t), []string{
 		"[A-Za-z0-9._-]+",
 		"`..`",
+		"`.`",
+		"subdirectory",
 		"its own argument",
 	})
 }
