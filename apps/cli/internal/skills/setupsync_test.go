@@ -342,3 +342,185 @@ func TestSyncConfigReadsTheLocalProfile(t *testing.T) {
 		"Read the profile `profile.yaml`", "normal setup", "write nothing",
 	})
 }
+
+// lineTokens returns the backtick-quoted tokens of the first line of sec that
+// holds marker. A missing marker is reported and yields nil.
+func lineTokens(t *testing.T, sec, marker string) []string {
+	t.Helper()
+	for _, line := range strings.Split(sec, "\n") {
+		if !strings.Contains(line, marker) {
+			continue
+		}
+		var out []string
+		for _, m := range regexp.MustCompile("`([^`]+)`").FindAllStringSubmatch(line, -1) {
+			out = append(out, m[1])
+		}
+		return out
+	}
+	t.Errorf("%s ## Sync config: no line with %q", setupSkill, marker)
+	return nil
+}
+
+// sameList reports whether two token lists hold the same tokens in order.
+func sameList(a, b []string) bool {
+	return strings.Join(a, "\n") == strings.Join(b, "\n")
+}
+
+// Intent 0018 S4: the proposal holds exactly the work-style keys, in the
+// order the spec lists them, and no other key of the source.
+func TestSyncProposalKeysAreExactlyTheS4Keys(t *testing.T) {
+	t.Parallel()
+	got := lineTokens(t, syncStep(t, 5), "exactly these (S4):")
+	want := []string{
+		"mode", "runtimes.coder", "runtimes.reviewer", "runtimes.assistant",
+		"slots.<name>.adapter", "parallelism", "wave.after", "plan_change.scope",
+		"plan_change.global_without_owner", "review.auto_merge", "reviewer.placement",
+	}
+	if !sameList(got, want) {
+		t.Errorf("%s step 5: the S4 keys are %q, want exactly %q", setupSkill, got, want)
+	}
+	requireAll(t, syncStep(t, 5), []string{"No other key of the source is proposed."})
+}
+
+// Intent 0018 D4: the generic review.human_only_paths entries are exactly the
+// seven the plan fixes; any other entry of the source is asked, not proposed.
+func TestSyncProposalHumanOnlyPathsAreExactlyTheGenericEntries(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 5)
+	got := lineTokens(t, step, "D4) are exactly these:")
+	want := []string{"gabo.yaml", ".github/", "AGENTS.md", "CLAUDE.md", ".claude/", ".codex/", ".agents/"}
+	if !sameList(got, want) {
+		t.Errorf("%s step 5: the generic human-only entries are %q, want exactly %q", setupSkill, got, want)
+	}
+	requireAll(t, step, []string{
+		"Any other entry of the source (for example `plugins/`) is asked about, one question at a time, and is not proposed.",
+	})
+}
+
+// Intent 0018 D5 and S4: the proposal is one diff against the target
+// gabo.yaml, with a status per key, and it marks the autonomy keys.
+func TestSyncProposalIsOneDiffWithStatusesAndAutonomyMarks(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 5)
+	requireAll(t, step, []string{
+		"compared with the target `gabo.yaml`, and show it as one diff.",
+		"one table with the columns `key`, `target`, `source` and `status`",
+		"`same` when the values are equal",
+		"`differs` when they are not",
+		"`added` when the target lacks the key",
+		"The status column says autonomy for the autonomy keys.",
+	})
+	got := lineTokens(t, step, "Autonomy keys (marked in the diff):")
+	want := []string{"mode", "review.auto_merge", "plan_change.global_without_owner"}
+	if !sameList(got, want) {
+		t.Errorf("%s step 5: the autonomy keys are %q, want exactly %q", setupSkill, got, want)
+	}
+}
+
+// Intent 0018 S4 and D5: the target value is kept unless the owner picks the
+// source value, and the owner can drop any key from the diff.
+func TestSyncKeepsTheTargetValueUnlessTheOwnerPicksTheSource(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncStep(t, 5), []string{
+		"The target value stays by default.",
+		"The source value replaces it only when the owner picks the source value for that key in step 6;",
+	})
+	requireAll(t, syncStep(t, 6), []string{
+		"pick the source value for a `differs` key",
+		"drop any key",
+	})
+}
+
+// Intent 0018 S4: no write happens before the owner confirms the diff; the
+// proposal writes nothing, and in step 6 the confirmation comes before the
+// first call of gabo-config-writer.
+func TestSyncWritesNothingBeforeTheOwnerConfirms(t *testing.T) {
+	t.Parallel()
+	propose := syncStep(t, 5)
+	if strings.Contains(propose, "gabo-config-writer") {
+		t.Errorf("%s step 5: the proposal must not call gabo-config-writer", setupSkill)
+	}
+	requireAll(t, propose, []string{"Writes nothing in this step."})
+
+	apply := syncStep(t, 6)
+	answer := strings.Index(apply, "Write nothing before that answer;")
+	writer := strings.Index(apply, "gabo-config-writer")
+	if answer < 0 || writer < 0 || answer > writer {
+		t.Errorf("%s step 6: the owner's answer must gate the first gabo-config-writer call (answer at %d, writer at %d)", setupSkill, answer, writer)
+	}
+	requireAll(t, apply, []string{
+		"a dropped or declined key is not written",
+		"through `gabo-config-writer`",
+		"its minimal edit, then `gabo check` before the next key",
+		"the writer's recorded-decision path applies to each value",
+		"reported as unverified",
+	})
+}
+
+// Intent 0018 S5: the repository-specific and personal keys are never copied.
+func TestSyncNeverCopiesRepositorySpecificOrPersonalKeys(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 5)
+	got := lineTokens(t, step, "Never copied (S5):")
+	want := []string{
+		"repo.name", "repo.integration_branch", "review.checks", "review.check_env",
+		"developers", "worktree.keep", "alias", "language", "tone", "interaction_level",
+	}
+	if !sameList(got, want) {
+		t.Errorf("%s step 5: the never-copied keys are %q, want exactly %q", setupSkill, got, want)
+	}
+	requireAll(t, step, []string{
+		"a slot adapter path",
+		"`repo.name` is detected from the target's git remote",
+		"or asked",
+		"The other repository-specific keys are asked one at a time, as step 1 asks them.",
+	})
+}
+
+// Intent 0018 D4 and PD4: an adapter is copied by its skill name and resolved
+// in the target, asking the owner when the target has no such adapter.
+func TestSyncCopiesAdapterNamesAndResolvesThemInTheTarget(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncStep(t, 5), []string{
+		"the source names an adapter by its skill name.",
+		"In the target it resolves to `.gabo/skills/<name>/SKILL.md` when that file exists;",
+		"otherwise the skill asks the owner which adapter the target uses for that slot, one question.",
+	})
+}
+
+// Intent 0018 S6 and PD5: a secret-like key or value stops the sync; the
+// refusal names the key path only, and the rule is the one PD5 defines.
+func TestSyncRefusesSecretLikeKeysAndValuesByKeyPath(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 5)
+	gotKeys := lineTokens(t, step, "Secret-like key (PD5)")
+	wantKeys := []string{"token", "secret", "password", "passwd", "credential", "api_key", "_key", "_env", "_login", "login"}
+	if !sameList(gotKeys, wantKeys) {
+		t.Errorf("%s step 5: the secret-like key rule is %q, want exactly %q", setupSkill, gotKeys, wantKeys)
+	}
+	gotValues := lineTokens(t, step, "Secret-like value (PD5):")
+	wantValues := []string{"ghp_", "gho_", "github_pat_", "sk-", "xox", "AKIA", "eyJ"}
+	if !sameList(gotValues, wantValues) {
+		t.Errorf("%s step 5: the secret-like value prefixes are %q, want exactly %q", setupSkill, gotValues, wantValues)
+	}
+	requireAll(t, step, []string{
+		"Every key and value of the source is checked for these before the proposal is built.",
+		"name the key path only, never the value, and write nothing",
+	})
+}
+
+// The plugins/codex copy of the setup skill is identical to the embedded one.
+func TestSyncSetupSkillMirrorIsIdentical(t *testing.T) {
+	t.Parallel()
+	a, err := os.ReadFile("gabo-setup/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile("../../../../plugins/codex/skills/gabo-setup/SKILL.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(a) != string(b) {
+		t.Errorf("plugins/codex/skills/gabo-setup/SKILL.md differs from apps/cli/internal/skills/gabo-setup/SKILL.md")
+	}
+}
