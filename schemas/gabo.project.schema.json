@@ -42,12 +42,12 @@
           }
         },
         "runtimes": {
-          "description": "Agent runtime per role: coder and reviewer take one engine or session (the role runs in the main session, valid only with assistant set); assistant takes one engine or a non-empty list of distinct engines.",
+          "description": "Agent runtime per role: coder takes one engine name or session (the role runs in the main session, valid only with assistant set); reviewer takes one of the four reviewer engines or session; assistant takes one engine name or a non-empty list of distinct engine names.",
           "type": ["object", "null"],
           "additionalProperties": false,
           "properties": {
             "coder": { "$ref": "#/$defs/roleRuntime" },
-            "reviewer": { "$ref": "#/$defs/roleRuntime" },
+            "reviewer": { "$ref": "#/$defs/reviewerRuntime" },
             "assistant": { "$ref": "#/$defs/assistant" }
           }
         },
@@ -249,16 +249,30 @@
       ]
     },
     "engine": {
-      "enum": ["claude", "codex", "pi", "opencode"]
+      "description": "An engine name (intent 0017 D2): lower case letters, digits and '-', starting with a letter. Any such name is accepted here; gabo check then needs its runtime skill. session is not an engine.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "not": { "const": "session" },
+      "examples": ["claude", "codex", "pi", "opencode"]
     },
     "runtime": {
-      "enum": ["claude", "codex", "pi", "opencode", null]
+      "description": "One engine name or null (missing). session is not an engine.",
+      "type": ["string", "null"],
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "not": { "const": "session" },
+      "examples": ["claude", "codex", "pi", "opencode"]
     },
     "roleRuntime": {
       "$comment": "if/then/else keeps one refusal line per bad value, the single-value line of 0.2.10.",
       "if": { "const": "session" },
       "then": true,
       "else": { "$ref": "#/$defs/runtime" }
+    },
+    "reviewerRuntime": {
+      "$comment": "The reviewer runs only the engines the reviewer scripts run (TRD D27, intent 0017 D3); session runs it in the main session.",
+      "if": { "const": "session" },
+      "then": true,
+      "else": { "enum": ["claude", "codex", "pi", "opencode", null] }
     },
     "assistant": {
       "$comment": "if/then/else keeps one refusal line per bad value, the single-value line of 0.2.10.",

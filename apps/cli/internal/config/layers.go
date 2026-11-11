@@ -204,6 +204,11 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 		if l.Name == LayerProject {
 			res.Warnings = append(res.Warnings, dropPersonalKeys(doc, l.Path)...)
 		}
+		// Engine names get their own lines first, as in Parse (intent 0017
+		// S3, S6), so gabo check prints the same refusal for a bad name.
+		if err := layerRuntimeNames(doc); err != nil {
+			return res, &FileError{File: l.Path, Err: err}
+		}
 		// Each layer is checked against its schema on its own, so a bad
 		// value fails in the file that holds it even when a higher layer
 		// overrides it. Personal keys are already gone from the project layer.
@@ -239,6 +244,30 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 	}
 	res.Config = cfg
 	return res, nil
+}
+
+// layerRuntimeNames runs the engine-name rules of runtimes on one layer. The
+// names need no other key, so a layer can be judged alone. An absent or null
+// value is not a name (missing keys are judged on the merged result), and a
+// shape the decoder refuses is left to the schema line.
+func layerRuntimeNames(doc map[string]any) error {
+	raw, ok := doc["runtimes"]
+	if !ok || raw == nil {
+		return nil
+	}
+	b, err := yaml.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var rt Runtimes
+	if err := yaml.Unmarshal(b, &rt); err != nil {
+		return nil
+	}
+	var errs []error
+	for _, e := range (Config{Runtimes: rt}).runtimeNameErrors() {
+		errs = append(errs, fmt.Errorf("%s: %s", e.field, e.msg))
+	}
+	return errors.Join(errs...)
 }
 
 // validateLayer validates one decoded layer: the user file against the user

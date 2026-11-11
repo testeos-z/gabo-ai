@@ -77,7 +77,7 @@ func TestParseValidationErrors(t *testing.T) {
 		want string
 	}{
 		{"bad repo", strings.Replace(minimal, "cappy-lab/vulcam", "vulcam", 1), "repo.name"},
-		{"bad runtime", with("runtimes:\n  coder: foo\n"), "runtimes.coder"},
+		{"bad runtime", with("runtimes:\n  coder: \"Foo Bar\"\n"), "runtimes.coder"},
 		{"relative state dir", with("review:\n  state_dir: state\n"), "review.state_dir"},
 		{"unknown field", minimal + "extra: 1\n", "extra"},
 	}
@@ -313,8 +313,8 @@ func TestParseRefusesBadAssistantList(t *testing.T) {
 			`runtimes.assistant: must list at least one engine; next: set one of "claude", "codex", "pi", "opencode" or a list of them`},
 		"duplicate": {"  coder: claude\n  reviewer: claude\n  assistant: [pi, pi]\n",
 			`runtimes.assistant: "pi" is listed more than once; next: list each engine once`},
-		"unknown engine": {"  coder: claude\n  reviewer: claude\n  assistant: [claude, gpt]\n",
-			`runtimes.assistant: entry "gpt" must be one of "claude", "codex", "pi", "opencode"; next: replace or remove it`},
+		"malformed engine": {"  coder: claude\n  reviewer: claude\n  assistant: [claude, \"gpt 5\"]\n",
+			`runtimes.assistant: entry "gpt 5" must be an engine name of lower case letters, digits and "-", starting with a letter; next: replace or remove it`},
 		"session": {"  coder: claude\n  reviewer: claude\n  assistant: session\n",
 			`runtimes.assistant: "session" is valid only in runtimes.coder and runtimes.reviewer; next: set the engine of the main session`},
 	} {
@@ -328,14 +328,18 @@ func TestParseRefusesBadAssistantList(t *testing.T) {
 // A single value keeps its 0.2.10 meaning and messages.
 func TestParseSingleValueMessagesUnchanged(t *testing.T) {
 	t.Parallel()
-	for _, role := range []string{"coder", "reviewer", "assistant"} {
-		_, err := Parse([]byte(strings.Replace(minimal, role+": claude", role+": foo", 1)))
-		want := `runtimes.` + role + `: must be one of "claude", "codex", "pi", "opencode", got "foo"`
+	for _, role := range []string{"coder", "assistant"} {
+		_, err := Parse([]byte(strings.Replace(minimal, role+": claude", role+`: "Foo Bar"`, 1)))
+		want := engineNameLine(role, "Foo Bar")
 		if got := linesNaming(err, "runtimes."+role); len(got) != 1 || got[0] != want {
-			t.Errorf("%s foo: lines = %q, want [%q]", role, got, want)
+			t.Errorf("%s Foo Bar: lines = %q, want [%q]", role, got, want)
 		}
 	}
-	_, err := Parse([]byte(strings.Replace(minimal, "assistant: claude", `assistant: ""`, 1)))
+	_, err := Parse([]byte(strings.Replace(minimal, "reviewer: claude", "reviewer: foo", 1)))
+	if got := linesNaming(err, "runtimes.reviewer"); len(got) != 1 || got[0] != reviewerLine("foo") {
+		t.Errorf("reviewer foo: lines = %q, want [%q]", got, reviewerLine("foo"))
+	}
+	_, err = Parse([]byte(strings.Replace(minimal, "assistant: claude", `assistant: ""`, 1)))
 	if got := linesNaming(err, "runtimes.assistant"); len(got) != 1 || got[0] != "✗ runtimes.assistant missing" {
 		t.Errorf(`assistant "": lines = %q, want the missing line`, got)
 	}

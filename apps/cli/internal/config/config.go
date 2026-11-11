@@ -30,8 +30,19 @@ const (
 // It names no engine, so runtimes.assistant refuses it.
 const RuntimeSession Runtime = "session"
 
-// runtimes lists every supported engine; each role accepts all of them.
-var runtimes = []Runtime{RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode}
+// reviewerEngines are the engines the reviewer scripts run (TRD D27). The
+// reviewer keeps this set whatever runtime skills exist (intent 0017 D3).
+var reviewerEngines = []Runtime{RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode}
+
+// engineNamePattern is an engine name (intent 0017 D2, PD2): lower case
+// letters, digits and "-", starting with a letter. Config accepts any name
+// that matches it, and gabo check then needs a runtime skill for it (intent
+// 0017 D1, D4). The schema's $defs/engine and $defs/runtime carry the same
+// expression, and a test runs one list of names through both.
+var engineNamePattern = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
+
+// engineNameRule names the rule of engineNamePattern in the refusal lines.
+const engineNameRule = `an engine name of lower case letters, digits and "-", starting with a letter`
 
 // RuntimeList is runtimes.assistant: one engine or a list of engines. A
 // scalar decodes to a one-item list; an absent, null or empty scalar to nil
@@ -237,46 +248,68 @@ func (c Config) Marshal() ([]byte, error) {
 	return b, nil
 }
 
-// engineChoice is the message part naming the four engines.
+// engineChoice is the message part naming the four reviewer engines.
 var engineChoice = fmt.Sprintf("%q, %q, %q, %q", RuntimeClaude, RuntimeCodex, RuntimePi, RuntimeOpencode)
 
 type fieldError struct{ field, msg string }
 
-// runtimeErrors validates the runtimes block (intent 0013 S1): a single
-// value keeps its 0.2.10 message; a list, session and the session rule get
-// their own message with the next step.
+// runtimeErrors validates the runtimes block (intent 0013 S1, intent 0017):
+// the name rules of runtimeNameErrors, then the rules that need the whole
+// block: session needs runtimes.assistant, and an assistant list is non-empty
+// and lists each engine once.
 func (c Config) runtimeErrors() []fieldError {
 	var errs []fieldError
 	fail := func(field, msg string) { errs = append(errs, fieldError{field, msg}) }
-	unknown := func(field string, r Runtime) {
-		fail(field, fmt.Sprintf("must be one of %s, got %q", engineChoice, r))
-	}
 	for _, role := range []struct {
 		field string
 		value Runtime
 	}{{"runtimes.coder", c.Runtimes.Coder}, {"runtimes.reviewer", c.Runtimes.Reviewer}} {
-		switch {
-		case role.value == RuntimeSession && c.Runtimes.Assistant == nil:
+		if role.value == RuntimeSession && c.Runtimes.Assistant == nil {
 			fail(role.field, fmt.Sprintf("%q is valid only with runtimes.assistant set; next: set runtimes.assistant or name an engine for %s", RuntimeSession, role.field))
-		case role.value != RuntimeSession && !slices.Contains(runtimes, role.value):
-			unknown(role.field, role.value)
 		}
 	}
+	errs = append(c.runtimeNameErrors(), errs...)
 	const field = "runtimes.assistant"
 	list := c.Runtimes.Assistant
 	if list != nil && len(list) == 0 {
 		fail(field, fmt.Sprintf("must list at least one engine; next: set one of %s or a list of them", engineChoice))
 	}
 	for i, r := range list {
+		if r == RuntimeSession || !engineNamePattern.MatchString(string(r)) {
+			continue
+		}
+		if slices.Index(list, r) < i && slices.Index(list[i+1:], r) < 0 {
+			fail(field, fmt.Sprintf("%q is listed more than once; next: list each engine once", r))
+		}
+	}
+	return errs
+}
+
+// runtimeNameErrors checks the engine names of runtimes.coder,
+// runtimes.reviewer and runtimes.assistant, one line per bad value, with the
+// rules of the role (intent 0017 S1, S3, S6). A missing (empty) value is not
+// a name here: missingKeys reports it. The check needs no other key, so the
+// loader runs it on each layer before the merge.
+func (c Config) runtimeNameErrors() []fieldError {
+	var errs []fieldError
+	fail := func(field, msg string) { errs = append(errs, fieldError{field, msg}) }
+	if r := c.Runtimes.Coder; r != "" && r != RuntimeSession && !engineNamePattern.MatchString(string(r)) {
+		fail("runtimes.coder", fmt.Sprintf("must be %s, got %q", engineNameRule, r))
+	}
+	if r := c.Runtimes.Reviewer; r != "" && r != RuntimeSession && !slices.Contains(reviewerEngines, r) {
+		fail("runtimes.reviewer", fmt.Sprintf("must be one of %s, got %q; next: set one of them (the reviewer scripts run only these engines) or ask your agent to configure the reviewer with gabo-reviewer-config", engineChoice, r))
+	}
+	const field = "runtimes.assistant"
+	list := c.Runtimes.Assistant
+	for _, r := range list {
 		switch {
 		case r == RuntimeSession:
 			fail(field, fmt.Sprintf("%q is valid only in runtimes.coder and runtimes.reviewer; next: set the engine of the main session", RuntimeSession))
-		case !slices.Contains(runtimes, r) && len(list) == 1:
-			unknown(field, r)
-		case !slices.Contains(runtimes, r):
-			fail(field, fmt.Sprintf("entry %q must be one of %s; next: replace or remove it", r, engineChoice))
-		case slices.Index(list, r) < i && slices.Index(list[i+1:], r) < 0:
-			fail(field, fmt.Sprintf("%q is listed more than once; next: list each engine once", r))
+		case engineNamePattern.MatchString(string(r)):
+		case len(list) == 1:
+			fail(field, fmt.Sprintf("must be %s, got %q", engineNameRule, r))
+		default:
+			fail(field, fmt.Sprintf("entry %q must be %s; next: replace or remove it", r, engineNameRule))
 		}
 	}
 	return errs
