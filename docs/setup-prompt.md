@@ -76,6 +76,18 @@ Both are user-supplied adapters: gabo-ai ships none for them. Setup records only
 
 `gabo check` passes and each slot is reported as verified, or unverified with the failing operation and a question for you. Your project then holds a short global context under `docs/product/` (a conceptual PRD, a conventions-only TRD with the stack you chose, an optional `DESIGN.md` and `MIGRATIONS.md`, and an empty `intents/` folder), and `wave.after` says whether a finished wave takes the next accepted intent or waits (the default). Each change starts as an intent, created through `gabo-pm`, and you accept its spec before a wave runs it. The agent lists the files it changed (`gabo.yaml`, `.gabo/`, adapters, agent folders, `docs/product/`) for you to commit. After a gabo upgrade, run `gabo init` again and ask your agent to rebuild the agents, then rerun `gabo check`.
 
+## Sync config
+
+Once a project is set up, you can ask your agent to sync the work-style config, by saying "sync config" (or "poll-config"), instead of answering every setup question again. The agent applies no value you did not confirm.
+
+1. **Source.** The agent asks "local or remote?" and pre-selects local: it says "I will use the local profile; say remote to use another repository; Enter or ok keeps local." Enter or ok means local.
+2. **Local.** It reads `profile.yaml` in your user config folder (`$XDG_CONFIG_HOME/gabo/profile.yaml` when that variable is an absolute path, else `~/.config/gabo/profile.yaml`). If there is none, it says so and offers the remote source or the normal setup.
+3. **Remote.** You name another repository, by local path or by GitHub URL. The agent reads only its `gabo.yaml`, read-only, without cloning, and stores nothing from it.
+4. **Report and propose.** It shows one diff of the work-style keys against your `gabo.yaml`: `mode`, the runtimes, the adapter names, `parallelism`, `wave.after`, the plan-change and review keys, `reviewer.placement` and the generic human-only paths. The agent never copies repository-specific keys (`repo.name`, `repo.integration_branch`, `review.checks`, `developers`, `worktree.keep`) or personal keys; it asks for them. A secret-like key or value stops the sync and is named by its key path only.
+5. **Apply.** You confirm the diff, drop any key, or pick the source value for a key that differs. Only then does the agent write, through `gabo-config-writer`, one key at a time with `gabo check` after each.
+6. **Finish setup.** After a write, the agent runs `gabo init` when `.gabo/skills/` is missing or the runtimes changed, then builds the agents, runs `gabo check` until it passes and runs the slot smoke test. None is skipped; a slot whose smoke test did not run is reported as unverified.
+7. **Save the profile.** When you ask, the agent saves the work-style keys of this repository as `profile.yaml`, the same file step 2 reads. Only the work-style keys are saved, with adapter names instead of paths and never a secret. If a profile already exists, the agent shows the difference first and writes nothing without your yes.
+
 ## Prompt
 
 <!-- gabo-setup-prompt:begin -->
