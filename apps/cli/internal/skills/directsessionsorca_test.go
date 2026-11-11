@@ -22,7 +22,7 @@ func TestDirectSessionsOrcaTakesTheTwoHandleFields(t *testing.T) {
 	sectionRequire(t, "## Handle", contractSection(doc, "## Handle"), []string{
 		"A handle has two named fields, `host` and `handle`, never one joined string.",
 		"`host` is `local` for the local host, the literal that `gabo-contract-direct-sessions` names; it adds no `--environment`.",
-		"A remote `host` is the Orca environment name that `agent_host` reports for where the session runs (`report where agents run`: reached through Orca environment)",
+		"A remote `host` is the Orca environment name that `agent_host` reports for where the session runs: `gabo-agent-host-railway-orca` returns it with the session handle.",
 		"The adapter reads that name from the env var `GABO_ORCA_ENVIRONMENT` and never a secret value",
 		"`handle` is the terminal handle that Orca returned for the session.",
 	})
@@ -126,5 +126,23 @@ func TestDirectSessionsOrcaCloseRefusesSessionsItDidNotOpen(t *testing.T) {
 	sectionRequire(t, "### close session", contractSection(doc, "### close session"), []string{
 		"Closes only a handle this slot opened on the local host and recorded in the wave ledger.",
 		"For any other handle, including every remote `host`, refuse and name `stop agent session` of the host that reported it",
+	})
+}
+
+// Intent 0019 S2, PD3 (plan T2): the host name a remote handle carries is the one
+// the agent_host adapter returns, so the mapping is pinned on both sides: the
+// Railway Output Contract returns the Orca environment name with each session's
+// handle, and this adapter names that same name as the remote host.
+func TestDirectSessionsOrcaHostNameMatchesTheRailwayOutput(t *testing.T) {
+	t.Parallel()
+	railway := readCatalog(t, agentHostRailway)
+	requireIn(t, agentHostRailway, contractSection(railway, "## Output Contract"), []string{
+		"Return the host (Railway service id and Orca environment name), each session's handle,",
+	})
+	doc := readCatalog(t, directSessions)
+	requireIn(t, directSessions, contractSection(doc, "## Handle"), []string{
+		"the Orca environment name that `agent_host` reports",
+		"`gabo-agent-host-railway-orca` returns it with the session handle.",
+		"The adapter reads that name from the env var `GABO_ORCA_ENVIRONMENT`",
 	})
 }

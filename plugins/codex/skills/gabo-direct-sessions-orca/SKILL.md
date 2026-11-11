@@ -8,7 +8,7 @@ metadata:
 ---
 ## Activation Contract
 
-Use when the owner or the assistant opens, drives, reads or closes a direct session. This adapter fills the `direct_sessions` slot contract (`gabo-contract-direct-sessions`, TRD 9.1; R14, R18, US-005) with the Orca CLI: one named Orca terminal per session running the agent CLI of the resolved coder engine (`claude` or `pi`, see Engine Resolution), driven through the terminal handle Orca returns. `send message` and `read state` also reach an Orca terminal session that `agent_host` started on a remote Orca host, through its `host` and `handle` fields (see Handle). Point `slots.direct_sessions.adapter` at this skill's `SKILL.md`. Verified against Orca CLI 1.4.227 (`orca <command> --help`); on that CLI `orca terminal show --help` and `orca terminal read --help` list `--environment`.
+Use when the owner or the assistant opens, drives, reads or closes a direct session. This adapter fills the `direct_sessions` slot contract (`gabo-contract-direct-sessions`, TRD 9.1; R14, R18, US-005) with the Orca CLI: one named Orca terminal per session running the agent CLI of the resolved coder engine (`claude` or `pi`, see Engine Resolution), driven through the terminal handle Orca returns. `send message` and `read state` also reach an Orca terminal session that `agent_host` started on a remote Orca host, through its `host` and `handle` fields (see Handle). Point `slots.direct_sessions.adapter` at this skill's `SKILL.md`. Verified against Orca CLI 1.4.227 (`orca <command> --help`); on that CLI `orca terminal show --help`, `orca terminal read --help` and `orca terminal send --help` list `--environment`.
 
 ## Hard Rules
 
@@ -25,7 +25,7 @@ Use when the owner or the assistant opens, drives, reads or closes a direct sess
 
 - A handle has two named fields, `host` and `handle`, never one joined string.
 - `host` is `local` for the local host, the literal that `gabo-contract-direct-sessions` names; it adds no `--environment`.
-- A remote `host` is the Orca environment name that `agent_host` reports for where the session runs (`report where agents run`: reached through Orca environment). The adapter reads that name from the env var `GABO_ORCA_ENVIRONMENT` and never a secret value.
+- A remote `host` is the Orca environment name that `agent_host` reports for where the session runs: `gabo-agent-host-railway-orca` returns it with the session handle. The adapter reads that name from the env var `GABO_ORCA_ENVIRONMENT` and never a secret value. The caller records the `host` with the handle when it starts the session, since `start agent session` prints the handle; the name is the one its Output Contract returns.
 - `handle` is the terminal handle that Orca returned for the session.
 - This adapter drives Orca terminals only: a session that `gabo-agent-host-local` started is a background process with a pid and a session id, not an Orca terminal, so its handle is not reachable through this adapter and is refused before any `orca` command. Its `report where agents run` names the machine's hostname, which is an unknown host here.
 - A `host` that is neither `local` nor the Orca environment in `GABO_ORCA_ENVIRONMENT` is an unknown host: it is refused before any `orca` command, and nothing is sent or read.
