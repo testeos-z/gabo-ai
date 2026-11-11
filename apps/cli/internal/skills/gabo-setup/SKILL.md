@@ -81,7 +81,7 @@ Run after a gabo upgrade (TRD 9.4), or when `gabo check` prints one of these lin
 
 ## Sync config
 
-Run when the owner asks to sync the config ("sync config", or "poll-config", the owner's own name for the same sync). It reads a work-style source (the keys the owner keeps the same across repositories, S4), never a repository the owner did not name, and writes nothing in steps 1 to 4; steps 5 and 6 propose and apply the keys.
+Run when the owner asks to sync the config ("sync config", or "poll-config", the owner's own name for the same sync). It reads a work-style source (the keys the owner keeps the same across repositories, S4), never a repository the owner did not name, and writes nothing in steps 1 to 4; steps 5 and 6 propose and apply the keys, step 7 finishes setup and step 8 saves the profile.
 
 1. **Source.** Ask one question at a time: "local or remote?", with local pre-selected and announced in one sentence: "I will use the local profile; say remote to use another repository; Enter or ok keeps local." Enter or ok means local. Remote means another repository; ask for it in step 3.
 2. **Local.** Read the profile `profile.yaml` in the user config folder: `$XDG_CONFIG_HOME/gabo/profile.yaml` when `XDG_CONFIG_HOME` is an absolute path, else `~/.config/gabo/profile.yaml` (the user file's path rule). `profile.yaml` is its own file in the same folder as `config.yaml`, not a config layer, and the save step of this mode (T3 #501) writes it. If it is missing, report `no profile at <path>`, offer the remote source or the normal setup above, and write nothing.
@@ -109,6 +109,19 @@ Run when the owner asks to sync the config ("sync config", or "poll-config", the
    - `repo.name` is detected from the target's git remote (`git remote get-url origin`) or asked. The other repository-specific keys are asked one at a time, as step 1 asks them.
    - Adapter names (PD4): the source names an adapter by its skill name. In the target it resolves to `.gabo/skills/<name>/SKILL.md` when that file exists; otherwise the skill asks the owner which adapter the target uses for that slot, one question.
 6. **Apply.** Show the diff and wait for the owner's answer: confirm it, drop any key, or pick the source value for a `differs` key. Write nothing before that answer; a dropped or declined key is not written. Then, for each confirmed key in turn, write it through `gabo-config-writer`: its minimal edit, then `gabo check` before the next key. In auto mode (`mode` in the target) the writer's recorded-decision path applies to each value. A write that does not show up is reported as unverified.
+7. **Finish setup.** Run after the apply step writes at least one key, so a sync never leaves the engines or the checks behind the config. Do the rest of setup as it is written above, by reference, and none is skipped:
+   - `gabo init` first when `.gabo/skills/` is missing or `runtimes.*` changed by the sync; it never touches `gabo.yaml` or the user file.
+   - Then setup's step 4 (the agent build for each engine of the engine set, through each runtime skill), setup's step 5 (`gabo check` until it passes) and setup's step 6 (the slot smoke test of each configured slot).
+   - A slot whose smoke test did not run is reported as `unverified`; the sync never claims it verified.
+8. **Save the profile.** Run when the owner asks to save this style as the local profile, after a sync or on a configured repository, whose `gabo.yaml` is then the source. The profile is `profile.yaml` at the profile path of step 2: its own file, never a config layer.
+   - Saved keys (S4): `mode`, `runtimes.coder`, `runtimes.reviewer`, `runtimes.assistant`, `slots.<name>.adapter`, `parallelism`, `wave.after`, `plan_change.scope`, `plan_change.global_without_owner`, `review.auto_merge`, `reviewer.placement`. Only these keys of the configured repository's config file are read, with their values, under the same key paths. No other key of the target is saved.
+   - Never saved (S5): the keys of the **Never copied (S5)** list of step 5, and any personal key.
+   - `slots.<name>.adapter` is saved as the adapter's skill name, the folder name of `.gabo/skills/<name>/SKILL.md`, never a path; an adapter outside the catalog has no portable name, so the skill asks the owner for the skill name, one question, or leaves the key out.
+   - Secret check (S6): the secret-like key and value rules (PD5) of step 5 run on every saved key and value before the profile is built; a match writes nothing and names the key path only, never the value.
+   - The saved keys are checked against `gabo.project.schema.json` before anything is written; a refused key is not saved and is named by its key path.
+   - If the profile already exists, show the difference first, as a table with the columns `key`, `profile`, `new` and `status`, marking each differing key. Write nothing without the owner's yes. A key the owner does not confirm keeps its value in the profile.
+   - **Write the profile:** with the rules of `gabo-config-writer`: a minimal YAML edit, owner values only, no secret, keys outside the schemas refused, and that skill writes only the two config files, so this step applies its rules to the profile itself. `gabo check` does not read the profile, so the save runs no `gabo check`; a `gabo.yaml` write by this mode still runs it, as step 6 does.
+   - Read the profile back. A write that does not show up is reported as unverified.
 
 ## Output Contract
 

@@ -509,6 +509,158 @@ func TestSyncRefusesSecretLikeKeysAndValuesByKeyPath(t *testing.T) {
 	})
 }
 
+// Intent 0018 S7 and D3: step 7 finishes setup after a sync that wrote a key;
+// it runs gabo init first when the catalog is missing or runtimes changed,
+// then setup's steps 4, 5 and 6 in that order, skipping none.
+func TestSyncFinishRunsInitAndTheRestOfSetupInOrder(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 7)
+	requireAll(t, step, []string{
+		"after the apply step writes at least one key",
+		"`gabo init` first when `.gabo/skills/` is missing or `runtimes.*` changed",
+		"the agent build for each engine of the engine set",
+		"none is skipped",
+		"reported as `unverified`",
+	})
+	marks := []string{"`gabo init` first", "setup's step 4", "setup's step 5", "setup's step 6"}
+	last := -1
+	for _, m := range marks {
+		at := strings.Index(step, m)
+		if at < 0 || at < last {
+			t.Errorf("%s step 7: %q missing or out of order", setupSkill, m)
+			return
+		}
+		last = at
+	}
+}
+
+// Intent 0018 S7 and D3: step 8 saves the style of a configured repository, or
+// of the sync that just ran, as the local profile. It writes the profile at the
+// path of step 2 and spells no second copy of the path rule.
+func TestSyncSaveWritesTheProfileAtTheStepTwoPath(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 8)
+	requireAll(t, step, []string{
+		"save this style as the local profile",
+		"the profile path of step 2",
+	})
+	if strings.Contains(step, "gabo/profile.yaml") {
+		t.Errorf("%s step 8: the profile path is spelled again; it must reference step 2", setupSkill)
+	}
+}
+
+// Intent 0018 S7 and D4: the saved keys are exactly the S4 keys of step 5, in
+// the same order, and no other key of the target is saved.
+func TestSyncSaveKeysAreExactlyTheS4Keys(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 8)
+	got := lineTokens(t, step, "Saved keys (S4):")
+	want := []string{
+		"mode", "runtimes.coder", "runtimes.reviewer", "runtimes.assistant",
+		"slots.<name>.adapter", "parallelism", "wave.after", "plan_change.scope",
+		"plan_change.global_without_owner", "review.auto_merge", "reviewer.placement",
+	}
+	if !sameList(got, want) {
+		t.Errorf("%s step 8: the saved keys are %q, want exactly %q", setupSkill, got, want)
+	}
+	s5 := lineTokens(t, syncStep(t, 5), "exactly these (S4):")
+	if !sameList(got, s5) {
+		t.Errorf("%s step 8: the saved keys %q differ from the proposal keys of step 5 %q", setupSkill, got, s5)
+	}
+	requireAll(t, step, []string{"No other key of the target is saved."})
+}
+
+// Intent 0018 S5 and S6: the save never writes a repository-specific, personal
+// or secret-like key; the PD5 rules of step 5 run on every saved key and value
+// before the profile is built, and a match writes nothing.
+func TestSyncSaveNeverWritesRepositorySpecificPersonalOrSecretKeys(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 8)
+	requireAll(t, step, []string{
+		"Never saved (S5): the keys of the **Never copied (S5)** list of step 5",
+		"the secret-like key and value rules (PD5) of step 5 run on every saved key and value before the profile is built",
+		"a match writes nothing and names the key path only, never the value",
+	})
+}
+
+// Intent 0018 PD4: a saved adapter is its skill name, never a path; an adapter
+// outside the catalog has no portable name, so the owner is asked for it.
+func TestSyncSaveAdapterIsASkillNameNeverAPath(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncStep(t, 8), []string{
+		"`slots.<name>.adapter` is saved as the adapter's skill name, the folder name of `.gabo/skills/<name>/SKILL.md`, never a path",
+		"asks the owner for the skill name, one question, or leaves the key out",
+	})
+}
+
+// Intent 0018 D3: the saved keys are checked against gabo.project.schema.json
+// before the profile is written.
+func TestSyncSaveValidatesAgainstTheProjectSchemaBeforeWriting(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 8)
+	schema := strings.Index(step, "`gabo.project.schema.json`")
+	write := strings.Index(step, "Write the profile")
+	if schema < 0 || write < 0 || write < schema {
+		t.Errorf("%s step 8: the keys must be checked against `gabo.project.schema.json` before the profile is written (schema at %d, write at %d)", setupSkill, schema, write)
+	}
+}
+
+// Intent 0018 S7: an existing profile is never overwritten without the owner's
+// yes; the diff is shown first and nothing is written before that answer.
+func TestSyncSaveExistingProfileGatesTheWrite(t *testing.T) {
+	t.Parallel()
+	step := syncStep(t, 8)
+	requireAll(t, step, []string{
+		"If the profile already exists, show the difference first, as a table with the columns `key`, `profile`, `new` and `status`",
+		"Write nothing without the owner's yes.",
+	})
+	gate := strings.Index(step, "Write nothing without the owner's yes.")
+	write := strings.Index(step, "Write the profile")
+	if gate < 0 || write < 0 || write < gate {
+		t.Errorf("%s step 8: the owner's yes must gate the write (gate at %d, write at %d)", setupSkill, gate, write)
+	}
+}
+
+// Intent 0018 D3 and S6: the profile is written with the writer's rules; the
+// writer itself keeps writing only the two config files, and gabo check does
+// not read the profile. The written profile is read back.
+func TestSyncSaveUsesTheWriterRulesAndReadsItBack(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncStep(t, 8), []string{
+		"the rules of `gabo-config-writer`: a minimal YAML edit, owner values only, no secret, keys outside the schemas refused",
+		"that skill writes only the two config files",
+		"`gabo check` does not read the profile, so the save runs no `gabo check`",
+		"Read the profile back",
+		"reported as unverified",
+	})
+}
+
+// Intent 0018 T3: docs/setup-prompt.md describes the mode in a section outside
+// the embedded prompt block, which TestPublishedPromptMatchesEmbedded keeps
+// byte-identical.
+func TestSyncModeIsDocumentedOutsideThePromptBlock(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile("../../../../docs/setup-prompt.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := string(b)
+	const begin = "<!-- gabo-setup-prompt:begin -->"
+	heading := strings.Index(doc, "\n## Sync config\n")
+	block := strings.Index(doc, begin)
+	if heading < 0 || block < 0 || heading > block {
+		t.Fatalf("docs/setup-prompt.md: want a ## Sync config section before the prompt block (heading at %d, block at %d)", heading, block)
+	}
+	sec := doc[heading:block]
+	requireAll(t, sec, []string{
+		"local or remote",
+		"Enter or ok keeps local",
+		"`profile.yaml`",
+		"Save",
+		"never copies",
+	})
+}
+
 // The plugins/codex copy of the setup skill is identical to the embedded one.
 func TestSyncSetupSkillMirrorIsIdentical(t *testing.T) {
 	t.Parallel()
