@@ -10,7 +10,7 @@ import (
 // reads it fails on its own.
 func syncConfig(t *testing.T) string {
 	t.Helper()
-	_, sec, ok := strings.Cut(setupDoc(t), "## Sync config")
+	_, sec, ok := strings.Cut(setupDoc(t), "\n## Sync config")
 	if !ok {
 		t.Errorf("%s: no ## Sync config section", setupSkill)
 		return ""
@@ -122,4 +122,67 @@ func TestSyncConfigValidatesRemoteNamesBeforeGh(t *testing.T) {
 		"subdirectory",
 		"its own argument",
 	})
+}
+
+// hardRules returns the ## Hard Rules section of the setup skill.
+func hardRules(t *testing.T) string {
+	t.Helper()
+	_, sec, ok := strings.Cut(setupDoc(t), "## Hard Rules")
+	if !ok {
+		t.Errorf("%s: no ## Hard Rules section", setupSkill)
+		return ""
+	}
+	sec, _, _ = strings.Cut(sec, "\n## ")
+	return sec
+}
+
+// Intent 0018 S1 and D2: the owner-answer rule of Hard Rules has exactly one
+// explicit exception, the sync source default; the sync question shows local
+// as its default, and nothing applies until the owner confirms the diff.
+func TestSyncConfigDefaultIsTheOneExceptionToTheOwnerAnswerRule(t *testing.T) {
+	t.Parallel()
+	requireAll(t, hardRules(t), []string{
+		"Apply no value without the owner's answer.",
+		"The one explicit exception is the sync source default (the Sync config section, step 1)",
+		"local is taken when the owner does not answer",
+		"because it is read-only and nothing applies until the owner confirms the diff",
+	})
+	requireAll(t, syncConfig(t), []string{
+		"\"local or remote? (default: local)\"",
+		"local is the source when the owner does not answer",
+		"one question at a time",
+	})
+}
+
+// Intent 0018 D3: the profile path is the absolute $XDG_CONFIG_HOME/gabo/profile.yaml
+// when that variable is an absolute path, else ~/.config/gabo/profile.yaml.
+func TestSyncConfigPinsTheProfilePathRule(t *testing.T) {
+	t.Parallel()
+	requireAll(t, syncConfig(t), []string{
+		"the user config folder: `$XDG_CONFIG_HOME/gabo/profile.yaml` when `XDG_CONFIG_HOME` is an absolute path, else `~/.config/gabo/profile.yaml`",
+	})
+}
+
+// Intent 0018 S3: the GitHub URL forms are one list of exact forms; any other
+// URL is refused, and the ref split of a slash-containing ref is defined once.
+func TestSyncConfigNamesTheAcceptedURLFormsInOneList(t *testing.T) {
+	t.Parallel()
+	sec := syncConfig(t)
+	requireAll(t, sec, []string{
+		"the accepted forms are exactly these three",
+		"`https://github.com/<owner>/<repo>` (the default branch)",
+		"`https://github.com/<owner>/<repo>/blob/<ref>/gabo.yaml`",
+		"`https://github.com/<owner>/<repo>/tree/<ref>/gabo.yaml`",
+		"any other URL is refused and read nothing",
+		"`<ref>` is the text between `/blob/` or `/tree/` and the final `/gabo.yaml`",
+		"one path segment",
+		"`/blob/feat/x/gabo.yaml` has the ref `feat/x`",
+		"is refused: the owner names that branch through a local path",
+		"adding `?ref=<ref>` only when the URL names a branch",
+	})
+	for _, old := range []string{"[A-Za-z0-9._/-]+", "(or `/tree/<ref>`)"} {
+		if strings.Contains(sec, old) {
+			t.Errorf("%s ## Sync config: contradictory URL rule still present: %q", setupSkill, old)
+		}
+	}
 }
