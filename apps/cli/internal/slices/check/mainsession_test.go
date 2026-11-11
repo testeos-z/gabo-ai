@@ -196,10 +196,12 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 			p[claudeKeys] = file(strings.Replace(claudeKeysJSON, "{", "{\n  \"agent\": [\"<a>\"],", 1))
 		}, [][2]string{{`✗ .claude/settings.json: agent is ["<a>"], not "gabo-assistant"`, changeKey("agent", claudeKeys)}}},
 		{"claude nothing", "claude", func(_ *testing.T, p fstest.MapFS) {
-			delete(p, claudeLink)
+			for _, sk := range []string{"gabo-assistant", "gabo-cycle", "gabo-wave-report"} {
+				delete(p, ".claude/skills/"+sk)
+			}
 			delete(p, claudeAgent)
 			p[claudeKeys] = file(claudeKeysJSON)
-		}, [][2]string{line(claudeLink, "missing", "claude"), line(claudeAgent, "missing", "claude"), key(claudeKeys, "missing", "claude", "agent")}},
+		}, [][2]string{line(claudeLink, "missing", "claude"), line(".claude/skills/gabo-cycle", "missing", "claude"), line(".claude/skills/gabo-wave-report", "missing", "claude"), line(claudeAgent, "missing", "claude"), key(claudeKeys, "missing", "claude", "agent")}},
 		{"opencode agent file and key", "opencode", func(t *testing.T, p fstest.MapFS) {
 			delete(p, ocAgent)
 			p[ocConfig] = file(readTestdata(t, "opencode.jsonc"))
@@ -219,9 +221,11 @@ func TestMainSessionEntryPiecesFail(t *testing.T) {
 		{"codex block", "codex", func(_ *testing.T, p fstest.MapFS) { p["AGENTS.md"] = file("# Project\n") },
 			[][2]string{line("AGENTS.md", "incomplete", "codex")}},
 		{"codex nothing", "codex", func(_ *testing.T, p fstest.MapFS) {
-			delete(p, sharedLink)
+			for _, sk := range []string{"gabo-assistant", "gabo-cycle", "gabo-wave-report"} {
+				delete(p, ".agents/skills/"+sk)
+			}
 			delete(p, "AGENTS.md")
-		}, [][2]string{line(sharedLink, "missing", "codex"), line("AGENTS.override.md or AGENTS.md", "missing", "codex")}},
+		}, [][2]string{line(sharedLink, "missing", "codex"), line(".agents/skills/gabo-cycle", "missing", "codex"), line(".agents/skills/gabo-wave-report", "missing", "codex"), line("AGENTS.override.md or AGENTS.md", "missing", "codex")}},
 		// The block must be in the first existing file of the order.
 		{"codex block below an override", "codex", func(_ *testing.T, p fstest.MapFS) { p["AGENTS.override.md"] = file("# Local\n") },
 			[][2]string{line("AGENTS.override.md", "incomplete", "codex")}},
@@ -300,6 +304,8 @@ func TestMainSessionStaleEntriesFail(t *testing.T) {
 	wantEntryLines(t, r, "✗ AGENTS.md: gabo assistant entry for codex, but runtimes.assistant is claude")
 
 	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".agents/skills/gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[".agents/skills/gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	proj[".opencode/agents/gabo-assistant.md"] = file("---\nmode: primary\n---\n<!-- gabo-version: 1.2.3 -->\nbody\n")
 	proj["opencode.json"] = file(`{"default_agent": "gabo-assistant"}`)
 	proj["CLAUDE.md"] = file(block)
@@ -311,6 +317,8 @@ func TestMainSessionStaleEntriesFail(t *testing.T) {
 	// pieces keep the rebuild hint.
 	wantEntry(t, r,
 		[2]string{stale(".agents/skills/gabo-assistant", "codex"), NextRebuild},
+		[2]string{stale(".agents/skills/gabo-cycle", "codex"), NextRebuild},
+		[2]string{stale(".agents/skills/gabo-wave-report", "codex"), NextRebuild},
 		[2]string{stale("AGENTS.md", "codex"), NextRebuild},
 		[2]string{stale(".opencode/agents/gabo-assistant.md", "opencode"), NextRebuild},
 		[2]string{stale("opencode.json", "opencode"), initRemoves("default_agent", "opencode.json")},
