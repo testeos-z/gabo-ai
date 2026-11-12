@@ -1,8 +1,7 @@
 // Manifest, tarball and skill rules of the gabo Pi package
 // (intent 0003: S1, S3, S10, D1, D5, D6; plan tasks T4 and T5).
-import { afterAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const pkgDir = resolve(import.meta.dir, "..");
@@ -52,20 +51,14 @@ const contentLines = (text: string) =>
     .map((line) => line.trim())
     .filter((line) => /[\p{L}\p{N}]/u.test(line));
 
-const cache = mkdtempSync(join(tmpdir(), "gabo-pi-npm-cache-"));
-afterAll(() => rmSync(cache, { recursive: true, force: true }));
-
+// `bun pm pack --dry-run` prints one "packed <size> <path>" line per file.
 const packed = (): string[] => {
-  const run = Bun.spawnSync(["npm", "pack", "--dry-run", "--json"], {
-    cwd: pkgDir,
-    env: { ...process.env, npm_config_cache: cache, npm_config_update_notifier: "false" },
-  });
+  const run = Bun.spawnSync(["bun", "pm", "pack", "--dry-run"], { cwd: pkgDir });
   expect({ exitCode: run.exitCode, stderr: run.exitCode === 0 ? "" : run.stderr.toString() }).toEqual({
     exitCode: 0,
     stderr: "",
   });
-  const [result] = JSON.parse(run.stdout.toString());
-  return result.files.map((f: { path: string }) => f.path).sort();
+  return [...run.stdout.toString().matchAll(/^packed \S+ (.+)$/gm)].map((m) => m[1]).sort();
 };
 
 describe("package.json manifest (S1, D5, D6)", () => {
@@ -112,7 +105,7 @@ describe("package.json manifest (S1, D5, D6)", () => {
   });
 });
 
-describe("npm pack --dry-run (S1, D1)", () => {
+describe("bun pm pack --dry-run (S1, D1)", () => {
   test("holds package.json, the listed skills and extensions, and nothing else", () => {
     const files = packed();
     const listed = [
@@ -206,7 +199,7 @@ describe("gabo-reviewer-config skill (S10, S1, S3)", () => {
     expect(pkg.pi?.skills ?? []).toContain(`./skills/${reviewerConfig}`);
   });
 
-  test("npm pack holds every file of its catalog folder", () => {
+  test("bun pm pack holds every file of its catalog folder", () => {
     const files = packed();
     for (const file of filesUnder(source, `skills/${reviewerConfig}`)) expect(files).toContain(file);
     expect(files.filter((f) => f.split("/").includes("gabo-reviewer"))).toEqual([]);
