@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0024-mechanical-wave-steps-and-follow-up-fixes](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted (owner, 2026-11-12) |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-12 |
@@ -94,3 +94,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-12 | Accepted by the owner as the spec stands on dev (PR #665), with its recorded decisions, including the new script `scripts/wave-record.sh` of the `gabo-wave-report` skill. Owner, verbatim: "aprobada la spec" and, asked whether that meant the current version with the new script or a rewrite without new scripts, "tal como esta ahora con el script nuevop". Relayed unedited by the assistant from the owner's own messages in the session of 2026-11-12. |
