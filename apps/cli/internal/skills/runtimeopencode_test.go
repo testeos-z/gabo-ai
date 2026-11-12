@@ -105,7 +105,7 @@ func TestRuntimeOpenCodeCitesItsSources(t *testing.T) {
 		"https://opencode.ai/docs/permissions", "https://opencode.ai/docs/tools",
 		"https://opencode.ai/docs/config", "https://opencode.ai/docs/plugins",
 		"https://opencode.ai/docs/migrate-v1/", "https://opencode.ai/docs/build/plugins/migrate-v1",
-		"(binary)",
+		"(binary)", "`ctx.location.directory`",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("## Sources: missing %q", want)

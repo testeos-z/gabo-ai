@@ -111,7 +111,7 @@ const mod = await import(pluginPath);
 const def = mod.default;
 const out = { threw: false, message: "", warnings, id: def && def.id, setup: typeof (def && def.setup), hooks: [] };
 const handlers = {};
-const ctx = { location: { directory: process.cwd() }, tool: { hook(name, fn) { out.hooks.push(name); handlers[name] = fn; } } };
+const ctx = { location: { directory: process.env.SESSION_DIR }, tool: { hook(name, fn) { out.hooks.push(name); handlers[name] = fn; } } };
 await def.setup(ctx);
 const hook = handlers["execute.before"];
 if (hook) {
@@ -129,7 +129,7 @@ process.stdout.write(JSON.stringify(out));
 // $FAKE_GABO_OUT and exits with $FAKE_GABO_EXIT.
 const fakeGabo = `#!/bin/sh
 for a in "$@"; do printf '%s\n' "$a" >> "$FAKE_GABO_LOG"; done
-printf -- '--\n' >> "$FAKE_GABO_LOG"
+printf 'cwd=%s\n--\n' "$PWD" >> "$FAKE_GABO_LOG"
 printf '%s' "$FAKE_GABO_OUT"
 exit "$FAKE_GABO_EXIT"
 `
@@ -142,6 +142,7 @@ type stageGateRun struct {
 	Setup    string   `json:"setup"`
 	Hooks    []string `json:"hooks"`
 	calls    [][]string
+	cwds     []string
 }
 
 // runStageGate runs the plugin hook once under node for one tool call, with
@@ -172,8 +173,14 @@ func runStageGate(t *testing.T, node string, call map[string]any, withGabo bool,
 		t.Fatal(err)
 	}
 	cmd := exec.Command(node, driver, plugin, string(callJSON))
+	// The session directory differs from the process cwd, as after a session
+	// move: gabo must run in the session directory.
+	session := filepath.Join(dir, "session")
+	if err := os.Mkdir(session, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	cmd.Dir = dir
-	cmd.Env = []string{"PATH=" + bin, "HOME=" + dir, "FAKE_GABO_LOG=" + log, "FAKE_GABO_EXIT=" + exit, "FAKE_GABO_OUT=" + out}
+	cmd.Env = []string{"SESSION_DIR=" + session, "PATH=" + bin, "HOME=" + dir, "FAKE_GABO_LOG=" + log, "FAKE_GABO_EXIT=" + exit, "FAKE_GABO_OUT=" + out}
 	stdout, err := cmd.Output()
 	if err != nil {
 		var stderr string
@@ -198,6 +205,10 @@ func runStageGate(t *testing.T, node string, call map[string]any, withGabo bool,
 			if l == "--" {
 				r.calls = append(r.calls, cur)
 				cur = nil
+				continue
+			}
+			if v, ok := strings.CutPrefix(l, "cwd="); ok {
+				r.cwds = append(r.cwds, v)
 				continue
 			}
 			cur = append(cur, l)
@@ -256,6 +267,11 @@ func TestStageGatePluginRelaysWritesToGabo(t *testing.T) {
 			r := runStageGate(t, node, tc.call, tc.withGabo, tc.exit, tc.out)
 			if !slices.EqualFunc(r.calls, tc.wantCalls, slices.Equal) {
 				t.Errorf("gabo calls = %q, want %q", r.calls, tc.wantCalls)
+			}
+			for _, cwd := range r.cwds {
+				if filepath.Base(cwd) != "session" {
+					t.Errorf("gabo ran in %q, want the session directory (ctx.location.directory)", cwd)
+				}
 			}
 			if r.Threw != tc.wantThrow {
 				t.Errorf("threw = %v (message %q), want %v", r.Threw, r.Message, tc.wantThrow)

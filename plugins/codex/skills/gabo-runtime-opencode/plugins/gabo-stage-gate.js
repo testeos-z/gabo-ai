@@ -10,7 +10,7 @@
 //   1      -> the call fails before the write, with gabo's output (a hook
 //             blocks a call by throwing; the message reaches the model);
 //   other  -> the call runs and one warning is logged, as when gabo is not
-//             on PATH (gabo could not decide).
+//             on PATH or was killed by a signal (gabo could not decide).
 // Which paths block is gabo's decision; this file holds no rule.
 // A shell call that writes files is not gated (documented limit).
 
@@ -45,28 +45,39 @@ function warn(problem) {
   console.warn(`gabo stage-gate warning: gabo check --pre-write could not run (${problem}); the write is not gated`);
 }
 
+// Runs gabo without blocking OpenCode's event loop; resolves with the exit
+// status (null when a signal killed it) or the spawn error.
+function runGabo(spawn, paths, cwd) {
+  return new Promise((resolve) => {
+    const child = spawn("gabo", ["check", "--pre-write", ...paths], { cwd });
+    let out = "";
+    child.stdout.on("data", (d) => { out += d; });
+    child.stderr.on("data", (d) => { out += d; });
+    child.on("error", (error) => resolve({ error }));
+    child.on("close", (status) => resolve({ status, out }));
+  });
+}
+
 export default {
   id: "gabo-stage-gate",
   async setup(ctx) {
     // The runtime hands over its built-in child_process module; nothing is loaded from disk.
-    const { spawnSync } = process.getBuiltinModule("node:child_process");
+    const { spawn } = process.getBuiltinModule("node:child_process");
+    // `ctx.location.directory` is the project directory OpenCode started in.
+    const cwd = ctx.location?.directory ?? process.cwd();
     ctx.tool.hook("execute.before", async (event) => {
       if (!WRITE_TOOLS.has(event?.tool)) return;
       const paths = targetPaths(event.tool, event.input);
       if (paths.length === 0) return;
-      const result = spawnSync("gabo", ["check", "--pre-write", ...paths], {
-        cwd: ctx.location?.directory ?? process.cwd(),
-        encoding: "utf8",
-      });
+      const result = await runGabo(spawn, paths, cwd);
       if (result.error) {
         warn(result.error.code === "ENOENT" ? "gabo not found on PATH" : String(result.error.message ?? result.error));
         return;
       }
       if (result.status === 1) {
-        const text = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
-        throw new Error(text || "gabo check --pre-write blocked this write");
+        throw new Error(result.out.trim() || "gabo check --pre-write blocked this write");
       }
-      if (result.status !== 0) warn(`exit ${result.status}`);
+      if (result.status !== 0) warn(result.status === null ? "gabo was killed by a signal" : `exit ${result.status}`);
     });
   },
 };
