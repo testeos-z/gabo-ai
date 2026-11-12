@@ -19,7 +19,7 @@ bash "$s/reviewer.sh" preflight
 bash "$s/reviewer.sh" head <pr> <40-hex sha>
 ```
 
-Other modes: `due <pr> <sha>`, `list-due`, `once` (every due head, one at a time) and `prune`: it removes every `worktrees/pr-<n>` of the state dir whose PR is not open, and every one that is not the current PR's and has not been used for more than `REVIEWER_KEEP_DAYS` days, skipping a run in progress (its `pr-<n>.lock` is held) and logging a `WARN` for a path that is not a worktree of the reviewer's mirror. `head` runs it first and removes the `pr-<n>` worktree after a successful merge; a prune problem is logged and never changes a verdict. The last line of `head` is always:
+Other modes: `due <pr> <sha>`, `list-due`, `once` (every due head, one at a time) and `prune`: it removes every `worktrees/pr-<n>` of the state dir whose PR is not open, and every one that is not the current PR's and has not been used for more than `REVIEWER_KEEP_DAYS` days, skipping a run in progress (its `pr-<n>.lock` is held) and logging a `WARN` for a path that is not a worktree of the reviewer's mirror. `head` runs it first and removes the `pr-<n>` worktree after a successful merge; `prune` also keeps `cache/go-build`, `cache/go-mod` and `check-home` together under `REVIEWER_CACHE_MAX`: when over, it runs `go clean -cache` with the reviewer's own `GOCACHE`, removes the `check-home` files older than `REVIEWER_KEEP_DAYS` and prints one line `pruned: <what> (<size freed>)`; under the limit it prints nothing, and a review holds `cache.lock` shared while it runs and `prune` takes it exclusive without waiting, so it never trims under a running review (and warns when `cache/go-mod` alone keeps the total over the limit). A prune problem is logged and never changes a verdict. The last line of `head` is always:
 
 ```text
 VERDICT PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>
@@ -89,6 +89,7 @@ Script defaults: `scripts/config.env` (plain `KEY=value`, read as data, never ex
 | `REVIEWER_PI_MODEL`, `REVIEWER_CODEX_MODEL`, `REVIEWER_OPENCODE_MODEL` | the owner's default Pi, Codex and OpenCode models | Engine models |
 | `REVIEWER_MERGE_TRIES`, `REVIEWER_MERGE_DELAY` | `5`, `3` | Asks for GitHub's merge result |
 | `REVIEWER_KEEP_DAYS` | `7` | Days an open PR's `pr-<n>` worktree may stay unused before `prune` removes it |
+| `REVIEWER_CACHE_MAX` | `2G` | Size (K, M or G) `cache/go-build`, `cache/go-mod` and `check-home` may reach together before `prune` trims them |
 | `GABO_REVIEWER_STATE_DIR` | `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer` | Own mirror, base checkout, worktrees, caches, logs |
 
 Secrets go only in `${XDG_CONFIG_HOME:-~/.config}/gabo/reviewer.env` (mode 600, refused otherwise; override the path with `REVIEWER_ENV_FILE`): `CLAUDE_CODE_OAUTH_TOKEN` (optional; with it the review runs with an empty HOME, without it the owner's Claude Code login is used) and `REVIEWER_GH_TOKEN` (optional; else gh's stored login). Neither reaches the checks.

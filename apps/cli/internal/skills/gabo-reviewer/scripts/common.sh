@@ -141,6 +141,8 @@ DIFF_MAX_BYTES="${REVIEWER_DIFF_MAX_BYTES:-200000}"
 MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
 # Days an open PR's pr-<n> worktree may stay unused before prune removes it.
 KEEP_DAYS="${REVIEWER_KEEP_DAYS:-7}"
+# Size the Go caches and check-home may reach together before prune trims them.
+CACHE_MAX="${REVIEWER_CACHE_MAX:-2G}"
 MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
 REMOTE_URL="${REVIEWER_REMOTE_URL:-https://github.com/$REPO.git}"
 # The trusted install locations: the engine-neutral user-level copy (TRD 9.4)
@@ -736,6 +738,81 @@ prune_worktrees() {
     ! prune_one "$n" "$current" "$days" || removed=$((removed + 1))
   done
   ((removed == 0)) || log_event "PRUNED" "$removed pr-<n> worktree(s)" >/dev/null
+  return 0
+}
+
+# size_bytes <K|M|G number>: "2G", "512M", "100K" or plain bytes to bytes; empty
+# when it is not a size.
+size_bytes() {
+  local v="${1:-}" n u
+  [[ "$v" =~ ^([0-9]+)([KkMmGg]?)$ ]] || return 1
+  n="${BASH_REMATCH[1]}"
+  u="${BASH_REMATCH[2]}"
+  case "$u" in
+    K | k) echo $((n * 1024)) ;;
+    M | m) echo $((n * 1048576)) ;;
+    G | g) echo $((n * 1073741824)) ;;
+    *) echo "$n" ;;
+  esac
+}
+
+# human_bytes <bytes>: 1.5G, 12M, 340K.
+human_bytes() {
+  awk -v b="${1:-0}" 'BEGIN { if (b >= 1073741824) printf "%.1fG", b / 1073741824; else if (b >= 1048576) printf "%.1fM", b / 1048576; else printf "%dK", b / 1024 }'
+}
+
+# cache_bytes: size in bytes of cache/go-build, cache/go-mod and check-home
+# together.
+cache_bytes() {
+  local d total=0 b
+  for d in "$WORKDIR/cache/go-build" "$WORKDIR/cache/go-mod" "$WORKDIR/check-home"; do
+    [[ -d "$d" && ! -L "$d" ]] || continue
+    b="$(du -sb "$d" 2>/dev/null | cut -f1)"
+    total=$((total + ${b:-0}))
+  done
+  echo "$total"
+}
+
+# prune_caches: when cache/go-build, cache/go-mod and check-home together
+# exceed CACHE_MAX, runs `go clean -cache` with the reviewer's own GOCACHE and
+# removes the check-home files older than KEEP_DAYS (then its empty
+# directories), then prints one line `pruned: <what> (<size freed>)`. Under the
+# limit it does nothing and prints nothing. The checks of a review run under a
+# shared cache.lock (reviewer.sh, review_head); prune takes it exclusive
+# without waiting and skips when it is held, so it never trims while a review
+# runs and a review that starts meanwhile waits for it. Only paths under
+# $WORKDIR are touched. Best effort: every problem is logged and never changes
+# the exit code.
+prune_caches() {
+  local max days="$KEEP_DAYS" before line
+  max="$(size_bytes "$CACHE_MAX")" || { log_event "WARN" "prune: REVIEWER_CACHE_MAX '$CACHE_MAX' is not a size; caches not pruned" >/dev/null; return 0; }
+  [[ "$days" =~ ^[0-9]+$ ]] || days=7
+  before="$(cache_bytes)"
+  ((before > max)) || return 0
+  mkdir -p "$STATE/locks"
+  line="$(
+    exec 5>"$STATE/locks/cache.lock"
+    if ! flock -n -x 5; then
+      log_event "WARN" "prune: a review is in progress (cache.lock held); caches not pruned" >/dev/null
+      exit 0
+    fi
+    if ! command -v go >/dev/null 2>&1; then
+      log_event "WARN" "prune: go clean -cache failed (go not found)" >/dev/null
+    elif ! GOCACHE="$WORKDIR/cache/go-build" go clean -cache >/dev/null 2>&1; then
+      log_event "WARN" "prune: go clean -cache failed" >/dev/null
+    fi
+    if [[ -d "$WORKDIR/check-home" && ! -L "$WORKDIR/check-home" ]]; then
+      { find "$WORKDIR/check-home" -type f -mmin "+$((days * 1440))" -delete &&
+        find "$WORKDIR/check-home" -mindepth 1 -type d -empty -delete; } >/dev/null 2>&1 ||
+        log_event "WARN" "prune: could not trim check-home" >/dev/null
+    fi
+    after="$(cache_bytes)"
+    ((after <= max)) || log_event "WARN" "prune: caches still over REVIEWER_CACHE_MAX ($(human_bytes "$after")); go-mod is never trimmed" >/dev/null
+    ((after < before)) || exit 0
+    echo "pruned: go-build cache, check-home files older than $days days ($(human_bytes $((before - after))) freed)"
+  )" || true
+  [[ -z "$line" ]] || log_event "PRUNED" "${line#pruned: }" >/dev/null
+  [[ -z "$line" ]] || echo "$line"
   return 0
 }
 
