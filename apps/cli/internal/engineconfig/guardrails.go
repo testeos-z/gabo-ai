@@ -1,6 +1,9 @@
 package engineconfig
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // GuardrailsFile is the project file that turns on gentle-pi's autonomous
 // mode (intent 0023 S5, D4). It is project config: committed, so it applies
@@ -65,4 +68,39 @@ func guardWriteResult(b []byte) Result {
 // .pi/settings.json failure (S5).
 func guardFail(reason string) Result {
 	return Result{Section: Section{Lines: []string{FailurePrefix + " " + GuardrailsFile + ": " + reason + "; fix it and run gabo init again"}}}
+}
+
+// guardCheckLine is the gabo check warning while the guardrails file does not
+// turn autonomous mode on (intent 0023 S6). The report adds its "! " prefix.
+const guardCheckLine = GuardrailsFile + ": autonomousMode is not true (mode auto with pi); coders stop at git push unless GENTLE_PI_AUTONOMOUS_MODE=1 is set; next: run gabo init"
+
+// GuardrailsChecked reports whether gabo check reads the guardrails file: only
+// in mode auto with pi in set (S6). Any other project reads nothing.
+func GuardrailsChecked(mode string, set []string) bool {
+	return mode == ModeAuto && slices.Contains(set, Pi)
+}
+
+// GuardrailsCheck is the read rule of gabo check for the guardrails file (S6,
+// PD8). Where GuardrailsChecked holds, a missing file or one whose
+// autonomousMode is not true returns the warning line, and a file that is not
+// valid JSON returns the failure line; otherwise both are empty. It reads
+// Input.Files only and writes nothing; it shares the JSON scan with
+// Guardrails, so check and init agree on what autonomousMode true means.
+func GuardrailsCheck(set []string, in Input) (warning, failure string) {
+	if !GuardrailsChecked(in.Mode, set) {
+		return "", ""
+	}
+	data, ok := in.Files[GuardrailsFile]
+	if !ok {
+		return guardCheckLine, ""
+	}
+	if err := checkJSON(data); err != nil {
+		return "", FailurePrefix + " " + GuardrailsFile + ": invalid JSON (" + err.Error() + ")"
+	}
+	if obj, ok := scanTopObject(data); ok {
+		if m, found := obj.member(guardKey); found && strings.TrimSpace(string(data[m.start:m.end])) == "true" {
+			return "", ""
+		}
+	}
+	return guardCheckLine, ""
 }

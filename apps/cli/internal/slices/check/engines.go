@@ -34,12 +34,39 @@ var piMissingLine = engineconfig.FailurePrefix + " " + engineconfig.PiSettings +
 // that the project lacks, for the engines the runtime roles name (S11). It
 // only reads.
 func (u *UseCase) checkEngineKeys(r *Report, cfg config.Config) error {
-	lines, err := engineKeyFailures(u.project, engineconfig.Set(runtimesOf(cfg)...))
+	set := engineconfig.Set(runtimesOf(cfg)...)
+	lines, err := engineKeyFailures(u.project, set)
 	if err != nil {
 		return err
 	}
 	if len(lines) > 0 {
 		r.fail(lines...)
+	}
+	return u.checkGuardrails(r, string(cfg.Mode), set)
+}
+
+// checkGuardrails reads the Pi guardrails file in mode auto with pi listed
+// (intent 0023 S6): a missing file or autonomousMode not true warns and keeps
+// exit 0, invalid JSON fails. Any other project reads nothing, and the check
+// reads one file and writes nothing.
+func (u *UseCase) checkGuardrails(r *Report, mode string, set []string) error {
+	if !engineconfig.GuardrailsChecked(mode, set) {
+		return nil
+	}
+	in := engineconfig.Input{Files: map[string][]byte{}, Mode: mode}
+	b, err := fs.ReadFile(u.project, engineconfig.GuardrailsFile)
+	switch {
+	case err == nil:
+		in.Files[engineconfig.GuardrailsFile] = b
+	case !errors.Is(err, fs.ErrNotExist):
+		return fmt.Errorf("read %s: %w", engineconfig.GuardrailsFile, err)
+	}
+	warning, failure := engineconfig.GuardrailsCheck(set, in)
+	switch {
+	case failure != "":
+		r.fail(failure)
+	case warning != "":
+		r.warn(warning)
 	}
 	return nil
 }
