@@ -98,8 +98,8 @@ T5 recorded its results on [#581](https://github.com/testeos-z/gabo-ai/issues/58
 | (b) `wave.max_coders: 1` | Claude Code | PASS: paused report names `max_coders`, "continue" resumed, one reset line, second coder launched | 3,239,988 |
 | (c) `wave.max_fix_rounds: 1`, before T7 | Claude Code | Fail, not honored: a task took 2 fix rounds and went DONE, the wave never paused (PD14, fixed by T7) | not summed |
 | (c) `wave.max_fix_rounds: 1`, after T7 | Claude Code | PASS: coder stopped at the limit, wave paused, task stayed claimed and not BLOCKED, "continue" resumed with one reset line and the allowance restarted | 4,478,255 |
-| (a), (b), (c) and continue | OpenCode v2.2.6 | PASS: `steps: 3` read back; paused reports name each cap; "continue" resumed with one reset line and the cap counted from zero | (a) 1,553,565; (b) 3,893,246; (c) 4,220,767 |
-| (a), (b), (c) and continue | Codex (codex-cli 0.167.2) | PASS: no turn key built, the limit travels in the launch input and the coders stopped on it (advisory); paused reports, reset lines and resumes as expected | (a) 2,329,583; (b) 6,868,826; (c) 10,468,442 |
+| (a), (b), (c) and continue | OpenCode v2.2.6 | PASS: `steps: 3` read back; paused reports name each cap; "continue" resumed with one reset line and the cap counted from zero. Caveat: the rebuild session rewrote the working-tree `gabo.yaml`, a human-only path (finding 4) | (a) 1,553,565; (b) 3,893,246; (c) 4,220,767 |
+| (a), (b), (c) and continue | Codex (codex-cli 0.167.2) | PASS for the caps, with a gap on S4 wording: no turn key built, the limit travels in the launch input and the coders stopped on it (advisory); paused reports, reset lines and resumes worked, but the paused answers did not literally ask "continue or stop" (finding 6) | (a) 2,329,583; (b) 6,868,826; (c) 10,468,442 |
 | (a), (b), (c) | Pi 1.5.2 (gentle-pi 4.7.0) | not run: openai subscription usage limit (the only model the login accepts answered "Subscription Sharing usage limit"); a repeat after the reset is optional and does not block closing I0020 | not run |
 
 Spec engine table (S9, PD12): Claude Code, OpenCode and Codex confirmed with no difference; the Pi row is marked unconfirmed in `spec.md`.
@@ -125,7 +125,7 @@ Findings of the T5 comments on #581, for the owner. The numbers follow the comme
 | Changing `wave.max_coder_turns` needs a rebuild of the agents (TRD risks table); a stale built coder keeps the old `maxTurns`. | T3, T5 | The runtime skill text says so; the probe rebuilds before each run. |
 | No engine caps spend from inside a wave; an owner may read the caps as a spend limit. | T2, T4 | D1: the report and the setup text say spend is not capped by gabo, and name `--max-budget-usd` for Claude Code print mode. |
 | The Pi reading of the spec's table is partial. | T5, T6 | The probe records what Pi did; a difference is corrected in the spec's table by T6 (PD12). |
-| T7 edits the same skill files as T2 and T3 (merged), and the spec's engine table says `max_fix_rounds` is enforced by the cycle. | T7, T6 | T7 adds a new test file and changes no pinned string; T6 corrects the spec's table cells from the repeated probe (PD12, PD14). |
+| T7 edits the same skill files as T2 and T3 (merged), and the spec's engine table was read as saying `max_fix_rounds` is enforced by the cycle (the table has no such column; resolved by T6: coder-enforced, advisory, stated under the table). | T7, T6 | T7 adds a new test file and changes no pinned string; T6 states the enforcement under the spec's table (PD12, PD14). |
 | An engine is not installed where the probe runs. | T5 | `not run: <engine> unavailable` is recorded and reported; no result is invented. |
 | `plugins/codex/skills/<name>/` drifts from the catalog skill. | T2 to T4 | `codexplugin_test.go` names the first drifted path; each PR refreshes its copies. |
 
