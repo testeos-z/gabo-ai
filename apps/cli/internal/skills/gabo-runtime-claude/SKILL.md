@@ -128,9 +128,10 @@ Report each piece written, kept or removed, and each one left.
    | `{{methodology}}` | `gabo-methodology` |
    | `{{adapter:tasks}}`, `{{adapter:repository_host}}`, `{{adapter:memory}}` | `gabo-tasks`, `gabo-repository-host`, `gabo-memory` |
    | `{{reviewer_script}}` | `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/gabo-reviewer/scripts/reviewer.sh`, written literally: the shell expands it on each machine; filled in `gabo-coder`, the only template that carries the slot |
+   | `{{turn_limit_line}}` | with `wave.max_coder_turns` set: `Turn limit: <n> turns; stop at it and report STOPPED at turn limit.`; unset: remove the whole line; filled in `gabo-coder`, the only template that carries the slot |
 
    A slot whose link does not exist (its slot has no skill adapter) cannot be filled: skip that agent and report it.
-6. Write `.claude/agents/<id>.md`: the frontmatter below, then the filled body without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them (intent 0013 S6: the engine moves into the frontmatter, where `gabo check` reads it). Frontmatter keys, in this order and no others:
+6. Write `.claude/agents/<id>.md`: the frontmatter below, then the filled body without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them (intent 0013 S6: the engine moves into the frontmatter, where `gabo check` reads it). Frontmatter keys, in this order and no others, except the one `maxTurns` key of `gabo-coder`:
 
    ```yaml
    ---
@@ -140,12 +141,13 @@ Report each piece written, kept or removed, and each one left.
    skills:
      - <each spec skill, in spec order>
      - <each fixed-name link the body names: gabo-methodology, gabo-tasks, gabo-repository-host, gabo-memory, in this order>
+   maxTurns: <wave.max_coder_turns, gabo-coder only>
    gabo-version: <x.y.z, unquoted>
    gabo-engine: claude
    ---
    ```
 
-   Omit `skills` when the list is empty.
+   Omit `skills` when the list is empty. Write `maxTurns: <wave.max_coder_turns>` for `gabo-coder` only, after `skills` and before `gabo-version`, and omit it when `wave.max_coder_turns` is unset; no other agent gets the key. Claude Code stops the agent at that many turns and returns its partial output, which the cycle counts as stopped at the turn cap. A changed `wave.max_coder_turns` needs a rebuild of the agents: a stale built coder keeps the old `maxTurns`. `gabo check` does not read the key.
 7. Verify: run `claude plugin validate .claude/agents`, then `gabo check`, which also checks every link of steps 2 to 4. Fix every failure this skill caused and rerun until `gabo check` passes, except the `✗ agent <id> missing` lines of agents you skipped and reported in step 5; report any other failure.
 8. Probe, on every build. When `.claude/agents` or `.claude/skills` did not exist when this Claude Code session started (you created it in this build), the session cannot see the new agent or links: skip the probe, change nothing, and report `probe not run: restart Claude Code and rebuild`. Otherwise write `.claude/agents/gabo-probe.md` in the same format, with `tools: Bash`, `skills:` listing every fixed-name link made in step 3, and the body: run `git rev-parse --show-toplevel` once and reply with its output, then one line per preloaded skill with the name it was listed under and its first Markdown heading. launch it once from the main session, the way spec agents are launched, and expect that no agent launches another; then delete the file whatever the result. It passes when it ran the command and every link shows its adapter's heading. Only a probe that ran in such a session can fail a link. A link that does not preload: in `skills:` and in its slot fill, use the adapter's frontmatter `name` instead of the link name, rebuild the affected agents, repeat step 7 and probe once more; still failing, stop and report the link. A `gabo-probe.md` that this skill did not write: leave it and report it, and report the probe as not run.
 

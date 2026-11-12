@@ -17,7 +17,7 @@ import (
 var agentSlots = []string{
 	"id", "role", "gabo_version", engineSlot, "methodology",
 	"adapter:tasks", "adapter:repository_host", "adapter:memory",
-	"reviewer_script",
+	"reviewer_script", "turn_limit_line",
 }
 
 const versionLine = "gabo-version: {{gabo_version}}"
