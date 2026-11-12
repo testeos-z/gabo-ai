@@ -150,6 +150,8 @@ The three grants an unattended Pi wave needs are the owner's to give for the ses
 
 The grant is the owner's: gabo grants none of them and writes no permission to the user's engine config. The only file this skill writes under the agent home is the reviewer link above.
 
+gentle-pi asks before deleting a remote branch, even in autonomous mode, and the owner decides whether to allow it. A coder whose remote branch delete is asked or refused does not retry it: its Task Close lists the branch under `leftovers:` with the command for the owner (`gabo-coder`, Task Close step 4).
+
 ## Launching Agents
 
 On Pi the main session launches each coder as one first-level `subagent_run` of `gabo-coder` and resumes it with `subagent_continue`; the run id is the handle. No built agent launches another (intent 0015 S6, D7): the agent files carry no `subagent_*` tool.

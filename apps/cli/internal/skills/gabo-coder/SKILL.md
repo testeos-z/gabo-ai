@@ -53,7 +53,7 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. L
    - it is not in `worktree.keep` (`gabo.yaml`);
    - `git -C <wt> status --porcelain --ignored=matching`, run before any removal, shows only committed work and rebuildable output (removal deletes ignored files);
    - `git worktree remove <wt>` succeeds, never `--force`.
-4. Delete the branch through `repository_host` (delete branch). A refused branch goes under `leftovers:`.
+4. Delete the branch through `repository_host` (delete branch). A refused branch goes under `leftovers:`. When the engine asks about deleting the merged remote branch or refuses it, do not retry it by another route (no API call, no force push, no other delete): list it under `leftovers:` as `merged remote branch left (<reason>)` with the exact command `git push origin --delete <branch>` for the owner, and the task still closes (step 2 unchanged). A delete that succeeds leaves no leftover.
 5. Containers stay: the cycle removes them from the ledger.
 
 ## Output Contract
@@ -71,7 +71,7 @@ The outcome to the cycle (TRD 9.2) holds, in this order:
 DONE carries the close report: merged SHA, issue closed (verified or not), worktree removed or left, local and remote branch deleted or left. Then always:
 
 ```
-leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output>
+leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output, and each merged remote branch left (<reason>) with its command>
 containers: <none | name and image of every container you created>
 unverified: <none | each tracker or host write whose re-read did not show it>
 resources: <worktree path, branch, and any test database you created>
