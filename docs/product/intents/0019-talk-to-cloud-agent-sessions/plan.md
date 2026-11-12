@@ -87,14 +87,17 @@ Intent tracker item: [#494](https://github.com/testeos-z/gabo-ai/issues/494) und
 
 ## Probe results
 
-T5 and T6 record their results on their issues; T7 copies them here.
+T5 and T6 recorded their results on their issues (#507, #508); T7 copied them here on 2026-11-12. A result is never recorded as a pass beyond what was observed.
 
 | probe | host | result |
 |---|---|---|
-| four operations | local | checks 2 to 5 passed, check 1 (local open, send, read, close in an Orca-managed repository) not run because Orca cannot unregister a repository (#507, #494 comment 6810008379); T7 copies the final record from #507 |
-| refused attempt without authorization | remote handle | not run in this table: the result is on #507, and T7 copies it (T5) |
-| four operations | remote Orca host | partial: run by hand from the owner's laptop on 2026-11-12 (client = laptop; #508, comment 6812020000), the four commands passed and the session was closed (its handle left `terminal list`); the adapter path was not exercised, so the adapter-level pass is T8's; T6 is closed by the owner's decision with this partial evidence (S8 stays not passed), and T7 copies this status, never a pass |
-| host B not named by the owner is refused | remote | not exercised: no attempt on a host the owner did not name was sent; the refusal was read from the adapter rules, not probed (#508); T7 copies this status |
+| `open session`, `send message`, `read state`, `close session` through the adapter | local | not run: Orca knows no disposable repository, and Orca CLI 1.4.227 has `repo add` but no remove command, so registering one would leave a permanent record in the owner's Orca app; closed by the owner's standing rule with check 1 not run (#507). Pending, not passed (Open questions 2a) |
+| handle naming no known host is refused, no `orca` command issued | local | passed, applied by hand from the adapter rules (the adapter is prose, not a runtime): 0 `orca` calls, with `GABO_ORCA_ENVIRONMENT` set to a placeholder and unset (#507) |
+| `close session` on a handle this slot did not open is refused and names `stop agent session` | local | passed, applied by hand from the adapter rules: empty ledger, 0 `orca` calls (#507) |
+| remote handle with no authorization sends and reads nothing | remote handle | passed, applied by hand from the adapter rules: 0 `orca` calls, no `--environment` in the log; an authorization for another host is also refused (#507) |
+| S5, the assistant's Intervene in a Task step | assistant text | passed by reading the step (d569144); the tracker-comment part is not applicable, the disposable repository has no tracker (#507) |
+| four operations | remote Orca host | partial: run by hand, not through the adapter, from the owner's laptop on 2026-11-12 (client = laptop, host = Orca environment `gabo-cloud`, with the owner's authorization recorded on #508): open, send, read and close passed, every command carrying `--environment gabo-cloud`, and the session was closed (its handle left `terminal list`) (#508, comment 6812020000). Finding: a remote `terminal create` requires `--worktree`, which `gabo-direct-sessions-orca` v1.2 does not document; the adapter also documents `open session` and `close session` as local only; both go to T8 (#567, PD7). An earlier run on the server was BLOCKED before any contact (the server is the host, not the client) and is superseded. T6 was closed by the owner's decision with this partial evidence: S8 stays not passed |
+| host B not named by the owner is refused | remote | not exercised: no attempt on a host the owner did not name was sent; the refusal was read from the adapter rules, not probed (#508) |
 
 ## Risks to the plan
 
