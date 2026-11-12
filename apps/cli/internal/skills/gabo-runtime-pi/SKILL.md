@@ -44,7 +44,7 @@ Load when a value of `runtimes.*` in `gabo.yaml` is `pi` and the gabo agents mus
 Run in the repository root, read-only:
 
 1. `pi --version` must succeed; else refuse: `Pi is not installed: see https://github.com/earendil-works/pi`.
-2. `pi list` (lists user and project packages, writes nothing). A subagent package is present when it lists `npm:gentle-pi` or a `git:` source of gentle-pi, or `gentle-shell` is on `PATH` (`npm i -g gentle-pi` ships it with its own Pi).
+2. `pi list` (lists user and project packages, writes nothing). A subagent package is present when it lists `npm:gentle-pi` or a `git:` source of gentle-pi, or, once `pi list` ran and exited 0, `gentle-shell` is on `PATH` (`npm i -g gentle-pi` ships it with its own Pi); a `pi list` that fails or times out counts as no package.
 3. Another subagent package is acceptable (for example `pi-subagents-j0k3r`) only after you confirm from its docs that it discovers project agents in `<cwd>/.pi/agents/` and the tool names it registers; else treat it as absent.
 4. None present: refuse, build nothing, install nothing, and say:
 
