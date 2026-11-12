@@ -108,6 +108,69 @@ expect_match "^wall time: unknown \(no wave-started stamp\)\$" "$(run --wave w4 
 
 expect_match "^wall time: unknown \\(no wave-started stamp\\)\$" "$(run --wave w9 measures | head -1)" "a wave with no stamps reads unknown"
 
+echo "# caps"
+cproj="$work/capsproj"
+mkdir -p "$cproj"
+caps() { (cd "$cproj" && sh "$script" caps "$@" 2>&1); }
+printf 'wave:\n  max_fix_rounds: 2\n' >"$cproj/gabo.yaml"
+for e in claude codex opencode pi other; do
+  expect_eq "max_fix_rounds: advisory
+spend is not capped by gabo" "$(caps --engine $e)" "max_fix_rounds is advisory on $e"
+done
+printf 'wave:\n  max_coders: 2\n' >"$cproj/gabo.yaml"
+expect_eq "max_coders: enforced by the cycle
+spend is not capped by gabo" "$(caps --engine claude)" "max_coders is enforced by the cycle"
+printf 'review:\n  x: 1\nwave:\n  max_coders: 2 # c\n  max_coder_turns: 30\n  max_fix_rounds: 1\nother:\n  max_coders: 9\n' >"$cproj/gabo.yaml"
+want="max_coders: enforced by the cycle
+max_fix_rounds: advisory
+max_coder_turns: enforced by the engine
+spend is not capped by gabo"
+expect_eq "$want" "$(caps --engine claude)" "all keys on claude, other sections ignored"
+expect_match "^max_coder_turns: advisory\$" "$(caps --engine codex | grep turns)" "max_coder_turns is advisory on codex"
+for e in opencode pi other; do
+  expect_match "^max_coder_turns: advisory\$" "$(caps --engine $e | grep turns)" "max_coder_turns is advisory on $e"
+done
+expect_eq "continue or stop" "$(caps --engine claude --paused | tail -1)" "--paused ends with continue or stop"
+expect_eq "spend is not capped by gabo" "$(caps --engine claude --paused | tail -2 | head -1)" "spend line precedes the paused line"
+printf 'name: x\n' >"$cproj/gabo.yaml"
+expect_eq "spend is not capped by gabo" "$(caps --engine claude)" "no wave key prints only the spend line"
+rm "$cproj/gabo.yaml"
+expect_eq "spend is not capped by gabo" "$(caps --engine claude)" "no gabo.yaml prints only the spend line"
+caps >/dev/null
+expect_eq "2" "$?" "caps without --engine exits 2"
+printf 'wave:\n  max_coders: 2\n' >"$cproj/gabo.yaml"
+h1="$(cksum <"$cproj/gabo.yaml")"
+caps --engine claude --paused >/dev/null
+expect_eq "$h1" "$(cksum <"$cproj/gabo.yaml")" "caps leaves gabo.yaml unchanged"
+expect_eq "gabo.yaml" "$(ls "$cproj")" "caps writes nothing in the project dir"
+
+echo "# saves"
+expect_eq "none" "$(run --wave s1 saves unverified)" "no saves prints none"
+run --wave s1 saves add k/one 11 >/dev/null
+run --wave s1 saves add k/two 12 >/dev/null
+run --wave s1 saves add k/three 13 >/dev/null
+run --wave s1 saves read k/one >/dev/null
+run --wave s1 saves read k/three >/dev/null
+expect_eq "k/two" "$(run --wave s1 saves unverified)" "three adds and two reads print the unread key"
+run --wave s1 saves add k/two 14 >/dev/null
+expect_eq "k/two" "$(run --wave s1 saves unverified)" "a key added twice counts once"
+run --wave s1 saves read k/two >/dev/null
+expect_eq "none" "$(run --wave s1 saves unverified)" "every key read prints none"
+run --wave s1 saves add k/one 15 >/dev/null
+expect_eq "none" "$(run --wave s1 saves unverified)" "a re-add of a read key stays read"
+out="$(run --wave s1 saves read k/never)"
+rc=$?
+expect_eq "2" "$rc" "reading a key never added exits 2"
+expect_match "never added" "$out" "reading a key never added says so"
+run --wave s1 saves add k/onlykey >/dev/null
+expect_eq "2" "$?" "add without an observation id exits 2"
+run --wave s1 saves bogus >/dev/null
+expect_eq "2" "$?" "an unknown saves action exits 2"
+run --wave s1 saves add "a b" 1 >/dev/null
+expect_eq "2" "$?" "a key with a space is refused"
+expect_eq "none" "$(run --wave s1 saves unverified)" "a refused add writes nothing"
+expect_eq "" "$(find "$waves/s1" -type f -not -name saves)" "saves writes only its file in the wave folder"
+
 echo "# read-only on gabo.yaml and no stray files"
 proj="$work/proj"
 mkdir -p "$proj"
@@ -116,7 +179,7 @@ h1="$(cksum <"$proj/gabo.yaml")"
 (cd "$proj" && sh "$script" --wave w5 stamp wave-started >/dev/null && sh "$script" --wave w5 measures >/dev/null)
 expect_eq "$h1" "$(cksum <"$proj/gabo.yaml")" "gabo.yaml is unchanged"
 expect_eq "gabo.yaml" "$(ls "$proj")" "nothing new in the project dir"
-expect_eq "" "$(find "$work" -type f -not -path "$waves/*" -not -path "$proj/*")" "no file outside the wave folders"
+expect_eq "" "$(find "$work" -type f -not -path "$waves/*" -not -path "$proj/*" -not -path "$cproj/*")" "no file outside the wave folders"
 
 echo
 echo "$passes passed, $failures failed"
