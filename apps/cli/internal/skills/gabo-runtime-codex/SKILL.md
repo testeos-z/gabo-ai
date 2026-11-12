@@ -32,6 +32,7 @@ Load when any of `runtimes.coder`, `runtimes.reviewer` or `runtimes.assistant` i
 - Overwrite only the agent files named after a spec id, the links this skill makes, the probe file it writes and the gabo main-session entries of the Main-Session Entry section. Any other existing entry at a path you would write (a real file or folder, or a link to another target): leave it and report it; never delete or move it.
 - Make every link of steps 2 to 4 on every build, also when the agent files are already current; a build that skips one is not finished.
 - Write no secret into any file (R21).
+- `gabo.yaml` is a human-only path (intent 0024 S5, D5). Before the rebuild, record `git hash-object gabo.yaml` (`absent` when the file does not exist); compare it after the rebuild. A rebuild writes no key of `gabo.yaml`. When the two differ, add `✗ gabo.yaml changed during the rebuild; next: review it with git diff gabo.yaml` to the report; when equal, print nothing. Report it and leave the file as it is: never restore or edit `gabo.yaml`.
 
 ## Sources
 
