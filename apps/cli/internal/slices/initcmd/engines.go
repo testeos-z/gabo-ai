@@ -133,8 +133,9 @@ func (u *UseCase) integrateEngine(engine string, assistants []string, version st
 }
 
 // piPackage runs the subagent-package check of intent 0016 S1 and D1: `pi
-// list` under piListDeadline, then gentle-shell on PATH. A `pi list` that is
-// missing, fails or outlives the deadline counts as no package (S2); a
+// list` under piListDeadline, then gentle-shell on PATH, which counts only
+// when `pi list` ran and exited 0 (S1). A `pi list` that is missing, fails or
+// outlives the deadline counts as no package, gentle-shell or not (S2); a
 // missing probe is no package too.
 func (u *UseCase) piPackage() bool {
 	if u.s.Pi == nil {
@@ -142,10 +143,11 @@ func (u *UseCase) piPackage() bool {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), piListDeadline)
 	defer cancel()
-	if out, ok := u.s.Pi.PiList(ctx); ok && engineconfig.PiListNamesPackage(out) {
-		return true
+	out, ok := u.s.Pi.PiList(ctx)
+	if !ok {
+		return false
 	}
-	return u.s.Pi.GentleShellOnPath()
+	return engineconfig.PiListNamesPackage(out) || u.s.Pi.GentleShellOnPath()
 }
 
 // loadOpencodeConfigs reads the OpenCode configs the rule may change
