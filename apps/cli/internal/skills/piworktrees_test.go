@@ -16,7 +16,7 @@ func TestCycleRegistersPiWorktreesBeforeTheCoder(t *testing.T) {
 	requireIn(t, "gabo-cycle step 5", step5, []string{
 		"your session engine is `pi`",
 		"`session_worktree_register`",
-		"add `registered` to that worktree's ledger line",
+		"when it returns success, add `registered` to that worktree's ledger line",
 		"launch `gabo-coder` as a first-level in-process subagent of this session",
 	})
 	reg := strings.Index(step5, "`session_worktree_register`")
