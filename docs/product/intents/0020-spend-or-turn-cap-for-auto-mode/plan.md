@@ -90,13 +90,31 @@ Intent tracker item: [#495](https://github.com/testeos-z/gabo-ai/issues/495) und
 
 ## Probe results
 
-T5 records its results on its issue; T6 copies them here. The Claude Code rows below are the partial result recorded before T7. A result is never recorded as a pass beyond what was observed.
+T5 recorded its results on [#581](https://github.com/testeos-z/gabo-ai/issues/581); this table copies them (T6). A result is never recorded as a pass beyond what was observed. In this table PASS means only that the cap behavior of S9 was observed (the cap fired, the wave paused, the task stayed claimed, "continue" resumed); S4 wording and S7 lines are named in each row when they were not observed or differed. Spend is input + output + cache tokens as each comment measured them (main session, coders and reviewer script; the agent rebuilds are not counted); gabo does not cap it.
 
-| probe | engine | result |
-|---|---|---|
-| (a) `wave.max_coder_turns: 3`, then (b) `wave.max_coders: 1` | Claude Code 2.1.302 (`claude-sonnet-5-5`) | Pass: (a) built `maxTurns: 3` read back, paused report names the turn cap, tasks stay claimed, none BLOCKED or DONE; (b) paused report names `max_coders` (1 of 1 launched), "continue" resumed, one reset line, second coder launched. Neither paused report carries the enforcement lines or the spend line (fixed by T7). Source: [#581 comment](https://github.com/testeos-z/gabo-ai/issues/581#issuecomment-6830607437) |
-| (c) `wave.max_fix_rounds: 1` | Claude Code 2.1.302 | Fail, not honored: a task took 2 fix rounds and went DONE, the wave never paused, because the coder's launch input carries no round limit (PD14, fixed by T7). To be repeated after T7 |
-| OpenCode, Codex, Pi | — | not run: stopped on the (c) finding; run after T7 |
+| probe | engine | result | spend (tokens) |
+|---|---|---|---|
+| (a) `wave.max_coder_turns: 3` | Claude Code 2.1.302 (`claude-sonnet-5-5`) | PASS for the cap behavior; S7 not observed (finding 2: the paused report had no enforcement or spend line; fixed by T7, not re-run for this cap); S5 observed as partial output (uncommitted worktree, PR open without verdict): built `maxTurns: 3` read back, paused report names the turn cap, tasks stay claimed, none BLOCKED or DONE | 1,861,499 |
+| (b) `wave.max_coders: 1` | Claude Code | PASS for the cap behavior; S7 not observed (finding 2, same): paused report names `max_coders`, "continue" resumed, one reset line, second coder launched | 3,239,988 |
+| (c) `wave.max_fix_rounds: 1`, before T7 | Claude Code | Fail, not honored: a task took 2 fix rounds and went DONE, the wave never paused (PD14, fixed by T7) | not summed |
+| (c) `wave.max_fix_rounds: 1`, after T7 | Claude Code | PASS for the cap behavior; partial on S7 (finding 3: the printed enforcement line was `enforced by the cycle`, not `advisory`, so T5's enforcement-line criterion is not met and the wording is open for the owner): coder stopped at the limit, wave paused, task stayed claimed and not BLOCKED, "continue" resumed with one reset line and the allowance restarted | 4,478,255 |
+| (a), (b), (c) and continue | OpenCode v2.2.6 | PASS for the cap behavior, with a boundary violation (finding 4: the rebuild session rewrote the working-tree `gabo.yaml`, a human-only path; follow-up); S7 lines observed (enforcement line and spend line, also for caps not in effect, finding 7): `steps: 3` read back; paused reports name each cap; "continue" resumed with one reset line and the cap counted from zero | (a) 1,553,565; (b) 3,893,246; (c) 4,220,767 |
+| (a), (b), (c) and continue | Codex (codex-cli 0.167.2) | PASS for the cap behavior; S4 wording not met (finding 6: no literal "continue or stop" question); S7 lines observed: no turn key built, the limit travels in the launch input and the coders stopped on it (advisory); paused reports, reset lines and resumes worked, but the paused answers did not literally ask "continue or stop" (finding 6) | (a) 2,329,583; (b) 6,868,826; (c) 10,468,442 |
+| (a), (b), (c) | Pi 1.5.2 (gentle-pi 4.7.0) | not run: openai subscription usage limit (the only model the login accepts answered "Subscription Sharing usage limit"). S9 asks for a Pi run; the missing run is recorded as a decision, not a pass: decided by the owner's standing rule on #581 (recommended option), a Pi repeat after the reset is optional and does not block closing I0020 | not run |
+
+Spec engine table (S9, PD12): Claude Code, OpenCode and Codex confirmed with no difference; the Pi row is marked unconfirmed in `spec.md`.
+
+### Review findings of the probe
+
+Findings of the T5 comments on #581, for the owner. The numbers follow the comments; the owner's standing rule decided the first two as T7.
+
+1. `max_fix_rounds` was not honored on Claude Code: the rounds run inside the coder and the cycle sees the count only on return. Fixed by T7 (PD14); the repeat passed on Claude Code, OpenCode and Codex.
+2. The paused reports lacked the per-cap enforcement lines and the spend line, because the assistant's final answer does not use the wave-report format. Fixed by T7 (assistant Wave Close text and a pinning test).
+3. After T7, Claude Code printed `max_fix_rounds ... enforced by the cycle`, while `gabo-wave-report` says `advisory` (coder-enforced): the assistant composed its own wording. The cap itself is honored. Open for the owner: pin the wording.
+4. OpenCode: the rebuild session rewrote the working-tree `gabo.yaml` (removed `wave.max_coder_turns: 3`) while writing `steps: 3`; a runtime skill must not touch `gabo.yaml`, a human-only path. Raised for a follow-up intent.
+5. OpenCode: a coder that reports `STOPPED at fix round limit` while its last head is already clean is not paused: the cycle re-reads the review, sees clean and finishes the task. Reasonable behavior, not a defect; raised for a follow-up intent.
+6. Codex: the paused answers name the cap, the tasks and the enforcement label but do not literally ask "continue or stop"; "continue" still resumed the wave. Open for the owner: a small text fix so the question is asked in those words (S4).
+7. Minor and probe-side: OpenCode paused reports also list caps not in effect (harmless); an `opencode run --agent gabo-assistant` call once answered `Agent not found` and worked on the next call (transient); Codex children fork the parent context, so a Codex wave spent about twice the tokens of the other engines; `claude -p` wrote `~/.config/gabo/config.yaml` (removed); a background `codex exec` needs `< /dev/null`.
 
 ## Risks to the plan
 
