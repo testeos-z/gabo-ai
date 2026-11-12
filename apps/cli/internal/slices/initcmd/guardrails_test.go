@@ -180,3 +180,43 @@ func TestInitWritesGuardrailsFromGaboYamlMode(t *testing.T) {
 		})
 	}
 }
+
+// S5 and the #617 decision: an existing autonomousMode that is a string or
+// null is not a choice. gabo init writes nothing, prints one ✗ line, leaves
+// the file bytes unchanged and exits 1 (golden per value).
+func TestGuardrailsNonBooleanGolden(t *testing.T) {
+	t.Parallel()
+	for _, c := range []struct{ name, value string }{
+		{"string-true", "{\"autonomousMode\": \"true\"}\n"},
+		{"null", "{\"autonomousMode\": null}\n"},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(map[string]string{guardFile: c.value})
+			r := guardrailsStep(s, "auto", "0.2.6", "pi")
+			golden(t, "guardrails-"+c.name+".golden", guardLines(t, r))
+			if slices.Contains(s.Writes, guardFile) || string(s.Files[guardFile]) != c.value {
+				t.Fatalf("non-boolean file was changed: writes %v", s.Writes)
+			}
+			if !r.Failed() {
+				t.Fatalf("non-boolean autonomousMode is not a failure:\n%s", r.Render())
+			}
+		})
+	}
+}
+
+// S5 through gabo init: a non-boolean autonomousMode makes the run fail with
+// exit 1 and leaves the guardrails file unchanged.
+func TestInitNonBooleanGuardrailsExitsOne(t *testing.T) {
+	t.Parallel()
+	const value = "{\"autonomousMode\": \"true\"}\n"
+	cfg := "mode: auto\nrepo:\n  name: o/r\nruntimes:\n  coder: pi\n  reviewer: claude\n  assistant: claude\n"
+	s := newStore(map[string]string{config: cfg, guardFile: value})
+	out, err := run(t, s, "1.2.3")
+	if err == nil {
+		t.Fatalf("non-boolean autonomousMode exited 0:\n%s", joined(out))
+	}
+	if slices.Contains(s.Writes, guardFile) || string(s.Files[guardFile]) != value {
+		t.Fatalf("file = %q, writes %v", s.Files[guardFile], s.Writes)
+	}
+}

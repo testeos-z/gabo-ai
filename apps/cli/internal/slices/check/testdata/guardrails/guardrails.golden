@@ -26,6 +26,16 @@ error: ""
 --- stdout
 ! .pi/gentle-ai/runtime-guardrails.json: autonomousMode is not true (mode auto with pi); coders stop at git push unless GENTLE_PI_AUTONOMOUS_MODE=1 is set; next: run gabo init
 check passed: config, agents, slot coverage and catalog version
+=== auto pi autonomousMode string true
+exit 1
+error: ""
+--- stdout
+✗ .pi/gentle-ai/runtime-guardrails.json: autonomousMode must be true or false
+=== auto pi autonomousMode null
+exit 1
+error: ""
+--- stdout
+✗ .pi/gentle-ai/runtime-guardrails.json: autonomousMode must be true or false
 === manual pi no file
 exit 0
 error: ""
