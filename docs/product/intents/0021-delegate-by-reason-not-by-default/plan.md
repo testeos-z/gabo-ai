@@ -92,8 +92,16 @@ T5 records its results on its issue; T6 copies them here. A result is never reco
 
 | probe | text | result |
 |---|---|---|
-| Same small intent, handoffs listed with their reasons | old (the `dev` commit before T1) | not run: T5 not started |
-| Same small intent, handoffs listed with their reasons | new (`dev` after T1 to T3) | not run: T5 not started |
+| Same small intent (I0001: T001 `Upper`, T002 `Lower`, independent; T003 `Both`, blocked by both), handoffs listed with their reasons | old (`a2e99a6`, the `dev` commit before the merge of T1, PR #642) | 4 handoffs: 3 `gabo-coder` (T001, T002, T003; first line `wave id: I0001`) and 1 `gabo-pm` (spec of I0002); no reason named in any. Wave: 3 done, 0 blocked (PRs #147 to #149), T002 one fix round. |
+| Same small intent, handoffs listed with their reasons | new (`d6e7e77`, the merge of T3, PR #644) | 4 handoffs: 3 `gabo-coder`, each first line `Reason: (a) parallel units`, and 1 `gabo-pm` with `Reason: role ownership`. The inline request (append a README line) launched no agent. Wave: 3 done, 0 blocked (PRs #155 to #157), T002 one fix round. |
+| S1 (clauses observed) | new | PASS on: tiny change inline with no agent; coders under (a); no explorer, verifier or suite handoff. not run: a map beyond one read batch (b), a suite or build in a subagent (c), two independent units launched together outside the cycle's coders. |
+| S2 | new | PASS: every handoff's first line is `Reason: <label>` with a PD6 label; asked why, the answer is that reason; work with no reason has no handoff. Finding 1 below (wave report). |
+| S3 | new | PASS: the spec request went to `gabo-pm` under `Reason: role ownership`. not run: the clean-context plan reviewer with the owner absent (no critical question arose). |
+| S4 | new | PASS for the three-task wave (only `gabo-coder`, one per task worktree, `parallelism: 2` held, each under (a)). not run: a wave of one task. |
+| S8 | both | PASS: both runs done on the same intent, old baseline recorded, every new handoff carries a reason, the task with no reason was done inline. |
+| Spend (one sample per text, not a measure) | old / new | Main plus subagents: old wave 1,652,494 + 1,982,987; new wave 1,428,778 + 1,724,803 (13% less each); reviewer script (`claude-haiku-5-5`) 726,554 old, 818,994 new; handoffs in the wave equal (3). |
+
+Source: the probe comment on [#630](https://github.com/testeos-z/gabo-ai/issues/630#issuecomment-6836069180), Claude Code 2.1.302 (`claude-sonnet-5-5`), run on `testeos-z/gabo-repo`. The findings and the open questions are in the intent's `## Review findings`.
 
 ## Risks to the plan
 
