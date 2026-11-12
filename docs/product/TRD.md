@@ -158,17 +158,7 @@ Owner ─ Assistant (main session; runs the gabo-cycle skill itself)
                └─ shell ── reviewer script (separate process, clean clone) ── PR comment + VERDICT ──> coder
 ```
 
-Amended (owner 2026-11-11, [intent 0015](intents/0015-one-subagent-layer-on-every-engine/spec.md)), S1 to S3, D30: the tree above is the accepted one-layer topology (seven agents with the main session, nine before). Until the tasks of intent 0015 are merged, the built topology is the earlier one:
-
-```
-Owner ─ Assistant (main session, Orca terminal)
-          ├─ pm / dev-lead / db-master / frontend   (subagents)
-          ├─ plan-change reviewer                   (fresh session)
-          └─ gabo-cycle                             (subagent)
-               └─ coder × N                         (subagents, one per task)
-                    └─ reviewer agent               (subagent, relay)
-        Reviewer agent ── reviewer script ── PR comment + VERDICT ──> coder
-```
+Amended (owner 2026-11-11, [intent 0015](intents/0015-one-subagent-layer-on-every-engine/spec.md)), S1 to S3, D30: the tree above is the accepted one-layer topology (seven agents with the main session, nine before).
 
 Subagents are launched in-process, not as split-pane teammates, unless the owner asks (D23).
 
