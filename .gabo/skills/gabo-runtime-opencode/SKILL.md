@@ -24,7 +24,7 @@ Load when `runtimes.coder` or `runtimes.reviewer` in `gabo.yaml` is `opencode`, 
 
 - Build every agent of `.gabo/skills/gabo-agent-templates/agents.yaml`, each as `.opencode/agents/<id>.md`, whatever runtime each agent plays: `gabo check` requires all of them in `.opencode/agents`.
 - Read the spec, the templates and `.gabo/VERSION` from the project; never build from memory. A missing or empty `.gabo/VERSION` or catalog: stop and tell the user to run `gabo init`.
-- Fill only the template slots, as below, and invent nothing: no frontmatter key, permission, skill, model or rule the spec and template do not give. OpenCode passes unknown agent options to the provider as model options, so the frontmatter holds `description`, `mode` and `permissions` and no other key (no `permission` map and no `tools`, the deprecated V1 fields); the version goes in a body comment (D2).
+- Fill only the template slots, as below, and invent nothing: no frontmatter key, permission, skill, model or rule the spec and template do not give. OpenCode passes unknown agent options to the provider as model options, so the frontmatter holds `description`, `mode` and `permissions` and no other key, except `steps` for `gabo-coder` (build step 7) (no `permission` map and no `tools`, the deprecated V1 fields); the version goes in a body comment (D2).
 - Permissions only restrict (D3): a capability the spec lists is left at the owner's setting, a capability it lacks gets a `deny` rule. Never loosen the owner's own rules.
 - Never place `gabo-reviewer` in the project (D5, TRD D20): never create `.agents/skills/gabo-reviewer`, no copy of its scripts, and never in an agent's `Skills:` line. OpenCode gets no reviewer link at all, neither in the project nor under `~/.config/opencode/skills`: the `gabo-coder` agent runs the user-level script by path, and every spec agent gets a `permissions` rule `skill` with resource `gabo-reviewer` and effect `deny`, so a `gabo-reviewer` skill OpenCode finds elsewhere (for example in `~/.claude/skills`) cannot start a second review. The `gabo-reviewer-config` link of build step 4 is not a reviewer link: that skill configures the reviewer engine and never runs a review (intent 0004 S14).
 - Engine config (intent 0004 S8, D7): gabo writes only the engine keys it needs to operate, at project level only, merged with the existing project config (every unrelated key kept), reports what it wrote, and has the value verified by `gabo check`; never the user's global engine config. `gabo init` writes every engine config key (intent 0010 S5), `default_agent` included, and never writes or edits `experimental.subagent_depth` (intent 0015 S8); this skill writes none and only builds agent files, links and the stage-gate plugin.
@@ -101,9 +101,10 @@ Each slot of `gabo.yaml` (`slots.<slot>.adapter`) whose adapter is a `<folder>/S
    | `{{methodology}}` | `gabo-methodology` |
    | `{{adapter:tasks}}`, `{{adapter:repository_host}}`, `{{adapter:memory}}` | `gabo-tasks`, `gabo-repository-host`, `gabo-memory` |
    | `{{reviewer_script}}` | `${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh`, written literally: the shell expands it on each machine, so the committed file holds no personal path |
+   | `{{turn_limit_line}}` | with `wave.max_coder_turns` set: `Turn limit: <n> turns; stop at it and report STOPPED at turn limit.`; unset: remove the whole line; filled in `gabo-coder`, the only template that carries the slot |
 
    A slot whose link does not exist (its slot has no skill adapter) cannot be filled: skip that agent and report it.
-7. Write `.opencode/agents/<id>.md` in exactly this shape: frontmatter with only `description`, `mode: subagent` and `permissions`, no other key, then the body.
+7. Write `.opencode/agents/<id>.md` in exactly this shape: frontmatter with only `description`, `mode: subagent` and `permissions`, no other key, except `steps` for `gabo-coder`, then the body.
 
    ```markdown
    ---
@@ -127,6 +128,7 @@ Each slot of `gabo.yaml` (`slots.<slot>.adapter`) whose adapter is a `<folder>/S
    - `<!-- gabo-engine: opencode -->` is the template's engine line moved into an HTML comment, with `{{engine}}` filled (intent 0013 S6); `gabo check` fails a file whose engine is not `opencode`.
    - The `Skills:` line lists the spec `skills` in spec order, then each fixed-name link the body names (`gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory`, in this order).
    - `<filled body>` is the filled template without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them.
+   - For `gabo-coder` only, write `steps: <wave.max_coder_turns>` as the last frontmatter line, after `permissions`, and omit it when `wave.max_coder_turns` is unset; no other agent gets the key. OpenCode ends the agent's agentic iterations at that many steps with a text-only wrap-up summary and no outcome status, which the cycle counts as stopped at the turn cap. A changed `wave.max_coder_turns` needs a rebuild of the agents: a stale built coder keeps the old `steps`. `gabo check` does not read the key.
    - For `gabo-coder` only, write this paragraph between the `Skills:` line and `<filled body>`, with one blank line before and after it (intent 0004 S7, D6: the `subagent` tool takes no working directory; the coder never moves its session, intent 0015 T18):
 
      ```text

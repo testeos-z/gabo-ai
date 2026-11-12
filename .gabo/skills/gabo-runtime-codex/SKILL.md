@@ -81,6 +81,7 @@ Codex has no project setting that selects the main-session agent, so the owner's
    | `{{adapter:tasks}}`, `{{adapter:repository_host}}`, `{{adapter:memory}}` | `gabo-tasks`, `gabo-repository-host`, `gabo-memory` |
    | `{{reviewer_script}}` | `$HOME/.agents/skills/gabo-reviewer/scripts/reviewer.sh`, written literally: the shell expands it on each machine; filled in `gabo-coder`, the only template that carries the slot |
    | `{{engine}}` | `codex`, the engine as written in `gabo.yaml` (intent 0013 S6) |
+   | `{{turn_limit_line}}` | with `wave.max_coder_turns` set: `Turn limit: <n> turns; stop at it and report STOPPED at turn limit.`; unset: remove the whole line; filled in `gabo-coder`, the only template that carries the slot |
 
    A slot whose link does not exist (its slot has no skill adapter) cannot be filled: skip that agent and report it.
 7. Write `.codex/agents/<id>.toml` in exactly this shape, these keys in this order and no others:
@@ -100,6 +101,7 @@ Codex has no project setting that selects the main-session agent, so the owner's
    - `# gabo-version: <x.y.z>` is the template's version line moved into a TOML comment, with the value of `.gabo/VERSION`; `gabo check` compares it with the stamp.
    - `# gabo-engine: codex` is the template's engine line moved into a TOML comment; `gabo check` fails an agent file whose filled engine is not `codex` (intent 0013 S6).
    - `<filled body>` is the filled template without its first two lines `gabo-version: …` and `gabo-engine: …` and the blank line after them.
+   - The TOML has no turn-limit key: the coder gets no engine key for the turn limit; it travels in the launch input as `turn limit: <n>` and is advisory.
    - `<skills>` are the spec `skills` in spec order, then each fixed-name link the body names (`gabo-methodology`, `gabo-tasks`, `gabo-repository-host`, `gabo-memory`, in this order), comma-separated. Codex has no skill preload key, so this line is how the agent gets them. Omit the line and the blank line before it when the list is empty.
    - Escaping: in `description` write each `\` as `\\` and each `"` as `\"`; in `developer_instructions` write each `\` as `\\` and each `"""` as `""\"`. Copy every other byte unchanged.
 8. Verify: each file must parse as TOML (with `python3 -c 'import sys, tomllib; tomllib.load(open(sys.argv[1], "rb"))' <file>` when Python 3.11 or newer is present) with `name` equal to its id; then run `gabo check`, which also checks every link of steps 2 to 4. Fix every failure this skill caused and rerun until `gabo check` passes, except the `✗ agent <id> missing` lines of agents you skipped and reported in step 6; report any other failure.

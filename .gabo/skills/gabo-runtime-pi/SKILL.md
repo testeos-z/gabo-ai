@@ -44,11 +44,11 @@ Load when a value of `runtimes.*` in `gabo.yaml` is `pi` and the gabo agents mus
 Run in the repository root, read-only:
 
 1. `pi --version` must succeed; else refuse: `Pi is not installed: see https://github.com/earendil-works/pi`.
-2. `pi list` (lists user and project packages, writes nothing). A subagent package is present when it lists `npm:gentle-pi` or a `git:` source of gentle-pi, or `gentle-shell` is on `PATH` (`npm i -g gentle-pi` ships it with its own Pi).
+2. `pi list` (lists user and project packages, writes nothing). A subagent package is present when it lists `npm:gentle-pi` or a `git:` source of gentle-pi, or, once `pi list` ran and exited 0, `gentle-shell` is on `PATH` (`npm i -g gentle-pi` ships it with its own Pi); a `pi list` that fails or times out counts as no package.
 3. Another subagent package is acceptable (for example `pi-subagents-j0k3r`) only after you confirm from its docs that it discovers project agents in `<cwd>/.pi/agents/` and the tool names it registers; else treat it as absent.
 4. None present: refuse, build nothing, install nothing, and say:
 
-   > Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild.
+   > Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi; npm is used only because gentle-pi's postinstall needs it); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild.
 
    There is no fallback: without a subagent package, gabo does not build on Pi.
 
@@ -82,6 +82,7 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 ```
 
 - `description` is the spec `role` in double quotes, so a colon in it stays plain text.
+- The agent file has no turn-limit key: the coder gets no engine key for the turn limit; it travels in the launch input as `turn limit: <n>` and is advisory.
 - `gabo-version: <version>` is the template's version line, moved into the frontmatter with the value of `.gabo/VERSION`; `gabo check` compares it with the stamp.
 - `gabo-engine: pi` is the template's engine line, moved into the frontmatter with `pi`, the engine as written in `gabo.yaml`; `gabo check` fails an agent file whose filled engine is not `pi` (intent 0013 S6).
 - The `Skills:` line is the spec's `skills` written where Pi can see it (a Pi agent has no skill-list field; the body is its system prompt). Omit the line when the list is empty.
@@ -105,6 +106,7 @@ Slots:
 | `{{methodology}}` | `gabo-methodology` |
 | `{{adapter:<slot>}}` | `gabo-<slot>` with `_` written `-` (for example `gabo-repository-host`) |
 | `{{engine}}` | `pi` (intent 0013 S6) |
+| `{{turn_limit_line}}` | with `wave.max_coder_turns` set: `Turn limit: <n> turns; stop at it and report STOPPED at turn limit.`; unset: remove the whole line; filled in `gabo-coder`, the only template that carries the slot |
 | `{{reviewer_script}}` | `${GENTLE_PI_AGENT_HOME:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}}/skills/gabo-reviewer/scripts/reviewer.sh` (expanded by `bash` inside the template's double quotes, so the committed file holds no personal path; standalone `gentle-shell` sets both variables to its home); filled in `gabo-coder`, the only template that carries the slot |
 
 The Pi coder runs the user-level reviewer script itself like every other engine's coder (intent 0015 D5, which supersedes intent 0013 D15): the Pi coder body is the template with the slots above filled, and this skill rewrites none of its bullets.
@@ -137,6 +139,18 @@ Earlier builds placed the links in `.pi/skills/` (intent 0003). On every build, 
 
 - `<agent-home>/skills/gabo-reviewer` → the user-level copy. An existing link to it is left; anything else at that path: stop and report, never replace it.
 - The scripts resolve their own real path, so they run from the trusted user-level copy through the link.
+
+## Grants for an unattended Pi wave
+
+The three grants an unattended Pi wave needs are the owner's to give for the session, not gabo's:
+
+1. the worktree root `worktree.dir` of `gabo.yaml`, where each task worktree is created;
+2. the user file `${XDG_CONFIG_HOME:-~/.config}/gabo/config.yaml`, which the assistant reads at session start;
+3. the user-level reviewer skill folder `${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer` and its state directory `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer`, which the coder's review runs from.
+
+The grant is the owner's: gabo grants none of them and writes no permission to the user's engine config. The only file this skill writes under the agent home is the reviewer link above.
+
+gentle-pi asks before deleting a remote branch, even in autonomous mode, and the owner decides whether to allow it. A coder whose remote branch delete is asked or refused does not retry it: its Task Close lists the branch under `leftovers:` with the command for the owner (`gabo-coder`, Task Close step 4).
 
 ## Launching Agents
 
