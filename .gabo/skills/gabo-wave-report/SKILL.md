@@ -4,7 +4,7 @@ description: "Trigger: gabo wave report, build wave report, save wave report, wa
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.1"
+  version: "1.2"
 ---
 ## Activation Contract
 
@@ -19,16 +19,17 @@ Load in the main session when it runs the `gabo-cycle` skill and builds the wave
 
 ## Report Format (TRD 9.2)
 
-1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`, and the line `session engine: <engine>`, the engine the wave ran on (intent 0013 S7; `unknown (rebuild the agents)` when the main-session entry has no engine line). When `runtimes.coder` is a fixed engine other than the session engine, also the line `coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`.
+1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`, and the line `session engine: <engine>`, the engine the wave ran on (intent 0013 S7; `unknown (rebuild the agents)` when the main-session entry has no engine line). When `runtimes.coder` is a fixed engine other than the session engine, also the line `coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`. A wave that stopped at a launch cap (intent 0020) adds the paused line `status: paused`: the cap that fired (`max_coders`, `max_fix_rounds` or `max_coder_turns`), the affected task ids and the question "continue or stop". With any cap set, one line per cap in effect in the form `<cap>: <enforcement>` (for example `max_coder_turns: advisory`), the enforcement being: `enforced by the engine` (`max_coder_turns` on Claude Code and OpenCode, only when the built `gabo-coder` agent file carries the engine key `maxTurns` or `steps`; read it, and when it does not, say `advisory`), `enforced by the cycle` (`max_coders`) or `advisory` (`max_coder_turns` on Codex and Pi, and `max_fix_rounds` as `advisory` (coder-enforced) on every engine, because the fix rounds run inside the coder), and the line `spend is not capped by gabo`. No section is added or reordered.
 2. **Tasks**: one line per task: task id, status (DONE, HANDED, BLOCKED), PR, last verdict, fix rounds, coder handle. A BLOCKED task adds its reason.
 3. **Questions**: each question raised with its answer and resolver (R5), and whether it was a manual answer or an auto decision record.
 4. **Interactions**: interaction count with the reasons for each interaction with the owner (R29).
 5. **Unverified writes**: every tracker, host or memory write whose re-read did not show it (R24).
 6. **Resume disagreements**: the resume disagreements the cycle left alone, where tracker, host and trace differ (D17).
-7. **Leftovers**: REFUSED removals and leftovers from coder task closes and the wave-close sweep: paths, branches, containers, test databases; merged tasks still open because no coder could close them (R13).
+7. **Leftovers**: REFUSED removals and leftovers from coder task closes and the wave-close sweep: paths, branches, containers, test databases; merged tasks still open because no coder could close them (R13). On Pi, a task worktree the cycle could not register is listed here as `worktree not registered (<reason>)` with its path (intent 0023 S3).
 8. **Plan-change proposals**: the plan-change proposals of the wave, each with issue or PR, scope, affected tasks and outcome.
-9. **Denied board moves**: denied board moves as the exact list (`issue -> Ready`, `issue -> Backlog`) for the assistant to apply.
-10. **Comfort answer**: the owner's comfort answer to apply next wave (R17). The cycle writes `pending`; the assistant fills it at Wave Close and saves the report again with `save wave trace`, read back.
+9. **Measures** (intent 0022): Measures is an ordered checklist of eight lines, built line by line from the trace and the tracker: wall time; fix rounds per task; agent sessions; PRs opened and merged; plan-change proposals; interactions; tokens; each task's outcome; each line is printed even when it reads `unknown (<source that lacked it>)`. One line each, built from the trace, the tracker and the host, never from a guess: wall time from the wave start in the trace to the report time (when the trace holds `cap <name> reset` lines, the line names how many, because the owner's wait is inside it); fix rounds per task; agent sessions started, by agent, as `gabo-assistant: 1 (the main session), gabo-coder: <n>`, counted from the trace lines `session started <agent> <task id> <UTC time>` (a coder resumed by its handle is not counted and the reviewer script's runs are not counted); PRs opened and merged, from the trace PR lines; plan-change proposals as a count and their scope (`0` when there is none); interactions with the owner (the count of section 4); tokens; each task's outcome (DONE, HANDED or BLOCKED). A value no source gave reads `unknown (<source that lacked it>)`, never a guess; the section appears with `none` or `unknown` when empty. Tokens are recorded only as the engine reports them, with the source named: on Claude Code a figure the owner or the assistant copies from the Session block of `/usage` or from the OpenTelemetry metric, else `unknown (claude: not reported to the agent)`; on Codex, OpenCode and Pi `unknown (<engine>: not verified)`. Rules: a subagent's own figure is never added into a total; no numeric threshold, secret or account identifier appears in the section.
+10. **Denied board moves**: denied board moves as the exact list (`issue -> Ready`, `issue -> Backlog`) for the assistant to apply.
+11. **Comfort answer**: the owner's comfort answer to apply next wave (R17). The cycle writes `pending`; the assistant fills it at Wave Close and saves the report again with `save wave trace`, read back.
 
 ## Summary (UX 1.5)
 

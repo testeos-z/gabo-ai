@@ -53,7 +53,9 @@ Resolve the role's engine from `gabo.yaml` before any check of `start agent sess
 A session runs headless (`--print`), so nobody can answer a permission prompt. The adapter never relies on one: it pins on the command line the tools the session may use, and anything else is denied at once instead of waiting.
 
 - `claude`: `--permission-mode dontAsk --permission-prompts none` denies every tool that is not pre-approved, and `--allowedTools "$tools"` pre-approves exactly the tools of the role's built agent (the one `tools:` line of its frontmatter, for example `Read, Grep, Glob, Edit, Write, Bash, Skill, Agent` for `gabo-coder`). The owner's settings `deny` rules still apply on top. The session also reads the worktree's project settings; that is safe only because the worktree holds the task's own branch, written by the same role, which is why a `reviewer` session is never started.
-- `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. It starts only the `coder` and `assistant` roles, which need edit and shell tools anyway: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, `--append-system-prompt <role agent file>` reads the file (pi 1.4.0 `--help`: "Append text or file contents to the system prompt"), and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same role.
+- `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. It starts only a `coder`, which needs edit and shell tools: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, `--append-system-prompt <role agent file>` reads the file (pi 1.4.0 `--help`: "Append text or file contents to the system prompt"), and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same role.
+
+An `assistant` on `pi` is refused before any check and before any process starts, with the line `refused: a Pi assistant cannot run a wave under --print; start it from an interactive session or pi --mode rpc`. `--print` ends a Pi session after its first turn, which would kill the coder subagents of a wave. The refusal reports a handle of none; no process starts and no ledger entry is written. A `coder` on `pi` and every `claude` session are unaffected.
 
 Check before starting, after Engine Resolution, on the resolved engine, and start nothing when a check fails; report which one failed instead of a handle. When the `tools:` check fails, say that the built agent needs exactly one one-line `tools: A, B, C` entry in its frontmatter (a YAML list under `tools:` is refused, never guessed):
 
@@ -64,6 +66,7 @@ Check before starting, after Engine Resolution, on the resolved engine, and star
 case "<runtime role>" in coder|assistant) ;; *) false ;; esac &&
   tools=$(awk '/^---$/ { if (++n == 2) exit; next } n == 1 && sub(/^tools: */, "") { print; c++ } END { exit c != 1 }' <role agent file>) &&
   [ -n "$tools" ] && claude --help | grep -qF -- --permission-prompts && claude --help | grep -qF -- --allowedTools
+# pi: an assistant is refused above, before this check; the role check keeps reviewers out
 # pi: the installed version must support every flag the start command relies on
 case "<runtime role>" in coder|assistant) ;; *) false ;; esac &&
   pi --help | grep -qF -- --approve && pi --help | grep -qF -- --tools &&

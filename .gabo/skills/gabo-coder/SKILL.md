@@ -14,10 +14,12 @@ Load in a `gabo-coder` subagent launched by the main session (the assistant that
 
 - Never merge, approve or set commit statuses; the reviewer does that.
 - Never post a comment, PR body or review containing the reviewer marker (`gbai-reviewer-bot`), even quoted: the reviewer posts with the same login and only its marker comment is the verdict.
-- Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Closes #<n>`. On a base that is not the default branch the keyword closes nothing; the Task Close does. Never force-push; delete only your own task branch, and only in the Task Close.
+- Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Refs #<n>` on every base, never with a closing keyword: a closing keyword that merges into the default branch closes the task before the Task Close removes its worktree and labels, and the Task Close is the only writer of DONE (TRD D23). Never force-push; delete only your own task branch, and only in the Task Close.
 - The PR body also holds one line `gabo check impact: <none, with the reason / updated in <file>>` (TRD 8.5): whether the change adds or alters something `gabo check` should verify (an agent file, a runtime skill, the neutral agent spec, a slot contract or a project file gabo writes) and where the check was updated, or why it needs no update.
 - After every push, run the user-level reviewer script yourself from the main checkout, never from your worktree (the caller's `gabo.yaml` names the integration branch the review trusts), exactly as your agent file says, and act on its `VERDICT` line; the request is exactly `PR #<n> head <40-hex pushed sha>` and the PR comment holds the findings.
 - Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the script refuses it.
+- A coder whose input carries `turn limit: <n>` stops at it: it commits nothing new and reports `STOPPED at turn limit` with its resources (worktree, branch, containers) and the state of the work; the cycle then pauses the wave. The limit never changes the fix-round cap below.
+- A coder whose input carries `fix round limit: <n>` stops when it has used that many fix rounds in total without a clean review, counting from `fix rounds used: <k>` when the input carries it (a resumed or replacement coder; none means zero): it commits nothing new and reports `STOPPED at fix round limit` with its resources (worktree, branch, containers) and the state of the work; the cycle then pauses the wave. The limit never raises the fix-round cap: "Max 4 fix rounds" below is unchanged.
 - Questions go back to the assistant in your outcome; never ask the owner directly.
 - You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
 
@@ -47,12 +49,12 @@ Max 4 fix rounds; then label the issue `needs-user`, report BLOCKED with the que
 Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. Like the review request, this runs outside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome: they are entries of your wave's ledger, and the close touches only entries of your own wave's ledger (`gabo/ledger/<wave>`), per intent 0013 S9 and D6. A resource of another wave (a worktree under another `<repo-name>-worktrees/<wave>/` folder, or a branch or container of another wave's task) is neither removed nor reported as a leftover of this wave; `leftovers:` lists only resources of this task (its worktree and branch). Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover. If your worktree or branch is already gone (a new coder launched after a session restart), the caller gives you the main checkout path in your input: run steps 1 and 2 from it without `git -C <wt>`, skip steps 3 and 4 for what is gone, and list nothing as a leftover for it. With the PR still open and only the worktree gone, recreate it there with `git worktree add <worktree path> <branch>` and continue; with the branch gone too, return the question.
 
 1. Verify through `repository_host` (read status) that the PR is merged into `repo.integration_branch` from your branch, and note its merged head SHA. Not merged, or another base or head branch ⇒ change nothing, report HANDED "not merged".
-2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
+2. Close the task issue (`tasks` change status DONE), which removes every status label it carries (`status:in-progress`, `status:blocked`, `needs-user`), and re-read it: it must show state closed and no status label. Retry once, then report it under `unverified:`, naming each status label that survives.
 3. Remove the worktree only if all hold, else keep it and its local branch, list them under `leftovers:` and skip the local branch in step 4:
    - it is not in `worktree.keep` (`gabo.yaml`);
    - `git -C <wt> status --porcelain --ignored=matching`, run before any removal, shows only committed work and rebuildable output (removal deletes ignored files);
    - `git worktree remove <wt>` succeeds, never `--force`.
-4. Delete the branch through `repository_host` (delete branch). A refused branch goes under `leftovers:`.
+4. Delete the branch through `repository_host` (delete branch). A refused branch goes under `leftovers:`. When the engine asks about deleting the merged remote branch or refuses it, do not retry it by another route (no API call, no force push, no other delete): list it under `leftovers:` as `merged remote branch left (<reason>)` with the exact command `git push origin --delete <branch>` for the owner, and the task still closes (step 2 unchanged). A delete that succeeds leaves no leftover.
 5. Containers stay: the cycle removes them from the ledger.
 
 ## Output Contract
@@ -60,7 +62,7 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. L
 The outcome to the cycle (TRD 9.2) holds, in this order:
 
 - `status`: `HANDED` (review clean, you stay resumable), `BLOCKED` (with the reason) or, only after the Task Close, `DONE`;
-- task id and the PR link (number and URL, the PR that carries `Closes #<n>`), with the last reviewed SHA;
+- task id and the PR link (number and URL, the PR that carries `Refs #<n>`), with the last reviewed SHA;
 - a one-paragraph summary of the change;
 - open questions for the cycle, each with what it blocks;
 - resources created: worktrees, branches, containers and test databases, so the cycle can add them to the wave ledger;
@@ -70,7 +72,7 @@ The outcome to the cycle (TRD 9.2) holds, in this order:
 DONE carries the close report: merged SHA, issue closed (verified or not), worktree removed or left, local and remote branch deleted or left. Then always:
 
 ```
-leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output>
+leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output, and each merged remote branch left (<reason>) with its command>
 containers: <none | name and image of every container you created>
 unverified: <none | each tracker or host write whose re-read did not show it>
 resources: <worktree path, branch, and any test database you created>
