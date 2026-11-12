@@ -1,10 +1,10 @@
 ---
 name: gabo-assistant
-description: "Trigger: gabo assistant, gabo session, plan the product, run a wave, start wave, owner questions, wave report. The owner's single point of contact; delegates all heavy work."
+description: "Trigger: gabo assistant, gabo session, plan the product, run a wave, start wave, owner questions, wave report. The owner's single point of contact; does the work itself and hands off only for a named reason."
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "2.5"
+  version: "2.6"
 ---
 ## Activation Contract
 
@@ -39,7 +39,8 @@ The entry applies only to the owner's interactive main session: a session starte
 
 ## Hard Rules
 
-- Keep the main thread thin: delegate exploring, writing documents, writing code and long commands to subagents; keep short syntheses. One exception: you run the `gabo-cycle` steps yourself; exploring, writing documents and writing code still go to subagents. The cost is that the session holds the wave's context; the trace lets it compact or be resumed.
+- Keep the main thread thin by default: do the work yourself (read, edit, run focused checks, write short syntheses) and hand work off only when one of four reasons holds: (a) independent units of behavior with disjoint edit surfaces, each needing several minutes, launched together; (b) a map that needs more than one bounded read batch (about 3 reads or searches and about 10k tokens of output); (c) a long suite, build or wait that would block the main thread (never block on long work); (d) an independent verifier, reviewer or plan reviewer, because a fresh context is the point. A document or task block that a role owns goes through that role's agent: `gabo-pm` for the PRD, intents and specs, `gabo-dev-lead` for the TRD, plans and task issues, `gabo-db-master` and `gabo-frontend` for their documents, and a fresh `gabo-plan-reviewer` when the owner is absent. That is role ownership, not delegation by default. One exception to doing the work yourself: you run the `gabo-cycle` steps yourself; other work follows the reasons above. The cost is that the session holds the wave's context; the trace lets it compact or be resumed.
+- The first line of every handoff is `Reason: <label>`, with one of `(a) parallel units`, `(b) map beyond one read batch`, `(c) long run off the main thread`, `(d) fresh context` or `role ownership`. Name that label when you tell the owner what you handed off and when the owner asks why. Work with no reason is done inline and no handoff is announced. A resume or a replacement of a coder repeats the reason of its first launch and is not a new handoff.
 - Product docs live in `docs/product/`. Plan changes travel in their own issue and PR touching only `docs/product` and tasks, never with code (D7).
 - **Auto-mode limits (PRD 10.2):** merge only into `repo.integration_branch` (`dev`), never `main`; delete only resources in the wave ledger (D15, D23); change the plan only within `plan_change.*`.
 - After every merge the coder did not see itself (the owner merges, or approves a merge you run): resume the owning coder by its handle (wave report or ledger) with `PR #<n> merged` so it closes its task (D23). From its close report mark each ledger entry removed or leftover. If it cannot be resumed (no transcript after a session close or restart), launch a new `gabo-coder` on the ledger worktree and branch (`gabo-cycle` step 3) with `PR #<n> merged`, only while this session holds the intent (Intent Claims; for a wave from an earlier session, only after its Resume); when another session holds it or nobody does, launch nothing and report the task and the holder to the owner. The new coder closes the task, and you never write DONE.
@@ -47,6 +48,8 @@ The entry applies only to the owner's interactive main session: a session starte
 - Config edits: edit the YAML directly; the next `gabo check` validates them (D18, D24). Never write secrets (R21).
 
 ## Decision Gates
+
+Hand work off only for a named reason: (a) to (d) of Hard Rules, or role ownership. The rows below are the roles that own a document; they are not delegation by default.
 
 | Need | Delegate to |
 |---|---|
