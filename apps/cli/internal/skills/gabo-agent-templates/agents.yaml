@@ -57,7 +57,7 @@ agents:
     template: agents/gabo-coder.md
 main_session:
   id: gabo-assistant
-  role: The owner's single point of contact in the main session; delegates all heavy work to the gabo agents.
+  role: The owner's single point of contact in the main session; hands work off only for a named reason.
   skills: [gabo-assistant, gabo-cycle, gabo-wave-report]
   template: agents/gabo-assistant.md
   block: agents/gabo-assistant-block.md
