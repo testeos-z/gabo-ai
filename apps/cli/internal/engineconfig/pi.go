@@ -9,7 +9,7 @@ import (
 // intent 0006 S7): the quoted block of gabo-runtime-pi Prerequisite step 4,
 // kept equal to the catalog skill by a test. The Pi hook mode and the pi
 // section of the init report both print it.
-const SubagentRefusal = "Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `pi install npm:gentle-pi` after adding `\"npmCommand\": [\"bun\"]` to Pi's global agent settings, so Pi's own installer runs through bun and needs no npm (bun must be on PATH); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild."
+const SubagentRefusal = "Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi; npm is used only because gentle-pi's postinstall needs it); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild."
 
 // PiPackage is the npm package of the gabo Pi integration, published with
 // each release (D9). gabo writes it from this constant, never from

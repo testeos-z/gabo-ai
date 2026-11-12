@@ -48,7 +48,7 @@ func TestRuntimePiSkill(t *testing.T) {
 
 	for _, s := range []string{
 		// prerequisite: a subagent package, checked read-only, never configured.
-		"`pi list`", "`\"npmCommand\": [\"bun\"]`", "`pi install npm:gentle-pi`", "another subagent package",
+		"`pi list`", "`npm i -g gentle-pi`", "`pi install npm:gentle-pi`", "npm is used only because gentle-pi's postinstall needs it", "another subagent package",
 		"Never edit", "`subagents.json`", "refuse",
 		// refusal without a subagent package: no fallback, recommends gentle-pi and the full Gentle AI framework (S15).
 		"Pi has no subagents, so gabo cannot work on Pi without a subagent package",
