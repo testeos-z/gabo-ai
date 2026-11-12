@@ -40,7 +40,8 @@ func TestCycleRunsWaveRecordStamps(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	steps := section(t, doc, "\n2. Intent claim", "\n3. Resume")
-	requireIn(t, "gabo-cycle step 2", steps, []string{waveRecord + " stamp wave-started`", "paste its output unchanged", "On a wave start only (never when the holder resumes)"})
+	requireIn(t, "gabo-cycle step 2", steps, []string{waveRecord + " stamp wave-started`", "paste each output unchanged", "On a wave start only (never when the holder resumes)",
+		waveRecord + " stamp session-started gabo-assistant main`", "an earlier run of the same wave id stay in the file and count"})
 	launch := section(t, doc, "\n5. Per task:", "\n6. On each outcome")
 	requireIn(t, "gabo-cycle step 5", launch, []string{
 		waveRecord + " stamp session-started <agent> <task id>` before the launch call",
@@ -52,9 +53,14 @@ func TestCycleRunsWaveRecordStamps(t *testing.T) {
 	})
 	report := section(t, doc, "\n8. Report:", "\n## Output Contract")
 	requireIn(t, "gabo-cycle step 8", report, []string{waveRecord + " stamp wave-reported`"})
+	step3 := section(t, doc, "\n3. Resume (D17)", "\n4. Read this intent")
+	requireIn(t, "gabo-cycle step 3", step3, []string{"stamped as in the Trace rule"})
 	trace := section(t, doc, "- Trace (D17)", "\n\n")
 	requireIn(t, "gabo-cycle Trace", trace, []string{
-		"adds the content of the stamps file as one more entry of `gabo/trace/<wave>`, never replacing the entries above",
+		waveRecord + " stamp session-started <agent> <task id>` (step 5, a replacement coder of step 3 or of the turn-cap resume included, none for a resume by a coder's handle)",
+		"${XDG_STATE_HOME:-$HOME/.local/state}/gabo/waves/<wave>/stamps",
+		"as one more entry of `gabo/trace/<wave>`, never replacing the entries above",
+		"adds the content of the stamps file (",
 		waveRecord + " saves add <topic key> <observation id>` after each `mem_save`",
 		waveRecord + " saves read <topic key>` after each read-back that matched",
 	})
@@ -66,7 +72,9 @@ func TestWaveReportMeasuresAndSavesComeFromTheScript(t *testing.T) {
 	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
 	measures := section(t, doc, "9. **Measures**", "\n10. ")
 	requireIn(t, "gabo-wave-report Measures", measures, []string{
-		"the wall time, agent sessions and PRs opened and merged lines are the output of " + waveRecord + " measures` pasted unchanged",
+		"the wall time line, the agent sessions lines (one per agent, in the script's format",
+		"are the lines of " + waveRecord + " measures` pasted unchanged",
+		"each at its own place in the order above (the block may be split there)",
 		"the other lines (fix rounds per task, plan-change proposals, interactions, tokens, each task's outcome) are still built as below",
 		"never a figure with `~`",
 	})
