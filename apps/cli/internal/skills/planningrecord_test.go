@@ -44,7 +44,7 @@ func TestMemoryExampleNamesPlanningTopic(t *testing.T) {
 	requireIn(t, "memory-engram.md", doc, []string{
 		"| planning record | `gabo/trace/<I####>/planning` |",
 		"topic key is exactly `gabo/trace/<wave>`",
-		"ignores keys with a segment after the wave id",
+		"ignoring keys with a segment after the wave id",
 		"separate record saved with the same operation",
 	})
 	for _, h := range []string{"### save wave trace", "### read wave trace", "### save ledger"} {
