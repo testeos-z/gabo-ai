@@ -27,7 +27,7 @@ In the steps, "ask the agent" means a prompt in the Pi session, and a blocked ca
 The subagent refusal quoted in steps 4 and 5 is this text, from `gabo-runtime-pi` (Prerequisite step 4):
 
 ```text
-Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `npm i -g gentle-pi` (adds the `gentle-shell` launcher) or `pi install npm:gentle-pi` (inside plain Pi); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild.
+Pi has no subagents, so gabo cannot work on Pi without a subagent package. For subagents I recommend gentle-pi, installed with `pi install npm:gentle-pi` after adding `"npmCommand": ["bun"]` to Pi's global agent settings, so Pi's own installer runs through bun and needs no npm (bun must be on PATH); another subagent package is acceptable. As the recommended setup I recommend the full Gentle AI framework (https://github.com/Gentleman-Programming/gentle-ai): its methodology with RDD and the Engram memory stack, set up for Pi with `gentle-ai install --agent pi`. Then ask me to rebuild.
 ```
 
 ## Steps
