@@ -27,7 +27,7 @@ slots:
   methodology:
     adapter: .claude/skills/gabo-methodology-gentle-ai/SKILL.md
   # Owner choice 2026-10-28: the catalog local placement adapter covers the
-  # reviewer_placement contract; the gabo-reviewer agent stays template-built.
+  # reviewer_placement contract; it runs the user-level gabo-reviewer skill scripts.
   reviewer_placement:
     adapter: .gabo/skills/gabo-reviewer-placement-local/SKILL.md
   # Owner choice 2026-10-28: agents run on the owner's machine (catalog adapter).
