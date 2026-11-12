@@ -282,6 +282,15 @@ else
   fail "gabo-agent-check fails when the checkout is not on dev"
 fi
 
+# The image is bun-only: the default tool check requires bun and not npm.
+new_case
+out="$(run env -u GABO_REQUIRED_TOOLS GABO_ENGRAM_VERSION=3.6.0 gabo-agent-check 2>&1 || true)"
+if grep -q 'PATH: bun' <<<"$out" && ! grep -qw 'npm' <<<"$out"; then
+  pass "gabo-agent-check requires bun and not npm by default"
+else
+  fail "gabo-agent-check requires bun and not npm by default"
+fi
+
 if [ "$failures" -gt 0 ]; then
   printf '%d test(s) failed\n' "$failures"
   exit 1
