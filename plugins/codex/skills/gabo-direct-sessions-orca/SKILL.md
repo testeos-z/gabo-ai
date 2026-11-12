@@ -4,16 +4,16 @@ description: "Trigger: direct session, talk to the coder, intervene in a task, o
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.2"
+  version: "1.3"
 ---
 ## Activation Contract
 
-Use when the owner or the assistant opens, drives, reads or closes a direct session. This adapter fills the `direct_sessions` slot contract (`gabo-contract-direct-sessions`, TRD 9.1; R14, R18, US-005) with the Orca CLI: one named Orca terminal per session running the agent CLI of the resolved coder engine (`claude` or `pi`, see Engine Resolution), driven through the terminal handle Orca returns. `send message` and `read state` also reach an Orca terminal session that `agent_host` started on a remote Orca host, through its `host` and `handle` fields (see Handle). Point `slots.direct_sessions.adapter` at this skill's `SKILL.md`. Verified against Orca CLI 1.4.227 (`orca <command> --help`); on that CLI `orca terminal show --help`, `orca terminal read --help` and `orca terminal send --help` list `--environment`.
+Use when the owner or the assistant opens, drives, reads or closes a direct session. This adapter fills the `direct_sessions` slot contract (`gabo-contract-direct-sessions`, TRD 9.1; R14, R18, US-005) with the Orca CLI: one named Orca terminal per session running the agent CLI of the resolved coder engine (`claude` or `pi`, see Engine Resolution), driven through the terminal handle Orca returns. `open session` and `close session` also run on a remote Orca host, and `send message` and `read state` also reach an Orca terminal session that `agent_host` started there, through its `host` and `handle` fields (see Handle). Point `slots.direct_sessions.adapter` at this skill's `SKILL.md`. Verified against Orca CLI 1.4.227 (`orca <command> --help`); on that CLI `orca terminal show --help`, `orca terminal read --help` and `orca terminal send --help` list `--environment`.
 
 ## Hard Rules
 
-- Open a session only in an existing task worktree, selected with `--worktree path:<worktree>`; never run `orca worktree create`, `orca worktree rm` or `orca terminal close --all`, and never touch another task's worktree.
-- `open session` runs on the local Orca only; a session on a remote host is started by `agent_host`.
+- Open a session only in an existing task worktree, selected with `--worktree path:<worktree>` (on a remote host, `--worktree path:<path on that host>`, given by the caller); never run `orca worktree create`, `orca worktree rm` or `orca terminal close --all`, and never touch another task's worktree.
+- `open session` still opens `claude` and `pi` sessions only, and never runs `orca worktree create` or `orca worktree list` on a remote host.
 - Name every session `gabo-<task id>` with `--title`, so the owner can find it in Orca.
 - The brief names the task id, the worktree path and the branch, and repeats the coder's hard rules: never merge, never force-push, never post the reviewer marker.
 - While the task's coder is running, send messages only when the owner asked for it.
@@ -34,7 +34,7 @@ Use when the owner or the assistant opens, drives, reads or closes a direct sess
 
 ## Remote Use
 
-- Before any command to a remote `host`, the owner's explicit authorization, given in this session, must name the host, the operation (`send message` or `read state`) and the credential or session to use.
+- Before any command to a remote `host`, the owner's explicit authorization, given in this session, must name the host, the operation (`open session`, `send message`, `read state` or `close session`) and the credential or session to use.
 - With no authorization that names all three, send and read nothing and ask the caller for it.
 - An authorization for host A never reaches host B.
 - Never discover, reuse or create an Orca pairing, a credential, an SSH agent, a ControlMaster socket or an authenticated session; their presence is not permission.
@@ -52,7 +52,9 @@ Resolve the coder engine from `gabo.yaml` before `open session` (intent 0013 S10
 
 ### open session
 
-Opens on the local Orca only; a session on a remote host is started by `agent_host`.
+Opens a session on the local Orca, or on a remote Orca host when the caller names one.
+
+Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command. For a remote `host`, check that it equals `GABO_ORCA_ENVIRONMENT` and that the variable is set and non-empty; otherwise refuse and run no command.
 
 Write the brief to a file in a `mktemp -d` dir, outside the worktree. Then:
 
@@ -64,6 +66,17 @@ orca terminal send --terminal <handle> --text "$(cat <brief file>)" --enter --wa
 ```
 
 `<agent cli>` is the resolved coder engine (`claude` or `pi`, Engine Resolution). Keep the terminal handle returned by `terminal create` as the `handle` field, with `host` `local`. Confirm with `orca terminal list --worktree path:<worktree> --json`: the handle is listed.
+
+A remote `host` runs the same commands with the environment flag after each `orca terminal` subcommand:
+
+```bash
+orca terminal create --environment "$GABO_ORCA_ENVIRONMENT" --worktree path:<path on that host> --title "gabo-<task id>" --command "<agent cli>" --json
+orca terminal wait --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --for tui-idle --timeout-ms 60000 --json
+orca terminal send --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --text "$(cat <brief file>)" --enter --wait-submit 10 --json
+orca terminal list --environment "$GABO_ORCA_ENVIRONMENT" --worktree path:<path on that host> --json
+```
+
+A remote `terminal create` requires `--worktree path:<path on that host>`: the caller gives that path, the adapter never discovers it, and a missing path is refused before any `orca` command. The handle is returned with `host` set to the Orca environment name.
 
 ### send message
 
@@ -101,11 +114,20 @@ orca terminal read --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --
 
 ### close session
 
-Closes only a handle this slot opened on the local host and recorded in the wave ledger. For any other handle, including every remote `host`, refuse and name `stop agent session` of the host that reported it; `agent_host` owns the lifecycle of the sessions it started.
+Closes only a handle this slot opened, on the local host or on a remote `host`, and recorded in the wave ledger. For any other handle, local or remote, refuse and name `stop agent session` of the host that reported it; `agent_host` owns the lifecycle of the sessions it started.
+
+Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command. For a remote `host`, check that it equals `GABO_ORCA_ENVIRONMENT` and that the variable is set and non-empty; otherwise refuse and run no command. A `local` handle:
 
 ```bash
 orca terminal close --terminal <handle> --tab --json
 orca terminal list --worktree path:<worktree> --json
+```
+
+A remote handle runs the same commands with the environment flag:
+
+```bash
+orca terminal close --environment "$GABO_ORCA_ENVIRONMENT" --terminal <handle> --tab --json
+orca terminal list --environment "$GABO_ORCA_ENVIRONMENT" --worktree path:<path on that host> --json
 ```
 
 The handle must no longer appear in the list; if it does, report the session as still open.
