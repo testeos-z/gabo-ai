@@ -194,6 +194,22 @@
             "after": {
               "description": "What the assistant does when a wave closes: next starts the next intent whose spec is accepted and that has unblocked tasks; wait stops and reports. Unset means wait. With no eligible intent it waits either way.",
               "enum": ["next", "wait", "", null]
+            },
+            "max_coder_turns": {
+              "description": "Most turns one coder may use before it stops and the wave pauses. Unset means no cap.",
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "max_coders": {
+              "description": "Most coders one wave may launch before it pauses. Unset means no cap.",
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "max_fix_rounds": {
+              "description": "Most fix rounds per task before the wave pauses, from 1 to 4. Unset means the built-in 4.",
+              "type": ["integer", "null"],
+              "minimum": 1,
+              "maximum": 4
             }
           }
         }

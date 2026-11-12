@@ -128,6 +128,8 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"wave after wait":         with("wave: {after: wait}"),
 		"null wave":               with("wave:\n"),
 		"empty wave after":        with(`wave: {after: ""}`),
+		"wave caps":               with("wave: {max_coder_turns: 30, max_coders: 1, max_fix_rounds: 4}"),
+		"null wave caps":          with("wave: {max_coder_turns: null, max_coders: null, max_fix_rounds: null}"),
 	}
 	reject := map[string]string{
 		"missing runtimes.coder":      string(without(t, "runtimes.coder")),
@@ -199,6 +201,11 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"string global_without_owner": with("plan_change: {global_without_owner: maybe}"),
 		"bad wave after":              with("wave: {after: later}"),
 		"unknown wave field":          with("wave: {chain: true}"),
+		"zero max coders":             with("wave: {max_coders: 0}"),
+		"zero max coder turns":        with("wave: {max_coder_turns: 0}"),
+		"zero max fix rounds":         with("wave: {max_fix_rounds: 0}"),
+		"five max fix rounds":         with("wave: {max_fix_rounds: 5}"),
+		"string max coders":           with("wave: {max_coders: many}"),
 		"bad interaction level":       with("interaction_level: max"),
 		"bad language":                with("language: 'not a tag'"),
 		"not a mapping":               "- a\n- b\n",
@@ -472,5 +479,15 @@ func TestSchemaRuntimeRefusalsAreOneLine(t *testing.T) {
 		if err := ValidateSchema(SchemaLayer, []byte(doc)); err != nil {
 			t.Errorf("%s: error = %v, want valid", doc, err)
 		}
+	}
+}
+
+// A non-integer cap fails the schema (the Go decoder alone truncates it).
+func TestSchemaRejectsFloatWaveCap(t *testing.T) {
+	t.Parallel()
+	doc := "wave: {max_coders: 1.5}\n"
+	err := ValidateSchema(SchemaFile, []byte(doc))
+	if err == nil || !strings.Contains(err.Error(), "wave.max_coders") {
+		t.Errorf("ValidateSchema() error = %v, want a float cap rejected", err)
 	}
 }

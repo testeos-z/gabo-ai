@@ -90,6 +90,12 @@ const (
 // Wave configures how waves chain. Chaining is optional: unset means wait.
 type Wave struct {
 	After string `yaml:"after,omitempty"`
+
+	// Optional caps (intent 0020). A pointer tells unset (nil) from 0, which
+	// is rejected; no default fills a value.
+	MaxCoderTurns *int `yaml:"max_coder_turns,omitempty"`
+	MaxCoders     *int `yaml:"max_coders,omitempty"`
+	MaxFixRounds  *int `yaml:"max_fix_rounds,omitempty"`
 }
 
 // AfterWave is wave.after with its default: an unset key reads as
@@ -158,6 +164,15 @@ func (c Config) validateProjectKeys() []error {
 	case "", AfterNext, AfterWait:
 	default:
 		fail("wave.after", "must be %q or %q, got %q", AfterNext, AfterWait, c.Wave.After)
+	}
+	if n := c.Wave.MaxCoderTurns; n != nil && *n < 1 {
+		fail("wave.max_coder_turns", "must be at least 1, got %d", *n)
+	}
+	if n := c.Wave.MaxCoders; n != nil && *n < 1 {
+		fail("wave.max_coders", "must be at least 1, got %d", *n)
+	}
+	if n := c.Wave.MaxFixRounds; n != nil && (*n < 1 || *n > 4) {
+		fail("wave.max_fix_rounds", "must be from 1 to 4, got %d", *n)
 	}
 	return errs
 }
