@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0022-measure-roles](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted (owner, 2026-11-12) |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-11 |
