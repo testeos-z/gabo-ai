@@ -57,5 +57,5 @@ func TestWaveReportNoLongerComposesTheTurnCapLabel(t *testing.T) {
 			t.Errorf("gabo-wave-report/SKILL.md: still composes the turn-cap label (%q)", bad)
 		}
 	}
-	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{"the labels belong to the script and are never composed here"})
+	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{"the labels belong to the script and are never composed here", "takes effect only after the agents are rebuilt"})
 }
