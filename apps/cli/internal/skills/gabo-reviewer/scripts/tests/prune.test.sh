@@ -345,4 +345,16 @@ chmod +x "$work/bin/claude-lock"
 d="$(reviewer head_lock head REVIEWER_CLAUDE="$work/bin/claude-lock")"
 expect_eq "busy" "$(cat "$work/head_lock/lockprobe" 2>/dev/null)" "an exclusive lock is refused while a review runs"
 
+echo "# a failing cache prune never changes the verdict of head"
+seed head_fail
+fill "$work/head_fail/cache/go-build" 3000
+mkdir -p "$work/gobin4"
+# fails only `go clean`; every other call goes to the suite's go stub
+printf '#!/usr/bin/env bash\n[[ "$1" != clean ]] || exit 1\nexec %q "$@"\n' "$work/bin/go" >"$work/gobin4/go"
+chmod +x "$work/gobin4/go"
+d="$(reviewer head_fail head REVIEWER_CACHE_MAX=1M PATH="$work/gobin4:$PATH")"
+d0="$(reviewer head_ok head REVIEWER_CACHE_MAX=1G)"
+expect_eq "$(grep -E '^VERDICT ' "$d0/out.log" | sed 's/head [0-9a-f]*//')" "$(grep -E '^VERDICT ' "$d/out.log" | sed 's/head [0-9a-f]*//')" "the VERDICT line is the same with a failing go clean"
+expect_match 'WARN prune: go clean -cache failed' "$(cat "$d/state/reviewer.log")" "head logged the failed prune"
+
 finish

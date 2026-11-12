@@ -136,8 +136,14 @@ review_head() {
   (
     mkdir -p "$STATE/locks"
     exec 5>"$STATE/locks/cache.lock"
-    flock -s 5
-    CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN" run_bounded "$HEAD_TIMEOUT" "$log" bash "$HEAD_SCRIPT" "$1" "$2"
+    # A bounded wait: a stuck prune never hangs the head. The run itself does
+    # not inherit the descriptor (5>&-), so PR code and the review cannot drop
+    # the lock or keep it.
+    if ! flock -s -w "$HEAD_TIMEOUT" 5; then
+      echo "$(now_utc) RETRY #$1 $2 the cache lock stayed held; run the review again" >"$log"
+      exit 1
+    fi
+    CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN" run_bounded "$HEAD_TIMEOUT" "$log" bash "$HEAD_SCRIPT" "$1" "$2" 5>&-
   ) || code=$?
   outcome="$(cat "$log")"
   has() { grep -qE "^[^ ]+ $1 #$2( |$)" <<<"$outcome"; }
