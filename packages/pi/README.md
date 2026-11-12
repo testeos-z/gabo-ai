@@ -57,16 +57,16 @@ Publishing to npm is automated:
 
 1. A merge to `main` runs [`sync-pi-pkg-up.yml`](../../.github/workflows/sync-pi-pkg-up.yml): it runs [`scripts/sync-pkg-up.sh`](scripts/sync-pkg-up.sh), which merges `main` into the `pi/pkg-up` branch (fast-forward when possible, a merge commit otherwise; it fails on a conflict outside `.github/workflows/`) and pushes it. The push uses `GITHUB_TOKEN`, which GitHub refuses for any change under `.github/workflows/`, so the merge always keeps `pi/pkg-up`'s own `.github/workflows/`: workflow changes on `main` do not reach `pi/pkg-up` automatically (see [Updating workflows on `pi/pkg-up`](#updating-workflows-on-pipkg-up)). `test/sync-pkg-up.test.ts` covers it against a temporary git repository.
 2. It then dispatches [`publish-pi.yml`](../../.github/workflows/publish-pi.yml) on `pi/pkg-up` (a push made with the workflow token starts no workflow by itself). A direct push to `pi/pkg-up` that touches `packages/pi/` starts it too.
-3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `npm publish --access public` only when `@gabo-ai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
+3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `bun publish --access public` only when `@gabo-ai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
 
 The owner's gate is the merge into `main`, which only the owner performs. Before merging a release to `main`, the owner runs the [verification procedure](VERIFY.md) on a real Pi.
 
-It needs the repository secret `NPM_TOKEN`: an npm granular access token with read and write on the `@gabo-ai` scope and 2FA bypass for publishing. Two npm limits apply (the npm token page shows both):
+It needs the repository secret `NPM_TOKEN`, passed to `bun publish` as `NPM_CONFIG_TOKEN`: an npm granular access token with read and write on the `@gabo-ai` scope and 2FA bypass for publishing. Two npm limits apply (the npm token page shows both):
 
 - Granular tokens with write permissions have a maximum lifetime of 90 days ([GitHub changelog, 2025-11-05](https://github.blog/changelog/2025-11-05-npm-security-update-classic-token-creation-disabled-and-granular-token-changes/): "All npm existing granular tokens with write permissions are now capped at 90-day maximum lifetime"), so rotate the secret before it expires.
 - npm removes direct publishing with granular tokens in January 2027 ([npm docs, About access tokens](https://docs.npmjs.com/about-access-tokens): "The ability to publish new package versions directly with a granular access token will be removed in January 2027"). After that this workflow can no longer publish with `NPM_TOKEN`; the follow-up is npm trusted publishing (OIDC from GitHub Actions), which needs no stored token.
 
-The publish decision lives in [`scripts/publish-decision.sh`](scripts/publish-decision.sh) (already published: exit 0, no publish; `npm view` E404 or empty: publish; any other `npm view` error: the job fails). `test/publish-decision.test.ts` runs it against a fake `npm`.
+The publish decision lives in [`scripts/publish-decision.sh`](scripts/publish-decision.sh) (already published: exit 0, no publish; `bun info` reports a 404 or an empty result: publish; any other `bun info` error: the job fails). `test/publish-decision.test.ts` runs it against a fake `bun`.
 
 ### Updating workflows on `pi/pkg-up`
 
