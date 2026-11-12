@@ -190,7 +190,7 @@ func TestRuntimeOpenCodeWritesTheAgentShape(t *testing.T) {
 	if len(bl) < 3 || !strings.HasPrefix(bl[2], "Skills: ") {
 		t.Errorf("body third line does not start with Skills: :\n%s", body)
 	}
-	for _, want := range []string{"`.opencode/agents/<id>.md`", "no other key", "double quotes", "`mode: subagent`", "frontmatter holds `description`, `mode` and `permissions` and no other key"} {
+	for _, want := range []string{"`.opencode/agents/<id>.md`", "no other key", "double quotes", "`mode: subagent`", "frontmatter holds `description`, `mode` and `permissions` and no other key, except `steps` for `gabo-coder`"} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("%s: missing %q", runtimeOpenCode, want)
 		}

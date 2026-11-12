@@ -4,7 +4,7 @@ description: "Trigger: gabo wave report, build wave report, save wave report, wa
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.1"
+  version: "1.2"
 ---
 ## Activation Contract
 
@@ -19,7 +19,7 @@ Load in the main session when it runs the `gabo-cycle` skill and builds the wave
 
 ## Report Format (TRD 9.2)
 
-1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`, and the line `session engine: <engine>`, the engine the wave ran on (intent 0013 S7; `unknown (rebuild the agents)` when the main-session entry has no engine line). When `runtimes.coder` is a fixed engine other than the session engine, also the line `coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`.
+1. **Wave**: wave id, mode, start time from `gabo/trace/<wave>`, and the line `session engine: <engine>`, the engine the wave ran on (intent 0013 S7; `unknown (rebuild the agents)` when the main-session entry has no engine line). When `runtimes.coder` is a fixed engine other than the session engine, also the line `coders ran on <session engine> (runtimes.coder is <engine>; subagents inherit the session engine)`. A wave that stopped at a launch cap (intent 0020) adds the paused line `status: paused`: the cap that fired (`max_coders`, `max_fix_rounds` or `max_coder_turns`), the affected task ids and the question "continue or stop". With any cap set, one line per cap in effect in the form `<cap>: <enforcement>` (for example `max_coder_turns: advisory`), the enforcement being: `enforced by the engine` (`max_coder_turns` on Claude Code and OpenCode, only when the built `gabo-coder` agent file carries the engine key `maxTurns` or `steps`; read it, and when it does not, say `advisory`), `enforced by the cycle` (`max_coders` and `max_fix_rounds`) or `advisory` (`max_coder_turns` on Codex and Pi), and the line `spend is not capped by gabo`. No section is added or reordered.
 2. **Tasks**: one line per task: task id, status (DONE, HANDED, BLOCKED), PR, last verdict, fix rounds, coder handle. A BLOCKED task adds its reason.
 3. **Questions**: each question raised with its answer and resolver (R5), and whether it was a manual answer or an auto decision record.
 4. **Interactions**: interaction count with the reasons for each interaction with the owner (R29).
