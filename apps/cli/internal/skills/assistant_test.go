@@ -220,7 +220,7 @@ func TestAssistantRunsTheWaveInItsOwnSession(t *testing.T) {
 	_, hard, _ := strings.Cut(doc, "## Hard Rules")
 	hard, _, _ = strings.Cut(hard, "\n## ")
 	requireIn(t, "gabo-assistant Hard Rules", hard, []string{
-		"One exception: you run the `gabo-cycle` steps yourself; exploring, writing documents and writing code still go to subagents",
+		"One exception to doing the work yourself: you run the `gabo-cycle` steps yourself; other work follows the reasons above",
 		"the session holds the wave's context",
 		"the trace lets it compact or be resumed",
 	})
