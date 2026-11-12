@@ -106,7 +106,7 @@ func TestDirectSessionsContractRequiresOwnerAuthorizationForRemoteUse(t *testing
 	t.Parallel()
 	doc := readCatalog(t, directSessionsContract)
 	requireIn(t, directSessionsContract, contractSection(doc, "## Hard Rules"), []string{
-		"Any remote use needs the owner's explicit authorization, given in this session, that names the host, the operation (`send message` or `read state`) and the credential or session to use.",
+		"Any remote use needs the owner's explicit authorization, given in this session, that names the host, the operation (`open session`, `send message`, `read state` or `close session`) and the credential or session to use.",
 		"A missing authorization sends and reads nothing, and the adapter asks the caller for it.",
 		"An authorization for host A never reaches host B.",
 		"The adapter never discovers or reuses ambient credentials, SSH agents, ControlMaster sockets, Orca pairings or authenticated sessions.",

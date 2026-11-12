@@ -84,7 +84,7 @@ func TestDirectSessionsOrcaRemoteUseNeedsAuthorization(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, directSessions)
 	sectionRequire(t, "## Remote Use", contractSection(doc, "## Remote Use"), []string{
-		"Before any command to a remote `host`, the owner's explicit authorization, given in this session, must name the host, the operation (`send message` or `read state`) and the credential or session to use.",
+		"Before any command to a remote `host`, the owner's explicit authorization, given in this session, must name the host, the operation (`open session`, `send message`, `read state` or `close session`) and the credential or session to use.",
 		"With no authorization that names all three, send and read nothing and ask the caller for it.",
 		"An authorization for host A never reaches host B.",
 		"Never discover, reuse or create an Orca pairing, a credential, an SSH agent, a ControlMaster socket or an authenticated session; their presence is not permission.",
@@ -113,7 +113,7 @@ func TestDirectSessionsOrcaSendAndReadWorkForAnyEngine(t *testing.T) {
 		"This adapter opens `claude` and `pi` sessions only: a resolved `codex` or `opencode` is refused with `refused: <engine> has no Orca session command in gabo-direct-sessions-orca`.",
 	})
 	sectionRequire(t, "### open session", contractSection(doc, "### open session"), []string{
-		"Opens on the local Orca only; a session on a remote host is started by `agent_host`.",
+		"Opens a session on the local Orca, or on a remote Orca host when the caller names one.",
 	})
 }
 
@@ -124,9 +124,48 @@ func TestDirectSessionsOrcaCloseRefusesSessionsItDidNotOpen(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, directSessions)
 	sectionRequire(t, "### close session", contractSection(doc, "### close session"), []string{
-		"Closes only a handle this slot opened on the local host and recorded in the wave ledger.",
-		"For any other handle, including every remote `host`, refuse and name `stop agent session` of the host that reported it",
+		"Closes only a handle this slot opened, on the local host or on a remote `host`, and recorded in the wave ledger.",
+		"For any other handle, local or remote, refuse and name `stop agent session` of the host that reported it",
 	})
+}
+
+// Intent 0019 S1, S3, S4, S8, D1 (plan T8, PD7): open session and close session
+// take a remote host. Every remote command carries --environment with the env var
+// name; a remote terminal create needs the caller's --worktree path:<path on that
+// host>, never discovered, refused when missing.
+func TestDirectSessionsOrcaOpenAndCloseTakeARemoteHost(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, directSessions)
+	open := contractSection(doc, "### open session")
+	requireIn(t, directSessions+" ### open session", open, []string{
+		"orca terminal create " + remoteFlag + " --worktree path:<path on that host> --title \"gabo-<task id>\" --command \"<agent cli>\" --json",
+		"orca terminal wait " + remoteFlag + " --terminal <handle> --for tui-idle --timeout-ms 60000 --json",
+		"orca terminal send " + remoteFlag + " --terminal <handle> --text \"$(cat <brief file>)\" --enter --wait-submit 10 --json",
+		"orca terminal list " + remoteFlag + " --worktree path:<path on that host> --json",
+		"A remote `terminal create` requires `--worktree path:<path on that host>`: the caller gives that path, the adapter never discovers it, and a missing path is refused before any `orca` command.",
+		"returned with `host` set to the Orca environment name",
+	})
+	closeOp := contractSection(doc, "### close session")
+	requireIn(t, directSessions+" ### close session", closeOp, []string{
+		"orca terminal close " + remoteFlag + " --terminal <handle> --tab --json",
+		"orca terminal list " + remoteFlag + " --worktree path:<path on that host> --json",
+	})
+	for _, op := range []string{"### open session", "### close session"} {
+		sectionRequire(t, op, contractSection(doc, op), []string{
+			"Check the handle under `## Handle` and, for a remote `host`, the authorization under `## Remote Use` before any command.",
+			"For a remote `host`, check that it equals `GABO_ORCA_ENVIRONMENT` and that the variable is set and non-empty; otherwise refuse and run no command.",
+		})
+	}
+	if strings.Contains(doc, "`open session` runs on the local Orca only") {
+		t.Errorf("%s: still limits open session to the local Orca", directSessions)
+	}
+}
+
+// Intent 0019 D6 (plan T8): the adapter is at version 1.3.
+func TestDirectSessionsOrcaVersionIs13(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, directSessions)
+	requireIn(t, directSessions, doc, []string{`version: "1.3"`})
 }
 
 // Intent 0019 S2, PD3 (plan T2): the host name a remote handle carries is the one
