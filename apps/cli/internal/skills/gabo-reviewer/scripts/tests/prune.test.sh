@@ -106,6 +106,20 @@ run_prune "$d" "" REVIEWER_KEEP_DAYS=2 >/dev/null
 check "the environment overrides the days" gone "$d" 1
 check "config.env ships REVIEWER_KEEP_DAYS=7" grep -qx 'REVIEWER_KEEP_DAYS=7' "$skill/config.env"
 
+echo "# the lock is held while prune decides and removes"
+d="$(state_dir race)"
+add_wt "$d" 1 CLOSED
+cat >"$work/bin/gh-race" <<RACE
+#!/usr/bin/env bash
+# a review that starts while prune reads the PR state: it must not get the lock
+if (exec 5>"$d/state/locks/pr-1.lock"; flock -n 5); then echo free >"$d/probe"; else echo busy >"$d/probe"; fi
+exec "$work/bin/gh" "\$@"
+RACE
+chmod +x "$work/bin/gh-race"
+run_prune "$d" "" REVIEWER_GH="$work/bin/gh-race" >/dev/null
+expect_eq "busy" "$(cat "$d/probe" 2>/dev/null)" "pr-<n>.lock is held while the PR state is read"
+check "the race fixture's worktree is still pruned" gone "$d" 1
+
 echo "# 349 worktrees of closed PRs"
 d="$(state_dir many)"
 for n in $(seq 1 349); do
