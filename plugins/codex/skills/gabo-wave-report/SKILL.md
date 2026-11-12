@@ -25,7 +25,7 @@ Load in the main session when it runs the `gabo-cycle` skill and builds the wave
 4. **Interactions**: interaction count with the reasons for each interaction with the owner (R29).
 5. **Unverified writes**: every tracker, host or memory write whose re-read did not show it (R24).
 6. **Resume disagreements**: the resume disagreements the cycle left alone, where tracker, host and trace differ (D17).
-7. **Leftovers**: REFUSED removals and leftovers from coder task closes and the wave-close sweep: paths, branches, containers, test databases; merged tasks still open because no coder could close them (R13).
+7. **Leftovers**: REFUSED removals and leftovers from coder task closes and the wave-close sweep: paths, branches, containers, test databases; merged tasks still open because no coder could close them (R13). On Pi, a task worktree the cycle could not register is listed here as `worktree not registered (<reason>)` with its path (intent 0023 S3).
 8. **Plan-change proposals**: the plan-change proposals of the wave, each with issue or PR, scope, affected tasks and outcome.
 9. **Denied board moves**: denied board moves as the exact list (`issue -> Ready`, `issue -> Backlog`) for the assistant to apply.
 10. **Comfort answer**: the owner's comfort answer to apply next wave (R17). The cycle writes `pending`; the assistant fills it at Wave Close and saves the report again with `save wave trace`, read back.
