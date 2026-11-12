@@ -82,6 +82,7 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 ```
 
 - `description` is the spec `role` in double quotes, so a colon in it stays plain text.
+- The agent file has no turn-limit key: the coder gets no engine key for the turn limit; it travels in the launch input as `turn limit: <n>` and is advisory.
 - `gabo-version: <version>` is the template's version line, moved into the frontmatter with the value of `.gabo/VERSION`; `gabo check` compares it with the stamp.
 - `gabo-engine: pi` is the template's engine line, moved into the frontmatter with `pi`, the engine as written in `gabo.yaml`; `gabo check` fails an agent file whose filled engine is not `pi` (intent 0013 S6).
 - The `Skills:` line is the spec's `skills` written where Pi can see it (a Pi agent has no skill-list field; the body is its system prompt). Omit the line when the list is empty.
@@ -105,6 +106,7 @@ Slots:
 | `{{methodology}}` | `gabo-methodology` |
 | `{{adapter:<slot>}}` | `gabo-<slot>` with `_` written `-` (for example `gabo-repository-host`) |
 | `{{engine}}` | `pi` (intent 0013 S6) |
+| `{{turn_limit_line}}` | with `wave.max_coder_turns` set: `Turn limit: <n> turns; stop at it and report STOPPED at turn limit.`; unset: remove the whole line; filled in `gabo-coder`, the only template that carries the slot |
 | `{{reviewer_script}}` | `${GENTLE_PI_AGENT_HOME:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}}/skills/gabo-reviewer/scripts/reviewer.sh` (expanded by `bash` inside the template's double quotes, so the committed file holds no personal path; standalone `gentle-shell` sets both variables to its home); filled in `gabo-coder`, the only template that carries the slot |
 
 The Pi coder runs the user-level reviewer script itself like every other engine's coder (intent 0015 D5, which supersedes intent 0013 D15): the Pi coder body is the template with the slots above filled, and this skill rewrites none of its bullets.
