@@ -153,7 +153,7 @@ if [[ -z "$merge_sha" ]]; then
 fi
 base="$(git -C "$mirror" merge-base "$base_ref" "$sha")" || skip "no merge base with $BASE_BRANCH"
 if [[ -d "$wt" ]]; then
-  git -C "$wt" checkout -q --detach --force "$sha" >>"$logs/fetch.log" 2>&1
+  git -C "$wt" checkout -q --detach --force "$sha" >>"$logs/fetch.log" 2>&1 && touch "$wt"
 else
   mkdir -p "$WORKDIR/worktrees"
   git -C "$mirror" worktree add -q --detach "$wt" "$sha" >>"$logs/fetch.log" 2>&1

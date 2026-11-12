@@ -4,6 +4,8 @@
 #   reviewer.sh head <pr> <sha>      reviews that head (40-hex) if it is due
 #   reviewer.sh due <pr> <sha>       exit 0 when that head is due, else 1
 #   reviewer.sh list-due             prints "<pr> <sha>" for each due head
+#   reviewer.sh prune                removes the pr-<n> worktrees of PRs that are not open and
+#                                    the stale ones (REVIEWER_KEEP_DAYS); also runs at the start of head
 #   reviewer.sh once                 reviews every due head, one at a time
 # Every mode takes a trailing `engine <claude|codex|pi|opencode>`, required
 # when runtimes.reviewer (or REVIEWER_ENGINE) is `session` and refused
@@ -26,10 +28,10 @@ source "$(dirname "$0")/common.sh"
 HEAD_SCRIPT="$reviewer_dir/review-head.sh"
 mode="${1:-}"
 usage() {
-  echo "usage: reviewer.sh preflight|once|list-due|due <pr> <sha>|head <pr> <40-hex sha> [engine <engine>]" >&2
+  echo "usage: reviewer.sh preflight|prune|once|list-due|due <pr> <sha>|head <pr> <40-hex sha> [engine <engine>]" >&2
   exit 2
 }
-[[ "$mode" =~ ^(once|preflight|list-due|due|head)$ ]] || usage
+[[ "$mode" =~ ^(once|preflight|list-due|due|head|prune)$ ]] || usage
 nargs=1
 if [[ "$mode" == due || "$mode" == head ]]; then
   is_number "${2:-}" && [[ "${3:-}" =~ ^[0-9a-f]{40}$ ]] || usage
@@ -158,7 +160,11 @@ review_head() {
   return "$code"
 }
 
+# Best effort: a prune problem is logged and never changes a review or its verdict.
+[[ "$mode" != head && "$mode" != prune ]] || prune_worktrees "${2:-}" >/dev/null 2>&1 || true
+
 case "$mode" in
+  prune) exit 0 ;;
   preflight)
     echo "PREFLIGHT-OK repo=$REPO base=$BASE_BRANCH login=$BOT_LOGIN mode=$MODE engine=$ENGINE placement=$PLACEMENT minimum=$MINIMUM"
     exit 0

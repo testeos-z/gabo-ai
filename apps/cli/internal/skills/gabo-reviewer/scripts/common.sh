@@ -139,6 +139,8 @@ CODEX_MODEL="${REVIEWER_CODEX_MODEL:-}"
 OPENCODE_MODEL="${REVIEWER_OPENCODE_MODEL:-}"
 DIFF_MAX_BYTES="${REVIEWER_DIFF_MAX_BYTES:-200000}"
 MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
+# Days an open PR's pr-<n> worktree may stay unused before prune removes it.
+KEEP_DAYS="${REVIEWER_KEEP_DAYS:-7}"
 MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
 REMOTE_URL="${REVIEWER_REMOTE_URL:-https://github.com/$REPO.git}"
 # The trusted install locations: the engine-neutral user-level copy (TRD 9.4)
@@ -655,14 +657,16 @@ run_bounded() {
   return "$code"
 }
 
-# remove_run_worktree <path>: removes the one merge-result worktree a run
-# created. Refuses anything that is not a direct child of $WORKDIR/worktrees
-# named merge-pr-*, a symlink, or not registered in the reviewer's own mirror.
+# remove_run_worktree <path>: removes one worktree the reviewer created: the
+# merge-result worktree of a run (merge-pr-*) or the head worktree of a PR
+# (pr-<n>). Refuses anything that is not a direct child of $WORKDIR/worktrees
+# with one of those names, a symlink, or not registered in the reviewer's own
+# mirror. The caller holds the mirror lock.
 remove_run_worktree() {
   local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$WORKDIR/repo.git" real_p line listed=false
   [[ -n "$p" ]] || return 0
-  if [[ "$p" != "$base"/merge-pr-* || "${p#"$base"/}" == */* || -L "$p" ]]; then
-    log_event "WARN" "refusing to remove $p: not a merge-pr-* worktree directly under $base" >/dev/null
+  if [[ ( "$p" != "$base"/merge-pr-* && "$p" != "$base"/pr-* ) || "${p#"$base"/}" == */* || -L "$p" ]]; then
+    log_event "WARN" "refusing to remove $p: not a merge-pr-* or pr-* worktree directly under $base" >/dev/null
     return 1
   fi
   if [[ -e "$p" ]]; then
@@ -682,6 +686,57 @@ remove_run_worktree() {
       { log_event "WARN" "could not remove $p (remove it by hand)" >/dev/null; return 1; }
   fi
   git -C "$mirror_dir" worktree prune >/dev/null 2>&1 || true
+}
+
+# remove_pr_worktree <pr>: removes worktrees/pr-<n> under the mirror lock.
+remove_pr_worktree() {
+  local rc=0
+  (
+    exec 7>"$STATE/locks/mirror.lock"
+    flock -w 120 7 || exit 1
+    remove_run_worktree "$WORKDIR/worktrees/pr-$1"
+  ) || rc=$?
+  return "$rc"
+}
+
+# prune_one <pr> <current pr> <days>: decides and removes worktrees/pr-<n>
+# while holding pr-<n>.lock, so a review that starts meanwhile waits for the
+# lock (review-head.sh takes it first) instead of losing its checkout. Returns
+# 0 when removed, 1 when kept or when the removal failed. The lock is taken
+# before the mirror lock, the order review-head.sh uses.
+prune_one() {
+  local n="$1" current="$2" days="$3" p="$WORKDIR/worktrees/pr-$1" state
+  (
+    exec 6>"$STATE/locks/pr-$n.lock"
+    flock -n 6 || exit 1
+    state="$("$GH" pr view "$n" --repo "$REPO" --json state 2>/dev/null | jq -r '.state // empty' 2>/dev/null)" || state=""
+    [[ -n "$state" ]] || log_event "WARN" "prune: could not read the state of PR #$n; only the age rule applies" >/dev/null
+    if [[ -z "$state" || "$state" == OPEN ]]; then
+      # Open or unknown: only the age rule, never for the current PR.
+      [[ "$n" != "$current" ]] || exit 1
+      [[ -n "$(find "$p" -maxdepth 0 -mmin "+$((days * 1440))" 2>/dev/null)" ]] || exit 1
+    fi
+    remove_pr_worktree "$n"
+  )
+}
+
+# prune_worktrees [current pr]: removes every worktrees/pr-<n> whose PR is not
+# open, and every one that is not the current PR's and has not been used for
+# more than KEEP_DAYS days (its directory mtime; review-head.sh touches it on
+# every run). Skips the worktree of a run in progress (pr-<n>.lock held) and a
+# PR whose state cannot be read (only the age rule applies). Best effort: every
+# problem is logged and never changes the exit code.
+prune_worktrees() {
+  local current="${1:-}" base="$WORKDIR/worktrees" p n days="$KEEP_DAYS" removed=0
+  [[ "$days" =~ ^[0-9]+$ ]] || days=7
+  [[ -d "$base" ]] || return 0
+  mkdir -p "$STATE/locks"
+  for p in "$base"/pr-*; do
+    { [[ -e "$p" || -L "$p" ]] && n="${p##*/pr-}" && is_number "$n"; } || continue
+    ! prune_one "$n" "$current" "$days" || removed=$((removed + 1))
+  done
+  ((removed == 0)) || log_event "PRUNED" "$removed pr-<n> worktree(s)" >/dev/null
+  return 0
 }
 
 strip_ansi() { sed -E $'s/\e\\[[0-9;]*[A-Za-z]//g; s/\r$//'; }
