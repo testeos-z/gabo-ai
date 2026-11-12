@@ -57,7 +57,7 @@ Tool calls come from this adapter's former operation table and Records, and the 
 
 ### save wave trace
 
-Same pattern as `save ledger` on `gabo/trace/<wave>`: wave tasks with status, PR, verdict, open questions. The observation whose topic key is exactly `gabo/trace/<wave>` is the wave's trace; the planning topic `gabo/trace/<I####>/planning` is a separate record saved with the same operation, which a wave never reads or overwrites; its content is a separate format (the lines of the Planning record row), not the wave tasks above.
+Same pattern as `save ledger` on `gabo/trace/<wave>`: wave tasks with status, PR, verdict, open questions. Select the observation whose topic key is exactly `gabo/trace/<wave>` for the update (the search is full text, so a hit with another key, such as the planning record, is never updated); if none matches, `mem_save`. That observation is the wave's trace; the planning topic `gabo/trace/<I####>/planning` is a separate record saved with the same operation, which a wave never reads or overwrites; its content is a separate format (the lines of the Planning record row), not the wave tasks above.
 
 ### read wave trace
 
