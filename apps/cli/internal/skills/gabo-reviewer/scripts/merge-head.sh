@@ -93,4 +93,7 @@ fi
 
 "$GH" pr merge "$pr" --repo "$REPO" --merge --match-head-commit "$sha" >/dev/null 2>&1 ||
   fail "gh refused the merge (conflict, head moved, or branch rules)"
+# The head worktree of a merged PR is not needed any more; a failure to remove
+# it never changes the merge result (prune retries it).
+remove_pr_worktree "$pr" || true
 log_event "MERGED" "#$pr $sha"
