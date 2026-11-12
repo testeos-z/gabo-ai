@@ -26,6 +26,7 @@ import (
 //go:embed gabo-runtime-opencode/plugins/*.js
 //go:embed gabo-reviewer-config/scripts/*.sh gabo-reviewer-config/scripts/tests/*.sh
 //go:embed gabo-reviewer/README.md gabo-reviewer/scripts/*.sh gabo-reviewer/scripts/config.env gabo-reviewer/scripts/tests/*.sh
+//go:embed gabo-wave-report/scripts/*.sh gabo-wave-report/scripts/tests/*.sh
 var content embed.FS
 
 // File is one embedded file; Path is relative, like gabo-setup/SKILL.md or
