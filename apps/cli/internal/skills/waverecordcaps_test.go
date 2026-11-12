@@ -31,7 +31,7 @@ func TestAssistantPausedAnswerCarriesTheScriptOutput(t *testing.T) {
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
 	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
 		capsCall + " --paused", "unchanged", "its last line is `continue or stop`",
-		"moved after every report section and after the `session id: <session id>` line", "asks no comfort question",
+		"placed as the Wave section of `gabo-wave-report` says", "asks no comfort question",
 	})
 }
 
@@ -45,4 +45,17 @@ func TestSkillsNameNoCapLabelOutsideTheScript(t *testing.T) {
 			}
 		}
 	}
+}
+
+// The turn-cap label is the script's fixed table (S3); the skills never read
+// the built agent file to compose it.
+func TestWaveReportNoLongerComposesTheTurnCapLabel(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
+	for _, bad := range []string{"carries the engine key `maxTurns` or `steps`", "say `advisory`"} {
+		if strings.Contains(doc, bad) {
+			t.Errorf("gabo-wave-report/SKILL.md: still composes the turn-cap label (%q)", bad)
+		}
+	}
+	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{"the labels belong to the script and are never composed here"})
 }
