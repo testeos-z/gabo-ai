@@ -13,6 +13,7 @@ Notes:
 | decision | `gabo/decision/<wave>/<task or global>/<slug>` |
 | resource ledger | `gabo/ledger/<wave>` |
 | wave trace | `gabo/trace/<wave>` |
+| planning record | `gabo/trace/<I####>/planning` |
 | preference | `user/preferences` |
 
 ## Operations
@@ -43,11 +44,11 @@ Notes:
 
 ### save wave trace
 
-Same pattern as `save ledger` on `gabo/trace/<wave>`; the content is one line per task: `<T###> status=<s> pr=#<n> verdict=<v> questions=<n>`.
+Same pattern as `save ledger` on `gabo/trace/<wave>`; the content is one line per task: `<T###> status=<s> pr=#<n> verdict=<v> questions=<n>`. The observation whose topic key is exactly `gabo/trace/<wave>` is the wave's trace; the planning topic `gabo/trace/<I####>/planning` is a separate record saved with the same operation, which a wave never reads or overwrites.
 
 ### read wave trace
 
-`mem_search` for `gabo/trace/<wave>` (or `gabo/trace/` for the latest), then `mem_get_observation`.
+`mem_search` for `gabo/trace/<wave>` (or `gabo/trace/` for the latest), then `mem_get_observation`. Select the observation whose topic key is exactly `gabo/trace/<wave>`; the "latest" fallback ignores keys with a segment after the wave id, so it never returns a `.../planning` record.
 
 ### save preference
 
