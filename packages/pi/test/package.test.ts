@@ -58,7 +58,10 @@ const packed = (): string[] => {
     exitCode: 0,
     stderr: "",
   });
-  return [...run.stdout.toString().matchAll(/^packed \S+ (.+)$/gm)].map((m) => m[1]).sort();
+  const files = [...run.stdout.toString().matchAll(/^packed \S+ (.+)$/gm)].map((m) => m[1]).sort();
+  // An unparsed listing must fail here, not pass the exclusion checks below vacuously.
+  expect(files).toContain("package.json");
+  return files;
 };
 
 describe("package.json manifest (S1, D5, D6)", () => {
