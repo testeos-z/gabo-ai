@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0020-spend-or-turn-cap-for-auto-mode](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted (owner, 2026-11-12) |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-11 |
