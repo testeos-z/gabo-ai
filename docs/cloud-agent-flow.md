@@ -61,6 +61,8 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`),
 7. If blocking: gabo-coder launches a fix session that reads the reviewer's marker comment findings on the PR, fixes, pushes, and goes back to step 4 (max 4 rounds, then `BLOCKED` + `needs-user`).
 8. If merged: gabo-coder recomputes eligibility (the merge may unblock other issues) and starts the next wave. With nothing eligible it ends its turn until a message arrives.
 
+A wave can be capped by three optional keys in `gabo.yaml`: `wave.max_coder_turns` (turns per coder), `wave.max_coders` (coders launched in the wave) and `wave.max_fix_rounds` (fix rounds per task, 1 to 4, the 4-round ceiling stays). Each unset keeps today's behavior. A capped wave pauses and asks to continue or stop. Spend is not capped by gabo.
+
 ## Identities and credentials
 
 - **GitHub**: the owner's own account, through `gh` logged in as `orca` (browser login, or `gabo secrets set reviewer-github` piped over stdin). The reviewer posts, sets statuses and merges with it; `bot.login` in `gabo.yaml` is the owner's login and defaults to the login `gh` reports (`gabo review run`, `audit` and `status` all use it; when set it must match `gh`). The former **vulcambot** machine account is no longer used.

@@ -43,7 +43,7 @@ The [per-change SDLC flow](docs/product/diagrams/sdlc-flow.md) is a Mermaid char
 | 8. Release | **you** | the `dev` → `main` merge | agents never merge into `main` |
 | 9. Tag | **you** authorize it | `apps/cli/vX.Y.Z` | installs come from tags |
 
-The three documents live together in [`docs/product/intents/<NNNN-slug>/`](docs/product/intents/README.md). When a wave closes, `wave.after` decides what happens: `wait` (the default) stops until you ask, `next` starts the next accepted intent. Changes to scope mid-project go through a **plan change**: a proposal you debate, or that a clean-context plan reviewer debates when you are away.
+The three documents live together in [`docs/product/intents/<NNNN-slug>/`](docs/product/intents/README.md). When a wave closes, `wave.after` decides what happens: `wait` (the default) stops until you ask, `next` starts the next accepted intent. Three optional keys cap a wave: `wave.max_coder_turns` (turns per coder), `wave.max_coders` (coders launched) and `wave.max_fix_rounds` (fix rounds per task, 1 to 4); each unset keeps today's behavior, and a capped wave pauses and asks you to continue or stop. gabo does not cap spend. Changes to scope mid-project go through a **plan change**: a proposal you debate, or that a clean-context plan reviewer debates when you are away.
 
 ## Philosophy: let questions float
 
