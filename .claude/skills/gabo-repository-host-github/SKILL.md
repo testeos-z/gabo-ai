@@ -14,7 +14,7 @@ Use whenever a gabo agent works with branches or pull requests. Fills the `repos
 
 - Every PR targets the integration branch `dev`. Never open a PR to `main`, never merge into `main`, never push to `main` or `dev` directly (TRD D13).
 - Merge only into `dev`, only pinned to the head SHA that received a clean verdict, and only when the merge is yours to do (reviewer gate or explicit owner request). Coders never merge.
-- Never force-push. Delete only branches the workflow created and that are merged (ledger, D15, D23). Never force-delete a branch (`-D`): delete the local branch with `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it), so git checks it against that upstream ref (a squash merge never reaches `dev` for git), then the remote one. A `-d` refusal means unpushed work: leave it as a leftover.
+- Never force-push. Delete only branches the workflow created and that are merged (ledger, D15, D23). Never force-delete a branch (`-D`): delete the local branch with `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it), so git checks it against that upstream ref (the merge commit keeps the pushed head reachable from `dev`), then the remote one. A `-d` refusal means unpushed work: leave it as a leftover.
 - Re-read after every write: `gh pr view` must show the expected state.
 - Never post the reviewer marker (`gbai-reviewer-bot`) in a PR body, comment or review.
 
@@ -60,7 +60,7 @@ gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateSt
 Check `baseRefName == "dev"` first (`gh pr view <pr> -R $R --json baseRefName --jq .baseRefName`); refuse on any other base. Then:
 
 ```bash
-gh pr merge <pr> -R $R --squash --match-head-commit <sha>
+gh pr merge <pr> -R $R --merge --match-head-commit <sha>
 ```
 
 Read back: `gh pr view <pr> -R $R --json state,mergeCommit --jq '[.state,.mergeCommit.oid]'` must show `MERGED`; return the merged SHA.
