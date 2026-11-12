@@ -24,6 +24,7 @@ Use whenever a gabo agent records or reads decisions, the per-wave resource ledg
 | Decision | `gabo/decision/<wave>/<task or "global">/<slug>` | project | what, question, choice, why, who (owner, assistant, directiva), mode (manual/auto), wave, task (R6, R30) |
 | Resource ledger | `gabo/ledger/<wave>` | project | one line per resource the workflow created: kind (worktree, branch, container, test db), name or path, creator agent, task, state (live, removed, leftover) (D15) |
 | Wave trace | `gabo/trace/<wave>` | project | wave tasks with status, PR, verdict, open questions; enough to resume (D17) |
+| Planning record | `gabo/trace/<I####>/planning` | project | the lines the assistant saves after a planning step: agent, `roles: separate`, `gaps: <n> (<ids>)` or `gaps: none`, `proposals: <n>` with issue or PR and scope each or `proposals: none`, and the UTC time |
 | Preference | `user/preferences` | personal (global) or project | observation, evidence, count; at about 3 repeats propose it for `~/.config/gabo/config.yaml` (D22) |
 
 ## Operations
@@ -56,11 +57,11 @@ Tool calls come from this adapter's former operation table and Records, and the 
 
 ### save wave trace
 
-Same pattern as `save ledger` on `gabo/trace/<wave>`: wave tasks with status, PR, verdict, open questions.
+Same pattern as `save ledger` on `gabo/trace/<wave>`: wave tasks with status, PR, verdict, open questions. The observation whose topic key is exactly `gabo/trace/<wave>` is the wave's trace; the planning topic `gabo/trace/<I####>/planning` is a separate record saved with the same operation, which a wave never reads or overwrites; its content is a separate format (the lines of the Planning record row), not the wave tasks above.
 
 ### read wave trace
 
-`mem_search` for `gabo/trace/<wave>` (or `gabo/trace/` for the latest), then `mem_get_observation`.
+`mem_search` for `gabo/trace/<wave>` (or `gabo/trace/` for the latest), then `mem_get_observation`. Select the observation whose topic key is exactly `gabo/trace/<wave>`; the "latest" fallback picks only the newest observation whose key has no segment after the wave id, so it never returns a `.../planning` record.
 
 ### save preference
 
