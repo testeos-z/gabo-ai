@@ -31,7 +31,7 @@ func TestAssistantPausedAnswerCarriesTheScriptOutput(t *testing.T) {
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
 	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
 		capsCall + " --paused", "unchanged", "its last line is `continue or stop`",
-		"placed as the Wave section of `gabo-wave-report` says", "asks no comfort question",
+		"placed as the Wave section of `gabo-wave-report` says", "asks no comfort question", "when the script fails the answer still ends with `continue or stop`",
 	})
 }
 
@@ -39,7 +39,7 @@ func TestSkillsNameNoCapLabelOutsideTheScript(t *testing.T) {
 	t.Parallel()
 	for _, f := range []string{"gabo-wave-report/SKILL.md", "gabo-cycle/SKILL.md", "gabo-assistant/SKILL.md"} {
 		doc := readCatalog(t, f)
-		for _, bad := range []string{"`advisory`", "`enforced by the cycle`", "`enforced by the engine`", "max_coder_turns: advisory", "as `advisory` (coder-enforced)"} {
+		for _, bad := range []string{"`advisory`", "`enforced by the cycle`", "`enforced by the engine`", "max_coder_turns: advisory", "as `advisory` (coder-enforced)", "enforced by the engine", "enforced by the cycle"} {
 			if strings.Contains(doc, bad) {
 				t.Errorf("%s: names the label %s; only the script prints labels", f, bad)
 			}
@@ -57,5 +57,5 @@ func TestWaveReportNoLongerComposesTheTurnCapLabel(t *testing.T) {
 			t.Errorf("gabo-wave-report/SKILL.md: still composes the turn-cap label (%q)", bad)
 		}
 	}
-	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{"the labels belong to the script and are never composed here", "takes effect only after the agents are rebuilt"})
+	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{"the labels belong to the script and are never composed here", "takes effect only after the agents are rebuilt", "`.opencode/agents/gabo-coder.md` for `steps:`", "a paused answer still ends with `continue or stop`"})
 }
