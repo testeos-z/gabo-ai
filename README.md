@@ -87,7 +87,7 @@ Coder questions travel straight to the assistant, which runs the cycle in the ma
 
 | concept | what it means |
 |---|---|
-| **Assistant** | The agent you talk to. It delegates everything else. |
+| **Assistant** | The agent you talk to. It hands work off only for a named reason. |
 | **Directiva** | The planning agents: PM (PRD, intents, specs), dev lead (TRD, plans, task issues), DB master (data changes and the [migrations log](docs/product/MIGRATIONS.md)) and frontend (UX and flow in the spec). |
 | **gabo-cycle skill, coders, reviewer** | The wave runner (a skill the main session runs, not an agent), the agents that implement one task each, and the independent merge gate. The reviewer never reads the shared memory. |
 | **Runtimes** | The engine each role runs in: `runtimes.coder`, `runtimes.reviewer`, `runtimes.assistant`. `runtimes.assistant` takes one engine or a list without duplicates, such as `[claude, pi]`: each listed engine gets its own main-session entry. `runtimes.coder` and `runtimes.reviewer` take one engine or `session`, the engine of the main session that starts the wave (valid only with `runtimes.assistant` set). A fixed `runtimes.reviewer`, such as `pi`, reviews the waves of every engine. |
