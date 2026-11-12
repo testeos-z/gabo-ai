@@ -96,6 +96,78 @@ func TestCoderTaskCloseRemovesStatusLabelsAndReportsSurvivors(t *testing.T) {
 	})
 }
 
+// Intent 0023 S9 (plan T10, finding #565 (c), D8): when the engine asks about
+// or refuses deleting the merged remote branch, the coder's Task Close does not
+// retry it by another route, lists it under `leftovers:` with the exact command
+// for the owner, and the task still closes. Source and Codex copy are the same
+// text (PD10).
+func TestCoderTaskCloseLeavesARefusedRemoteBranchWithItsCommand(t *testing.T) {
+	t.Parallel()
+	catalog := readCatalog(t, "gabo-coder/SKILL.md")
+	mirror, err := os.ReadFile(filepath.Join(repoRoot, "plugins/codex/skills/gabo-coder/SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(mirror) != catalog {
+		t.Error("plugins/codex/skills/gabo-coder/SKILL.md differs from the catalog source (S9, PD10)")
+	}
+	_, closing, ok := strings.Cut(catalog, "## Task Close")
+	if !ok {
+		t.Fatal("gabo-coder/SKILL.md: no ## Task Close section")
+	}
+	closing, _, _ = strings.Cut(closing, "## Output Contract")
+	step := lineWith(t, closing, "4. Delete the branch")
+	requireIn(t, "gabo-coder Task Close step 4", step, []string{
+		"the engine asks about deleting the merged remote branch or refuses it",
+		"do not retry it by another route (no API call, no force push, no other delete)",
+		"list it under `leftovers:` as `merged remote branch left (<reason>)`",
+		"with the exact command `git push origin --delete <branch>` for the owner",
+		"the task still closes (step 2 unchanged)",
+		"A delete that succeeds leaves no leftover.",
+	})
+	leftovers := lineWith(t, catalog, "leftovers: <none")
+	requireIn(t, "gabo-coder leftovers line", leftovers, []string{
+		"merged remote branch left (<reason>) with its command",
+	})
+}
+
+// Intent 0023 S9 (plan T10, D8): the Pi notes say gentle-pi asks before
+// deleting a remote branch even in autonomous mode, and that the owner decides
+// whether to allow it. The Codex copy carries the same text (PD10).
+func TestRuntimePiSaysGentlePiAsksBeforeRemoteBranchDelete(t *testing.T) {
+	t.Parallel()
+	doc := runtimePiDoc(t)
+	mirror, err := os.ReadFile(filepath.Join(repoRoot, "plugins/codex/skills/gabo-runtime-pi/SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(mirror) != doc {
+		t.Error("plugins/codex/skills/gabo-runtime-pi/SKILL.md differs from the catalog source (S9, PD10)")
+	}
+	_, section, ok := strings.Cut(doc, "\n## Grants for an unattended Pi wave\n")
+	if !ok {
+		t.Fatal("gabo-runtime-pi/SKILL.md: no ## Grants for an unattended Pi wave section")
+	}
+	section, _, _ = strings.Cut(section, "\n## ")
+	requireIn(t, "gabo-runtime-pi Pi notes", section, []string{
+		"gentle-pi asks before deleting a remote branch, even in autonomous mode",
+		"the owner decides whether to allow it",
+	})
+}
+
+// Intent 0023 PD6 (plan T10): gabo-wave-report/SKILL.md is not edited. Its
+// Leftovers item still names the coder task-close leftovers, which carry a
+// refused remote branch to the wave report (S9). This is a guard: it passes on
+// the unchanged text.
+func TestWaveReportLeftoversStillNamesCoderTaskCloseLeftovers(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
+	leftovers := lineWith(t, doc, "7. **Leftovers**")
+	requireIn(t, "gabo-wave-report Leftovers item", leftovers, []string{
+		"leftovers from coder task closes",
+	})
+}
+
 // operationSection returns the text of one `### ` section, up to the next
 // heading of any level.
 func operationSection(doc, heading string) string {
