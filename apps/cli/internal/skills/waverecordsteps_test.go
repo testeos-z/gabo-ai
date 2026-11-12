@@ -1,11 +1,15 @@
 package skills
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
 
-const waveRecord = "`.gabo/skills/gabo-wave-report/scripts/wave-record.sh"
+const waveRecord = "`.gabo/skills/gabo-wave-report/scripts/wave-record.sh --wave <wave>"
 
 // failureRule is the sentence every skill carries for a missing or failing
 // wave-record.sh (intent 0024 S1).
@@ -36,7 +40,7 @@ func TestCycleRunsWaveRecordStamps(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	steps := section(t, doc, "\n2. Intent claim", "\n3. Resume")
-	requireIn(t, "gabo-cycle step 2", steps, []string{waveRecord + " stamp wave-started`", "paste its output unchanged"})
+	requireIn(t, "gabo-cycle step 2", steps, []string{waveRecord + " stamp wave-started`", "paste its output unchanged", "On a wave start only (never when the holder resumes)"})
 	launch := section(t, doc, "\n5. Per task:", "\n6. On each outcome")
 	requireIn(t, "gabo-cycle step 5", launch, []string{
 		waveRecord + " stamp session-started <agent> <task id>` before the launch call",
@@ -50,7 +54,7 @@ func TestCycleRunsWaveRecordStamps(t *testing.T) {
 	requireIn(t, "gabo-cycle step 8", report, []string{waveRecord + " stamp wave-reported`"})
 	trace := section(t, doc, "- Trace (D17)", "\n\n")
 	requireIn(t, "gabo-cycle Trace", trace, []string{
-		"saves the content of the stamps file as the wave trace",
+		"adds the content of the stamps file as one more entry of `gabo/trace/<wave>`, never replacing the entries above",
 		waveRecord + " saves add <topic key> <observation id>` after each `mem_save`",
 		waveRecord + " saves read <topic key>` after each read-back that matched",
 	})
@@ -62,7 +66,8 @@ func TestWaveReportMeasuresAndSavesComeFromTheScript(t *testing.T) {
 	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
 	measures := section(t, doc, "9. **Measures**", "\n10. ")
 	requireIn(t, "gabo-wave-report Measures", measures, []string{
-		"the output of " + waveRecord + " measures` pasted unchanged",
+		"the wall time, agent sessions and PRs opened and merged lines are the output of " + waveRecord + " measures` pasted unchanged",
+		"the other lines (fix rounds per task, plan-change proposals, interactions, tokens, each task's outcome) are still built as below",
 		"never a figure with `~`",
 	})
 	unverified := section(t, doc, "5. **Unverified writes**", "\n6. ")
@@ -82,4 +87,43 @@ func TestAssistantWaveCloseRunsSavesUnverified(t *testing.T) {
 		"before the final answer",
 		failureRule,
 	})
+}
+
+// Every command the skills document must pass the script's own argument checks
+// (wave id, the event table, saves): the review of PR 684 found a missing
+// --wave that wording tests cannot see.
+func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
+	t.Parallel()
+	script := filepath.Join(t.TempDir(), "wave-record.sh")
+	if err := os.WriteFile(script, []byte(readCatalog(t, "gabo-wave-report/scripts/wave-record.sh")), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	re := regexp.MustCompile("`\\.gabo/skills/gabo-wave-report/scripts/wave-record\\.sh ([^`]*)`")
+	repl := strings.NewReplacer("<wave>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
+	seen := 0
+	for _, name := range []string{"gabo-cycle", "gabo-wave-report", "gabo-assistant"} {
+		for _, m := range re.FindAllStringSubmatch(readCatalog(t, name+"/SKILL.md"), -1) {
+			args := strings.Fields(repl.Replace(m[1]))
+			if len(args) < 3 || args[0] != "--wave" {
+				t.Errorf("%s: %q does not start with --wave <wave>", name, m[1])
+				continue
+			}
+			seen++
+			state := t.TempDir()
+			env := append(os.Environ(), "XDG_STATE_HOME="+state)
+			seed := exec.Command("sh", script, "--wave", "w1", "saves", "add", "k", "1")
+			seed.Env = env
+			if out, err := seed.CombinedOutput(); err != nil {
+				t.Fatalf("seed: %v: %s", err, out)
+			}
+			cmd := exec.Command("sh", append([]string{script}, args...)...)
+			cmd.Env = env
+			if out, err := cmd.CombinedOutput(); err != nil {
+				t.Errorf("%s: %q fails: %v: %s", name, m[1], err, out)
+			}
+		}
+	}
+	if seen < 9 {
+		t.Errorf("found %d documented commands, want at least 9", seen)
+	}
 }
