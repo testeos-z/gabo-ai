@@ -39,6 +39,8 @@ func guardCases(t *testing.T) []guardCase {
 		{name: "auto pi invalid JSON", cfg: auto, proj: piWith("{\"autonomousMode\": \n")},
 		{name: "auto pi autonomousMode false", cfg: auto, proj: piWith("{\"autonomousMode\": false}\n")},
 		{name: "auto pi not an object", cfg: auto, proj: piWith("[1]\n")},
+		{name: "auto pi autonomousMode string true", cfg: auto, proj: piWith("{\"autonomousMode\": \"true\"}\n")},
+		{name: "auto pi autonomousMode null", cfg: auto, proj: piWith("{\"autonomousMode\": null}\n")},
 		{name: "manual pi no file", cfg: manual, proj: piBuilt(t, "1.2.3")},
 		{name: "manual pi autonomousMode false", cfg: manual, proj: piWith("{\"autonomousMode\": false}\n")},
 		{name: "auto without pi no file", cfg: autoClaude, proj: project()},

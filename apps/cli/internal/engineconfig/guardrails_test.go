@@ -100,3 +100,20 @@ func TestGuardrailsRuleRefusesBadFile(t *testing.T) {
 		}
 	}
 }
+
+// An existing autonomousMode that is neither true nor false (a string or
+// null) is left unchanged and gets one failure line that says the value must
+// be true or false (intent 0023 S5, owner decision on #617).
+func TestGuardrailsRuleRefusesNonBoolean(t *testing.T) {
+	t.Parallel()
+	const want = FailurePrefix + " .pi/gentle-ai/runtime-guardrails.json: autonomousMode must be true or false; fix it and run gabo init again"
+	for _, data := range []string{"{\"autonomousMode\": \"true\"}\n", "{\"autonomousMode\": null}\n"} {
+		res := Guardrails(Input{Files: map[string][]byte{GuardrailsFile: []byte(data)}, Mode: "auto"})
+		if len(res.Writes) != 0 {
+			t.Fatalf("%q: writes = %v, want none", data, res.Writes)
+		}
+		if !slices.Equal(res.Section.Lines, []string{want}) {
+			t.Fatalf("%q: lines = %q, want %q", data, res.Section.Lines, want)
+		}
+	}
+}

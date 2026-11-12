@@ -17,6 +17,10 @@ const ModeAuto = "auto"
 // guardKey is the one key gabo writes into the guardrails file.
 const guardKey = "autonomousMode"
 
+// guardBoolReason is the failure reason of an autonomousMode that is neither
+// a JSON true nor a JSON false (intent 0023 S5, owner decision on #617).
+const guardBoolReason = guardKey + " must be true or false"
+
 // guardWrote is the report line of a written guardrails file. It names the
 // file as project config and the environment variable as the per-session
 // alternative (S5, D4).
@@ -25,8 +29,9 @@ const guardWrote = "wrote " + GuardrailsFile + ": autonomousMode true (mode auto
 // Guardrails is the S5 rule (PD8). In mode auto it makes GuardrailsFile hold
 // autonomousMode true: a missing file becomes exactly that one key, and an
 // existing file keeps every other byte and key. An existing autonomousMode of
-// either value is kept as the owner left it. An existing file that is not a
-// JSON object is left unchanged and gets one failure line. Any other mode
+// either boolean is kept as the owner left it; any other value (a string,
+// null) is left unchanged and gets one failure line. An existing file that is
+// not a JSON object is left unchanged and gets one failure line. Any other mode
 // writes nothing and prints nothing. The rule is pure: the caller reads the
 // file into Input.Files and writes the result. It never depends on
 // Input.Version, so a development build writes the file too.
@@ -49,11 +54,13 @@ func Guardrails(in Input) Result {
 	if !found {
 		return guardWriteResult(obj.insert(data, "\""+guardKey+"\": true"))
 	}
-	value := strings.TrimSpace(string(data[m.start:m.end]))
-	if value == "true" {
+	switch value := strings.TrimSpace(string(data[m.start:m.end])); value {
+	case "true":
 		return Result{Section: Section{Lines: []string{"unchanged " + GuardrailsFile + ": " + guardKey + " true already set"}}}
+	case "false":
+		return Result{Section: Section{Lines: []string{"kept " + GuardrailsFile + ": " + guardKey + " false by the user's choice"}}}
 	}
-	return Result{Section: Section{Lines: []string{"kept " + GuardrailsFile + ": " + guardKey + " " + value + " by the user's choice"}}}
+	return guardFail(guardBoolReason)
 }
 
 // guardWriteResult is the result of writing the guardrails file b.
@@ -98,8 +105,15 @@ func GuardrailsCheck(set []string, in Input) (warning, failure string) {
 		return "", FailurePrefix + " " + GuardrailsFile + ": invalid JSON (" + err.Error() + ")"
 	}
 	if obj, ok := scanTopObject(data); ok {
-		if m, found := obj.member(guardKey); found && strings.TrimSpace(string(data[m.start:m.end])) == "true" {
-			return "", ""
+		if m, found := obj.member(guardKey); found {
+			switch strings.TrimSpace(string(data[m.start:m.end])) {
+			case "true":
+				return "", ""
+			case "false":
+				return guardCheckLine, ""
+			default:
+				return "", FailurePrefix + " " + GuardrailsFile + ": " + guardBoolReason
+			}
 		}
 	}
 	return guardCheckLine, ""
