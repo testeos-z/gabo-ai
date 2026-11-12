@@ -41,3 +41,68 @@ func TestCoderPRBodyLinksTaskWithRefsNeverClosing(t *testing.T) {
 		t.Error("gabo-coder/SKILL.md: `Closes #<n>` still names the task link (S8)")
 	}
 }
+
+// Intent 0023 S7 (plan T9, finding #565 (a)): closing a task removes every
+// status label it carries, in the contract example and its Codex copy (PD10:
+// the `.gabo/` catalog copy is never edited). The claim and progress commands
+// of an open task touch no label they do not add.
+func TestContractTasksCloseRemovesEveryStatusLabel(t *testing.T) {
+	t.Parallel()
+	example := readCatalog(t, "gabo-contract-tasks/examples/tasks-gh.md")
+	mirror, err := os.ReadFile(filepath.Join(repoRoot, "plugins/codex/skills/gabo-contract-tasks/examples/tasks-gh.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(mirror) != example {
+		t.Error("plugins/codex/skills/gabo-contract-tasks/examples/tasks-gh.md differs from the catalog source (S7, PD10)")
+	}
+	done := lineWith(t, example, "- DONE, only after the PR merged:")
+	requireIn(t, "tasks-gh.md DONE line", done, []string{
+		"--remove-label status:in-progress,status:blocked,needs-user",
+		"gh issue close <n> -R $R --reason completed",
+	})
+	requireIn(t, "tasks-gh.md", example, []string{
+		"gh issue edit <n> -R $R --add-assignee @me --add-label status:in-progress",
+		"gh issue edit <n> -R $R --add-label status:blocked --remove-label status:in-progress",
+		"gh issue comment <n> -R $R --body \"<!-- gabo-progress --> <one line>\"",
+	})
+	for _, heading := range []string{"### claim", "### log progress", "### read one"} {
+		sec := operationSection(example, heading)
+		if sec == "" {
+			t.Errorf("tasks-gh.md: no %s section", heading)
+		}
+		if strings.Contains(sec, "--remove-label") {
+			t.Errorf("tasks-gh.md: %s removes a label of an open task (S7): %q", heading, sec)
+		}
+	}
+}
+
+// Intent 0023 S7 (plan T9): the coder's Task Close step 2 closes the task,
+// re-reads it, and reports a status label that survives under `unverified:`
+// (retry once, as today). Source and Codex copy are the same text (PD10).
+func TestCoderTaskCloseRemovesStatusLabelsAndReportsSurvivors(t *testing.T) {
+	t.Parallel()
+	catalog := readCatalog(t, "gabo-coder/SKILL.md")
+	_, closing, ok := strings.Cut(catalog, "## Task Close")
+	if !ok {
+		t.Fatal("gabo-coder/SKILL.md: no ## Task Close section")
+	}
+	closing, _, _ = strings.Cut(closing, "## Output Contract")
+	step := lineWith(t, closing, "2. Close the task issue")
+	requireIn(t, "gabo-coder Task Close step 2", step, []string{
+		"removes every status label it carries (`status:in-progress`, `status:blocked`, `needs-user`)",
+		"re-read it: it must show state closed and no status label",
+		"Retry once, then report it under `unverified:`, naming each status label that survives",
+	})
+}
+
+// operationSection returns the text of one `### ` section, up to the next
+// heading of any level.
+func operationSection(doc, heading string) string {
+	_, rest, ok := strings.Cut(doc, heading+"\n")
+	if !ok {
+		return ""
+	}
+	sec, _, _ := strings.Cut(rest, "\n#")
+	return sec
+}

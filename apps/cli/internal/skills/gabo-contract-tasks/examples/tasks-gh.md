@@ -74,7 +74,7 @@ gh issue comment <n> -R $R --body "<!-- gabo-progress --> <one line>"
 
 ### change status
 
-- DONE, only after the PR merged: `gh issue edit <n> -R $R --remove-label status:in-progress`, then `gh issue close <n> -R $R --reason completed --comment "DONE via PR #<pr>"`.
+- DONE, only after the PR merged: `gh issue edit <n> -R $R --remove-label status:in-progress,status:blocked,needs-user`, then `gh issue close <n> -R $R --reason completed --comment "DONE via PR #<pr>"`. The removal covers every status label, not only `status:in-progress`, so a closed task keeps none.
 - BLOCKED: `gh issue edit <n> -R $R --add-label status:blocked --remove-label status:in-progress`, then a comment with the reason.
 
 ### link PR
