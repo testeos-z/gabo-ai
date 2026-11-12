@@ -1,0 +1,1 @@
+✗ .pi/gentle-ai/runtime-guardrails.json: .pi/gentle-ai is a symlink; gabo init writes only inside the project, so replace it with a real directory and run gabo init again

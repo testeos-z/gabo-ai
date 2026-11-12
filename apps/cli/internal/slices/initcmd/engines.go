@@ -68,23 +68,34 @@ func engineSet(b []byte) ([]string, []string, error) {
 	return engineconfig.Set(engineconfig.Engines(rt.Coder, rt.Reviewer, assistants)...), assistants, nil
 }
 
+// configMode returns the mode key of gabo.yaml (intent 0023 S5, D4); empty
+// when the key is absent or not a string, which writes no guardrails file.
+// engineSet has already read the YAML.
+func configMode(b []byte) string {
+	var doc struct {
+		Mode string `yaml:"mode"`
+	}
+	_ = yaml.Unmarshal(b, &doc)
+	return strings.TrimSpace(doc.Mode)
+}
+
 // engineStep runs each engine's rule in set order and writes each changed
 // engine file. A refused or failed engine gets its ✗ line and the next
 // engine still runs (S5, D10). Then it removes the gabo main-session value
 // from the file of each engine outside the set (intent 0010 S4, D2); a
 // listed assistant engine is always in the set, so its value stays (intent
 // 0013 D7). It reads and writes only project files.
-func (u *UseCase) engineStep(set, assistants []string, version string) engineconfig.Report {
+func (u *UseCase) engineStep(set, assistants []string, mode, version string) engineconfig.Report {
 	var report engineconfig.Report
 	for _, engine := range set {
-		report.Sections = append(report.Sections, u.integrateEngine(engine, assistants, version))
+		report.Sections = append(report.Sections, u.integrateEngine(engine, assistants, mode, version))
 	}
 	report.Sections = append(report.Sections, u.removeMainSession(set, assistants, version)...)
 	return report
 }
 
-func (u *UseCase) integrateEngine(engine string, assistants []string, version string) engineconfig.Section {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistants: assistants}
+func (u *UseCase) integrateEngine(engine string, assistants []string, mode, version string) engineconfig.Section {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistants: assistants, Mode: mode}
 	file, owns := engineFiles[engine]
 	fail := func(reason string) engineconfig.Section {
 		return engineconfig.Section{Engine: engine, Lines: []string{engineconfig.FailurePrefix + " " + file + ": " + reason}}
@@ -126,10 +137,44 @@ func (u *UseCase) integrateEngine(engine string, assistants []string, version st
 			return fail(reason)
 		}
 	}
+	var guard engineconfig.Result
+	var guardWritable []string
+	if engine == engineconfig.Pi {
+		guard, guardWritable = u.guardrailsStep(&in)
+	}
 	report, writes := engineconfig.Integrate([]string{engine}, in)
 	section := report.Sections[0]
+	section.Lines = append(section.Lines, guard.Section.Lines...)
+	for path, b := range guard.Writes {
+		writes[path] = b
+	}
+	writable = append(writable, guardWritable...)
 	section.Lines = append(section.Lines, u.writeEngineFiles(writes, writable)...)
 	return section
+}
+
+// guardrailsStep runs the S5 rule of intent 0023 for pi in gabo.yaml mode
+// auto (D4): it reads the guardrails file into in, unless its directory or
+// the file is refused, and returns the rule's result with the files it may
+// write. Any other mode reads and refuses nothing, so it writes nothing and
+// prints nothing.
+func (u *UseCase) guardrailsStep(in *engineconfig.Input) (engineconfig.Result, []string) {
+	if in.Mode != engineconfig.ModeAuto {
+		return engineconfig.Result{}, nil
+	}
+	file := engineconfig.GuardrailsFile
+	if reason := u.refuseEngineFile(file); reason != "" {
+		return engineconfig.Result{Section: engineconfig.Section{Lines: []string{engineconfig.FailurePrefix + " " + file + ": " + reason}}}, nil
+	}
+	b, err := u.store.ReadFile(u.path(file))
+	switch {
+	case err == nil:
+		in.Files[file] = b
+	case !errors.Is(err, fs.ErrNotExist):
+		line := fmt.Sprintf("%s %s: cannot read it (%v); fix it and run gabo init again", engineconfig.FailurePrefix, file, err)
+		return engineconfig.Result{Section: engineconfig.Section{Lines: []string{line}}}, nil
+	}
+	return engineconfig.Guardrails(*in), []string{file}
 }
 
 // piPackage runs the subagent-package check of intent 0016 S1 and D1: `pi
