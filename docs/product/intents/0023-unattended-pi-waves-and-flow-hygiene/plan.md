@@ -43,7 +43,7 @@ The spec was accepted by the owner on 2026-11-12 (spec section 7, the acceptance
 
 Applied by the tasks named. Each is marked amended with intent 0023 (owner, 2026-11-12); a task may fix wording only to fit its file, never the meaning.
 
-- **TRD 9.4, "Engine integration" bullet (T14).** Add after the Pi `packages` entry sentence: "For Pi in `mode: auto`, `gabo init` also writes `.pi/gentle-ai/runtime-guardrails.json` with `{"autonomousMode": true}` at project level, keeping every other key and any `autonomousMode` the owner set; `gabo check` warns when that file is missing or not true (amended, owner 2026-11-12, intent 0023 S5, S6, D4)."
+- **TRD 9.4, "Engine integration" bullet (T14).** Add after the Pi `packages` entry sentence: "For Pi in `mode: auto`, `gabo init` also writes `.pi/gentle-ai/runtime-guardrails.json` with `{"autonomousMode": true}` at project level, keeping every other key and any `autonomousMode` the owner set; `gabo check` warns when that file is missing or `autonomousMode` is `false`, and fails when `autonomousMode` is neither `true` nor `false` (amended, owner 2026-11-12, intent 0023 S5, S6, D4; #617)."
 - **PRD R32 row (T14).** Add: "Amended (owner 2026-11-12, intent 0023 S5, S10): with `mode: auto` and `pi` in `runtimes.*`, `gabo init` also writes the project-level file `.pi/gentle-ai/runtime-guardrails.json`; no user-level file is written."
 
 ## Steps
