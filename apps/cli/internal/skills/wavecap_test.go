@@ -81,3 +81,13 @@ func TestCycleMaxCodersCountRestartsOnContinue(t *testing.T) {
 		"returns without an outcome status (`HANDED`, `DONE` or `BLOCKED`)",
 	})
 }
+
+func TestWaveCapReviewFixes(t *testing.T) {
+	t.Parallel()
+	requireIn(t, "gabo-cycle/SKILL.md", readCatalog(t, "gabo-cycle/SKILL.md"), []string{
+		"With `wave.max_coder_turns` set only", "unset keeps today's handling of a coder without a status",
+		"stays claimed with no worktree and no PR; on resume the cycle launches it as a first launch",
+	})
+	requireIn(t, "gabo-wave-report/SKILL.md", readCatalog(t, "gabo-wave-report/SKILL.md"), []string{"`<cap>: <enforcement>`", "`max_coder_turns: advisory`"})
+	requireIn(t, "gabo-assistant/SKILL.md", readCatalog(t, "gabo-assistant/SKILL.md"), []string{"In manual mode the paused report is shown the same way"})
+}
