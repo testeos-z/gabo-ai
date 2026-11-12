@@ -63,3 +63,13 @@ func TestWaveReportCarriesTheCapLines(t *testing.T) {
 		"Codex and Pi", "spend is not capped by gabo",
 	})
 }
+
+func TestWaveReportEnforcementReadsTheBuiltAgent(t *testing.T) {
+	t.Parallel()
+	requireIn(t, "gabo-wave-report/SKILL.md", readCatalog(t, "gabo-wave-report/SKILL.md"), []string{
+		"only when the built `gabo-coder` agent file carries the engine key `maxTurns` or `steps`", "say `advisory`",
+	})
+	requireIn(t, "gabo-cycle/SKILL.md", readCatalog(t, "gabo-cycle/SKILL.md"), []string{
+		"The one exception is a paused wave the owner stops", "unfinished tasks left as they are",
+	})
+}
