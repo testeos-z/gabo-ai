@@ -223,3 +223,56 @@ func TestConfigWithoutWaveLoadsUnchanged(t *testing.T) {
 		t.Errorf("AfterWave() after round trip = %q", again.AfterWave())
 	}
 }
+
+// Intent 0020 S1: three optional integer caps under wave. Unset is nil and
+// changes nothing; no default fills a value.
+func TestParseWaveCaps(t *testing.T) {
+	t.Parallel()
+	cfg, err := Parse([]byte(minimal + "wave:\n  max_coder_turns: 30\n  max_coders: 1\n  max_fix_rounds: 4\n"))
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	w := cfg.Wave
+	if w.MaxCoderTurns == nil || *w.MaxCoderTurns != 30 ||
+		w.MaxCoders == nil || *w.MaxCoders != 1 ||
+		w.MaxFixRounds == nil || *w.MaxFixRounds != 4 {
+		t.Errorf("wave = %+v, want 30, 1, 4", w)
+	}
+	cfg, err = Parse([]byte(minimal + "wave:\n  after: next\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Wave.MaxCoderTurns != nil || cfg.Wave.MaxCoders != nil || cfg.Wave.MaxFixRounds != nil {
+		t.Errorf("unset caps got values: %+v", cfg.Wave)
+	}
+	out, err := cfg.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(out), "max_") {
+		t.Errorf("Marshal() added a cap key:\n%s", out)
+	}
+}
+
+func TestParseRejectsBadWaveCaps(t *testing.T) {
+	t.Parallel()
+	tests := []struct{ name, yaml, want string }{
+		{"coders zero", "max_coders: 0", "wave.max_coders: must be at least 1, got 0"},
+		{"turns zero", "max_coder_turns: 0", "wave.max_coder_turns: must be at least 1, got 0"},
+		{"turns negative", "max_coder_turns: -2", "wave.max_coder_turns: must be at least 1, got -2"},
+		{"rounds zero", "max_fix_rounds: 0", "wave.max_fix_rounds: must be from 1 to 4, got 0"},
+		{"rounds five", "max_fix_rounds: 5", "wave.max_fix_rounds: must be from 1 to 4, got 5"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := Parse([]byte(minimal + "wave:\n  " + tt.yaml + "\n"))
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Errorf("Parse() error = %v, want it to contain %q", err, tt.want)
+			}
+		})
+	}
+	if _, err := Parse([]byte(minimal + "wave:\n  max_coders: many\n")); err == nil {
+		t.Error("Parse() error = nil for a non-integer cap")
+	}
+}
