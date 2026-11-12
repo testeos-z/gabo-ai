@@ -90,22 +90,22 @@ Intent tracker item: [#575](https://github.com/testeos-z/gabo-ai/issues/575) und
 
 | task | issue |
 |---|---|
-| T1 | — |
-| T2 | — |
-| T3 | — |
-| T4 | — |
-| T5 | — |
-| T6 | — |
-| T7 | — |
-| T8 | — |
-| T9 | — |
-| T10 | — |
-| T11 | — |
-| T12 | — |
-| T13 | — |
-| T14 | — |
-| T15 | — |
-| T16 | — |
+| T1 | [#585](https://github.com/testeos-z/gabo-ai/issues/585) |
+| T2 | [#586](https://github.com/testeos-z/gabo-ai/issues/586) |
+| T3 | [#587](https://github.com/testeos-z/gabo-ai/issues/587) |
+| T4 | [#588](https://github.com/testeos-z/gabo-ai/issues/588) |
+| T5 | [#589](https://github.com/testeos-z/gabo-ai/issues/589) |
+| T6 | [#590](https://github.com/testeos-z/gabo-ai/issues/590) |
+| T7 | [#591](https://github.com/testeos-z/gabo-ai/issues/591) |
+| T8 | [#592](https://github.com/testeos-z/gabo-ai/issues/592) |
+| T9 | [#593](https://github.com/testeos-z/gabo-ai/issues/593) |
+| T10 | [#594](https://github.com/testeos-z/gabo-ai/issues/594) |
+| T11 | [#595](https://github.com/testeos-z/gabo-ai/issues/595) |
+| T12 | [#596](https://github.com/testeos-z/gabo-ai/issues/596) |
+| T13 | [#597](https://github.com/testeos-z/gabo-ai/issues/597) |
+| T14 | [#598](https://github.com/testeos-z/gabo-ai/issues/598) |
+| T15 | [#599](https://github.com/testeos-z/gabo-ai/issues/599) |
+| T16 | [#600](https://github.com/testeos-z/gabo-ai/issues/600) |
 
 ## Probe results
 
