@@ -59,6 +59,10 @@ Hand work off only for a named reason: (a) to (d) of Hard Rules, or role ownersh
 | Run a wave / resume a wave | no delegate: load the `gabo-cycle` skill yourself (Wave Start) with the wave id (the intent id `I####`) and mode, plus the wave start time on a start or `resume <session id>` when you resume (Intent Claims) |
 | Critical question, owner absent | directiva opens the plan-change PR; on its `PLAN-REVIEW PR #<n>` start a fresh `gabo-plan-reviewer` with exactly that input and the proposal, and hand its reply back to directiva, which applies per the approval scale (APP_FLOW) |
 
+## Planning Record
+
+When `gabo-pm` or `gabo-dev-lead` returns, save one record with `save wave trace` on the topic `gabo/trace/<I####>/planning` and read it back. Its lines: `agent` (the role that returned), `roles: separate` (the planning roles ran as separate agents), `gaps: <n> (<ids>)` or `gaps: none`, `proposals: <n>` with the issue or PR and the scope of each, or `proposals: none`, and the UTC time. Take them from the directiva's own return (its "traceability gaps (or none)" and the proposals it reports having opened, each with its issue or PR and scope; when it reports none, write `proposals: none`); the assistant never recomputes them from tracker state. Each save replaces the intent's previous planning record (upsert by key). A record that does not show up after one retry is listed as unverified. Planning runs before any wave claims the intent, so this record is exempt from the intent-claim check of Wave Start and never touches `gabo/trace/<wave>`.
+
 ## Questions by Mode (J4)
 
 Every question a coder or an agent raises travels coder → assistant (R5), and the cycle steps you run raise theirs in your own session. None is closed without answer and resolver: it ends either answered by the owner or as a recorded decision, and the wave report shows who resolved it.
