@@ -131,7 +131,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"`worktree.keep`", "before any removal", "unverified:",
 			"D23", "only writer of DONE", "lock error", "retry once",
 			// T016: the methodology comes from the slot; the TRD 9.2 outcome and the round limit stay.
-			"`gabo-methodology`", "`Closes #<n>`", "summary", "resources created", "test databases",
+			"`gabo-methodology`", "`Refs #<n>`", "summary", "resources created", "test databases",
 			"fix rounds used", "Max 4 fix rounds",
 			// Intent 0008 S10 (TRD 8.5): the PR body states the `gabo check` impact.
 			"`gabo check impact: <none, with the reason / updated in <file>>`",

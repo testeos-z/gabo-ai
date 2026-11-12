@@ -14,7 +14,7 @@ Load in a `gabo-coder` subagent launched by the main session (the assistant that
 
 - Never merge, approve or set commit statuses; the reviewer does that.
 - Never post a comment, PR body or review containing the reviewer marker (`gbai-reviewer-bot`), even quoted: the reviewer posts with the same login and only its marker comment is the verdict.
-- Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Closes #<n>`. On a base that is not the default branch the keyword closes nothing; the Task Close does. Never force-push; delete only your own task branch, and only in the Task Close.
+- Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Refs #<n>` on every base, never with a closing keyword: a closing keyword that merges into the default branch closes the task before the Task Close removes its worktree and labels, and the Task Close is the only writer of DONE (TRD D23). Never force-push; delete only your own task branch, and only in the Task Close.
 - The PR body also holds one line `gabo check impact: <none, with the reason / updated in <file>>` (TRD 8.5): whether the change adds or alters something `gabo check` should verify (an agent file, a runtime skill, the neutral agent spec, a slot contract or a project file gabo writes) and where the check was updated, or why it needs no update.
 - After every push, run the user-level reviewer script yourself from the main checkout, never from your worktree (the caller's `gabo.yaml` names the integration branch the review trusts), exactly as your agent file says, and act on its `VERDICT` line; the request is exactly `PR #<n> head <40-hex pushed sha>` and the PR comment holds the findings.
 - Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the script refuses it.
@@ -61,7 +61,7 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. L
 The outcome to the cycle (TRD 9.2) holds, in this order:
 
 - `status`: `HANDED` (review clean, you stay resumable), `BLOCKED` (with the reason) or, only after the Task Close, `DONE`;
-- task id and the PR link (number and URL, the PR that carries `Closes #<n>`), with the last reviewed SHA;
+- task id and the PR link (number and URL, the PR that carries `Refs #<n>`), with the last reviewed SHA;
 - a one-paragraph summary of the change;
 - open questions for the cycle, each with what it blocks;
 - resources created: worktrees, branches, containers and test databases, so the cycle can add them to the wave ledger;
