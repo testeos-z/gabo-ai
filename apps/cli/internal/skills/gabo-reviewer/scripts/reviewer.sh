@@ -130,7 +130,15 @@ review_head() {
   local log="$STATE/logs/head-$1.log" code=0 verdict merge outcome
   # The Claude token reaches the child only; review-head.sh moves it out of the
   # environment again and hands it to the review step alone.
-  CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN" run_bounded "$HEAD_TIMEOUT" "$log" bash "$HEAD_SCRIPT" "$1" "$2" || code=$?
+  # The whole run holds cache.lock shared: prune_caches takes it exclusive, so
+  # it never deletes a cache under a running check and a review that starts
+  # during a prune waits for it instead of being skipped.
+  (
+    mkdir -p "$STATE/locks"
+    exec 5>"$STATE/locks/cache.lock"
+    flock -s 5
+    CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN" run_bounded "$HEAD_TIMEOUT" "$log" bash "$HEAD_SCRIPT" "$1" "$2"
+  ) || code=$?
   outcome="$(cat "$log")"
   has() { grep -qE "^[^ ]+ $1 #$2( |$)" <<<"$outcome"; }
   grep -E '^[^ ]+ (CONFLICT|UPGRADE-PR|REVIEWED|MERGED|MERGE-SKIPPED|NEEDS-HUMAN-MERGE|MERGE-FAILED|SKIP|RETRY) #' <<<"$outcome" ||

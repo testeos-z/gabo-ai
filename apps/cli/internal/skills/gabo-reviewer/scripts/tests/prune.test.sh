@@ -164,13 +164,17 @@ fill "$d/cache/go-build" 3000
 fill "$d/cache/go-mod" 500
 fill "$d/check-home/old" 1500
 fill "$d/check-home/new" 100
-touch -d '10 days ago' "$d/check-home/old"
+fill "$d/check-home/mixed" 10
+head -c 1024 /dev/zero >"$d/check-home/mixed/fresh"
+touch -d '10 days ago' "$d/check-home/old/blob" "$d/check-home/mixed/blob"
+touch -d '10 days ago' "$d/check-home/old" "$d/check-home/mixed"
 out="$(run_caches "$d" REVIEWER_CACHE_MAX=2M)"
 expect_eq "1" "$(grep -c '^pruned: ' <<<"$out")" "exactly one pruned line is printed over the limit"
-expect_match 'pruned: go-build cache, check-home older than 7 days \(' "$out" "the line names what was pruned and the size freed"
+expect_match 'pruned: go-build cache, check-home files older than 7 days \(' "$out" "the line names what was pruned and the size freed"
 check "the total is under the limit after prune" bash -c "(( $(total_kib "$d") < 2048 ))"
 check "check-home contents newer than the keep days stay" test -e "$d/check-home/new"
-check "check-home contents older than the keep days go" test ! -e "$d/check-home/old"
+check "check-home files older than the keep days go, with their empty directory" test ! -e "$d/check-home/old"
+check "a fresh file in a directory with an old mtime stays" test -e "$d/check-home/mixed/fresh"
 check "go clean -cache ran" grep -q 'go clean -cache' "$d/calls.log"
 check "go-mod is not touched" test -e "$d/cache/go-mod/blob"
 expect_match 'rc=0$' "$out" "prune_caches ends 0"
@@ -178,9 +182,9 @@ expect_match 'rc=0$' "$out" "prune_caches ends 0"
 d="$(state_dir caches_under)"
 fill "$d/cache/go-build" 300
 fill "$d/check-home/old" 100
-touch -d '10 days ago' "$d/check-home/old"
+touch -d '10 days ago' "$d/check-home/old/blob"
 out="$(run_caches "$d" REVIEWER_CACHE_MAX=2M)"
-check "under the limit nothing is removed" test -e "$d/cache/go-build/blob" -a -e "$d/check-home/old"
+check "under the limit nothing is removed" test -e "$d/cache/go-build/blob" -a -e "$d/check-home/old/blob"
 check "under the limit no line is printed" bash -c "! grep -q '^pruned:' <<<'$out'"
 check "under the limit go is not run" bash -c "! grep -qs 'go clean' '$d/calls.log'"
 check "config.env ships REVIEWER_CACHE_MAX=2G" grep -qx 'REVIEWER_CACHE_MAX=2G' "$skill/config.env"
@@ -193,26 +197,35 @@ expect_match 'rc=0$' "$out" "a failing go clean does not fail prune"
 
 d="$(state_dir caches_lock)"
 fill "$d/cache/go-build" 3000
-( exec 9>"$d/state/locks/pr-5.lock"; flock 9; sleep 30 ) &
+# a review running its checks holds cache.lock shared
+( exec 9>"$d/state/locks/cache.lock"; flock -s 9; touch "$d/ready"; sleep 30 ) &
 holder=$!
-sleep 0.3
-run_caches "$d" REVIEWER_CACHE_MAX=1M >/dev/null
+for _ in $(seq 1 50); do [[ -e "$d/ready" ]] && break; sleep 0.1; done
+out="$(run_caches "$d" REVIEWER_CACHE_MAX=1M)"
 kill "$holder" 2>/dev/null
 wait "$holder" 2>/dev/null
-check "a review holding a lock blocks the trim" test -e "$d/cache/go-build/blob"
-expect_match 'WARN prune: .*in progress' "$(cat "$d/state/reviewer.log")" "the skipped trim is logged"
+check "a review holding cache.lock blocks the trim" test -e "$d/cache/go-build/blob"
+expect_match 'WARN prune: a review is in progress' "$(cat "$d/state/reviewer.log")" "the skipped trim is logged"
+check "a skipped trim prints no line" bash -c "! grep -q '^pruned:' <<<'$out'"
 
 d="$(state_dir caches_held)"
 fill "$d/cache/go-build" 3000
-touch "$d/state/locks/pr-9.lock"
 cat >"$work/gobin2/go" <<PROBE
 #!/usr/bin/env bash
-if (exec 5>"$d/state/locks/pr-9.lock"; flock -n 5); then echo free >"$d/probe"; else echo busy >"$d/probe"; fi
+# a review that starts while go clean runs: its shared lock must wait
+if (exec 5>"$d/state/locks/cache.lock"; flock -s -n 5); then echo free >"$d/probe"; else echo busy >"$d/probe"; fi
 rm -rf "\${GOCACHE:?}"/*
 PROBE
 chmod +x "$work/gobin2/go"
 run_caches "$d" REVIEWER_CACHE_MAX=1M PATH="$work/gobin2:$PATH" >/dev/null
-expect_eq "busy" "$(cat "$d/probe" 2>/dev/null)" "the pr locks are held while the cache is removed"
+expect_eq "busy" "$(cat "$d/probe" 2>/dev/null)" "cache.lock is held exclusive while the cache is removed"
+check "prune does not take any pr-<n>.lock (open PRs are not skipped)" bash -c "! ls '$d/state/locks' | grep -q '^pr-'"
+
+d="$(state_dir caches_gomod)"
+fill "$d/cache/go-mod" 3000
+fill "$d/cache/go-build" 100
+run_caches "$d" REVIEWER_CACHE_MAX=1M >/dev/null
+expect_match 'WARN prune: caches still over REVIEWER_CACHE_MAX' "$(cat "$d/state/reviewer.log")" "a go-mod over the limit is warned about"
 
 echo "# the guard accepts only direct children named pr-* or merge-pr-*"
 d="$(state_dir guard)"
@@ -320,5 +333,16 @@ d="$(reviewer head_run head)"
 expect_match "VERDICT PR #7 head $HEAD_SHA verdict=" "$(tail -n 2 "$d/out.log" | head -n 1)" "head still ends with its VERDICT line"
 check "head prunes the closed PR's worktree at its start" gone "$d" 1
 check "head keeps the open PR's worktree" exists "$d" 2
+
+echo "# head holds cache.lock shared during the review"
+seed head_lock
+cat >"$work/bin/claude-lock" <<LOCKPROBE
+#!/usr/bin/env bash
+if (exec 5>"$work/head_lock/state/locks/cache.lock"; flock -x -n 5); then echo free >"$work/head_lock/lockprobe"; else echo busy >"$work/head_lock/lockprobe"; fi
+exec "$work/bin/claude" "\$@"
+LOCKPROBE
+chmod +x "$work/bin/claude-lock"
+d="$(reviewer head_lock head REVIEWER_CLAUDE="$work/bin/claude-lock")"
+expect_eq "busy" "$(cat "$work/head_lock/lockprobe" 2>/dev/null)" "an exclusive lock is refused while a review runs"
 
 finish
