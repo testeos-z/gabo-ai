@@ -148,7 +148,7 @@ func (u *UseCase) withEngines(lines []string, hasConfig bool, bin version) (Outp
 		line := engineconfig.FailurePrefix + " " + ConfigFile + ": " + err.Error() + "; fix it and run gabo init again"
 		return Output{Lines: append(lines, line)}, ErrEngineFailures
 	}
-	report := u.engineStep(set, assistant, bin.String())
+	report := u.engineStep(set, assistant, configMode(b), bin.String())
 	lines = append(lines, strings.Split(strings.TrimSuffix(report.Render(), "\n"), "\n")...)
 	if report.Failed() {
 		return Output{Lines: lines}, ErrEngineFailures

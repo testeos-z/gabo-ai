@@ -71,6 +71,9 @@ type Input struct {
 	Files      map[string][]byte
 	Version    string
 	Assistants []string
+	// Mode is the gabo.yaml mode (intent 0023 S5, D4); only ModeAuto makes
+	// the guardrails rule write.
+	Mode string
 	// PiPackage reports that the Pi subagent-package check found a package
 	// (intent 0016 S1, D1); piRule then omits the refusal. Unset means no
 	// package, which prints the refusal (S2).

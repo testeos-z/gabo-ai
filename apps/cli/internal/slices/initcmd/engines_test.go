@@ -46,7 +46,7 @@ func golden(t *testing.T, name, got string) {
 }
 
 func engineStep(s *memStore, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, nil, "0.2.6")
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, nil, "manual", "0.2.6")
 }
 
 func sectionOf(t *testing.T, r engineconfig.Report, engine string) engineconfig.Section {
@@ -250,7 +250,7 @@ func engineStepAs(s *memStore, assistant string, set ...string) engineconfig.Rep
 // engineStepList runs the engine step with runtimes.assistant listing
 // assistants (intent 0013 S3).
 func engineStepList(s *memStore, assistants []string, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, assistants, "0.2.6")
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, assistants, "manual", "0.2.6")
 }
 
 const (
@@ -725,7 +725,7 @@ func (f *fakePi) GentleShellOnPath() bool { return f.shell }
 // engineStepPi runs the engine step with probe as the Pi probe (intent 0016
 // S1, S2).
 func engineStepPi(s *memStore, probe PiProbe, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6", Pi: probe}).engineStep(set, nil, "0.2.6")
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6", Pi: probe}).engineStep(set, nil, "manual", "0.2.6")
 }
 
 // piRefusalLines are the three lines today's Pi section prints without a
