@@ -495,8 +495,7 @@ func TestRuntimeOpenCodeCoderWorktreeStep(t *testing.T) {
 		"First step, before any other tool call",
 		"pass the worktree path from your launch prompt as `workdir` on every `shell` call",
 		"absolute path under it for every `read`, `edit`, `write` and `patch`",
-		"`git rev-parse --show-toplevel` with that `workdir`",
-		"if it does not, stop and report BLOCKED",
+		"check that `git rev-parse --show-toplevel` with that `workdir` prints the worktree path; if it does not, stop and report BLOCKED.",
 	} {
 		if !strings.Contains(m[2], want) {
 			t.Errorf("coder worktree step: missing %q:\n%s", want, m[2])
@@ -520,6 +519,7 @@ func TestRuntimeOpenCodeSessionMoveNeverCalled(t *testing.T) {
 	}
 	for _, want := range []string{
 		"Agent not found: \"gabo-coder\"",
+		"that used `workdir` and no session move completed normally",
 		"the coder never calls it",
 		"https://github.com/testeos-z/gabo-ai/issues/487#issuecomment-6810538380",
 		"`workdir`",
