@@ -92,3 +92,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-12 | Accepted by the owner as the spec stands on dev, with its recorded decisions (resolver: agent, rule of the owner). Owner, verbatim: "los que ya tienes spec estan aprobados" (this sentence accepts the specs of intents 0020, 0021 and 0022). Relayed unedited by the assistant from the owner's own message in the session of 2026-11-12; the status row was set in PR #573. |
