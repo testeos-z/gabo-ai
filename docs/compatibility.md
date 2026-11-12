@@ -123,4 +123,4 @@ Each runtime skill rechecks its sources when the installed version differs.
 | Codex (`codex-cli`) | 0.163.0 | 2026-11-03 | `gabo-runtime-codex` skill, Sources |
 | Pi | 1.4.0 | 2026-11-03 | `gabo-runtime-pi` skill, Sources |
 | gentle-pi | 4.5.1 | 2026-11-03 | `gabo-runtime-pi` skill, Sources |
-| OpenCode | 2.0.32 | 2026-11-03 | `gabo-runtime-opencode` skill, Sources |
+| OpenCode | 2.2.6 | 2026-11-11 | `gabo-runtime-opencode` skill, Sources |

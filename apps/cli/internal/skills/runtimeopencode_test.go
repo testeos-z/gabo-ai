@@ -91,20 +91,34 @@ func TestRuntimeOpenCodeSections(t *testing.T) {
 	}
 }
 
-// Sources are dated, name OpenCode 2.0.32 and carry the recheck rule that
-// stops the build when the version differs and a row no longer holds (S2).
+// Sources are dated, name OpenCode 2.2.6 and carry the recheck rule that
+// stops the build when the version differs and a row no longer holds (S2;
+// intent 0015 T17): every row cites the V2 page it was read from and every
+// (binary) row is restated from the 2.2.6 binary.
 func TestRuntimeOpenCodeCitesItsSources(t *testing.T) {
 	t.Parallel()
 	s := openCodeSection(t, runtimeOpenCodeDoc(t), "Sources")
 	for _, want := range []string{
-		"2026-11-03", "OpenCode 2.0.32", "`opencode --version`",
-		"When it is not 2.0.32", "A row that no longer holds: stop, build nothing",
+		"2026-11-11", "OpenCode 2.2.6", "`opencode --version`", "`opencode debug agents`",
+		"When it is not 2.2.6", "A row that no longer holds: stop, build nothing",
 		"https://opencode.ai/docs/agents", "https://opencode.ai/docs/skills",
 		"https://opencode.ai/docs/permissions", "https://opencode.ai/docs/tools",
-		"(binary)",
+		"https://opencode.ai/docs/config", "https://opencode.ai/docs/plugins",
+		"https://opencode.ai/docs/migrate-v1/", "https://opencode.ai/docs/build/plugins/migrate-v1",
+		"(binary)", "`ctx.location.directory`",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("## Sources: missing %q", want)
+		}
+	}
+	for _, bad := range []string{"2026-11-03", "2.0.32"} {
+		if strings.Contains(s, bad) {
+			t.Errorf("## Sources: still names %q", bad)
+		}
+	}
+	for _, l := range strings.Split(s, "\n") {
+		if strings.HasPrefix(l, "| ") && !strings.Contains(l, "https://") && !strings.HasSuffix(l, "| OpenCode 2.2.6 binary |") && !strings.HasPrefix(l, "| fact") && !strings.HasPrefix(l, "|---") {
+			t.Errorf("## Sources: a row cites neither a page nor the 2.2.6 binary: %.80s", l)
 		}
 	}
 }
@@ -112,7 +126,8 @@ func TestRuntimeOpenCodeCitesItsSources(t *testing.T) {
 var markdownFence = regexp.MustCompile("(?ms)^( *)```markdown\n(.*?)\n *```$")
 
 // The agent file holds only description (double-quoted role), mode: subagent
-// and permission, with no allow; its body starts with the version comment,
+// and permissions (an ordered list of {action, resource, effect} rules, no
+// `permission` map; intent 0015 T17), with no allow; its body starts with the version comment,
 // then the Skills: line (S3, D2, D3).
 func TestRuntimeOpenCodeWritesTheAgentShape(t *testing.T) {
 	t.Parallel()
@@ -141,13 +156,26 @@ func TestRuntimeOpenCodeWritesTheAgentShape(t *testing.T) {
 			keys = append(keys, k)
 		}
 	}
-	if want := []string{"description", "mode", "permission"}; !slices.Equal(keys, want) {
+	if want := []string{"description", "mode", "permissions"}; !slices.Equal(keys, want) {
 		t.Errorf("frontmatter keys = %v, want %v", keys, want)
 	}
-	for _, want := range []string{"description: \"<role>\"", "mode: subagent", "task: deny", "subagent: deny", "gabo-reviewer: deny"} {
+	for _, want := range []string{
+		"description: \"<role>\"", "mode: subagent",
+		"  - {action: <each action of the Tool Map for a capability the spec lacks>, resource: \"*\", effect: deny}",
+		"  - {action: subagent, resource: \"*\", effect: deny}",
+		"  - {action: skill, resource: gabo-reviewer, effect: deny}",
+	} {
 		if !strings.Contains(front, want) {
 			t.Errorf("frontmatter lacks %q:\n%s", want, front)
 		}
+	}
+	for _, bad := range []string{"task:", "permission:", "tools:"} {
+		if strings.Contains(front, bad) {
+			t.Errorf("frontmatter holds the V1 field %q:\n%s", bad, front)
+		}
+	}
+	if i, j := strings.Index(front, "action: subagent"), strings.Index(front, "action: skill"); i < 0 || j < i {
+		t.Errorf("the subagent rule must come before the skill rule (last match wins):\n%s", front)
 	}
 	if strings.Contains(block, "allow") {
 		t.Errorf("agent block sets allow (D3 is deny-only):\n%s", block)
@@ -162,15 +190,15 @@ func TestRuntimeOpenCodeWritesTheAgentShape(t *testing.T) {
 	if len(bl) < 3 || !strings.HasPrefix(bl[2], "Skills: ") {
 		t.Errorf("body third line does not start with Skills: :\n%s", body)
 	}
-	for _, want := range []string{"`.opencode/agents/<id>.md`", "no other key", "double quotes", "`mode: subagent`"} {
+	for _, want := range []string{"`.opencode/agents/<id>.md`", "no other key", "double quotes", "`mode: subagent`", "frontmatter holds `description`, `mode` and `permissions` and no other key"} {
 		if !strings.Contains(doc, want) {
 			t.Errorf("%s: missing %q", runtimeOpenCode, want)
 		}
 	}
 }
 
-// The Tool Map has every spec capability with the deny keys of spec D3 and
-// never an allow (S4, D3).
+// The Tool Map has every spec capability with the deny actions of spec D3 and
+// never an allow (S4, D3); V2 names (`shell`, `subagent`) only.
 func TestRuntimeOpenCodeToolMap(t *testing.T) {
 	t.Parallel()
 	s := openCodeSection(t, runtimeOpenCodeDoc(t), "Tool Map")
@@ -178,10 +206,10 @@ func TestRuntimeOpenCodeToolMap(t *testing.T) {
 		"read":            {"`read`"},
 		"search":          {"`grep`", "`glob`"},
 		"edit":            {"`edit`"},
-		"shell":           {"`bash`"},
-		"git":             {"`bash`"},
-		"tracker":         {"`bash`"},
-		"repository-host": {"`bash`"},
+		"shell":           {"`shell`"},
+		"git":             {"`shell`"},
+		"tracker":         {"`shell`"},
+		"repository-host": {"`shell`"},
 		"memory":          {"`<server>_*`"},
 		"web":             {"`webfetch`", "`websearch`"},
 		"skills":          {"`skill`"},
@@ -200,12 +228,15 @@ func TestRuntimeOpenCodeToolMap(t *testing.T) {
 		}
 		for _, k := range keys {
 			if !strings.Contains(row, k) {
-				t.Errorf("Tool Map row for %s lacks deny key %s: %s", c, k, row)
+				t.Errorf("Tool Map row for %s lacks deny action %s: %s", c, k, row)
 			}
 		}
 	}
 	if strings.Contains(s, "allow") {
 		t.Errorf("## Tool Map mentions allow (D3 is deny-only)")
+	}
+	if strings.Contains(s, "`bash`") || strings.Contains(s, "`task`") {
+		t.Errorf("## Tool Map still names a V1 key (`bash` or `task`)")
 	}
 	// intent 0015 S6, D7: no capability maps to a launch tool.
 	for _, l := range strings.Split(s, "\n") {
@@ -214,11 +245,11 @@ func TestRuntimeOpenCodeToolMap(t *testing.T) {
 		}
 	}
 	mustContainIn(t, "## Tool Map", s,
-		"No capability maps to a launch tool: every spec agent gets `task: deny` and `subagent: deny`, after the keys of the table and before `skill` (intent 0015 S6, D7)",
+		"No capability maps to a launch tool: every spec agent gets one `subagent` deny rule, after the rules of the table and before the `skill` rule (intent 0015 S6, D7)",
 		"The main session launches each spec agent and no agent launches another",
-		"`gabo-coder` runs `{{reviewer_script}}` through `shell`, which its spec lists, so `bash` stays at the owner's setting and no key is written for the run",
+		"`gabo-coder` runs `{{reviewer_script}}` through `shell`, which its spec lists, so `shell` stays at the owner's setting and no rule is written for the run",
 	)
-	for _, want := range []string{"`deny`", "left at the owner's setting"} {
+	for _, want := range []string{"`deny`", "left at the owner's setting", "`{action, resource, effect}`", "last matching rule wins"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("## Tool Map: missing %q", want)
 		}
@@ -234,8 +265,8 @@ func TestRuntimeOpenCodeReviewerRules(t *testing.T) {
 		"Never place `gabo-reviewer` in the project",
 		"never create `.agents/skills/gabo-reviewer`",
 		"no reviewer link",
-		"every spec agent sets `permission.skill` `gabo-reviewer: deny`",
-		"`gabo-reviewer: deny`",
+		"every spec agent gets a `permissions` rule `skill` with resource `gabo-reviewer` and effect `deny`",
+		"effect: deny",
 		"`${XDG_DATA_HOME:-$HOME/.local/share}/gabo/skills/gabo-reviewer/scripts/reviewer.sh`, written literally",
 		"Never write under `~/.config/opencode`",
 	} {
@@ -568,6 +599,7 @@ func TestRuntimeOpenCodeBuildsTheMainSessionEntry(t *testing.T) {
 		"make `.agents/skills/gabo-assistant` a relative symlink to `../../.gabo/skills/gabo-assistant`",
 		"write `.opencode/agents/gabo-assistant.md` from `main_session.template`",
 		"`mode: primary`",
+		"`permissions` holds only the `skill` rule with resource `gabo-reviewer` and effect `deny`",
 		"`gabo init` writes `default_agent` with the value `\"gabo-assistant\"` into `<file>` (intent 0010 S4)",
 		"when it is missing, report `run gabo init`",
 		"A `default_agent` with another value is the owner's own: leave it and report it",
@@ -646,7 +678,7 @@ func TestRuntimeOpenCodeAllowsTheMainSessionKey(t *testing.T) {
 		t.Errorf("%s: still says no build sets a default agent", runtimeOpenCode)
 	}
 	src := openCodeSection(t, doc, "Sources")
-	for _, want := range []string{"https://opencode.ai/docs/config", "`default_agent`", "must be a primary agent"} {
+	for _, want := range []string{"https://opencode.ai/docs/config", "`default_agent`", "must exist, be visible, and support primary use"} {
 		if !strings.Contains(src, want) {
 			t.Errorf("## Sources: missing %q", want)
 		}

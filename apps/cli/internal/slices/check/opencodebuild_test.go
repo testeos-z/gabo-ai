@@ -31,7 +31,7 @@ func readTestdata(t *testing.T, name string) string {
 // opencodeBuilt is a project with the real embedded catalog (its own
 // gabo-runtime-opencode, which declares metadata.main_session), and every
 // spec agent built in the shape of spec 0004 S3
-// (.opencode/agents/<id>.md: frontmatter description, mode and permission;
+// (.opencode/agents/<id>.md: frontmatter description, mode and permissions;
 // the body starts with <!-- gabo-version: x.y.z -->, then the Skills: line
 // of build step 7, omitted for an empty list);
 // each spec skill linked in the shared .agents/skills (intent 0008 S3) as
@@ -57,7 +57,7 @@ func opencodeBuilt(t *testing.T, version string) fstest.MapFS {
 		list, rest := agentSkillList(t, a)
 		proj[".opencode/agents/"+a.ID+".md"] = file("---\n" +
 			`description: "` + strings.ReplaceAll(a.Role, `"`, `\"`) + "\"\n" +
-			"mode: subagent\npermission:\n  skill:\n    gabo-reviewer: deny\n---\n" +
+			"mode: subagent\npermissions:\n  - {action: shell, resource: \"*\", effect: deny}\n  - {action: subagent, resource: \"*\", effect: deny}\n  - {action: skill, resource: gabo-reviewer, effect: deny}\n---\n" +
 			"<!-- gabo-version: " + version + " -->\n" +
 			skillsLine(opencodeWhere, list) + rest)
 		for _, name := range a.Skills {
