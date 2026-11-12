@@ -8,7 +8,7 @@
 #   skills       catalog skills the agent loads (slot adapters are linked by
 #                the runtime skill under their fixed slot names, not here)
 #   tools        capabilities, engine-neutral: read, search, edit, shell, git,
-#                tracker, repository-host, memory, web, skills, subagents
+#                tracker, repository-host, memory, web, skills
 #   launched_by  the spec agent that launches it, or main-session (the
 #                assistant's main session, which has no agent file)
 #   template     body template, relative to this directory
@@ -49,27 +49,15 @@ agents:
     tools: [read, search, shell]
     launched_by: main-session
     template: agents/gabo-plan-reviewer.md
-  - id: gabo-cycle
-    role: Wave runner; runs one intent per wave, claims its unblocked tasks, creates worktrees, launches coders, keeps the resource ledger and reports the wave.
-    skills: [gabo-cycle, gabo-wave-report]
-    tools: [read, search, shell, git, tracker, repository-host, memory, skills, subagents]
-    launched_by: main-session
-    template: agents/gabo-cycle.md
   - id: gabo-coder
     role: Coder for one task in its own worktree; implements test-first, opens the PR, requests review and closes the task after the merge.
     skills: [gabo-coder, gabo-reviewer-notes]
-    tools: [read, search, edit, shell, git, tracker, repository-host, skills, subagents]
-    launched_by: gabo-cycle
+    tools: [read, search, edit, shell, git, tracker, repository-host, skills]
+    launched_by: main-session
     template: agents/gabo-coder.md
-  - id: gabo-reviewer
-    role: Review relay; validates the request, runs the user-level gbai-reviewer script for one pinned PR head and relays its VERDICT line.
-    skills: []
-    tools: [shell]
-    launched_by: gabo-coder
-    template: agents/gabo-reviewer.md
 main_session:
   id: gabo-assistant
   role: The owner's single point of contact in the main session; delegates all heavy work to the gabo agents.
-  skills: [gabo-assistant]
+  skills: [gabo-assistant, gabo-cycle, gabo-wave-report]
   template: agents/gabo-assistant.md
   block: agents/gabo-assistant-block.md
