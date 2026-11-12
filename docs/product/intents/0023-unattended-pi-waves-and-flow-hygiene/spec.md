@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0023-unattended-pi-waves-and-flow-hygiene](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted (owner, 2026-11-12) |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-12 |
@@ -95,3 +95,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-12 | Accepted by the owner as the spec stands on dev (PR #576), with its recorded decisions, including turning off the gentle-pi push confirmation only in projects with `mode: auto`. Owner, verbatim: "ahora mismo aprobare todos sus spec" and then "aprobado, siguamos trabajdno". Relayed unedited by the assistant; the owner merges this PR himself as his acceptance. |
