@@ -96,12 +96,12 @@ Intent tracker item: [#497](https://github.com/testeos-z/gabo-ai/issues/497) und
 
 | task | issue |
 |---|---|
-| T1 | TBD1 |
-| T2 | TBD2 |
-| T3 | TBD3 |
-| T4 | TBD4 |
-| T5 | TBD5 |
-| T6 | TBD6 |
+| T1 | [#633](https://github.com/testeos-z/gabo-ai/issues/633) |
+| T2 | [#634](https://github.com/testeos-z/gabo-ai/issues/634) |
+| T3 | [#635](https://github.com/testeos-z/gabo-ai/issues/635) |
+| T4 | [#636](https://github.com/testeos-z/gabo-ai/issues/636) |
+| T5 | [#637](https://github.com/testeos-z/gabo-ai/issues/637) |
+| T6 | [#638](https://github.com/testeos-z/gabo-ai/issues/638) |
 
 Cross-intent edges in the tracker: T1 is blocked by 0015/T1 [#476](https://github.com/testeos-z/gabo-ai/issues/476), 0015/T4 [#479](https://github.com/testeos-z/gabo-ai/issues/479), 0015/T12 [#487](https://github.com/testeos-z/gabo-ai/issues/487) and 0020/T5 [#581](https://github.com/testeos-z/gabo-ai/issues/581); T2 by #476 and #487; T4 by #476 and #487; T6 by 0020/T6 [#582](https://github.com/testeos-z/gabo-ai/issues/582).
 
