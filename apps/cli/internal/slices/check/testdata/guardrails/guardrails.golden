@@ -1,0 +1,43 @@
+=== auto pi no file
+exit 0
+error: ""
+--- stdout
+! .pi/gentle-ai/runtime-guardrails.json: autonomousMode is not true (mode auto with pi); coders stop at git push unless GENTLE_PI_AUTONOMOUS_MODE=1 is set; next: run gabo init
+check passed: config, agents, slot coverage and catalog version
+=== auto pi autonomousMode true
+exit 0
+error: ""
+--- stdout
+check passed: config, agents, slot coverage and catalog version
+=== auto pi invalid JSON
+exit 1
+error: ""
+--- stdout
+✗ .pi/gentle-ai/runtime-guardrails.json: invalid JSON (unexpected end of JSON input)
+=== auto pi autonomousMode false
+exit 0
+error: ""
+--- stdout
+! .pi/gentle-ai/runtime-guardrails.json: autonomousMode is not true (mode auto with pi); coders stop at git push unless GENTLE_PI_AUTONOMOUS_MODE=1 is set; next: run gabo init
+check passed: config, agents, slot coverage and catalog version
+=== auto pi not an object
+exit 0
+error: ""
+--- stdout
+! .pi/gentle-ai/runtime-guardrails.json: autonomousMode is not true (mode auto with pi); coders stop at git push unless GENTLE_PI_AUTONOMOUS_MODE=1 is set; next: run gabo init
+check passed: config, agents, slot coverage and catalog version
+=== manual pi no file
+exit 0
+error: ""
+--- stdout
+check passed: config, agents, slot coverage and catalog version
+=== manual pi autonomousMode false
+exit 0
+error: ""
+--- stdout
+check passed: config, agents, slot coverage and catalog version
+=== auto without pi no file
+exit 0
+error: ""
+--- stdout
+check passed: config, agents, slot coverage and catalog version
