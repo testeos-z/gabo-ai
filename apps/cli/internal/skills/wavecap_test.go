@@ -73,3 +73,11 @@ func TestWaveReportEnforcementReadsTheBuiltAgent(t *testing.T) {
 		"The one exception is a paused wave the owner stops", "unfinished tasks left as they are",
 	})
 }
+
+func TestCycleMaxCodersCountRestartsOnContinue(t *testing.T) {
+	t.Parallel()
+	requireIn(t, "gabo-cycle/SKILL.md", readCatalog(t, "gabo-cycle/SKILL.md"), []string{
+		"counted from the wave start or from the last `cap max_coders reset` line of the trace",
+		"returns without an outcome status (`HANDED`, `DONE` or `BLOCKED`)",
+	})
+}
