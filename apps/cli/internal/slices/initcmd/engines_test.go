@@ -743,7 +743,7 @@ func TestEngineStepPiPackagePresentPrintsNoRefusal(t *testing.T) {
 		{"npm", &fakePi{list: []byte("npm:gentle-pi\n"), listed: true}},
 		{"npm with version", &fakePi{list: []byte("npm:gentle-pi@1.2.3\n"), listed: true}},
 		{"git source", &fakePi{list: []byte("git:github.com/someone/gentle-pi\n"), listed: true}},
-		{"gentle-shell only", &fakePi{listed: false, shell: true}},
+		{"gentle-shell only", &fakePi{list: []byte("npm:@gabo-ai/pi\n"), listed: true, shell: true}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -777,6 +777,8 @@ func TestEngineStepPiNoPackagePrintsTodaysRefusal(t *testing.T) {
 		{"no package", &fakePi{list: []byte("npm:@gabo-ai/pi\n"), listed: true}},
 		{"pi not on PATH", &fakePi{}},
 		{"pi list exits 1", &fakePi{list: []byte("npm:gentle-pi\n")}},
+		{"pi not on PATH with gentle-shell", &fakePi{shell: true}},
+		{"pi list exits 1 with gentle-shell", &fakePi{list: []byte("npm:gentle-pi\n"), shell: true}},
 		{"no probe", nil},
 	}
 	for _, c := range cases {
@@ -803,13 +805,15 @@ func TestEngineStepPiListTimeoutIsNoPackage(t *testing.T) {
 	piListDeadline = 20 * time.Millisecond
 	t.Cleanup(func() { piListDeadline = saved })
 	s := newStore(map[string]string{})
-	probe := &fakePi{block: true}
-	sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
-	if got := sec.Lines[len(sec.Lines)-2:]; !slices.Equal(got, piRefusalLines[:2]) {
-		t.Errorf("refusal lines after a timeout = %q", got)
-	}
-	if probe.calls != 1 {
-		t.Errorf("pi list ran %d times, want once", probe.calls)
+	for _, shell := range []bool{false, true} {
+		probe := &fakePi{block: true, shell: shell}
+		sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
+		if got := sec.Lines[len(sec.Lines)-2:]; !slices.Equal(got, piRefusalLines[:2]) {
+			t.Errorf("refusal lines after a timeout (gentle-shell %v) = %q", shell, got)
+		}
+		if probe.calls != 1 {
+			t.Errorf("pi list ran %d times, want once", probe.calls)
+		}
 	}
 }
 
