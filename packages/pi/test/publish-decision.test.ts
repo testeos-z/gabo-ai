@@ -1,7 +1,15 @@
 // Publish decision of .github/workflows/publish-pi.yml: the workflow calls
 // scripts/publish-decision.sh, which asks `bun info` whether the version is
 // on npm and writes published=true|false to $GITHUB_OUTPUT. These tests run
-// it against a fake `bun` on PATH; the messages are the ones bun prints.
+// it against a fake `bun` on PATH. The 404 fixtures are verbatim stderr of
+// bun 1.4.2 (the version pinned by package.json packageManager), captured
+// against registry.npmjs.org on 2026-11-12:
+//   bun info @gabo-ai/pi@9.9.9 version
+//     error: No version of "@gabo-ai/pi" satisfying "9.9.9" found
+//     Recent versions: ...
+//   bun info @gabo-ai/nope-zz-probe 1.0.0 version
+//     404 Not Found: https://registry.npmjs.org/@gabo-ai%2fnope-zz-probe
+//      - '@gabo-ai/nope-zz-probe@latest' does not exist in this registry
 import { afterAll, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -48,7 +56,7 @@ describe("publish decision", () => {
 
   test("a version missing from the registry takes the publish path", () => {
     const r = run(
-      'echo "No version of \\"@gabo-ai/pi\\" satisfying \\"1.2.3\\" found" >&2; echo "" >&2; echo "Recent versions:" >&2; exit 1',
+      'echo "error: No version of \\"@gabo-ai/pi\\" satisfying \\"1.2.3\\" found" >&2; echo "" >&2; echo "Recent versions:" >&2; echo "- 0.2.6" >&2; exit 1',
     );
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("not on npm yet (404)");
@@ -58,7 +66,7 @@ describe("publish decision", () => {
 
   test("a package missing from the registry takes the publish path", () => {
     const r = run(
-      'echo "" >&2; echo "404 Not Found: https://registry.npmjs.org/@gabo-ai%2fpi" >&2; echo " - \'@gabo-ai/pi@latest\' does not exist in this registry" >&2; exit 1',
+      'echo "" >&2; echo "404 Not Found: https://registry.npmjs.org/@gabo-ai%2fnope-zz-probe" >&2; echo "" >&2; echo " - \'@gabo-ai/nope-zz-probe@latest\' does not exist in this registry" >&2; exit 1',
     );
     expect(r.code).toBe(0);
     expect(r.stdout).toContain("not on npm yet (404)");

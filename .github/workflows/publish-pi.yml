@@ -51,10 +51,19 @@ jobs:
           VERSION: ${{ steps.pkg.outputs.version }}
         run: bash packages/pi/scripts/publish-decision.sh "$NAME" "$VERSION"
 
+      # bun publish reads its registry token from NPM_CONFIG_TOKEN. This step asks the
+      # registry who the token belongs to, so a token bun cannot use fails here,
+      # before anything is published.
+      - name: Check the registry token
+        if: steps.check.outputs.published == 'false'
+        working-directory: packages/pi
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bun pm whoami
+
       - name: Publish to npm
         if: steps.check.outputs.published == 'false'
         working-directory: packages/pi
         env:
-          # bun publish reads its registry token from NPM_CONFIG_TOKEN.
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: bun publish --access public
