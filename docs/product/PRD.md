@@ -224,6 +224,7 @@ In auto mode the assistant:
 | Share of waves closed by the assistant without the human launching or relaying anything | Waves closed without human launch or relay steps, divided by total waves. |
 | Questions recorded and resolved, and by whom | Count of questions raised, resolved, and resolver (directiva, assistant, owner). |
 | Plan adjustments per wave without re-planning an intent | Count of task adjustments per wave; any intent whose plan was rewritten is reported separately. Amended (owner 2026-11-03, per-change-sdlc). |
+| Measures per wave and per planning run | Each wave report holds a `Measures` section (wall time, fix rounds per task, agent sessions, PRs opened and merged, plan-change proposals, interactions, tokens as the engine reports them, each task's outcome) and each planning run saves a record on `gabo/trace/<I####>/planning` (traceability gaps, plan-change proposals). A value no source gave reads `unknown (<source>)`. Amended (owner 2026-11-12, [intent 0022](intents/0022-measure-roles/spec.md) S8). |
 | Time from install to the first wave running with the team's tracker and methodology | Elapsed time from install to the start of the first wave. |
 
 **Targets.** The first release measures without targets. After 3 to 5 real waves the baseline is known and the owner sets targets.
