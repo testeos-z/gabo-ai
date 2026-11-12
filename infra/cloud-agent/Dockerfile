@@ -5,7 +5,8 @@
 #
 # Every download is pinned: the base image by digest, Ubuntu packages through a
 # dated snapshot of the signed archive, release files by SHA-256 (fetch-verified)
-# and npm packages by the committed lockfile (npm ci). A mismatch fails the build.
+# and bun packages by the committed bun.lock (bun install --frozen-lockfile).
+# A mismatch fails the build.
 # The image holds no secret; the operator supplies credentials at run time.
 # This image is not a reviewer environment.
 
@@ -54,7 +55,8 @@ RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
 
 COPY infra/cloud-agent/bin/ /usr/local/bin/
 
-# Release binaries, each verified against its pinned SHA-256.
+# Release binaries, each verified against its pinned SHA-256. Node.js runs the
+# JS tools; its npm and corepack are removed, the image installs with bun only.
 RUN tmp="$(mktemp -d)"; cd "$tmp"; \
     fetch-verified "https://github.com/Gentleman-Programming/engram/releases/download/v${ENGRAM_VERSION}/engram_${ENGRAM_VERSION}_linux_amd64.tar.gz" "$ENGRAM_SHA256" engram.tar.gz; \
     tar --no-same-owner -xzf engram.tar.gz engram; install -m 0755 engram /usr/local/bin/engram; \
@@ -67,23 +69,28 @@ RUN tmp="$(mktemp -d)"; cd "$tmp"; \
     fetch-verified "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" "$NODE_SHA256" node.tar.xz; \
     tar -C /usr/local --strip-components=1 --no-same-owner -xJf node.tar.xz \
       "node-v${NODE_VERSION}-linux-x64/bin" "node-v${NODE_VERSION}-linux-x64/lib" "node-v${NODE_VERSION}-linux-x64/include"; \
+    rm -rf /usr/local/lib/node_modules; \
+    rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack; \
     fetch-verified "https://github.com/oven-sh/bun/releases/download/bun-v${BUN_VERSION}/bun-linux-x64.zip" "$BUN_SHA256" bun.zip; \
     unzip -q -j bun.zip bun-linux-x64/bun; install -m 0755 bun /usr/local/bin/bun; \
     cd /; rm -rf "$tmp"
 
-# Claude Code and codegraph from the committed lockfile: npm ci refuses a
-# lockfile that does not match package.json and checks every package against
-# its lockfile integrity hash. Install scripts are off; the one Claude Code
-# needs (it links the native binary from the already verified platform
-# package) runs explicitly with the network disabled, so it cannot download.
-COPY infra/cloud-agent/npm/package.json infra/cloud-agent/npm/package-lock.json /opt/gabo-agent/npm/
-RUN cd /opt/gabo-agent/npm; \
-    npm ci --ignore-scripts --no-audit --no-fund --update-notifier=false; \
-    npm cache clean --force
-RUN --network=none cd /opt/gabo-agent/npm/node_modules/@anthropic-ai/claude-code; \
+# Claude Code and codegraph from the committed bun.lock: bun install with
+# --frozen-lockfile refuses a lockfile that does not match package.json and
+# checks every package against its lockfile integrity hash. Install scripts are
+# off; the one Claude Code needs (it links the native binary from the already
+# verified platform package) runs explicitly with the network disabled, so it
+# cannot download. The bun download cache lives in a scratch directory that is
+# removed, so no cache ships in the image.
+COPY infra/cloud-agent/tools/package.json infra/cloud-agent/tools/bun.lock /opt/gabo-agent/tools/
+RUN cd /opt/gabo-agent/tools; \
+    cache="$(mktemp -d)"; \
+    BUN_INSTALL_CACHE_DIR="$cache" bun install --frozen-lockfile --ignore-scripts; \
+    rm -rf "$cache"
+RUN --network=none cd /opt/gabo-agent/tools/node_modules/@anthropic-ai/claude-code; \
     node install.cjs; \
-    ln -s /opt/gabo-agent/npm/node_modules/.bin/claude /usr/local/bin/claude; \
-    ln -s /opt/gabo-agent/npm/node_modules/.bin/codegraph /usr/local/bin/codegraph
+    ln -s /opt/gabo-agent/tools/node_modules/.bin/claude /usr/local/bin/claude; \
+    ln -s /opt/gabo-agent/tools/node_modules/.bin/codegraph /usr/local/bin/codegraph
 
 # Repository seed from the build context's own git history (bin/gabo-make-seed:
 # local and origin remote-tracking branches, no network, no credential, the
