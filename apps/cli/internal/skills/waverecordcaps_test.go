@@ -14,6 +14,7 @@ func TestWaveReportCapLinesAreTheScriptOutput(t *testing.T) {
 	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
 	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{
 		capsCall, "pasted unchanged", "`status: paused`", "continue or stop",
+		"after the last section and after the `session id` line",
 	})
 }
 
@@ -30,6 +31,7 @@ func TestAssistantPausedAnswerCarriesTheScriptOutput(t *testing.T) {
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
 	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
 		capsCall + " --paused", "unchanged", "its last line is `continue or stop`",
+		"moved after every report section and after the `session id: <session id>` line", "asks no comfort question",
 	})
 }
 
