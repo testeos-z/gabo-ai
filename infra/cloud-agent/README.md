@@ -10,8 +10,8 @@ This image is **not a reviewer environment**: the reviewer gate keeps its own cl
 |---|---|
 | Base `ubuntu:24.04` | image index digest in `FROM` |
 | Ubuntu packages (`ca-certificates curl git jq less openssh-client procps tini unzip xz-utils`) | dated snapshot of the archive (`UBUNTU_SNAPSHOT`); apt checks the signed index with the base image keyring and every package against its SHA-256 |
-| Engram, gentle-ai, gh, Go, Node.js, Bun | version and SHA-256 build args; `bin/fetch-verified` fails the build on a mismatch |
-| Claude Code, codegraph | `npm/package-lock.json` (`npm ci` checks every package against its integrity hash) |
+| Engram, gentle-ai, gh, Go, Node.js, Bun | version and SHA-256 build args; `bin/fetch-verified` fails the build on a mismatch. Node.js is the runtime only: its npm and corepack are removed |
+| Claude Code, codegraph | `tools/bun.lock` (`bun install --frozen-lockfile` checks every package against its integrity hash); `tools/package.json` pins the exact versions |
 | gabo-ai repository | a seed built from the build context's own git history in `/opt/gabo-agent/seed.git` (`bin/gabo-make-seed`) |
 
 At build time Engram is registered as a user-scope Claude Code MCP server (`claude mcp add --transport stdio --scope user engram -- /usr/local/bin/engram mcp --tools=agent`).
@@ -79,7 +79,7 @@ Change one pin at a time, rebuild, and run the start checks.
 | `GO_VERSION`, `GO_SHA256` | `https://go.dev/dl/?mode=json&include=all` (`go<v>.linux-amd64.tar.gz`); keep it at or above the `go` line of `apps/cli/go.mod`, since `GOTOOLCHAIN=local` forbids toolchain downloads |
 | `NODE_VERSION`, `NODE_SHA256` | `https://nodejs.org/dist/v<v>/SHASUMS256.txt` (`node-v<v>-linux-x64.tar.xz`) |
 | `BUN_VERSION`, `BUN_SHA256` | `SHASUMS256.txt` of the `bun-v<v>` release in `oven-sh/bun` (`bun-linux-x64.zip`); match `packageManager` in the root `package.json` |
-| Claude Code, codegraph | edit the exact versions in `npm/package.json`, then `npm install --package-lock-only --ignore-scripts` in `infra/cloud-agent/npm` and commit both files |
+| Claude Code, codegraph | edit the exact versions in `tools/package.json`, then `bun install --lockfile-only --ignore-scripts` in `infra/cloud-agent/tools` with the `BUN_VERSION` above and commit both files |
 
 Download the file and compare `sha256sum` with the published value before committing a new checksum. Claude Code's self-updater is off (`DISABLE_AUTOUPDATER=1`), so the version changes only through the lockfile.
 
