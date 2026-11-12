@@ -31,7 +31,7 @@ gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateSt
 Check `baseRefName` equals `$B` first and refuse otherwise, then:
 
 ```bash
-gh pr merge <pr> -R $R --squash --match-head-commit <sha>
+gh pr merge <pr> -R $R --merge --match-head-commit <sha>
 gh pr view <pr> -R $R --json state,mergeCommit --jq '[.state,.mergeCommit.oid]|@tsv'
 ```
 
@@ -49,5 +49,5 @@ git push origin --delete <branch>
 ```
 
 1. The read must show `MERGED`, base `$B` and head `<branch>`; otherwise refuse.
-2. Local first, with lower-case `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it): git checks the branch against that upstream ref, so it succeeds after a squash merge and still refuses unpushed commits. A refusal is a leftover; never force it.
+2. Local first, with lower-case `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it): git checks the branch against that upstream ref; the merge commit keeps the pushed head reachable from `dev`, and unpushed commits still refuse. A refusal is a leftover; never force it.
 3. Remote only if `ls-remote` shows exactly `headRefOid`; no line means nothing to delete; any other SHA is a refusal and a leftover.
