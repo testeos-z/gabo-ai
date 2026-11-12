@@ -431,3 +431,14 @@ func TestSetupCommunicationReachesASessionOnAnotherHost(t *testing.T) {
 		t.Errorf("%s: still says %q", setupSkill, stale)
 	}
 }
+
+// Intent 0020 (plan T4, S8): the Waves bullet asks the three optional caps.
+func TestSetupAsksTheWaveCaps(t *testing.T) {
+	t.Parallel()
+	requireAll(t, setupDoc(t), []string{
+		"`wave.max_coder_turns`", "`wave.max_coders`", "`wave.max_fix_rounds`",
+		"each is optional", "unset keeps today's behavior",
+		"spend is not capped by gabo", "`--max-budget-usd`",
+		"pauses and asks to continue or stop",
+	})
+}
