@@ -478,9 +478,9 @@ func TestRuntimeOpenCodeWriteList(t *testing.T) {
 
 var textFence = regexp.MustCompile("(?ms)^( *)```text\n(.*?)\n *```$")
 
-// The built gabo-coder body gains an OpenCode-only first step that moves the
-// session to the launch-prompt worktree, else uses shell workdir and
-// absolute paths (S7, D6).
+// The built gabo-coder body gains an OpenCode-only first step that passes the
+// launch-prompt worktree as shell workdir and uses absolute paths, and never
+// moves the session (S6, D4, plan decision PD13).
 func TestRuntimeOpenCodeCoderWorktreeStep(t *testing.T) {
 	t.Parallel()
 	steps := openCodeSection(t, runtimeOpenCodeDoc(t), "Build Steps")
@@ -493,15 +493,43 @@ func TestRuntimeOpenCodeCoderWorktreeStep(t *testing.T) {
 	}
 	for _, want := range []string{
 		"First step, before any other tool call",
-		"`opencode.session_move` with the worktree path from your launch prompt",
-		"not callable",
-		"pass that worktree path as `workdir` on every `shell` call",
-		"absolute paths",
-		"`git rev-parse --show-toplevel`",
+		"pass the worktree path from your launch prompt as `workdir` on every `shell` call",
+		"absolute path under it for every `read`, `edit`, `write` and `patch`",
+		"check that `git rev-parse --show-toplevel` with that `workdir` prints the worktree path; if it does not, stop and report BLOCKED.",
 	} {
 		if !strings.Contains(m[2], want) {
 			t.Errorf("coder worktree step: missing %q:\n%s", want, m[2])
 		}
+	}
+	if strings.Contains(m[2], "session_move") {
+		t.Errorf("coder worktree step names session_move:\n%s", m[2])
+	}
+}
+
+// The Sources row of opencode.session_move records the P5 finding and the
+// rule that the coder never calls it; the Tool Map has no row for it.
+func TestRuntimeOpenCodeSessionMoveNeverCalled(t *testing.T) {
+	t.Parallel()
+	doc := runtimeOpenCodeDoc(t)
+	var row string
+	for _, l := range strings.Split(openCodeSection(t, doc, "Sources"), "\n") {
+		if strings.Contains(l, "`opencode.session_move`") && strings.Contains(l, "(binary)") {
+			row = l
+		}
+	}
+	for _, want := range []string{
+		"Agent not found: \"gabo-coder\"",
+		"that used `workdir` and no session move completed normally",
+		"the coder never calls it",
+		"https://github.com/testeos-z/gabo-ai/issues/487#issuecomment-6810538380",
+		"`workdir`",
+	} {
+		if !strings.Contains(row, want) {
+			t.Errorf("## Sources session_move row: missing %q", want)
+		}
+	}
+	if strings.Contains(openCodeSection(t, doc, "Tool Map"), "session_move") {
+		t.Errorf("## Tool Map names session_move")
 	}
 }
 
