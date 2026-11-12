@@ -138,6 +138,16 @@ Earlier builds placed the links in `.pi/skills/` (intent 0003). On every build, 
 - `<agent-home>/skills/gabo-reviewer` → the user-level copy. An existing link to it is left; anything else at that path: stop and report, never replace it.
 - The scripts resolve their own real path, so they run from the trusted user-level copy through the link.
 
+## Grants for an unattended Pi wave
+
+The three grants an unattended Pi wave needs are the owner's to give for the session, not gabo's:
+
+1. the worktree root `worktree.dir` of `gabo.yaml`, where each task worktree is created;
+2. the user file `${XDG_CONFIG_HOME:-~/.config}/gabo/config.yaml`, which the assistant reads at session start;
+3. the user-level reviewer skill folder `${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer` and its state directory `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer`, which the coder's review runs from.
+
+The grant is the owner's: gabo grants none of them and writes no permission to the user's engine config. The only file this skill writes under the agent home is the reviewer link above.
+
 ## Launching Agents
 
 On Pi the main session launches each coder as one first-level `subagent_run` of `gabo-coder` and resumes it with `subagent_continue`; the run id is the handle. No built agent launches another (intent 0015 S6, D7): the agent files carry no `subagent_*` tool.
