@@ -110,7 +110,7 @@ case $cmd in
     done
     [ -n "$engine" ] || { echo "wave-record: usage: caps --engine <engine> [--paused]" >&2; exit 2; }
     case $engine in
-      claude) turns="enforced by the engine" ;;
+      claude|opencode) turns="enforced by the engine" ;;
       *) turns=advisory ;;
     esac
     if [ -f gabo.yaml ]; then

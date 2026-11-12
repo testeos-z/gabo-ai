@@ -32,8 +32,7 @@ func TestAssistantPausedReportCarriesEnforcementAndSpendLines(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
 	requireIn(t, "gabo-assistant/SKILL.md", doc, []string{
-		"one line per cap in effect", "`enforced by the engine`", "`enforced by the cycle`", "`advisory`",
-		"spend is not capped by gabo", "Wave section of `gabo-wave-report`",
+		"cap lines of its Wave section", "wave-record.sh caps --engine <engine> --paused",
 	})
 }
 
@@ -41,7 +40,7 @@ func TestWaveReportFixRoundsAdvisory(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
 	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{
-		"`max_fix_rounds` as `advisory` (coder-enforced) on every engine",
-		"`enforced by the cycle` (`max_coders`)",
+		"the labels belong to the script and are never composed here",
+		"`spend is not capped by gabo`",
 	})
 }

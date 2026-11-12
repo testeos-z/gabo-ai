@@ -127,7 +127,8 @@ max_coder_turns: enforced by the engine
 spend is not capped by gabo"
 expect_eq "$want" "$(caps --engine claude)" "all keys on claude, other sections ignored"
 expect_match "^max_coder_turns: advisory\$" "$(caps --engine codex | grep turns)" "max_coder_turns is advisory on codex"
-for e in opencode pi other; do
+expect_match "^max_coder_turns: enforced by the engine\$" "$(caps --engine opencode | grep turns)" "max_coder_turns is enforced by the engine on opencode (steps)"
+for e in pi other; do
   expect_match "^max_coder_turns: advisory\$" "$(caps --engine $e | grep turns)" "max_coder_turns is advisory on $e"
 done
 expect_eq "continue or stop" "$(caps --engine claude --paused | tail -1)" "--paused ends with continue or stop"

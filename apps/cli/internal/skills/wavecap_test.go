@@ -59,16 +59,12 @@ func TestWaveReportCarriesTheCapLines(t *testing.T) {
 	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
 	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{
 		"`status: paused`", "the cap that fired", "the affected task ids", "continue or stop",
-		"one line per cap in effect", "`enforced by the engine`", "`enforced by the cycle`", "`advisory`",
-		"Codex and Pi", "spend is not capped by gabo",
+		"wave-record.sh caps --engine <engine>", "spend is not capped by gabo",
 	})
 }
 
 func TestWaveReportEnforcementReadsTheBuiltAgent(t *testing.T) {
 	t.Parallel()
-	requireIn(t, "gabo-wave-report/SKILL.md", readCatalog(t, "gabo-wave-report/SKILL.md"), []string{
-		"only when the built `gabo-coder` agent file carries the engine key `maxTurns` or `steps`", "say `advisory`",
-	})
 	requireIn(t, "gabo-cycle/SKILL.md", readCatalog(t, "gabo-cycle/SKILL.md"), []string{
 		"The one exception is a paused wave the owner stops", "unfinished tasks left as they are",
 	})
@@ -88,6 +84,6 @@ func TestWaveCapReviewFixes(t *testing.T) {
 		"With `wave.max_coder_turns` set only", "unset keeps today's handling of a coder without a status",
 		"stays claimed with no worktree and no PR; on resume the cycle launches it as a first launch",
 	})
-	requireIn(t, "gabo-wave-report/SKILL.md", readCatalog(t, "gabo-wave-report/SKILL.md"), []string{"`<cap>: <enforcement>`", "`max_coder_turns: advisory`"})
+	requireIn(t, "gabo-wave-report/SKILL.md", readCatalog(t, "gabo-wave-report/SKILL.md"), []string{"`<cap>: <label>`", "the labels belong to the script"})
 	requireIn(t, "gabo-assistant/SKILL.md", readCatalog(t, "gabo-assistant/SKILL.md"), []string{"In manual mode the paused report is shown the same way"})
 }
