@@ -1,0 +1,365 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "gabo-ai: per-change SDLC flow",
+    "subtitle": "One intent, from the owner idea to production. The main session runs the wave; each coder is one subagent.",
+    "output": ".archify/workflow-sdlc-flow-20261113-183046/sdlc-flow.html",
+    "quality_profile": "showcase",
+    "locale": "en"
+  },
+  "lanes": [
+    {
+      "id": "owner",
+      "label": "Owner"
+    },
+    {
+      "id": "dir",
+      "label": "Directiva"
+    },
+    {
+      "id": "state",
+      "label": "Tracker and memory"
+    },
+    {
+      "id": "main",
+      "label": "Main session"
+    },
+    {
+      "id": "coder",
+      "label": "Coder + reviewer"
+    }
+  ],
+  "phases": [
+    {
+      "id": "spec",
+      "label": "Spec",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "gate",
+      "label": "Owner gate",
+      "fromCol": 1,
+      "toCol": 1,
+      "variant": "emphasis"
+    },
+    {
+      "id": "plan",
+      "label": "Plan",
+      "fromCol": 2,
+      "toCol": 3
+    },
+    {
+      "id": "wave",
+      "label": "Wave, one coder per task",
+      "fromCol": 4,
+      "toCol": 4,
+      "variant": "dashed"
+    },
+    {
+      "id": "ship",
+      "label": "Review, merge, production",
+      "fromCol": 5,
+      "toCol": 5,
+      "variant": "security"
+    }
+  ],
+  "mainPath": [
+    "idea",
+    "ctx",
+    "pm",
+    "accept",
+    "lead",
+    "tasks",
+    "launch",
+    "coder",
+    "script",
+    "merge",
+    "gate"
+  ],
+  "nodes": [
+    {
+      "id": "idea",
+      "lane": "owner",
+      "col": 0,
+      "type": "external",
+      "width": 120,
+      "label": "Owner",
+      "sublabel": "product idea"
+    },
+    {
+      "id": "ctx",
+      "lane": "main",
+      "col": 0,
+      "type": "frontend",
+      "width": 120,
+      "label": "Assistant",
+      "sublabel": "context, PRD, TRD"
+    },
+    {
+      "id": "pm",
+      "lane": "dir",
+      "col": 1,
+      "type": "backend",
+      "width": 120,
+      "label": "gabo-pm",
+      "sublabel": "intent.md to spec.md",
+      "tag": "UX, DB when needed"
+    },
+    {
+      "id": "accept",
+      "lane": "owner",
+      "col": 1,
+      "type": "security",
+      "width": 120,
+      "label": "Owner accepts",
+      "sublabel": "spec.md gate"
+    },
+    {
+      "id": "planrev",
+      "lane": "dir",
+      "col": 2,
+      "type": "backend",
+      "width": 120,
+      "label": "gabo-plan-reviewer",
+      "sublabel": "owner absent only"
+    },
+    {
+      "id": "lead",
+      "lane": "dir",
+      "col": 3,
+      "type": "backend",
+      "width": 120,
+      "label": "gabo-dev-lead",
+      "sublabel": "writes plan.md"
+    },
+    {
+      "id": "block",
+      "lane": "state",
+      "col": 2,
+      "type": "database",
+      "width": 120,
+      "label": "Plan change",
+      "sublabel": "1 issue + 1 PR",
+      "tag": "owner present: debate"
+    },
+    {
+      "id": "tasks",
+      "lane": "state",
+      "col": 3,
+      "type": "database",
+      "width": 120,
+      "label": "Task issues T###",
+      "sublabel": "blocked-by links"
+    },
+    {
+      "id": "launch",
+      "lane": "main",
+      "col": 4,
+      "type": "frontend",
+      "width": 120,
+      "label": "gabo-cycle",
+      "sublabel": "claims intent, tasks"
+    },
+    {
+      "id": "coder",
+      "lane": "coder",
+      "col": 4,
+      "type": "backend",
+      "width": 120,
+      "label": "gabo-coder x N",
+      "sublabel": "worktree, test-first, PR"
+    },
+    {
+      "id": "script",
+      "lane": "coder",
+      "col": 5,
+      "type": "security",
+      "width": 120,
+      "label": "Reviewer script",
+      "sublabel": "clean clone, checks",
+      "tag": "VERDICT line"
+    },
+    {
+      "id": "merge",
+      "lane": "state",
+      "col": 5,
+      "type": "cloud",
+      "width": 120,
+      "label": "Merge to dev",
+      "sublabel": "clean or human merge"
+    },
+    {
+      "id": "report",
+      "lane": "main",
+      "col": 5,
+      "type": "frontend",
+      "width": 120,
+      "label": "Wave report",
+      "sublabel": "measures, questions"
+    },
+    {
+      "id": "gate",
+      "lane": "owner",
+      "col": 5,
+      "type": "security",
+      "width": 120,
+      "label": "Production gate",
+      "sublabel": "owner: dev to main",
+      "tag": "agent never crosses"
+    }
+  ],
+  "edges": [
+    {
+      "id": "idea-ctx",
+      "from": "idea",
+      "to": "ctx",
+      "label": "idea"
+    },
+    {
+      "id": "ctx-pm",
+      "from": "ctx",
+      "to": "pm",
+      "label": "new change",
+      "variant": "emphasis"
+    },
+    {
+      "id": "pm-accept",
+      "from": "pm",
+      "to": "accept",
+      "label": "spec.md",
+      "variant": "emphasis"
+    },
+    {
+      "id": "accept-lead",
+      "from": "accept",
+      "to": "lead",
+      "label": "spec accepted",
+      "variant": "emphasis"
+    },
+    {
+      "id": "lead-tasks",
+      "from": "lead",
+      "to": "tasks",
+      "label": "creates T###",
+      "variant": "default"
+    },
+    {
+      "id": "tasks-launch",
+      "from": "tasks",
+      "to": "launch",
+      "label": "unblocked",
+      "variant": "emphasis"
+    },
+    {
+      "id": "launch-coder",
+      "from": "launch",
+      "to": "coder",
+      "label": "one per task, within parallelism",
+      "variant": "emphasis"
+    },
+    {
+      "id": "coder-script",
+      "from": "coder",
+      "to": "script",
+      "label": "opens PR, runs the script",
+      "variant": "emphasis"
+    },
+    {
+      "id": "script-coder",
+      "from": "script",
+      "to": "coder",
+      "label": "blocking: fix round, max 4",
+      "variant": "dashed",
+      "role": "branch"
+    },
+    {
+      "id": "script-merge",
+      "from": "script",
+      "to": "merge",
+      "label": "clean",
+      "variant": "emphasis"
+    },
+    {
+      "id": "coder-launch",
+      "from": "coder",
+      "to": "launch",
+      "label": "outcome, or question (1)",
+      "variant": "default",
+      "role": "return"
+    },
+    {
+      "id": "launch-report",
+      "from": "launch",
+      "to": "report",
+      "label": "wave end",
+      "variant": "default"
+    },
+    {
+      "id": "merge-gate",
+      "from": "merge",
+      "to": "gate",
+      "variant": "emphasis",
+      "label": "ready for production"
+    },
+    {
+      "id": "launch-lead",
+      "from": "launch",
+      "to": "lead",
+      "label": "2. relays question",
+      "variant": "dashed",
+      "role": "async"
+    },
+    {
+      "id": "lead-block",
+      "from": "lead",
+      "to": "block",
+      "label": "3. critical",
+      "variant": "security",
+      "role": "async"
+    },
+    {
+      "id": "block-planrev",
+      "from": "block",
+      "to": "planrev",
+      "label": "4. owner absent",
+      "variant": "dashed",
+      "role": "async"
+    },
+    {
+      "id": "planrev-lead",
+      "from": "planrev",
+      "to": "lead",
+      "label": "5. adjusts the plan",
+      "variant": "dashed",
+      "role": "return"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Owner gates",
+      "items": [
+        "Spec acceptance is the owner's; no agent accepts a spec",
+        "Production: the owner releases dev to main"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Wave rules",
+      "items": [
+        "Intent claim per session, run id <I####>-<YYYYMMDDTHHMMSSZ>",
+        "Max 4 fix rounds, then BLOCKED with the question"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Questions",
+      "items": [
+        "Coder questions return in its outcome; the main session relays them to gabo-dev-lead, then gabo-pm and the owner",
+        "Only the task that depends on an answer is BLOCKED"
+      ]
+    }
+  ]
+}

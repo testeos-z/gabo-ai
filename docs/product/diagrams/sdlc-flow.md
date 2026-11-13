@@ -1,6 +1,6 @@
 # Per-change SDLC flow
 
-Each change is one intent. The tracker is the global view. This chart shows who does what from the idea to production, with one subagent layer in the wave (intent 0015, spec in PR #475, not yet on `dev`): the main session runs the `gabo-cycle` skill and launches the coders; each coder starts the reviewer script as a separate process in a clean clone.
+Each change is one intent. The tracker is the global view. This chart shows who does what from the idea to production, with one subagent layer in the wave (intent 0015, on `dev`): the main session runs the `gabo-cycle` skill and launches the coders; each coder starts the reviewer script as a separate process in a clean clone.
 
 ```mermaid
 flowchart TD
