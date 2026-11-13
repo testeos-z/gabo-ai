@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-const waveRecord = "`sh .gabo/skills/gabo-wave-report/scripts/wave-record.sh --wave <wave>"
+const waveRecord = "`sh .gabo/skills/gabo-wave-report/scripts/wave-record.sh --wave <run id>"
 
 // failureRule is the sentence every skill carries for a missing or failing
 // wave-record.sh (intent 0024 S1).
@@ -58,8 +58,8 @@ func TestCycleRunsWaveRecordStamps(t *testing.T) {
 	trace := section(t, doc, "- Trace (D17)", "\n\n")
 	requireIn(t, "gabo-cycle Trace", trace, []string{
 		waveRecord + " stamp session-started <agent> <task id>` (step 5, a replacement coder of step 3 or of the turn-cap resume included, none for a resume by a coder's handle)",
-		"${XDG_STATE_HOME:-$HOME/.local/state}/gabo/waves/<wave>/stamps",
-		"as one more entry of `gabo/trace/<wave>`, never replacing the entries above",
+		"${XDG_STATE_HOME:-$HOME/.local/state}/gabo/waves/<run id>/stamps",
+		"as one more entry of `gabo/trace/<run id>`, never replacing the entries above",
 		"adds the content of the stamps file (",
 		waveRecord + " saves add <topic key> <observation id>` after each `mem_save`",
 		waveRecord + " saves read <topic key>` after each read-back that matched",
@@ -107,7 +107,7 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	re := regexp.MustCompile("`sh \\.gabo/skills/gabo-wave-report/scripts/wave-record\\.sh ([^`]*)`")
-	repl := strings.NewReplacer("<wave>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
+	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
 	seen := 0
 	for _, name := range []string{"gabo-cycle", "gabo-wave-report", "gabo-assistant"} {
 		for _, m := range re.FindAllStringSubmatch(readCatalog(t, name+"/SKILL.md"), -1) {
@@ -116,7 +116,7 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 				continue // caps takes no --wave and is covered by waverecordcaps_test.go
 			}
 			if len(args) < 3 || args[0] != "--wave" {
-				t.Errorf("%s: %q does not start with --wave <wave>", name, m[1])
+				t.Errorf("%s: %q does not start with --wave <run id>", name, m[1])
 				continue
 			}
 			seen++

@@ -64,8 +64,8 @@ func TestCycleKeepsTheOnceSentencesInTheirStep(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
-		"The entry saved to `gabo/trace/<wave>` at the report step holds the whole output of `cat` of the stamps file",
+		"The entry saved to `gabo/trace/<run id>` at the report step holds the whole output of `cat` of the stamps file",
 		"Each coder's `session started <agent> <task id> <UTC time>` line is saved to the trace in the same step as its `stamp session-started`",
-		"The wave start entry save is followed by `sh .gabo/skills/gabo-wave-report/scripts/wave-record.sh --wave <wave> saves add <topic key> <observation id>`",
+		"The wave start entry save is followed by `sh .gabo/skills/gabo-wave-report/scripts/wave-record.sh --wave <run id> saves add <topic key> <observation id>`",
 	})
 }
