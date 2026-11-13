@@ -108,6 +108,58 @@ expect_match "^wall time: unknown \(no wave-started stamp\)\$" "$(run --wave w4 
 
 expect_match "^wall time: unknown \\(no wave-started stamp\\)\$" "$(run --wave w9 measures | head -1)" "a wave with no stamps reads unknown"
 
+echo "# stamp --at"
+out="$(run --wave at1 stamp pr-opened 7 --at 2026-11-13T09:00:00Z)"
+expect_eq "pr-opened 7 2026-11-13T09:00:00Z" "$out" "--at writes the given time in place of the clock"
+expect_eq "pr-opened 7 2026-11-13T09:00:00Z" "$(cat "$waves/at1/stamps")" "--at appends the printed line"
+expect_eq "wave-reported 2026-11-13T10:00:00Z" "$(run --wave at1 stamp wave-reported --at 2026-11-13T10:00:00Z)" "--at works on an event with no arguments"
+expect_eq "session-started coder-a T1 2026-11-13T08:00:00Z" "$(run --wave at1 stamp session-started coder-a T1 --at 2026-11-13T08:00:00Z)" "--at works on session-started"
+before="$(cat "$waves/at1/stamps")"
+for bad in not-a-time 2026-11-13 2026-11-13T09:00:00 2026-11-13T09:00:00+01:00 ""; do
+  run --wave at1 stamp pr-merged 7 --at "$bad" >/dev/null
+  expect_eq "2" "$?" "--at '$bad' exits 2"
+  expect_eq "$before" "$(cat "$waves/at1/stamps")" "--at '$bad' leaves the stamps file unchanged"
+done
+run --wave at1 stamp pr-merged 7 --at >/dev/null
+expect_eq "2" "$?" "--at without a value exits 2"
+expect_eq "$before" "$(cat "$waves/at1/stamps")" "--at without a value leaves the stamps file unchanged"
+run --wave at-new stamp wave-started --at not-a-time >/dev/null
+expect_eq "2" "$?" "a refused --at on a new wave exits 2"
+expect_eq "no" "$([ -e "$waves/at-new" ] && echo yes || echo no)" "a refused --at on a new wave creates no folder"
+expect_match "^pr-merged 9 $RFC\$" "$(run --wave at1 stamp pr-merged 9)" "without --at the clock time is still written"
+expect_match "usage: stamp" "$(run --wave at1 stamp pr-opened)" "a missing argument still prints the usage"
+run --wave at1 stamp pr-opened >/dev/null
+expect_eq "2" "$?" "a missing argument still exits 2"
+
+echo "# measures with out-of-order stamps"
+d="$waves/w10"
+mkdir -p "$d"
+cat >"$d/stamps" <<'EOS'
+wave-started 2026-11-12T10:00:00Z
+wave-reported 2026-11-12T11:00:00Z
+pr-merged 11 2026-11-12T10:30:00Z
+wave-reported 2026-11-12T11:30:05Z
+pr-opened 11 2026-11-12T10:20:00Z
+EOS
+expect_eq "wall time: 5405 s" "$(run --wave w10 measures | head -1)" "out of order stamps: first wave-started to the last wave-reported"
+d="$waves/w11"
+mkdir -p "$d"
+cat >"$d/stamps" <<'EOS'
+wave-started 2026-11-12T10:00:00Z
+wave-reported 2026-11-12T11:00:00Z
+wave-reported 2026-11-12T11:30:05Z
+EOS
+expect_eq "wall time: 5405 s" "$(run --wave w11 measures | head -1)" "two wave-reported lines in order"
+
+echo "# saves keys with an entry label"
+run --wave s2 saves add 'gabo/trace/I0001-20261113T101500Z#start' 21 >/dev/null
+run --wave s2 saves add 'gabo/trace/I0001-20261113T101500Z#T1' 21 >/dev/null
+expect_eq "2" "$(grep -c '^add ' "$waves/s2/saves")" "two labels of one observation id are two entries"
+run --wave s2 saves read 'gabo/trace/I0001-20261113T101500Z#T1' >/dev/null
+expect_eq "gabo/trace/I0001-20261113T101500Z#start" "$(run --wave s2 saves unverified)" "reading only the later label lists the #start key"
+run --wave s2 saves read 'gabo/trace/I0001-20261113T101500Z#start' >/dev/null
+expect_eq "none" "$(run --wave s2 saves unverified)" "reading both labels prints none"
+
 echo "# caps"
 cproj="$work/capsproj"
 mkdir -p "$cproj"
@@ -144,6 +196,10 @@ h1="$(cksum <"$cproj/gabo.yaml")"
 caps --engine claude --paused >/dev/null
 expect_eq "$h1" "$(cksum <"$cproj/gabo.yaml")" "caps leaves gabo.yaml unchanged"
 expect_eq "gabo.yaml" "$(ls "$cproj")" "caps writes nothing in the project dir"
+
+printf 'wave:\n  max_coder_turns: 30\n' >"$cproj/gabo.yaml"
+expect_match "^max_coder_turns: advisory\$" "$(caps --engine none)" "caps --engine none prints max_coder_turns: advisory"
+rm "$cproj/gabo.yaml"
 
 echo "# saves"
 expect_eq "none" "$(run --wave s1 saves unverified)" "no saves prints none"
