@@ -124,7 +124,15 @@ MODE="${REVIEWER_MODE:-single-user}"
 BOT_LOGIN="${REVIEWER_BOT_LOGIN:-}"
 WORKDIR="${GABO_REVIEWER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer}"
 STATE="$WORKDIR/state"
-BASE_DIR="$WORKDIR/base"
+# The reviewer's repository state carries the repository as <owner>__<repo>, the
+# qualifier pr_worktree_name gives the worktrees, so two repositories that share
+# one state dir share no mirror, PR ref or base checkout (intent 0026 S11). A
+# mirror, refs and base checkout from before (repo.git, refs/remotes/pr/<n>,
+# base) are left in place and read only by the legacy worktree removal.
+REPO_KEY="${REPO/\//__}"
+MIRROR_DIR="$WORKDIR/$REPO_KEY.git"
+BASE_DIR="$WORKDIR/base-$REPO_KEY"
+PR_REF_PREFIX="refs/remotes/pr/$REPO_KEY"
 MAX_ATTEMPTS="${REVIEWER_MAX_ATTEMPTS:-2}"
 CHECK_TIMEOUT="${REVIEWER_CHECK_TIMEOUT:-1800}"
 REVIEW_TIMEOUT="${REVIEWER_REVIEW_TIMEOUT:-900}"
@@ -432,7 +440,7 @@ validate_config() {
 # moves its own checkout ($BASE_DIR) to the tip. Prints the problem and fails
 # when that checkout is not a clean checkout of the integration branch.
 sync_base() {
-  local mirror="$WORKDIR/repo.git" base_ref="refs/remotes/origin/$BASE_BRANCH"
+  local mirror="$MIRROR_DIR" base_ref="refs/remotes/origin/$BASE_BRANCH"
   mkdir -p "$STATE/locks" || { echo "cannot create $STATE"; return 1; }
   (
     flock 7
@@ -670,15 +678,23 @@ pr_worktree_name() { echo "${REPO/\//__}__pr-$1"; }
 # repository (<owner>__<repo>__pr-<n>) or an unqualified one from before the
 # names were qualified (pr-<n>). Refuses anything that is not a direct child of
 # $WORKDIR/worktrees with one of those names, a symlink, or not registered in
-# the reviewer's own mirror. The caller holds the mirror lock.
+# the reviewer's own mirror. The mirror is picked per worktree: the repository's
+# own <owner>__<repo>.git for <owner>__<repo>__pr-<n>, the run's repository
+# for merge-pr-*, and the unqualified repo.git only for the legacy pr-<n>. The
+# caller holds the mirror lock.
 remove_run_worktree() {
-  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$WORKDIR/repo.git" real_p line listed=false name
+  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$MIRROR_DIR" real_p line listed=false name
   local qualified_re='^[^/]+__[^/]+__pr-[0-9]+$'
   [[ -n "$p" ]] || return 0
   name="${p#"$base"/}"
   if [[ ( "$p" != "$base"/merge-pr-* && "$p" != "$base"/pr-* && ! "$name" =~ $qualified_re ) || "$name" == */* || -L "$p" ]]; then
     log_event "WARN" "refusing to remove $p: not a merge-pr-*, pr-* or <owner>__<repo>__pr-* worktree directly under $base" >/dev/null
     return 1
+  fi
+  if [[ "$name" =~ $qualified_re ]]; then
+    mirror_dir="$WORKDIR/${name%__pr-*}.git"
+  elif [[ "$name" == pr-* ]]; then
+    mirror_dir="$WORKDIR/repo.git"
   fi
   if [[ -e "$p" ]]; then
     real_p="$(realpath -e -- "$p" 2>/dev/null)" || real_p=""

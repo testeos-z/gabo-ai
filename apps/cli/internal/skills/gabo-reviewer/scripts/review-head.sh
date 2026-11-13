@@ -77,7 +77,7 @@ mkdir -p "$logs"
 log_event "START" "#$pr $sha attempt $attempt/$MAX_ATTEMPTS"
 
 # --- mirror and head ---------------------------------------------------------
-mirror="$WORKDIR/repo.git"
+mirror="$MIRROR_DIR"
 wt="$WORKDIR/worktrees/$wt_name"
 exec 8>"$STATE/locks/mirror.lock"
 flock 8
@@ -86,11 +86,11 @@ if [[ ! -d "$mirror" ]]; then
 fi
 base_ref="refs/remotes/origin/$BASE_BRANCH"
 if ! git -C "$mirror" fetch -q --no-tags origin \
-  "+refs/heads/$BASE_BRANCH:$base_ref" "+refs/pull/$pr/head:refs/remotes/pr/$pr" >"$logs/fetch.log" 2>&1; then
+  "+refs/heads/$BASE_BRANCH:$base_ref" "+refs/pull/$pr/head:$PR_REF_PREFIX/$pr" >"$logs/fetch.log" 2>&1; then
   log_event "RETRY" "#$pr fetch failed"
   exit 1
 fi
-[[ "$(git -C "$mirror" rev-parse "refs/remotes/pr/$pr")" == "$sha" ]] || skip "head moved while fetching; review the new head"
+[[ "$(git -C "$mirror" rev-parse "$PR_REF_PREFIX/$pr")" == "$sha" ]] || skip "head moved while fetching; review the new head"
 
 # --- merge result --------------------------------------------------------------
 # refs/pull/<n>/merge is what would land on the integration branch. GitHub
@@ -107,8 +107,8 @@ for ((try = 1; ; try++)); do
     conflict_reads=0
   fi
   if ((conflict_reads == 0)) && git -C "$mirror" fetch -q --no-tags origin "+refs/heads/$BASE_BRANCH:$base_ref" \
-    "+refs/pull/$pr/merge:refs/remotes/pr/$pr-merge" >>"$logs/fetch.log" 2>&1; then
-    read -r m_sha m_first m_second m_extra < <(git -C "$mirror" rev-list --parents -n 1 "refs/remotes/pr/$pr-merge" 2>/dev/null)
+    "+refs/pull/$pr/merge:$PR_REF_PREFIX/$pr-merge" >>"$logs/fetch.log" 2>&1; then
+    read -r m_sha m_first m_second m_extra < <(git -C "$mirror" rev-list --parents -n 1 "$PR_REF_PREFIX/$pr-merge" 2>/dev/null)
     if [[ -n "${m_sha:-}" && "${m_first:-}" == "$(git -C "$mirror" rev-parse "$base_ref")" &&
       "${m_second:-}" == "$sha" && -z "${m_extra:-}" ]]; then
       merge_sha="$m_sha"

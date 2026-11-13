@@ -606,6 +606,7 @@ var reviewerFiles = []string{
 	"gabo-reviewer/scripts/tests/merge-head.test.sh",
 	"gabo-reviewer/scripts/tests/preflight.test.sh",
 	"gabo-reviewer/scripts/tests/prune.test.sh",
+	"gabo-reviewer/scripts/tests/repo-isolation.test.sh",
 	"gabo-reviewer/scripts/tests/review.test.sh",
 	"gabo-reviewer/scripts/tests/stubs.sh",
 }
@@ -670,8 +671,8 @@ func TestReviewerScriptsShellTests(t *testing.T) {
 		}
 	}
 	tests, err := filepath.Glob("gabo-reviewer/scripts/tests/*.test.sh")
-	if err != nil || len(tests) != 4 {
-		t.Fatalf("shell tests = %v (%v), want 4", tests, err)
+	if err != nil || len(tests) != 5 {
+		t.Fatalf("shell tests = %v (%v), want 5", tests, err)
 	}
 	for _, p := range tests {
 		t.Run(filepath.Base(p), func(t *testing.T) {

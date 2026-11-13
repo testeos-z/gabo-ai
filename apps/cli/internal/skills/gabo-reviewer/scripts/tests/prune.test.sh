@@ -27,12 +27,18 @@ state_dir() {
   echo owner >"$d/fx/user_login"
   echo "$d"
 }
+# mirror <dir> <key>: the repository's own mirror <key>.git (<owner>__<repo>)
+# beside the legacy repo.git, made on first use from it; prints its path.
+mirror() {
+  [[ -d "$1/$2.git" ]] || git clone -q --bare "$1/repo.git" "$1/$2.git"
+  echo "$1/$2.git"
+}
 # qname <n>: the name of PR <n>'s worktree in REVIEWER_REPO (example-org/example-repo).
 qname() { echo "example-org__example-repo__pr-$1"; }
 # add_wt <dir> <n> <state>: worktree <owner>__<repo>__pr-<n> in the mirror; the
 # PR is <state> ("none": unreadable).
 add_wt() {
-  git -C "$1/repo.git" worktree add -q --detach "$1/worktrees/$(qname "$2")" "$(cat "$1/commit")"
+  git -C "$(mirror "$1" example-org__example-repo)" worktree add -q --detach "$1/worktrees/$(qname "$2")" "$(cat "$1/commit")"
   [[ "$3" == none ]] || jq -n --arg s "$3" '{state:$s}' >"$1/fx/pr_$2.json"
 }
 # add_legacy <dir> <n>: an unqualified worktree pr-<n> (made before the names
@@ -77,7 +83,7 @@ echo keep >"$d/outside/file"
 ln -s "$d/outside" "$d/worktrees/$(qname 11)"
 jq -n '{state:"CLOSED"}' >"$d/fx/pr_11.json"
 mkdir "$d/worktrees/pr-x"
-git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/merge-pr-3-abc.1p1" "$(cat "$d/commit")"
+git -C "$(mirror "$d" example-org__example-repo)" worktree add -q --detach "$d/worktrees/merge-pr-3-abc.1p1" "$(cat "$d/commit")"
 # pr-6 is the current PR and not open; pr-5 is the current PR, open and old; pr-8 is locked.
 ( exec 9>"$d/state/locks/$(qname 8).lock"; flock 9; sleep 30 ) &
 holder=$!
@@ -131,7 +137,7 @@ echo "# 349 worktrees of closed PRs"
 d="$(state_dir many)"
 for n in $(seq 1 349); do
   mkdir -p "$d/worktrees"
-  git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/$(qname "$n")" "$(cat "$d/commit")"
+  git -C "$(mirror "$d" example-org__example-repo)" worktree add -q --detach "$d/worktrees/$(qname "$n")" "$(cat "$d/commit")"
   echo '{"state":"CLOSED"}' >"$d/fx/pr_$n.json"
 done
 add_wt "$d" 400 OPEN
@@ -140,8 +146,8 @@ expect_eq "$(qname 400)" "$(ls "$d/worktrees" | paste -sd' ')" "only the worktre
 
 echo "# worktrees are named by repository and number (intent 0025 S7, D5)"
 d="$(state_dir qualified)"
-git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/a-b__c__pr-12" "$(cat "$d/commit")"
-git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/a__b-c__pr-12" "$(cat "$d/commit")"
+git -C "$(mirror "$d" a-b__c)" worktree add -q --detach "$d/worktrees/a-b__c__pr-12" "$(cat "$d/commit")"
+git -C "$(mirror "$d" a__b-c)" worktree add -q --detach "$d/worktrees/a__b-c__pr-12" "$(cat "$d/commit")"
 jq -n '{state:"MERGED"}' >"$d/fx/pr_12_a-b__c.json"
 jq -n '{state:"CLOSED"}' >"$d/fx/pr_12_a__b-c.json"
 check "PR 12 of a-b/c and of a/b-c are two directories" test -d "$d/worktrees/a-b__c__pr-12" -a -d "$d/worktrees/a__b-c__pr-12"
@@ -151,7 +157,7 @@ check "a prune of a-b/c keeps the PR 12 of a/b-c and never asks about it" test -
 check "gh is never asked about the repository a/b-c" bash -c "! grep -qsF -- '--repo a/b-c' '$d/calls.log'"
 
 d="$(state_dir pr_locks)"
-git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/a-b__c__pr-12" "$(cat "$d/commit")"
+git -C "$(mirror "$d" a-b__c)" worktree add -q --detach "$d/worktrees/a-b__c__pr-12" "$(cat "$d/commit")"
 jq -n '{state:"CLOSED"}' >"$d/fx/pr_12_a-b__c.json"
 cat >"$work/bin/gh-pair" <<PAIR
 #!/usr/bin/env bash
@@ -437,11 +443,11 @@ seed() {
   # a mirror with the stale worktrees of PRs 1 (closed) and 2 (open)
   local d="$work/$1"
   mkdir -p "$d/worktrees" "$d/fx"
-  git init -q --bare "$d/repo.git"
-  git -C "$d/repo.git" remote add origin "$origin_dir"
-  git -C "$d/repo.git" fetch -q --no-tags origin "+refs/heads/dev:refs/remotes/origin/dev"
+  git init -q --bare "$d/example-org__example-repo.git"
+  git -C "$d/example-org__example-repo.git" remote add origin "$origin_dir"
+  git -C "$d/example-org__example-repo.git" fetch -q --no-tags origin "+refs/heads/dev:refs/remotes/origin/dev"
   for n in 1 2; do
-    git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/$(qname "$n")" "$DEV_SHA"
+    git -C "$d/example-org__example-repo.git" worktree add -q --detach "$d/worktrees/$(qname "$n")" "$DEV_SHA"
   done
   echo '{"state":"CLOSED"}' >"$d/fx/pr_1.json"
   echo '{"state":"OPEN"}' >"$d/fx/pr_2.json"
@@ -462,7 +468,7 @@ check "head keeps the open PR's worktree" exists "$d" 2
 
 echo "# a second head round of an open PR reuses its worktree (intent 0025 S7)"
 seed head_reuse
-git -C "$work/head_reuse/repo.git" worktree add -q --detach "$work/head_reuse/worktrees/$(qname 7)" "$DEV_SHA"
+git -C "$work/head_reuse/example-org__example-repo.git" worktree add -q --detach "$work/head_reuse/worktrees/$(qname 7)" "$DEV_SHA"
 touch "$work/head_reuse/worktrees/$(qname 7)/reuse-marker"
 d="$(reviewer head_reuse head)"
 check "the qualified worktree of the open PR is reused, not recreated" test -e "$d/worktrees/$(qname 7)/reuse-marker"
