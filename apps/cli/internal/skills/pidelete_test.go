@@ -32,21 +32,17 @@ func taskCloseStep4(t *testing.T) string {
 func TestCoderTaskCloseDeletesTheMergedTaskBranchInAutoMode(t *testing.T) {
 	t.Parallel()
 	requireIn(t, "gabo-coder Task Close step 4", taskCloseStep4(t), []string{
-		"In `mode: auto`",
-		"after the merge",
-		"the remote branch of the merged task the workflow created",
+		"the local branch always",
+		"in `mode: auto`, after the merge, the remote branch of the merged task the workflow created",
 		"through `repository_host` (delete branch)",
 	})
 }
 
-// Intent 0026 S4 (plan T6): the delete never reaches any other remote branch,
-// and outside mode: auto the merged remote branch is not deleted.
+// Intent 0026 S4 (plan T6): the delete never reaches any other remote branch.
 func TestCoderTaskCloseForbidsAnyOtherRemoteBranch(t *testing.T) {
 	t.Parallel()
 	requireIn(t, "gabo-coder Task Close step 4", taskCloseStep4(t), []string{
-		"never deletes any other remote branch",
-		"nor a branch the workflow did not create",
-		"in any other mode the merged remote branch is not deleted",
+		"It never deletes any other remote branch nor a branch the workflow did not create.",
 	})
 }
 
@@ -62,7 +58,15 @@ const (
 
 func TestRuntimePiStatesTheObservedRemoteBranchDelete(t *testing.T) {
 	t.Parallel()
-	_, section, ok := strings.Cut(runtimePiDoc(t), "\n## Grants for an unattended Pi wave\n")
+	doc := runtimePiDoc(t)
+	mirror, err := os.ReadFile(filepath.Join(repoRoot, "plugins/codex/skills/gabo-runtime-pi/SKILL.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(mirror) != doc {
+		t.Error("plugins/codex/skills/gabo-runtime-pi/SKILL.md differs from the catalog source (S4, PD10)")
+	}
+	_, section, ok := strings.Cut(doc, "\n## Grants for an unattended Pi wave\n")
 	if !ok {
 		t.Fatalf("%s: no ## Grants for an unattended Pi wave section", runtimePi)
 	}
