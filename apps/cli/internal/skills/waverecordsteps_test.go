@@ -107,7 +107,7 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	re := regexp.MustCompile("`sh \\.gabo/skills/gabo-wave-report/scripts/wave-record\\.sh ([^`]*)`")
-	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "'<topic key>#<entry>'", "k#start", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
+	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "'<topic key>#<entry>'", "k#start", "'<topic key>#start'", "k#start", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
 	seen := 0
 	for _, name := range []string{"gabo-cycle", "gabo-wave-report", "gabo-assistant"} {
 		for _, m := range re.FindAllStringSubmatch(readCatalog(t, name+"/SKILL.md"), -1) {

@@ -34,9 +34,10 @@ func TestCycleTraceRecordsEveryMemoryWriteByEntry(t *testing.T) {
 		"the entry is the label with `@<n>`",
 		"(`ledger@2`, `T1@3`, `report@2`)",
 	})
-	for _, old := range []string{"saves add <topic key> <observation id>` after each `mem_save`", "saves read <topic key>` after each read-back that matched"} {
-		if strings.Contains(trace, old) {
-			t.Errorf("gabo-cycle Trace still has %q", old)
+	// No bare topic key is left in the whole skill (a bare key counts once).
+	for _, old := range []string{"saves add <topic key>", "saves read <topic key>"} {
+		if strings.Contains(doc, old) {
+			t.Errorf("gabo-cycle still has %q", old)
 		}
 	}
 }
@@ -103,7 +104,7 @@ func TestSavesEntriesOfRepeatedWritesAreTold(t *testing.T) {
 	run("add", "gabo/ledger/w1#ledger", "5")
 	run("read", "gabo/ledger/w1#ledger")
 	run("add", "gabo/ledger/w1#ledger@2", "5")
-	if got := run("unverified"); !strings.Contains(got, "gabo/ledger/w1#ledger@2") || strings.Contains(got, "w1#ledger\n") {
+	if got := run("unverified"); got != "gabo/ledger/w1#ledger@2\n" {
 		t.Errorf("unverified = %q, want only the second ledger write", got)
 	}
 	run("read", "gabo/ledger/w1#ledger@2")
