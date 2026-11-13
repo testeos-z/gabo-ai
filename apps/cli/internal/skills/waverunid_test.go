@@ -16,8 +16,8 @@ func TestWaveRunIDAssistant(t *testing.T) {
 		"note the wave start time once (UTC ISO 8601) and build the run id from it as `<I####>-<YYYYMMDDTHHMMSSZ>`",
 		"the comment `intent claimed by session <session id> (engine <engine>) run <run id>` claims it",
 		"the run id is the one at the end of the claim comment of the session being resumed",
-		"run `read wave trace` with `mem_search` for `gabo/trace/<I####>-`",
-		"take the observation whose topic key starts with that text and sorts last",
+		"run `read wave trace` with `mem_search` for `gabo/trace/<I####>-`, asking for 20 hits, the tool's maximum",
+		"take the one that sorts last, the latest run",
 		"read `gabo/trace/<I####>` (a trace written before the run id)",
 		"`gabo/trace/<I####>/planning`",
 		"`resume <session id>` together with the run id you read when you resume",
@@ -31,6 +31,30 @@ func TestWaveRunIDAssistant(t *testing.T) {
 	// The resume reads the holder's claim, never the newest comment.
 	if strings.Contains(doc, "run id is the one at the end of the newest claim comment") {
 		t.Error("gabo-assistant: the resume must not read the newest claim comment")
+	}
+}
+
+// Intent 0026 S15 (plan T8): the run-id fallback considers only the TRD 5.1
+// run-id keys, compared case-insensitively, asks for the tool's maximum of 20
+// hits, and reads a full page without a run-id key as incomplete, never as no run.
+// Both the resume fallback and the memory example carry the same rule.
+var runIDFallbackPins = []string{
+	"asking for 20 hits, the tool's maximum",
+	"`gabo/trace/<I####>-<8 digits>T<6 digits>Z`",
+	"`<8 digits>` the UTC date YYYYMMDD, `<6 digits>` the UTC time HHMMSS",
+	"compared case-insensitively because Engram lowercases topic keys",
+	"take the one that sorts last, the latest run",
+	"`gabo/trace/i0001-w8-t001`",
+	"`gabo/trace/i0001-20261113t145700z`",
+	"`gabo/trace/i0001-20261113t150111z`",
+	"it takes `gabo/trace/i0001-20261113t150111z`",
+	"a full page of 20 hits with no run-id key is an incomplete lookup, never no run",
+}
+
+func TestRunIDFallbackMatchesOnlyRunIDKeys(t *testing.T) {
+	t.Parallel()
+	for _, p := range []string{"gabo-assistant/SKILL.md", "gabo-contract-memory/examples/memory-engram.md"} {
+		requireIn(t, p, readCatalog(t, p), runIDFallbackPins)
 	}
 }
 
