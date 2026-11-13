@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0025-wave-record-and-reviewer-follow-ups](intent.md) |
-| status | Draft (awaits owner acceptance) |
+| status | Accepted (owner, 2026-11-13) |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: section 3 and section 4 are not applicable) |
 | date | 2026-11-13 |
@@ -98,3 +98,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-13 | Accepted by the owner as the spec stands on dev (PR #696), with its recorded decisions D1 to D8, including the `--at` option of the existing `wave-record.sh` (S3). Owner, verbatim: "acepto la spec". The open questions of issue #700 are not part of this spec. Relayed unedited by the assistant from the owner's own message in the session of 2026-11-13. |
