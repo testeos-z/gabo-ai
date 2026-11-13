@@ -183,10 +183,13 @@ echo "# prune_caches (S12)"
 mkdir -p "$work/gobin" "$work/gobin2"
 cat >"$work/gobin/go" <<'GO'
 #!/usr/bin/env bash
-# stub go: `go clean -cache` empties $GOCACHE; GO_FAIL=1 fails it
-echo "go $*" >>"${STUB_LOG:-/dev/null}"
+# stub go: `go clean -cache` empties $GOCACHE and `go clean -modcache` empties
+# $GOMODCACHE; GO_FAIL=1 fails both, GO_MOD_FAIL=1 only the modcache one
+echo "go $* GOMODCACHE=${GOMODCACHE:-unset}" >>"${STUB_LOG:-/dev/null}"
 [[ "${GO_FAIL:-}" != 1 ]] || { echo "go: boom" >&2; exit 1; }
+[[ "$1 $2" != "clean -modcache" || "${GO_MOD_FAIL:-}" != 1 ]] || { echo "go: boom" >&2; exit 1; }
 [[ "$1 $2" == "clean -cache" ]] && rm -rf "${GOCACHE:?}"/* && exit 0
+[[ "$1 $2" == "clean -modcache" ]] && rm -rf "${GOMODCACHE:?}"/* && exit 0
 exit 2
 GO
 chmod +x "$work/gobin/go"
@@ -198,11 +201,12 @@ run_caches() {
   local d="$1"
   shift
   (
+    unset REVIEWER_CACHE_MAX
     export HOME="$fake_home" STUB_LOG="$d/calls.log" FIXTURE="$d/fx" REVIEWER_GH="$work/bin/gh" \
       GABO_REVIEWER_STATE_DIR="$d" REVIEWER_REPO=example-org/example-repo PATH="$work/gobin:$PATH"
     for kv in "$@"; do export "${kv?}"; done
     cd "$work" || exit 1
-    source "$skill/common.sh"
+    source "${CACHES_SCRIPTS:-$skill}/common.sh"
     prune_caches
     echo "rc=$?"
   ) 2>&1
@@ -217,8 +221,9 @@ head -c 1024 /dev/zero >"$d/check-home/mixed/fresh"
 touch -d '10 days ago' "$d/check-home/old/blob" "$d/check-home/mixed/blob"
 touch -d '10 days ago' "$d/check-home/old" "$d/check-home/mixed"
 out="$(run_caches "$d" REVIEWER_CACHE_MAX=2M)"
-expect_eq "1" "$(grep -c '^pruned: ' <<<"$out")" "exactly one pruned line is printed over the limit"
-expect_match 'pruned: go-build cache, check-home files older than 7 days \(' "$out" "the line names what was pruned and the size freed"
+expect_eq "2" "$(grep -c '^pruned: ' <<<"$out")" "one pruned line per step taken over the limit"
+expect_eq "pruned: go-build cache|pruned: check-home files older than 7 days" "$(grep '^pruned: ' <<<"$out" | sed -E 's/ \(.*//' | paste -sd'|' -)" "the lines name the steps in order, each with its size freed"
+expect_match 'pruned: check-home files older than 7 days \([0-9.]+[KMG] freed\)$' "$out" "a step line ends with the size freed"
 check "the total is under the limit after prune" bash -c "(( $(total_kib "$d") < 2048 ))"
 check "check-home contents newer than the keep days stay" test -e "$d/check-home/new"
 check "check-home files older than the keep days go, with their empty directory" test ! -e "$d/check-home/old"
@@ -235,7 +240,7 @@ out="$(run_caches "$d" REVIEWER_CACHE_MAX=2M)"
 check "under the limit nothing is removed" test -e "$d/cache/go-build/blob" -a -e "$d/check-home/old/blob"
 check "under the limit no line is printed" bash -c "! grep -q '^pruned:' <<<'$out'"
 check "under the limit go is not run" bash -c "! grep -qs 'go clean' '$d/calls.log'"
-check "config.env ships REVIEWER_CACHE_MAX=2G" grep -qx 'REVIEWER_CACHE_MAX=2G' "$skill/config.env"
+check "config.env ships REVIEWER_CACHE_MAX=1G" grep -qx 'REVIEWER_CACHE_MAX=1G' "$skill/config.env"
 
 d="$(state_dir caches_fail)"
 fill "$d/cache/go-build" 3000
@@ -272,8 +277,79 @@ check "prune does not take any pr-<n>.lock (open PRs are not skipped)" bash -c "
 d="$(state_dir caches_gomod)"
 fill "$d/cache/go-mod" 3000
 fill "$d/cache/go-build" 100
-run_caches "$d" REVIEWER_CACHE_MAX=1M >/dev/null
-expect_match 'WARN prune: caches still over REVIEWER_CACHE_MAX' "$(cat "$d/state/reviewer.log")" "a go-mod over the limit is warned about"
+out="$(run_caches "$d" REVIEWER_CACHE_MAX=1M)"
+check "a go-mod over the limit is removed by go clean -modcache" test ! -e "$d/cache/go-mod/blob"
+check "go clean -modcache runs with the reviewer's own GOMODCACHE" grep -qF "go clean -modcache GOMODCACHE=$d/cache/go-mod" "$d/calls.log"
+expect_match 'pruned: go-mod cache \(' "$out" "the go-mod step prints its line"
+check "no one-day trim when go-mod alone meets the limit" bash -c "! grep -q 'older than 1 day' <<<'$out'"
+check "no WARN when the limit is met after go-mod" bash -c "! grep -q 'caches still over' '$d/state/reviewer.log'"
+
+echo "# go clean -modcache and the one-day trim when still over (intent 0025 S8, D6)"
+d="$(state_dir modcache_order)"
+fill "$d/cache/go-build" 500
+fill "$d/cache/go-mod" 300
+fill "$d/check-home/two-days" 2200
+fill "$d/check-home/new" 100
+touch -d '2 days ago' "$d/check-home/two-days/blob" "$d/check-home/two-days"
+out="$(run_caches "$d" REVIEWER_CACHE_MAX=2M)"
+expect_eq "pruned: go-build cache|pruned: go-mod cache|pruned: check-home files older than 1 day" "$(grep '^pruned: ' <<<"$out" | sed -E 's/ \(.*//' | paste -sd'|' -)" "the steps run in order and each prints its line"
+check "a check-home file two days old goes with the one-day trim" test ! -e "$d/check-home/two-days"
+check "a check-home file newer than one day stays" test -e "$d/check-home/new/blob"
+check "go-mod is cleared before the one-day trim" test ! -e "$d/cache/go-mod/blob"
+
+d="$(state_dir cache_warn)"
+fill "$d/cache/go-mod" 300
+fill "$d/check-home/fresh" 2500
+out="$(run_caches "$d" REVIEWER_CACHE_MAX=2M)"
+expect_match 'WARN prune: caches still over REVIEWER_CACHE_MAX \(2M\): go-build [0-9.]+[KMG], go-mod [0-9.]+[KMG], check-home [0-9.]+[KMG]$' "$(cat "$d/state/reviewer.log")" "still over after every step: one WARN lists the size of each folder"
+expect_eq "1" "$(grep -c 'caches still over' "$d/state/reviewer.log")" "the WARN is logged once"
+check "a fresh check-home file is never removed" test -e "$d/check-home/fresh/blob"
+
+d="$(state_dir modcache_fail)"
+fill "$d/cache/go-mod" 3000
+out="$(run_caches "$d" REVIEWER_CACHE_MAX=1M GO_MOD_FAIL=1)"
+expect_match 'WARN prune: go clean -modcache failed' "$(cat "$d/state/reviewer.log")" "a failing go clean -modcache is logged"
+expect_match 'rc=0$' "$out" "a failing go clean -modcache does not fail prune"
+
+echo "# the shipped default is 1G (intent 0025 S8)"
+d="$(state_dir default_1g_gobuild)"
+mkdir -p "$d/cache/go-build" "$d/cache/go-mod"
+truncate -s 1000M "$d/cache/go-build/blob"
+truncate -s 990M "$d/cache/go-mod/blob"
+out="$(run_caches "$d")"
+check "1.99G with the default limit: go-build is cleared and the total ends under 1G" bash -c "[[ ! -e '$d/cache/go-build/blob' && -e '$d/cache/go-mod/blob' ]]"
+expect_eq "1" "$(grep -c '^pruned: ' <<<"$out")" "one line for the one step taken"
+check "no WARN when the total ends under 1G" bash -c "! grep -q 'WARN' '$d/state/reviewer.log'"
+
+d="$(state_dir default_1g_gomod)"
+mkdir -p "$d/cache/go-mod"
+truncate -s 1990M "$d/cache/go-mod/blob"
+out="$(run_caches "$d")"
+check "1.99G of go-mod with the default limit is removed" test ! -e "$d/cache/go-mod/blob"
+expect_match 'pruned: go-mod cache \(1\.9G freed\)$' "$out" "the go-mod line states the size freed"
+
+d="$(state_dir default_1g_15g)"
+mkdir -p "$d/cache/go-mod"
+truncate -s 1536M "$d/cache/go-mod/blob"
+out="$(run_caches "$d" REVIEWER_CACHE_MAX=2G)"
+check "REVIEWER_CACHE_MAX=2G in the environment is honored: 1.5G stays" test -e "$d/cache/go-mod/blob"
+check "no pruned line under 2G" bash -c "! grep -q '^pruned:' <<<'$out'"
+
+d="$(state_dir default_1g_fallback)"
+mkdir -p "$d/cache/go-mod"
+truncate -s 1536M "$d/cache/go-mod/blob"
+out="$(run_caches "$d")"
+check "without REVIEWER_CACHE_MAX in the environment, config.env's 1G prunes 1.5G" test ! -e "$d/cache/go-mod/blob"
+
+d="$(state_dir fallback_1g)"
+mkdir -p "$d/cache/go-mod"
+truncate -s 1536M "$d/cache/go-mod/blob"
+nocfg="$work/nocfg"
+rm -rf "$nocfg"
+mkdir -p "$nocfg"
+cp "$skill"/*.sh "$nocfg/"
+out="$(run_caches "$d" CACHES_SCRIPTS="$nocfg")"
+check "without config.env the fallback in common.sh is 1G: 1.5G is pruned" test ! -e "$d/cache/go-mod/blob"
 
 echo "# the guard accepts only direct children named pr-* or merge-pr-*"
 d="$(state_dir guard)"

@@ -161,8 +161,8 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"blocked-by links", "before each coder round", "rule 1", "rule 2", "rule 3",
 			"4 fix rounds", "Unverified writes", "test databases", "no `gabo` command",
 			"no state dir", "D15", "D17", "skips DONE", "reattach", "disagreement",
-			"never guess", "TRD 9.2", "save the wave report", "`gabo/trace/<wave>`",
-			"`gabo/ledger/<wave>`",
+			"never guess", "TRD 9.2", "save the wave report", "`gabo/trace/<run id>`",
+			"`gabo/ledger/<run id>`",
 			// T061: the report format lives in gabo-wave-report.
 			"`gabo-wave-report`",
 			// S11: one wave is one accepted intent, read through the tasks filter.
@@ -177,7 +177,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"answer and resolver", "R5", "interaction count", "reasons", "R29",
 			"Unverified writes", "R24", "leftovers", "test databases", "merged tasks still open", "R13",
 			"plan-change proposals", "denied board moves", "resume disagreements", "comfort answer", "R17",
-			"`memory`", "save wave trace", "last entry of `gabo/trace/<wave>`", "read it back", "unverified",
+			"`memory`", "save wave trace", "last entry of `gabo/trace/<run id>`", "read it back", "unverified",
 			"`Wave <n>: <done> done, <blocked> blocked`", "UX 1.5", "none",
 		},
 		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.

@@ -79,7 +79,7 @@ func TestAssistantStartsWavesOnlyOnUnclaimedIntents(t *testing.T) {
 		"does not stop a wave that is still running",
 		// a refused session writes nothing to the holder's trace.
 		"Before any trace write, `read one` the intent issue",
-		"write nothing to `gabo/trace/<wave>`", "a refused session never writes the holder's trace",
+		"write nothing to `gabo/trace/<run id>`", "a refused session never writes the holder's trace",
 		// stale or orphan claims.
 		"may be stale",
 		// report holders.
@@ -191,7 +191,7 @@ func TestAssistantRunsTheWaveInItsOwnSession(t *testing.T) {
 	}
 	start, _, _ = strings.Cut(start, "\n## ")
 	requireIn(t, "gabo-assistant Wave Start", start, []string{
-		"load the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`) in this main session and run it with the wave id, the mode and the wave start time, or `resume <session id>` when you resume",
+		"load the `gabo-cycle` skill (`.gabo/skills/gabo-cycle/SKILL.md`) in this main session and run it with the wave id, the mode, the wave start time and the run id, or `resume <session id>` when you resume",
 		"each coder is one first-level in-process subagent of this session",
 		"End your turn while the coders run; never poll",
 	})
