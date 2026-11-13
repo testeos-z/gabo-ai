@@ -56,7 +56,10 @@ login="$(cat "$FIXTURE/user_login" 2>/dev/null)"
 case "$args" in
   "api user"*) answer user_login ;;
   "pr list"*) answer prs.json ;;
-  "pr view "*) n="$(awk '{print $3}' <<<"$args")"; answer "pr_$n.json" ;;
+  "pr view "*) n="$(awk '{print $3}' <<<"$args")"
+    # pr_<n>_<owner>__<repo>.json answers one repository's PR <n>; pr_<n>.json any other.
+    repo="$(awk '{for (i = 1; i < NF; i++) if ($i == "--repo") print $(i + 1)}' <<<"$args")"
+    if [[ -f "$FIXTURE/pr_${n}_${repo//\//__}.json" ]]; then answer "pr_${n}_${repo//\//__}.json"; else answer "pr_$n.json"; fi ;;
   "pr merge "*) [[ -z "${MERGE_FAIL:-}" ]] || exit 1; echo merged ;;
   *"/pulls/"*"/files"*) n="$(grep -Eo 'pulls/[0-9]+' <<<"$args" | cut -d/ -f2)"; answer "files_$n" ;;
   *"-X POST repos/"*"/statuses/"*)

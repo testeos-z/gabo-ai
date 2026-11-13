@@ -139,7 +139,7 @@ CODEX_MODEL="${REVIEWER_CODEX_MODEL:-}"
 OPENCODE_MODEL="${REVIEWER_OPENCODE_MODEL:-}"
 DIFF_MAX_BYTES="${REVIEWER_DIFF_MAX_BYTES:-200000}"
 MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
-# Days an open PR's pr-<n> worktree may stay unused before prune removes it.
+# Days an open PR's worktree may stay unused before prune removes it.
 KEEP_DAYS="${REVIEWER_KEEP_DAYS:-7}"
 # Size the Go caches and check-home may reach together before prune trims them.
 CACHE_MAX="${REVIEWER_CACHE_MAX:-2G}"
@@ -659,16 +659,25 @@ run_bounded() {
   return "$code"
 }
 
+# pr_worktree_name <pr>: the name of PR <pr>'s head worktree in $REPO, and of
+# its lock, opencode home and run dir: <owner>__<repo>__pr-<n>. A GitHub owner
+# cannot contain "_", so the first "__" ends the owner and two repositories
+# never give one name (intent 0025 S7, D5).
+pr_worktree_name() { echo "${REPO/\//__}__pr-$1"; }
+
 # remove_run_worktree <path>: removes one worktree the reviewer created: the
-# merge-result worktree of a run (merge-pr-*) or the head worktree of a PR
-# (pr-<n>). Refuses anything that is not a direct child of $WORKDIR/worktrees
-# with one of those names, a symlink, or not registered in the reviewer's own
-# mirror. The caller holds the mirror lock.
+# merge-result worktree of a run (merge-pr-*), the head worktree of a PR of a
+# repository (<owner>__<repo>__pr-<n>) or an unqualified one from before the
+# names were qualified (pr-<n>). Refuses anything that is not a direct child of
+# $WORKDIR/worktrees with one of those names, a symlink, or not registered in
+# the reviewer's own mirror. The caller holds the mirror lock.
 remove_run_worktree() {
-  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$WORKDIR/repo.git" real_p line listed=false
+  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$WORKDIR/repo.git" real_p line listed=false name
+  local qualified_re='^[^/]+__[^/]+__pr-[0-9]+$'
   [[ -n "$p" ]] || return 0
-  if [[ ( "$p" != "$base"/merge-pr-* && "$p" != "$base"/pr-* ) || "${p#"$base"/}" == */* || -L "$p" ]]; then
-    log_event "WARN" "refusing to remove $p: not a merge-pr-* or pr-* worktree directly under $base" >/dev/null
+  name="${p#"$base"/}"
+  if [[ ( "$p" != "$base"/merge-pr-* && "$p" != "$base"/pr-* && ! "$name" =~ $qualified_re ) || "$name" == */* || -L "$p" ]]; then
+    log_event "WARN" "refusing to remove $p: not a merge-pr-*, pr-* or <owner>__<repo>__pr-* worktree directly under $base" >/dev/null
     return 1
   fi
   if [[ -e "$p" ]]; then
@@ -690,26 +699,32 @@ remove_run_worktree() {
   git -C "$mirror_dir" worktree prune >/dev/null 2>&1 || true
 }
 
-# remove_pr_worktree <pr>: removes worktrees/pr-<n> under the mirror lock.
-remove_pr_worktree() {
+# remove_named_worktree <name>: removes worktrees/<name> under the mirror lock.
+remove_named_worktree() {
   local rc=0
   (
     exec 7>"$STATE/locks/mirror.lock"
     flock -w 120 7 || exit 1
-    remove_run_worktree "$WORKDIR/worktrees/pr-$1"
+    remove_run_worktree "$WORKDIR/worktrees/$1"
   ) || rc=$?
   return "$rc"
 }
 
-# prune_one <pr> <current pr> <days>: decides and removes worktrees/pr-<n>
-# while holding pr-<n>.lock, so a review that starts meanwhile waits for the
-# lock (review-head.sh takes it first) instead of losing its checkout. Returns
-# 0 when removed, 1 when kept or when the removal failed. The lock is taken
-# before the mirror lock, the order review-head.sh uses.
+# remove_pr_worktree <pr>: removes the head worktree of PR <pr> of $REPO.
+remove_pr_worktree() { remove_named_worktree "$(pr_worktree_name "$1")"; }
+
+# prune_one <pr> <current pr> <days>: decides and removes the worktree of PR
+# <pr> of $REPO while holding its lock (<owner>__<repo>__pr-<n>.lock), so a
+# review that starts meanwhile waits for the lock (review-head.sh takes it
+# first) instead of losing its checkout. Returns 0 when removed, 1 when kept or
+# when the removal failed. The lock is taken before the mirror lock, the order
+# review-head.sh uses.
 prune_one() {
-  local n="$1" current="$2" days="$3" p="$WORKDIR/worktrees/pr-$1" state
+  local n="$1" current="$2" days="$3" name state p
+  name="$(pr_worktree_name "$n")"
+  p="$WORKDIR/worktrees/$name"
   (
-    exec 6>"$STATE/locks/pr-$n.lock"
+    exec 6>"$STATE/locks/$name.lock"
     flock -n 6 || exit 1
     state="$("$GH" pr view "$n" --repo "$REPO" --json state 2>/dev/null | jq -r '.state // empty' 2>/dev/null)" || state=""
     [[ -n "$state" ]] || log_event "WARN" "prune: could not read the state of PR #$n; only the age rule applies" >/dev/null
@@ -718,26 +733,49 @@ prune_one() {
       [[ "$n" != "$current" ]] || exit 1
       [[ -n "$(find "$p" -maxdepth 0 -mmin "+$((days * 1440))" 2>/dev/null)" ]] || exit 1
     fi
-    remove_pr_worktree "$n"
+    remove_named_worktree "$name"
   )
 }
 
-# prune_worktrees [current pr]: removes every worktrees/pr-<n> whose PR is not
+# prune_legacy <name> <days>: removes an unqualified worktree pr-<n> (made before
+# the names were qualified) by the age rule only: it has no known repository,
+# so its PR state is never asked and it is never judged by the caller's
+# repository. Returns 0 when removed, 1 when kept or refused (intent 0025 S7).
+prune_legacy() {
+  local name="$1" days="$2"
+  [[ -n "$(find "$WORKDIR/worktrees/$name" -maxdepth 0 -mmin "+$((days * 1440))" 2>/dev/null)" ]] || return 1
+  remove_named_worktree "$name" || return 1
+  log_event "PRUNED" "legacy worktree $name (unused more than $days days)" >/dev/null
+}
+
+# prune_worktrees [current pr]: removes every worktree of $REPO whose PR is not
 # open, and every one that is not the current PR's and has not been used for
 # more than KEEP_DAYS days (its directory mtime; review-head.sh touches it on
-# every run). Skips the worktree of a run in progress (pr-<n>.lock held) and a
-# PR whose state cannot be read (only the age rule applies). Best effort: every
-# problem is logged and never changes the exit code.
+# every run). Worktrees of another repository are never touched. Unqualified
+# worktrees pr-<n> have no known repository and go by the age rule only (logged
+# as legacy worktree). Skips the worktree of a run in progress (its lock is
+# held) and a PR whose state cannot be read (only the age rule applies). Best
+# effort: every problem is logged and never changes the exit code.
 prune_worktrees() {
-  local current="${1:-}" base="$WORKDIR/worktrees" p n days="$KEEP_DAYS" removed=0
+  local current="${1:-}" base="$WORKDIR/worktrees" p name n days="$KEEP_DAYS" removed=0 own
   [[ "$days" =~ ^[0-9]+$ ]] || days=7
   [[ -d "$base" ]] || return 0
   mkdir -p "$STATE/locks"
-  for p in "$base"/pr-*; do
-    { [[ -e "$p" || -L "$p" ]] && n="${p##*/pr-}" && is_number "$n"; } || continue
-    ! prune_one "$n" "$current" "$days" || removed=$((removed + 1))
+  own="${REPO/\//__}__pr-"
+  for p in "$base"/pr-* "$base/$own"*; do
+    { [[ -e "$p" || -L "$p" ]] || continue; }
+    name="${p##*/}"
+    if [[ "$name" == pr-* ]]; then
+      n="${name#pr-}"
+      is_number "$n" || continue
+      ! prune_legacy "$name" "$days" || removed=$((removed + 1))
+    else
+      n="${name#"$own"}"
+      is_number "$n" || continue
+      ! prune_one "$n" "$current" "$days" || removed=$((removed + 1))
+    fi
   done
-  ((removed == 0)) || log_event "PRUNED" "$removed pr-<n> worktree(s)" >/dev/null
+  ((removed == 0)) || log_event "PRUNED" "$removed worktree(s)" >/dev/null
   return 0
 }
 

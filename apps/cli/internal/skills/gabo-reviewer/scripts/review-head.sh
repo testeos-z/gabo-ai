@@ -64,7 +64,8 @@ skip() {
 [[ "$(jq -r .isCrossRepository <<<"$info")" == false ]] || skip "comes from a fork"
 
 mkdir -p "$STATE/locks" "$STATE/attempts"
-exec 9>"$STATE/locks/pr-$pr.lock"
+wt_name="$(pr_worktree_name "$pr")"
+exec 9>"$STATE/locks/$wt_name.lock"
 if ! flock -n 9; then
   echo "BUSY #$pr"
   exit 0
@@ -77,7 +78,7 @@ log_event "START" "#$pr $sha attempt $attempt/$MAX_ATTEMPTS"
 
 # --- mirror and head ---------------------------------------------------------
 mirror="$WORKDIR/repo.git"
-wt="$WORKDIR/worktrees/pr-$pr"
+wt="$WORKDIR/worktrees/$wt_name"
 exec 8>"$STATE/locks/mirror.lock"
 flock 8
 if [[ ! -d "$mirror" ]]; then
@@ -395,7 +396,7 @@ if [[ "$ENGINE" == opencode ]]; then
   engine_name="OpenCode"
   engine_model="$OPENCODE_MODEL"
   engine_env || { log_event "RETRY" "#$pr $sha cannot create $REVIEW_HOME"; exit 1; }
-  oc_home="$REVIEW_HOME/opencode/pr-$pr"
+  oc_home="$REVIEW_HOME/opencode/$wt_name"
   review_env=()
   for e in "${ENGINE_ENV[@]}"; do
     case "$e" in
@@ -406,7 +407,7 @@ if [[ "$ENGINE" == opencode ]]; then
     esac
     review_env+=("$e")
   done
-  review_cwd="$OPENCODE_RUN_DIR/pr-$pr"
+  review_cwd="$OPENCODE_RUN_DIR/$wt_name"
   review_stdin=/dev/null
   opencode_auth="${XDG_DATA_HOME:-$HOME/.local/share}/opencode/auth.json"
   if ! rm -rf -- "$review_cwd" "$oc_home" ||
