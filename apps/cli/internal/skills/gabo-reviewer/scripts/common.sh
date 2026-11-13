@@ -855,9 +855,10 @@ trim_check_home() {
 # prune_caches: when cache/go-build, cache/go-mod and check-home together
 # exceed CACHE_MAX, prunes step by step, each step only while the total is
 # still over the limit: `go clean -cache` with the reviewer's own GOCACHE, the
-# check-home files older than KEEP_DAYS, `go clean -modcache` with the
-# reviewer's own GOMODCACHE, and the check-home files older than one day (each
-# trim also removes the directories it leaves empty). It prints one line
+# check-home files older than KEEP_DAYS, and the check-home files older than one
+# day (each trim also removes the directories it leaves empty). It never runs
+# `go clean -modcache`: a module cache rebuilt on every review costs more than
+# the disk it frees, so the owner clears it by hand. It prints one line
 # `pruned: <what> (<size freed>)` per step that freed something; when the total
 # is still over the limit after every step it logs one WARN with the size of
 # each folder. Under the limit it does nothing and prints nothing. The checks of
@@ -897,11 +898,9 @@ prune_caches() {
     }
     go_clean -cache "GOCACHE=$WORKDIR/cache/go-build"
     step "go-build cache"
-    trim_check_home "$days"
-    step "check-home files older than $days days"
     if ((cur > max)); then
-      go_clean -modcache "GOMODCACHE=$WORKDIR/cache/go-mod"
-      step "go-mod cache"
+      trim_check_home "$days"
+      step "check-home files older than $days days"
     fi
     if ((cur > max)); then
       trim_check_home 1
