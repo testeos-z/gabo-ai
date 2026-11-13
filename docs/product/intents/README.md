@@ -58,4 +58,4 @@ Directiva opens each intent when the owner asks for a change; never create one b
 | [0027](0027-coders-follow-gentle-ai-odd-and-rdd/intent.md) | Coders and product QA share one definition of done | [#758](https://github.com/testeos-z/gabo-ai/issues/758) | [spec](0027-coders-follow-gentle-ai-odd-and-rdd/spec.md) (accepted by the owner 2026-11-13) | — |
 | [0028](0028-deterministic-hooks-as-locks/intent.md) | Deterministic hooks as locks | [#765](https://github.com/testeos-z/gabo-ai/issues/765) | — (no spec yet) | — |
 | [0029](0029-branch-protection-on-main-and-dev/intent.md) | Branch protection on main and dev | [#766](https://github.com/testeos-z/gabo-ai/issues/766) | — (no spec yet) | — |
-| [0030](0030-agent-evals-when-skills-change/intent.md) | Agent evals when skills change | [#767](https://github.com/testeos-z/gabo-ai/issues/767) | — (no spec yet) | — |
+| [0030](0030-agent-evals-when-skills-change/intent.md) | Agent evals, incident lessons and CLAUDE.md practices | [#767](https://github.com/testeos-z/gabo-ai/issues/767) | — (no spec yet) | — |
