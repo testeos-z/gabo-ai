@@ -278,11 +278,14 @@ func TestCoderSkillHasNoHardcodedMethodology(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// the report field names of intent 0027 T2 (`RDD: <outcome>`) are report
+	// format, not methodology; the methodology rules stay in the adapter.
+	doc := strings.ReplaceAll(string(b), "`RDD: <granted|declined|passive|off|unavailable>`", "")
 	for _, s := range []string{
 		"ODD", "Test-first", "test-first", "gentle-ai", "receipt-driven", "RDD",
 		"Work-unit commits", "Conventional Commits", "no AI attribution",
 	} {
-		if strings.Contains(string(b), s) {
+		if strings.Contains(doc, s) {
 			t.Errorf("gabo-coder/SKILL.md: must not contain %q", s)
 		}
 	}
