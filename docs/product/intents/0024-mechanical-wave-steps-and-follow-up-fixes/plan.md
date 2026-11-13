@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0024-mechanical-wave-steps-and-follow-up-fixes](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done |
 | owner | gabo-dev-lead |
 | date | 2026-11-12 |
 
@@ -69,7 +69,7 @@ All are **decided by the owner's standing rule** (resolver: agent, owner's rule 
 | PD10 | Probe authority on `testeos-z/gabo-repo` | The owner wrote "porque borrarlo ese repo esta par que todo l /oque quiean probar sea ahi." Remote operations still need a named destination, operation and credential. | The quote is taken as the owner's authorization for the operations T11 names on `testeos-z/gabo-repo` only: resetting its `dev` to the `seed` tag, running `scripts/seed-issues.sh`, pushing new `probe-i0024-<what>` branches and opening and merging their PRs, with the credential the session already uses. No tag is created, nothing is deleted, no other repository is touched; an operation not listed asks the owner through the assistant. | The owner named the repository as the place for probes and said it is never deleted; listing the operations keeps the scope explicit. | T11 |
 | PD11 | `gabo.yaml` | Owner-only. S1 reads it, S5 compares it, T11 part (c) rebuilds agents. | No task edits it. The script opens it read-only. The probe builds agents in a scratch clone of the probe repository, never in this repository, so the hash comparison of part (c) runs against a file no task owns. | Human-only path; spec D5. | T1, T2, T6, T11 |
 | PD12 | The spec leaves the wave id and the file layout of the script open | S1 says `<wave id>` and the three subcommand families, not how the id arrives or what the files are called. | The id comes from `--wave <id>` before the subcommand, else the environment variable `GABO_WAVE_ID`; with neither the script exits 2 with `wave-record: no wave id` and writes nothing. Files under `${XDG_STATE_HOME:-$HOME/.local/state}/gabo/waves/<wave id>/`: `stamps` (one line per stamp) and `saves` (one line per `add` and `read`). Stamp line shape `<event> <args> <UTC time, RFC 3339 to the second>`, as S2. `measures` reads `stamps` only. An id with a character outside `[A-Za-z0-9._-]` is refused (no path escape). | The cycle already knows the intent id; an environment variable keeps every step's command short; the guard keeps "writes only under the wave folder" true. | T1, T2 |
-| PD13 | The engine for `caps` | S3 labels `max_coder_turns` by engine but the script cannot see the engine. | `wave-record.sh caps --engine <claude\|codex\|opencode\|pi> [--paused]`. The table: `max_coders` `enforced by the cycle`, `max_fix_rounds` `advisory`, `max_coder_turns` `enforced by the engine` for `claude` and `advisory` for the other three, as the spec's examples state. T2 checks the 0020 engine table and, if an engine there differs, records the difference in its PR and does not edit that spec. An unknown engine prints `advisory` for `max_coder_turns`, never `enforced`. | The spec's Given examples fix Claude and Codex; the safe default is the weaker label. | T2, T4 |
+| PD13 | The engine for `caps` | S3 labels `max_coder_turns` by engine but the script cannot see the engine. | `wave-record.sh caps --engine <claude\|codex\|opencode\|pi> [--paused]`. The table: `max_coders` `enforced by the cycle`, `max_fix_rounds` `advisory`, `max_coder_turns` `enforced by the engine` for `claude` and `opencode` and `advisory` for `codex`, `pi` and any other value. Corrected by T4 (#670, PR #683), decided by the owner's standing rule: the I0020 probe (#581) saw OpenCode build `steps: 3` and enforce it, so the table says `enforced by the engine` for `opencode` too (the first wording, `advisory` for the other three, was PD13's original). T2 checks the 0020 engine table and, if an engine there differs, records the difference in its PR and does not edit that spec. An unknown engine prints `advisory` for `max_coder_turns`, never `enforced`. | The spec's Given examples fix Claude and Codex; the safe default is the weaker label. | T2, T4 |
 | PD14 | Probe failures | S14: a failed probe is one finding and one adjustment task, not a loop. | Each failing part produces one finding comment on the T11 issue and, when it is a text or script defect, one adjustment task (J6) with the next free id (T13). No third round: a part that still fails after its adjustment is recorded as not passed by T12. | Spec S14 and the bound the owner set in 0022 (PD20 there). | T11, T12 |
 | PD15 | The one adjustment of PD14: S2 failed on Claude Code in probe T11 | The saved wave trace held only the assistant's `session started` line: no coder `session started` lines, no stamps file content, and no `saves add` for the start entry save (finding 1 of the T11 probe comment). Add T13, or record S2 as not passed? | T13: a skill-text change with its pin and no Go change. The saved wave trace entry carries the stamps file content as `wave-record.sh` printed it, each coder `session started` line, and `saves add` and `saves read` around the start entry save. After T13 merges, T11 re-checks only S2 on Claude Code: not a full probe, no further loop (PD14). | Decided by the owner's standing rule (recommended option), on the T11 issue [#677](https://github.com/testeos-z/gabo-ai/issues/677) after the probe comment. | T13, T11, T12 |
 
@@ -129,14 +129,31 @@ Edges in the tracker (all inside this intent, no cross-intent edge, PD4): T2 [#6
 
 ## Probe results
 
-T11 records its results on its issue ([#677](https://github.com/testeos-z/gabo-ai/issues/677), comment of 2026-11-13); T12 copies them here. Summary of the T11 probe result on 2026-11-13, per spec item (engines: Claude Code 2.1.302, `codex-cli 0.167.2`, OpenCode v2.2.6; `gabo` built from `dev` 3f5a6bc):
+T11 recorded its results on its issue ([#677](https://github.com/testeos-z/gabo-ai/issues/677), comments of 2026-11-13: the [probe](https://github.com/testeos-z/gabo-ai/issues/677#issuecomment-6839648100), the decision comment after it and the [S2 re-check](https://github.com/testeos-z/gabo-ai/issues/677#issuecomment-6839914066)); T12 copies them here. Engines: Claude Code 2.1.302, `codex-cli 0.167.2`, OpenCode v2.2.6; `gabo` built from `dev` 3f5a6bc (the S2 re-check from `dev` 391737d, after T13 merged); both with `-ldflags "-X main.buildVersion=0.2.10"`.
 
 | probe | engine | result |
 |---|---|---|
-| (a) two-task wave: trace lines, wall time, caps, `launched under`, saves | Claude Code | S2 FAIL (partial): the saved trace has only the assistant's `session started` line, no coder lines and no stamps content; wall time 131 s matches; S3, S10 PASS; S4 PASS with a finding (the start entry was never added to the ledger). T13 adjusts (PD15). S2 re-check on Claude Code after T13: not run yet |
+| (a) two-task wave: trace lines, wall time, caps, `launched under`, saves | Claude Code | First run: S2 FAIL (partial): the saved trace had only the assistant's `session started` line, no coder lines and no stamps content; wall time 131 s matched; S3, S10 PASS; S4 PASS with a finding (the start entry was never added to the ledger). T13 adjusted (PD15). S2 re-check after T13 (PR #692), wave of PR #198 and #199: PASS, the saved report entry carries the stamps file content, the coder `session started` lines are saved at launch, wall time 158 s equals the seconds between `wave-started` and `wave-reported`; `saves unverified` printed `none` |
 | (b) paused wave ends with `continue or stop` | Codex | PASS: last line `continue or stop`; the trace holds the stamps and both `session started` lines; S2 PASS on Codex |
-| (c) rebuild leaves `gabo.yaml` unchanged | Claude Code (OpenCode if installed) | S5 PASS: unchanged on Claude Code, Codex and OpenCode; a changed file shows the `✗` line and is left as written |
-| (d) reviewer prune and removal on merge, on a copy of the real state | script, scratch install | S11 PASS (287 of 361 merged or closed worktrees removed); S12 PASS with a finding (the trim runs with the lock free, is skipped with a WARN while a review holds it, and prints `pruned:`); removal on merge confirmed |
+| (c) rebuild leaves `gabo.yaml` unchanged | Claude Code, Codex, OpenCode | S5 PASS: unchanged on all three; a changed file shows the `✗` line and is left as written (Codex) |
+| (d) reviewer prune and removal on merge, on a copy of the real state | script, scratch install | S11 PASS (287 of 361 merged or closed worktrees removed); S12 PASS with a finding (the trim runs with the lock free, is skipped with a WARN while a review holds it, and prints `pruned:`); removal on merge confirmed (PR #193, `verdict=clean merge=merged`) |
+
+No part is `not run`. Every part passed, so the adjustment bound of PD14 was not exhausted and the status is Done.
+
+### Findings for the owner
+
+Copied from the probe comment (findings 2 to 7) and the S2 re-check. Each was decided by the owner's standing rule; 2 and 4 are named for a follow-up intent that the owner opens.
+
+2. The wave id equals the intent id, so a second wave of one intent appends to the first wave's stamps file and `measures` mixes both. Named for a follow-up intent.
+3. `pr-opened`, `pr-merged` and `wave-reported` are stamped when the cycle writes them, not when they happen (same second); the wall time is right, the per-event times are not.
+4. Reviewer worktree names `pr-<n>` are not qualified by repository in `prune`: 74 of the 361 real worktrees belong to PRs that do not exist in `gabo-ai`, and a number that exists in both would be judged by the caller's repository (the age rule is the only guard). Named for a follow-up intent.
+5. On the real data the cache total (1.99G) sits just under the default limit of 2G, so the trim never triggers there; with a smaller limit the fresh `check-home` files and go-mod keep it over the limit and only a WARN says so.
+6. Codex `mem_save` with the topic key `gabo/trace/I0001` overwrote earlier probe observations (#5500 and the ledger #5501): a topic upsert replaces the previous wave's trace.
+7. The installed `gabo` on PATH, not the build, rejects `wave.max_coders`, `max_coder_turns` and `max_fix_rounds` in `gabo check`: a probe environment fact, not a defect of `dev`.
+8. From the S2 re-check: the `saves` ledger lists only the report entry; the start entry and the ledger entry have no `saves add`.
+9. From the S2 re-check: on PR #198 the reviewer skipped the merge and the assistant merged it itself, pinned to the clean head.
+
+Finding 1 (S2 on Claude Code) is the one T13 fixed (PD15).
 
 ## Risks to the plan
 

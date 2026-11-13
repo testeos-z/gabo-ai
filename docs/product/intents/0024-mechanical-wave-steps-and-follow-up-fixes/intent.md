@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0024-mechanical-wave-steps-and-follow-up-fixes |
-| status | Specified |
+| status | Done |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-12 |
@@ -77,5 +77,5 @@ The owner, who reads the wave report and cannot trust a label, a time or a "none
 | skill | `.gabo/skills/gabo-wave-report/SKILL.md`, `.gabo/skills/gabo-cycle/SKILL.md`, `.gabo/skills/gabo-assistant/SKILL.md`, `.gabo/skills/gabo-coder/SKILL.md`, `.gabo/skills/gabo-pm/SKILL.md`, `.gabo/skills/gabo-dev-lead/SKILL.md`, `.gabo/skills/gabo-reviewer/SKILL.md` |
 | code | `apps/cli/internal/skills/gabo-reviewer/scripts/` |
 | spec | [spec](spec.md) |
-| plan | — |
+| plan | [plan](plan.md) |
 | related intent | 0020-spend-or-turn-cap-for-auto-mode; 0021-delegate-by-reason-not-by-default; 0022-measure-roles; 0023-unattended-pi-waves-and-flow-hygiene (open, same skill files, no overlap in findings) |
