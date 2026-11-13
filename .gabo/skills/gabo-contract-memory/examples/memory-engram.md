@@ -49,7 +49,7 @@ Same pattern as `save ledger` on `gabo/trace/<run id>`; the content is one line 
 
 ### read wave trace
 
-`mem_search` for `gabo/trace/<run id>` (for the newest run of an intent, `gabo/trace/<I####>-`: take the observation whose topic key starts with that text and sorts last, else read `gabo/trace/<I####>` (a trace written before the run id)), then `mem_get_observation`. Select the observation whose topic key is exactly `gabo/trace/<run id>` (or the one the prefix lookup selected); the reader must treat the "latest" fallback as ignoring keys with a segment after the wave id, so that it never returns a `.../planning` record.
+`mem_search` for `gabo/trace/<run id>` (for the newest run of an intent, `gabo/trace/<I####>-`, asking for 20 hits, the tool's maximum, and consider only topic keys of the form `gabo/trace/<I####>-<8 digits>T<6 digits>Z` (`<8 digits>` the UTC date YYYYMMDD, `<6 digits>` the UTC time HHMMSS), compared case-insensitively because Engram lowercases topic keys; take the one that sorts last, the latest run: with the legacy key `gabo/trace/i0001-w8-t001` and the run keys `gabo/trace/i0001-20261113t145700z` and `gabo/trace/i0001-20261113t150111z` it takes `gabo/trace/i0001-20261113t150111z`, though the legacy key sorts last; when the page holds fewer than 20 hits and none is such a key, read `gabo/trace/<I####>` (a trace written before the run id); a full page of 20 hits with no run-id key is an incomplete lookup, never no run), then `mem_get_observation`. Select the observation whose topic key is exactly `gabo/trace/<run id>` (or the one the prefix lookup selected); the reader must treat the "latest" fallback as ignoring keys with a segment after the wave id, so that it never returns a `.../planning` record.
 
 ### save preference
 
