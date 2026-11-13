@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0027-coders-follow-gentle-ai-odd-and-rdd |
-| status | Accepted (spec, owner, 2026-11-13) |
+| status | Accepted (spec, owner, 2026-11-13); question 3 corrected by the owner on 2026-11-13, awaiting the owner's confirmation |
 | owner | gabo-pm |
 | scope | one intent for the whole quality flow: the coder's engineering with gentle-ai ODD and RDD, and the gabo reviewer as product QA (owner, 2026-11-13) |
 | product card | none open: [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) is closed, so no card was created; the intent issue is linked under #492 as #703 was |
@@ -16,15 +16,18 @@ The owner asked that the coders use gentle-ai as closely as possible to its ODD 
 The owner then widened the scope, relayed 2026-11-13 by the owner's local assistant (approximate voice transcription, quoted as relayed, with an English gloss in brackets):
 
 - "yo creo que podemos hacerlo en un solo intent, que organice bien el tema" [I think we can do it in one intent that organizes the topic well].
-- The gabo reviewer "no valida código. Valida es cómo interactúa el usuario con ese código, o sea, el producto" [does not validate code; it validates how the user interacts with that code, that is, the product].
+- The gabo reviewer "no valida código. Valida es cómo interactúa el usuario con ese código, o sea, el producto" [does not validate code; it validates how the user interacts with that code, that is, the product]. Superseded by the owner's correction below.
 - It must be well defined "qué debe cumplir el código, o sea, cuál es la funcionalidad final" [what the code must meet, that is, the final functionality].
+- Owner correction, relayed 2026-11-13 unedited by the owner's local assistant (verbatim): "yo no he dicho que no pueda leer el código el revisor, yo he dicho que su trabajo principal es otro. Que no solo validar el código" [I did not say the reviewer cannot read the code; I said its main job is something else. Not only validating the code]. The earlier relay overstated the owner's idea. The reviewer may read the code, and its main job is product QA.
 
 So this intent has two roles, one spec:
 
 - **(a) The coder** does the engineering and its own code review with gentle-ai ODD and RDD: well-written code, unit and integration tests.
-- **(b) The gabo reviewer** becomes a product QA. It uses the product as a user would and checks that it works as expected against an agreed definition of done, instead of reading the diff for code defects.
+- **(b) The gabo reviewer's main job is product QA.** It uses the product as a user would and checks that it works as expected against an agreed definition of done. It still reads the code, after the product QA (owner correction, 2026-11-13).
 
-Reference the owner cited: Anthropic, [Harness design for long-running apps](https://www.anthropic.com/engineering/harness-design-long-running-apps). The evaluator uses the running app as a user, the generator self-evaluates before handing off, and generator and evaluator agree beforehand on what done means. The same citation is used in spec 0022.
+Primary reference: Anthropic, [The AI-native SDLC playbook](https://claude.com/resources/articles/the-ai-native-sdlc-playbook), Louis Claxton, August 21, 2026. Its verifier exercises the changed behavior and the two nearest neighboring flows without fixing anything, and its builder pastes the output of build, test and lint before reporting done. Verbatim and summary-only facts are marked in the spec's evidence base.
+
+Secondary reference: Anthropic, [Harness design for long-running apps](https://www.anthropic.com/engineering/harness-design-long-running-apps), the citation spec 0022 uses. The evaluator uses the running app as a user, and generator and evaluator agree beforehand on what done means.
 
 ### The coder side
 
@@ -53,7 +56,7 @@ Result: a clean verdict says the code has no visible defect in the diff and the 
 - The owner, who wants the coders to build the way gentle-ai builds, who wants the reviewer to test the product the way a user does, and who needs to see both in each wave report.
 - The assistant that runs each wave. It relays consent envelopes, reads the RDD outcome of every task, and relays the reviewer's product QA result.
 - Every coder task of every wave. The gap appears in each one of the 13 runs reported above, so it is the normal case, not an exception.
-- The gabo reviewer, which stays the only merge gate (PRD R9) and changes from a code reader to a product QA on the PR head.
+- The gabo reviewer, which stays the only merge gate (PRD R9): its main job becomes product QA on the PR head, and it keeps a code read of every head after it.
 - Every product change of gabo-ai, because a clean verdict will mean the product was run and not only read.
 
 ## Desired outcome
@@ -62,11 +65,11 @@ Result: a clean verdict says the code has no visible defect in the diff and the 
 - Every coder task writes its done contract before its first commit: one observable check per linked requirement, agreed as OQ 7 decides. The contract is the definition of done the reviewer tests against.
 - The coder's code is its own review's responsibility: well-written code with unit tests for each changed rule and integration tests where a task crosses a boundary (a CLI command, a file, a skill that runs a command).
 - For every pushed head that changes product behavior, the gabo reviewer runs the build under test as a user would and reports each contract line as `pass`, `fail: <observed>` or `not run: <reason>`. A head with no product change reads `not applicable`.
-- The reviewer's verdict shows the product QA result and the checks result separately, so the coder knows which one to fix.
+- The reviewer's verdict shows the product QA result, the checks result and the code read separately, in that order, so the coder knows which one to fix.
 - Every wave report shows the RDD outcome and the ODD line for each task, so the owner can count how many tasks ran RDD, and with what result, without reading the coder transcripts.
 - A coder never answers a consent envelope, never toggles RDD, and never lowers a risk tier. A consent envelope reaches the owner through a route the owner decides.
 - The gabo reviewer stays the only merge gate (PRD R9). RDD and product QA add outside views and never merge anything.
-- Measure: the share of tasks whose wave report line carries an RDD outcome, per wave; and the share of product PRs whose reviewer comment carries a product QA result. The targets are set by the owner at acceptance.
+- Measure: the share of tasks whose wave report line carries an RDD outcome, per wave; and the share of product PRs whose reviewer comment carries a product QA result. The targets are set by the owner at acceptance. Cost per PR rises against today (the reviewer adds product QA and a code read to every head); it is not yet measured.
 
 ## Constraints
 
@@ -82,20 +85,20 @@ Result: a clean verdict says the code has no visible defect in the diff and the 
 
 ## Open questions
 
-The owner accepted the spec on 2026-11-13 with the recommended option of each question (spec, section 7). Each question is decided in the spec, section 6, with its option record. Question 8 option (b) is the one open question: the cost cap is not set.
+The owner accepted the spec on 2026-11-13 with the recommended option of each question (spec, section 7). Each question is decided in the spec, section 6, with its option record. Question 8 option (b) is the one open question: the cost cap is not set. On 2026-11-13 the owner corrected question 3 to option (b), and question 10 is superseded (spec Log).
 
 | # | question | status |
 |---|---|---|
 | 1 | How does a per-candidate RDD consent reach the owner when a coder cannot give it, and what happens to the task meanwhile? | decided (owner): option (a), spec section 6.1 |
 | 2 | Does the ODD feature document (`odd/tasks/<feature>.md` and its Engram mirror) get created per task, or do the gabo plan row and the task issue act as it? | decided (owner): option (b), spec section 6.2 |
-| 3 | Who reads the code: does coder-side RDD own the code read while the reviewer runs product QA only, or do both still read the code? | decided (owner): option (a), spec section 6.3 |
+| 3 | Who reads the code: does coder-side RDD own the code read while the reviewer runs product QA only, or do both still read the code? | decided (owner), corrected 2026-11-13 to option (b): both read the code and the reviewer's main job is product QA, spec section 6.3 |
 | 4 | Is the RDD candidate each work-unit commit before the push, or the PR head? | decided (owner): option (a), spec section 6.4 |
 | 5 | What happens when RDD is unavailable or its assessment fails? | decided (owner): option (c), spec section 6.5 |
 | 6 | Beyond visibility, does a gate enforce the coder's ODD, RDD and done contract? | decided (owner): option (a), revisit (b) after two waves, spec section 6.6 |
 | 7 | Where does the product QA get what the product must do: the spec's acceptance criteria, the task issue, a done contract agreed before coding, or a combination? | decided (owner): option (d), spec section 6.7 |
 | 8 | How does QA test a product that is a CLI plus skills with no web UI, and at what cost per PR? | decided in part (owner): (a) on every product PR and (c) once per wave; **open: option (b) and its cost cap**, spec section 6.8 |
-| 9 | Who gates the merge when QA does not read the code, and what happens to `review.checks` (build, vet, test)? | decided (owner): option (a), spec section 6.9 |
-| 10 | What happens when RDD did not run or was not due, and nobody reviewed the code? | decided (owner), narrowed: (c) for high-risk changes, (a) for the rest, spec section 6.10 |
+| 9 | Who gates the merge when QA does not read the code, and what happens to `review.checks` (build, vet, test)? | decided (owner): option (a), spec section 6.9; its premise (QA does not read the code) is superseded by the question 3 correction, the decision stands |
+| 10 | What happens when RDD did not run or was not due, and nobody reviewed the code? | superseded by the owner's correction of question 3 on 2026-11-13: the reviewer reads the code on every head, spec section 6.10 |
 | 11 | The intent title no longer names both roles. Keep "Coders follow gentle-ai ODD and RDD", or propose a new title with the folder unchanged? | decided (owner): option (b), title "Coders and product QA share one definition of done", spec section 6.11 |
 
 ## Links
@@ -109,4 +112,4 @@ The owner accepted the spec on 2026-11-13 with the recommended option of each qu
 | spec | [spec](spec.md) |
 | plan | none yet: the plan is written only after the owner accepts the spec |
 | related intent | [0022](../0022-measure-roles/intent.md) (the Anthropic harness citation); [0026](../0026-pi-probe-follow-ups/intent.md) (same probe evidence, accepted spec untouched) |
-| sources | coder runs of I0023, I0025 (PR #706) and I0026 (PR #739), reported by the assistant, session claude-b2e28fa5; gentle-ai 4.4.0 `review assess --help` and the 2026-11-13 assess check above; reviewer source `apps/cli/internal/skills/gabo-reviewer/scripts/review-head.sh` at `406015f`; [Anthropic, Harness design for long-running apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) |
+| sources | coder runs of I0023, I0025 (PR #706) and I0026 (PR #739), reported by the assistant, session claude-b2e28fa5; gentle-ai 4.4.0 `review assess --help` and the 2026-11-13 assess check above; reviewer source `apps/cli/internal/skills/gabo-reviewer/scripts/review-head.sh` at `406015f`; [Anthropic, The AI-native SDLC playbook](https://claude.com/resources/articles/the-ai-native-sdlc-playbook) (primary); [Anthropic, Harness design for long-running apps](https://www.anthropic.com/engineering/harness-design-long-running-apps) (secondary) |
