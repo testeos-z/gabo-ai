@@ -79,7 +79,7 @@ func TestMemoryExampleOperationsUseTheRunID(t *testing.T) {
 	requireIn(t, "memory-engram.md", doc, []string{
 		"`mem_search` for `gabo/ledger/<run id>`",
 		"`topic_key: gabo/ledger/<run id>`",
-		"`<wave>` is the wave's run id `<I####>-<YYYYMMDDTHHMMSSZ>`",
+		"`<run id>` is the wave's run id `<I####>-<YYYYMMDDTHHMMSSZ>`",
 	})
 }
 
