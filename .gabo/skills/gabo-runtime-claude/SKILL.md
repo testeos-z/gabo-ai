@@ -32,6 +32,7 @@ Load when `runtimes.coder` or `runtimes.reviewer` in `gabo.yaml` is `claude`, or
 - Make every link of steps 2 to 4 on every build, also when the agent files are already current, and run the probe of step 8; a build that skips one is not finished.
 - Write no secret into any file (R21).
 - Never install or upgrade Claude Code. Engine config (intent 0004 S8, D7): gabo writes only the engine keys it needs to operate, at project level only, merged with the existing project config (every unrelated key kept), reports what it wrote, and has the value verified by `gabo check`; never the user's global engine config (`~/.claude/settings.json` or `$CLAUDE_CONFIG_DIR/settings.json`). `gabo init` writes every engine config key (intent 0010 S5), the main-session key `agent` in `.claude/settings.json` included; this skill writes none and only builds the agent files and links, those of the Main-Session Entry included.
+- `gabo.yaml` is a human-only path (intent 0024 S5, D5). Before the rebuild, record `git hash-object gabo.yaml` (`absent` when the file does not exist); compare it after the rebuild. A rebuild writes no key of `gabo.yaml`. When the two differ, add `✗ gabo.yaml changed during the rebuild; next: review it with git diff gabo.yaml` to the report; when equal, print nothing. Report it and leave the file as it is: never restore or edit `gabo.yaml`.
 
 ## Sources
 
