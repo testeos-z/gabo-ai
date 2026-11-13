@@ -82,7 +82,7 @@ func TestMemoryRecordsComparisonNamesTheDifferingRow(t *testing.T) {
 	t.Parallel()
 	live := readRepoDoc(t, liveMemoryAdapter)
 	catalog := readCatalog(t, catalogMemoryExample)
-	changed := strings.Replace(live, "`gabo/ledger/<wave>`", "`gabo/ledgers/<wave>`", 1)
+	changed := strings.Replace(live, "`gabo/ledger/<run id>`", "`gabo/ledgers/<run id>`", 1)
 	if changed == live {
 		t.Fatal("live adapter no longer holds the ledger topic key")
 	}
@@ -90,7 +90,7 @@ func TestMemoryRecordsComparisonNamesTheDifferingRow(t *testing.T) {
 	if err == nil {
 		t.Fatal("changed topic key not detected")
 	}
-	for _, w := range []string{"row 2", "resource ledger", "gabo/ledgers/<wave>", liveMemoryAdapter, catalogMemoryExample} {
+	for _, w := range []string{"row 2", "resource ledger", "gabo/ledgers/<run id>", liveMemoryAdapter, catalogMemoryExample} {
 		if !strings.Contains(err.Error(), w) {
 			t.Errorf("error %q lacks %q", err, w)
 		}
