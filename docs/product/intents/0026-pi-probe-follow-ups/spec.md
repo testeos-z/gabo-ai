@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0026-pi-probe-follow-ups](intent.md) |
-| status | Draft |
+| status | Accepted (owner, 2026-11-13) |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: sections 3 and 4 are not applicable) |
 | date | 2026-11-13 |
@@ -106,3 +106,4 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
+| leomerida15 (owner, alias Leo) | 2026-11-13 | Accepted by the owner as the spec stands on dev (after PR #730), with S1 to S16 and the proposed answers to open questions 1 to 13. Owner, verbatim: "si", in reply to the assistant's question "¿La aceptas tal como está?" with the link to this spec. Relayed unedited by the assistant from the owner's own message in the session of 2026-11-13. |
