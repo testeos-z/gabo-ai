@@ -41,8 +41,28 @@ func TestPiMainSessionPrintsTheWarningOnceBeforeTheClaim(t *testing.T) {
 	requireIn(t, "gabo-assistant Hard Rules print-mode check", item, []string{
 		piPrintWarning,
 		"once, before the preflight and the intent claim",
+		"in `--print`, `--mode rpc` and interactive alike",
 		"and continues",
 	})
+}
+
+// Intent 0026 S1 (plan T4): while the mode is unreadable the warning never
+// refuses the wave, in any mode. The old sentence that let rpc and interactive
+// sessions print no line is gone (0023 S1 says so; 0026 S1 replaces it).
+func TestPiPrintCheckNeverRefusesAnUnreadableMode(t *testing.T) {
+	t.Parallel()
+	item := piPrintItem(readCatalog(t, "gabo-assistant/SKILL.md"))
+	requireIn(t, "gabo-assistant Hard Rules print-mode check", item, []string{
+		"the warning never refuses a session whose mode cannot be read",
+	})
+	for _, old := range []string{
+		"prints no line",
+		"a session in `rpc` or interactive mode",
+	} {
+		if strings.Contains(item, old) {
+			t.Errorf("gabo-assistant Hard Rules print-mode check: still holds %q (0026 S1: rpc and interactive print no line is removed)", old)
+		}
+	}
 }
 
 // The refusal is kept only as conditional on a mechanism that reads the mode,
@@ -87,7 +107,39 @@ func TestPiPrintCheckIsScopedToPi(t *testing.T) {
 	requireIn(t, "gabo-assistant Hard Rules print-mode check", item, []string{
 		"your session engine is Pi (the fixed session-engine line of your block)",
 		"Claude Code, Codex and OpenCode print nothing",
-		"Once a mechanism reads the mode, a session in `rpc` or interactive mode prints no line",
+		"Once a mechanism reads the mode, only a session under `--print` is refused",
+	})
+}
+
+// Intent 0026 S1 (plan T4): the host adapter refuses an assistant on Pi because
+// it passes `--print` itself; that refusal reads no session mode, so it is not
+// the unreadable-mode case the warning covers.
+func TestLocalAgentHostRefusalReadsNoSessionMode(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, agentHostLocal)
+	requireIn(t, agentHostLocal, doc, []string{
+		"The host passes `--print` itself, so this refusal reads no session mode",
+		"covers only the owner's main session",
+	})
+}
+
+// Intent 0026 S1 (plan T4): the Session-mode bullet of docs/compatibility.md
+// says the warning prints in every Pi mode, and the refusal waits for a mode
+// reader.
+func TestCompatibilityPiWarnsInEveryMode(t *testing.T) {
+	t.Parallel()
+	b, err := os.ReadFile(filepath.Join(repoRoot, "docs/compatibility.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, pi, ok := strings.Cut(string(b), "\n## Pi package\n")
+	if !ok {
+		t.Fatal("docs/compatibility.md: no ## Pi package section")
+	}
+	pi, _, _ = strings.Cut(pi, "\n## ")
+	requireIn(t, "docs/compatibility.md Pi section", pi, []string{
+		"in `--print`, `--mode rpc` and interactive alike",
+		"applies only once a mechanism can read the mode",
 	})
 }
 
