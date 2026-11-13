@@ -24,6 +24,8 @@ The wave probe ran with gabo built from dev `d8dcaea` (stamped 0.2.10) on testeo
 
 The intent grew by one finding that is not about Pi. The reviewer state of I0025 T2 (PR [#720](https://github.com/testeos-z/gabo-ai/pull/720), findings in [#705](https://github.com/testeos-z/gabo-ai/issues/705)) is still keyed by PR number in its mirror, its PR refs and its base checkout, so two repositories that share one reviewer state dir are not isolated, and two reviewer comments still name the old `pr-<n>` layout. The owner's standing rule on [#695](https://github.com/testeos-z/gabo-ai/issues/695#issuecomment-6855499990) (2026-11-13) sends these findings here before the owner accepts this spec, not into accepted spec 0025.
 
+The intent grew by two findings of the I0025 T9 probes ([#712](https://github.com/testeos-z/gabo-ai/issues/712), PR [#728](https://github.com/testeos-z/gabo-ai/pull/728)), sent here by the owner's standing rule on [#703](https://github.com/testeos-z/gabo-ai/issues/703#issuecomment-6857679682) (2026-11-13) before the owner accepts this spec. The run-id lookup that a resuming session uses for the newest run can take a legacy probe key as that run, because the lookup does not filter keys by the run-id form. Token reporting on Codex, OpenCode and Pi is still unverified: T9 observed it on Claude Code only.
+
 ## Who is affected
 
 The owner, who starts Pi waves and expects them to reach the merge without a question that nobody can answer; the team in `mode: auto`, which has no person at each gate; every Pi wave, because the mode, model, gate, delete and grant behaviors apply to every task of every Pi wave; and the owner when two repositories share one reviewer on one machine.
@@ -35,6 +37,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 - Two repositories that share one reviewer state dir never share a mirror, a PR ref or a base checkout, and no reviewer script comment or test description names the old `pr-<n>` layout as the current one; the legacy-worktree descriptions and the test cases that name them stay (S11, S12).
 - Each 0023 check that did not pass, or was not observed, is either observed on a probe or recorded as a known limit with its owner decision. A check not run reads `not run: <reason>`, never a pass.
 - The owner can tell from a wave report which Pi facts were observed, with the Pi and gentle-pi versions and the gabo build under test.
+- A resuming session finds the newest run of an intent only from a run-id-shaped trace key (S15), and the owner can tell, for Codex, OpenCode and Pi, whether the engine reports tokens at all (S16).
 
 ## Constraints
 
@@ -62,6 +65,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 | 10 | Does the title still fit the intent? | **Proposed (auto)**: keep the title for this PR and retitle at acceptance to "Pi probe follow-ups and reviewer state isolation", because S11 to S14 are not Pi facts. The folder keeps its name; no rename here. Owner decides. |
 | 11 | Should `prune` clear the Go module cache while the caches stay over `REVIEWER_CACHE_MAX` (advisory R4, Gentle AI review of PR #723)? | carried to spec (S13, spec question 11). **Proposed (auto)**: no; prune logs the WARN and the owner clears it by hand. Owner decides. |
 | 12 | Should the check-home age trim run after the go-build clean has brought the caches under `REVIEWER_CACHE_MAX` (advisory R3, Gentle AI review of PR #723)? | carried to spec (S14, spec question 12). **Proposed (auto)**: no; the trim is guarded by the over-cap check, as the README says. Owner decides. |
+| 13 | Do Codex, OpenCode and Pi wave reports get a token figure from their engines, and where does it appear? | carried to spec (S16, spec question 13). **Proposed (auto)**: observe and record only. Owner decides. |
 
 ## Links
 
@@ -72,6 +76,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 | follow-up issue | [#700 Follow-up: open questions from the I0023 Pi probes](https://github.com/testeos-z/gabo-ai/issues/700) (sub-issue of #703) |
 | sources | [#585](https://github.com/testeos-z/gabo-ai/issues/585) (probe T1, comment [6840556586](https://github.com/testeos-z/gabo-ai/issues/585#issuecomment-6840556586)); [#599](https://github.com/testeos-z/gabo-ai/issues/599) (probe T15, comment [6841235718](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718)); `docs/product/intents/0023-unattended-pi-waves-and-flow-hygiene/intent.md` (`## Review findings`) and `plan.md` (`## Probe results`) |
 | reviewer findings | [#705](https://github.com/testeos-z/gabo-ai/issues/705) (I0025 T2 findings, PR [#720](https://github.com/testeos-z/gabo-ai/pull/720)); owner's standing rule, [#695 comment](https://github.com/testeos-z/gabo-ai/issues/695#issuecomment-6855499990); open reviewer task [#706](https://github.com/testeos-z/gabo-ai/issues/706) (I0025 T3) |
+| sources (I0025 T9) | [#712](https://github.com/testeos-z/gabo-ai/issues/712) (probe comments (a) to (g) and their findings for the owner); PR [#728](https://github.com/testeos-z/gabo-ai/pull/728); owner's standing rule, [#703 comment](https://github.com/testeos-z/gabo-ai/issues/703#issuecomment-6857679682) (2026-11-13) |
 | related intent | 0023-unattended-pi-waves-and-flow-hygiene (closed; its spec is accepted and not reopened); 0016-gabo-init-pi-subagent-package-check-and-reviewer-content-check (reviewer content hash, S7); 0025-wave-record-and-reviewer-follow-ups (same skill files, accepted) |
 | PRD | [PRD](../../PRD.md), R21, R23, R31, R32 |
 | TRD | [TRD](../../TRD.md), D7, D24 |
