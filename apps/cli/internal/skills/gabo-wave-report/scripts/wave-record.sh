@@ -1,5 +1,5 @@
 #!/bin/sh
-# wave-record.sh [--wave <id>] stamp <event> <args...> | measures
+# wave-record.sh [--wave <id>] stamp <event> <args...> [--at <UTC time>] | measures
 #   | saves add <topic key> <observation id> | saves read <topic key> | saves unverified
 #   | caps --engine <engine> [--paused]
 # Records the steps of one wave and reports their measures (intent 0024).
@@ -29,12 +29,33 @@ case $cmd in
   stamp)
     event=${1:-}
     [ $# -eq 0 ] || shift
+    at=
+    if [ $# -ge 1 ]; then
+      eval "last=\${$#}"
+      if [ "$last" = --at ]; then
+        echo "wave-record: stamp: --at needs a time" >&2; exit 2
+      fi
+    fi
+    if [ $# -ge 2 ]; then
+      eval "prev=\${$(($# - 1))}"
+      if [ "$prev" = --at ]; then
+        at=$last
+        case $at in
+          [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) ;;
+          *) echo "wave-record: stamp: --at needs a UTC time YYYY-MM-DDTHH:MM:SSZ" >&2; exit 2 ;;
+        esac
+        n=$(($# - 2))
+        i=0
+        while [ "$i" -lt "$n" ]; do set -- "$@" "$1"; shift; i=$((i + 1)); done
+        shift 2
+      fi
+    fi
     case $event:$# in
       wave-started:0 | wave-reported:0 | pr-opened:1 | pr-merged:1 | session-started:2) ;;
       *) echo "wave-record: usage: stamp wave-started | session-started <agent> <task id> | pr-opened <pr> | pr-merged <pr> | wave-reported" >&2; exit 2 ;;
     esac
     mkdir -p "$dir"
-    line="$event${*:+ $*} $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    line="$event${*:+ $*} ${at:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
     echo "$line" >>"$stamps"
     echo "$line"
     ;;
