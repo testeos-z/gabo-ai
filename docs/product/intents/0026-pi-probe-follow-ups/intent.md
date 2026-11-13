@@ -22,14 +22,17 @@ The probes found that an unattended Pi wave does not do what the 0023 spec says,
 
 The wave probe ran with gabo built from dev `d8dcaea` (stamped 0.2.10) on testeos-z/gabo-repo, not on a disposable repository, by the owner's decision of 2026-11-12 on [#585](https://github.com/testeos-z/gabo-ai/issues/585#issuecomment-6831839550). Its results, recorded on 2026-11-13, are in the [#599 comment](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718). Several 0023 checks were never observed: the grant dialog (no dialog reached the driver), the status labels of closed tasks (no task reached Task Close) and a denied remote delete (none was denied).
 
+The intent grew by one finding that is not about Pi. The reviewer state of I0025 T2 (PR [#720](https://github.com/testeos-z/gabo-ai/pull/720), findings in [#705](https://github.com/testeos-z/gabo-ai/issues/705)) is still keyed by PR number in its mirror, its PR refs and its base checkout, so two repositories that share one reviewer state dir are not isolated, and two reviewer comments still name the old `pr-<n>` layout. The owner's standing rule on [#695](https://github.com/testeos-z/gabo-ai/issues/695#issuecomment-6855499990) (2026-11-13) sends these findings here before the owner accepts this spec, not into accepted spec 0025.
+
 ## Who is affected
 
-The owner, who starts Pi waves and expects them to reach the merge without a question that nobody can answer; the team in `mode: auto`, which has no person at each gate; and every Pi wave, because the mode, model, gate, delete and grant behaviors apply to every task of every Pi wave.
+The owner, who starts Pi waves and expects them to reach the merge without a question that nobody can answer; the team in `mode: auto`, which has no person at each gate; every Pi wave, because the mode, model, gate, delete and grant behaviors apply to every task of every Pi wave; and the owner when two repositories share one reviewer on one machine.
 
 ## Desired outcome
 
 - Each of the eight questions of [#700](https://github.com/testeos-z/gabo-ai/issues/700) has either an answer in the spec or an open decision for the owner with a recommended option.
 - A Pi wave stops at a gate only when gabo owns that gate. gentle-pi's default model, its approval label and its remote delete never stop a wave silently.
+- Two repositories that share one reviewer state dir never share a mirror, a PR ref or a base checkout, and no reviewer comment names the old `pr-<n>` layout (S11, S12).
 - Each 0023 check that did not pass, or was not observed, is either observed on a probe or recorded as a known limit with its owner decision. A check not run reads `not run: <reason>`, never a pass.
 - The owner can tell from a wave report which Pi facts were observed, with the Pi and gentle-pi versions and the gabo build under test.
 
@@ -41,6 +44,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 - gabo never creates a label to pass a gate. A `status:approved` label added to fake an approval is not a fix.
 - The CLI keeps `gabo init`, `gabo check`, `gabo version` and `gabo prompt` (PRD R31; TRD D24). The owner's preference (2026-11-12) is to keep custom scripts to a minimum and to prefer engine-native features.
 - The probes run on testeos-z/gabo-repo, by the owner's decision on #585. Its `dev` is reset to seed `73ec699` before and after each run, and runs are coordinated so that only one uses the repository at a time.
+- The reviewer changes of S11 and S12 widen S10 of the spec for the reviewer's scripts they name only. No other S10 limit changes.
 
 ## Open questions
 
@@ -54,6 +58,8 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 | 6 | What ends a Pi wave when `agent_settled` arrives while a background coder is pending? | carried to spec (S6) |
 | 7 | Is the user-level reviewer copy that a Pi wave runs current? | carried to spec (S7) |
 | 8 | Is the reviewer folder grant asked at most once per path? | carried to spec (S8, S9) |
+| 9 | What happens to an existing unqualified reviewer mirror, its PR refs and its base checkout after the change? | carried to spec (S11, spec question 9). **Proposed (auto)**: leave them in place and create the qualified ones beside them. Owner decides. |
+| 10 | Does the title still fit the intent? | **Proposed (auto)**: keep the title for this PR and retitle at acceptance to "Pi probe follow-ups and reviewer state isolation", because S11 and S12 are not Pi facts. The folder keeps its name; no rename here. Owner decides. |
 
 ## Links
 
@@ -63,6 +69,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 | intent issue | [#703 I0026: Pi probe follow-ups](https://github.com/testeos-z/gabo-ai/issues/703) (sub-issue of #492) |
 | follow-up issue | [#700 Follow-up: open questions from the I0023 Pi probes](https://github.com/testeos-z/gabo-ai/issues/700) (sub-issue of #703) |
 | sources | [#585](https://github.com/testeos-z/gabo-ai/issues/585) (probe T1, comment [6840556586](https://github.com/testeos-z/gabo-ai/issues/585#issuecomment-6840556586)); [#599](https://github.com/testeos-z/gabo-ai/issues/599) (probe T15, comment [6841235718](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718)); `docs/product/intents/0023-unattended-pi-waves-and-flow-hygiene/intent.md` (`## Review findings`) and `plan.md` (`## Probe results`) |
+| reviewer findings | [#705](https://github.com/testeos-z/gabo-ai/issues/705) (I0025 T2 findings, PR [#720](https://github.com/testeos-z/gabo-ai/pull/720)); owner's standing rule, [#695 comment](https://github.com/testeos-z/gabo-ai/issues/695#issuecomment-6855499990); open reviewer task [#706](https://github.com/testeos-z/gabo-ai/issues/706) (I0025 T3) |
 | related intent | 0023-unattended-pi-waves-and-flow-hygiene (closed; its spec is accepted and not reopened); 0016-gabo-init-pi-subagent-package-check-and-reviewer-content-check (reviewer content hash, S7); 0025-wave-record-and-reviewer-follow-ups (same skill files, accepted) |
 | PRD | [PRD](../../PRD.md), R21, R23, R31, R32 |
 | TRD | [TRD](../../TRD.md), D7, D24 |
