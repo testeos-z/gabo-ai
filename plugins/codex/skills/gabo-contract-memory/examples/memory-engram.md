@@ -7,7 +7,7 @@ Notes:
 - Records live under fixed topic keys so later agents find them. Update an existing topic with `mem_update` instead of saving a duplicate.
 - Project scope (`scope: project`) for everything but personal preferences.
 - Read back every save with `mem_get_observation` on the returned id.
-- In the ledger and trace rows below `<wave>` is the wave's run id `<I####>-<YYYYMMDDTHHMMSSZ>`; the operations spell it `<run id>`. The wave id (the intent id) keys only the planning record.
+- In the ledger and trace rows below `<wave>` is the wave's run id `<I####>-<YYYYMMDDTHHMMSSZ>`; the operations spell it `<run id>`. The decision row keeps the wave id (the intent id), so a resumed run finds the decisions of earlier runs; the planning record keeps the intent id too.
 
 | record | topic key |
 |---|---|

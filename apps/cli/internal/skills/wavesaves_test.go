@@ -1,6 +1,9 @@
 package skills
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -28,6 +31,8 @@ func TestCycleTraceRecordsEveryMemoryWriteByEntry(t *testing.T) {
 		"`ledger` for each ledger entry of `gabo/ledger/<run id>`",
 		"two entries of one observation are two ledger entries",
 		"the wave start entry calls of step 2 included",
+		"the entry is the label with `@<n>`",
+		"(`ledger@2`, `T1@3`, `report@2`)",
 	})
 	for _, old := range []string{"saves add <topic key> <observation id>` after each `mem_save`", "saves read <topic key>` after each read-back that matched"} {
 		if strings.Contains(trace, old) {
@@ -41,7 +46,7 @@ func TestAssistantRecordsItsMemoryWritesByEntry(t *testing.T) {
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
 	requireIn(t, "gabo-assistant", doc, []string{
 		"followed by `saves add '<topic key>#<entry>' <observation id>` and, after its read-back showed that entry, `saves read '<topic key>#<entry>'` of `wave-record.sh` (entry `start`; the entry labels are the ones of `gabo-cycle` Trace)",
-		"each save of the report entry again (the comfort answer) is followed by the same `saves add` and `saves read` calls with the entry `report`",
+		"each save of the report entry again (the comfort answer) is followed by the same `saves add` and `saves read` calls with the entry `report@<n>`",
 	})
 }
 
@@ -75,4 +80,34 @@ func TestMemoryExampleOperationsUseTheRunID(t *testing.T) {
 		"`topic_key: gabo/ledger/<run id>`",
 		"`<wave>` is the wave's run id `<I####>-<YYYYMMDDTHHMMSSZ>`",
 	})
+}
+
+// The script counts a key once and a read clears it for good: a later write of
+// the same label is told apart only by its `@<n>` entry, which `saves unverified` lists.
+func TestSavesEntriesOfRepeatedWritesAreTold(t *testing.T) {
+	t.Parallel()
+	script := filepath.Join(t.TempDir(), "wave-record.sh")
+	if err := os.WriteFile(script, []byte(readCatalog(t, "gabo-wave-report/scripts/wave-record.sh")), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := append(os.Environ(), "XDG_STATE_HOME="+t.TempDir())
+	run := func(args ...string) string {
+		cmd := exec.Command("sh", append([]string{script, "--wave", "w1", "saves"}, args...)...)
+		cmd.Env = env
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("saves %v: %v: %s", args, err, out)
+		}
+		return string(out)
+	}
+	run("add", "gabo/ledger/w1#ledger", "5")
+	run("read", "gabo/ledger/w1#ledger")
+	run("add", "gabo/ledger/w1#ledger@2", "5")
+	if got := run("unverified"); !strings.Contains(got, "gabo/ledger/w1#ledger@2") || strings.Contains(got, "w1#ledger\n") {
+		t.Errorf("unverified = %q, want only the second ledger write", got)
+	}
+	run("read", "gabo/ledger/w1#ledger@2")
+	if got := run("unverified"); !strings.Contains(got, "none") {
+		t.Errorf("unverified = %q, want none", got)
+	}
 }
