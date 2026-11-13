@@ -61,3 +61,30 @@ The owner, and the team in auto mode, who start a wave on Pi and expect it to ru
 | spec | [spec](spec.md) |
 | plan | — |
 | related intent | 0013-several-engines-in-parallel-in-one-project (claim, worktree namespace); 0015-one-subagent-layer-on-every-engine (closed; Pi coders and the cycle on Pi); 0016-gabo-init-pi-subagent-package-check-and-reviewer-content-check (closed; it left these findings out); 0020-spend-or-turn-cap-for-auto-mode, 0021-delegate-by-reason-not-by-default (same skill files) |
+
+## Review findings
+
+Recorded by I0023/T16 from the probe results of T1 ([#585](https://github.com/testeos-z/gabo-ai/issues/585)) and T15 ([#599](https://github.com/testeos-z/gabo-ai/issues/599)). Each result is copied from its issue. A check not observed reads `not run` or `not observed`, never a pass. The probes ran on testeos-z/gabo-repo by the owner's decision on #585, not on a disposable repository.
+
+| probe | result | source |
+|---|---|---|
+| S11 (a) session mode (T1) | Pi 1.5.2, gentle-pi 4.5.x. The mode was unreadable under `--print`, `--mode rpc` and interactive, so each gives the warning branch of S1 ("cannot tell"). | [#585 comment](https://github.com/testeos-z/gabo-ai/issues/585#issuecomment-6840556586) |
+| S11 (b) to (e) wave (T15) | Pi 1.5.2, gentle-pi 4.7.0, gabo built from dev `d8dcaea`. (b) one merge of two, PR #204; the second task stopped before its push. (b) worktree registered before its coder: PASS. (b) `gabo init` guardrails: PASS. (b) grant asked at most once per path: `not observed: no dialog reached the driver`. (c) push without `GENTLE_PI_AUTONOMOUS_MODE`: PASS. (d) PR body `Refs #203`, no closing keyword: PASS for one PR; status labels: `not run: no task reached Task Close`. (e) `not observed: no denial, the delete ran without a prompt`. S2 dry check: PASS. | [#599 comment](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718) |
+
+### Results that differ from S1 to S9
+
+- **S1.** The spec says rpc and interactive print no line. The mode is unreadable, so the warning prints in rpc (T15) and in every mode (T1), and no mode gets the no-line outcome.
+- **S3, (b).** The wave reached one merge of two. The first task stopped before its push: gentle-pi's `branch-pr` skill requires a `status:approved` label on the issue, and that label is absent in gabo-repo. Registration before each coder passed.
+- **S4.** No grant key exists in gentle-pi 4.7.0 project settings, so the grants went in the session prompt. S4 does not name the trace stamps under `$XDG_STATE_HOME/gabo/waves`, a fourth outside path the wave wrote.
+- **S9 and (e).** Not observed. gentle-pi deleted a merged remote branch with no confirmation while the project guardrails had `autonomousMode: true`, where S9 says it asks even in autonomous mode.
+
+### Open questions
+
+1. S1: with the mode unreadable, the rpc session printed the warning, but S1 says rpc prints no line. The acceptance cannot be met until a mode check exists.
+2. S9 and (e): gentle-pi deleted the merged remote branch with no confirmation while `autonomousMode` was true. P2a (#414) saw a confirmation with the variable unset, and S9 says gentle-pi asks even in autonomous mode. Which holds?
+3. Coder model: the built `gabo-coder` has no `model` field, so gentle-pi used `openai/gpt-5.5`, which this account rejects; both first coder launches failed with `invalid_request`. The probe pinned `openai/gpt-6.1-terra` in its scratch agent file. Should `gabo-runtime-pi` pin a model?
+4. `status:approved` gate: gentle-pi's `branch-pr` skill requires `status:approved` before a PR. The label is absent in gabo-repo, so the first task stopped before its push and the second task's Task Close was blocked. The gabo-coder contract has no such gate. Creating the label would fake an approval, so the probe did not.
+5. S4 is incomplete: the trace stamps under `$XDG_STATE_HOME/gabo/waves` are a fourth outside path. The user config `gabo/config.yaml` must exist (gabo-setup); the probe wrote a placeholder in scratch, which the owner did not choose.
+6. Driver finding: Pi emits `agent_settled` while a background subagent wake is still pending, so a driver that stops at `agent_settled` loses the wave's next turn. Two runs ended mid-wave this way.
+7. Reviewer copy: the coder runs the user-level reviewer through the existing `~/.pi/agent/skills/gabo-reviewer` link. Its content differs from the dev embedded copy with the same VERSION 0.2.10 (`diff -rq`). PR #204 has a clean reviewer marker comment; the VERDICT line itself was not captured.
+8. From #585: a Pi session cannot read its own mode under `--print`, `--mode rpc` or interactive, by any means found: the Pi extension API exposes `ctx.mode`, but no gentle-pi tool the session can call returns it. Not probed: a new tool that returns `ctx.mode`. With the mode unreadable, S1 keeps only the warning branch (D2).

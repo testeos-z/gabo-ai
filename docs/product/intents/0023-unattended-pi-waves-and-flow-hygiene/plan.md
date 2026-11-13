@@ -114,8 +114,8 @@ T1 and T15 record their results on their issues; T16 copies them here. A result 
 
 | probe | host | result |
 |---|---|---|
-| S11 (a) session mode under `--print`, `--mode rpc` and interactive (T1) | disposable repository, Pi | Pending |
-| S11 (b) to (e) wave under `--mode rpc`, guardrails, labels, leftovers (T15) | disposable repository, Pi | Pending |
+| S11 (a) session mode under `--print`, `--mode rpc` and interactive (T1) | testeos-z/gabo-repo, by the owner's decision on #585 (not a disposable repository), Pi | Observed: the mode was unreadable in all three modes, so each gives the warning branch (S1 outcome "cannot tell"). T2 keeps only the warning branch (D2, decision on #586, PR #697). Result: [#585 comment](https://github.com/testeos-z/gabo-ai/issues/585#issuecomment-6840556586) |
+| S11 (b) to (e) wave under `--mode rpc`, guardrails, labels, leftovers (T15) | testeos-z/gabo-repo, by the owner's decision on #585 (not a disposable repository), Pi | Partly observed: (b) one merge of two, PR #204 (differs); worktree registered before its coder PASS; `gabo init` guardrails PASS; the grant asked at most once per path `not observed: no dialog reached the driver`. (c) PASS. (d) PR body `Refs #203`, no closing keyword, PASS for one PR; status labels `not run: no task reached Task Close`. (e) `not observed: no denial, the delete ran without a prompt` (differs). The S1 warning printed in rpc (differs). Result: [#599 comment](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718) |
 
 ## Risks to the plan
 
