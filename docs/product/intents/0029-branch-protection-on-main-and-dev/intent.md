@@ -3,11 +3,11 @@
 | field | value |
 |---|---|
 | intent id | 0029-branch-protection-on-main-and-dev |
-| status | Draft |
+| status | Draft. The owner accepts the spec, not this intent (owner decision D-6, 2026-11-13) |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) (closed; intent issue linked under it, as [#758](https://github.com/testeos-z/gabo-ai/issues/758) was) |
 | intent issue | [#766 I0029: Branch protection on main and dev](https://github.com/testeos-z/gabo-ai/issues/766) |
-| date | 2026-11-13 |
+| date | 2026-11-13 (revised 2026-11-13 after the owner's decisions, see the Decided table) |
 
 ## Problem
 
@@ -34,9 +34,20 @@ Plan and visibility facts, from GitHub and GitLab documentation, read 2026-11-13
 - GitHub, "About protected branches": "You can enable branch restrictions in public repositories owned by a GitHub Free organization". Bypass lists: "Actors may only be added to bypass lists when the repository belongs to an organization." The page does not say whether rulesets are available on Free for public repositories; that is not stated, so this intent does not assume it.
 - GitLab, protected branches: the page lists "Tier: Free, Premium, Ultimate". Push, merge and force-push settings have no tier label; code owner approval is "Premium and Ultimate". The page does not state the tier of merge request approval rules.
 
-One fact shapes every option. The agents run with the owner's `gh` login (`gabo.yaml`, reviewer comment: "the scripts run as the owner with the owner's gh login"), and the owner's account has admin rights on the repository. A bypass for admins therefore also bypasses the rule for every agent. The playbook names the goal (extraction, 2026-11-13): "Branch protection turns anything the agent writes into a PR, with no direct path to main." It also says "Branch protection policies that require a code owner's approval are also worthwhile."
+One fact shapes every option. The agents run with the owner's `gh` login (`gabo.yaml`, reviewer comment: "the scripts run as the owner with the owner's gh login"), and the owner's account has admin rights on the repository. A bypass for admins therefore also bypasses the rule for every agent.
 
-Labels: the current tracker adapter reads `status:in-progress`, `status:blocked` and `needs-user` (`.claude/skills/gabo-tasks-github/SKILL.md`). Nothing in the repository reads `mode:cloud` or `mode:local` (searched 2026-11-13). `needs-user` exists on the repository today.
+Playbook, Anthropic, "The AI-native SDLC playbook", Louis Claxton, 2026-08-21, https://claude.com/resources/articles/the-ai-native-sdlc-playbook. Byte-checked on 2026-11-13 against the page text:
+
+- "Branch protection turns anything the agent writes into a PR, with no direct path to main."
+- "Branch protection policies that require a code owner's approval are also worthwhile."
+
+## Owner decisions, 2026-11-13
+
+- General criterion, verbatim: "si está en el documento de Anthropic, úsalo. Vamos a cumplir ese documento estrictamente" [if it is in Anthropic's document, use it; we will follow that document strictly]. What the playbook prescribes is in.
+- D-2 The reviewer keeps merging only into `dev`; a person approves the spec and `main`. Agents reach only `dev`; the owner does `main` and the versions.
+- D-1 CI on PRs stays out. The two required statuses come from the reviewer's scripts, not from a CI run.
+- D-6 The owner accepts the spec, not the intent nor the plan.
+- D-1, D-2 and D-6 are the owner's numbered choices as relayed by the assistant; the owner's own wording of them is not in the record, so they are not quoted verbatim.
 
 ## Who is affected
 
@@ -50,20 +61,21 @@ Labels: the current tracker adapter reads `status:in-progress`, `status:blocked`
 In scope:
 
 - A new operation of the `repository_host` contract (TRD 9.1, `docs/product/TRD.md:373`), service-agnostic, named for the protection of the integration branch and of `main`. It sets the rules and reads them back. The GitHub adapter implements it with the rulesets API. A GitLab adapter is not built by this intent; until one exists, the operation reports `unsupported` for GitLab.
+- The rules, decided: a pull request before a merge, no force-push and no deletion on both `main` and `dev`; the statuses `reviewer/tests` and `reviewer/review` required on `dev` only (see the Decided table).
 - Initial setup recommends the operation and offers it as optional. When the service or the plan lacks it, setup warns and names what is missing.
-- Recover the label set the tracker adapter uses (question 7).
+- Recover the label set the tracker adapter uses (open question 5).
 
 Non-goals:
 
 - No new CLI command (PRD R31, `docs/product/PRD.md:170`). The operation lives in the adapter and in the setup prompt, not in `gabo repo setup`.
 - No change to the reviewer's gate logic or its scripts.
 - No protection or secret change for `pi/pkg-up` or `NPM_TOKEN`. Intent 0011 (D2) left that as a later change. Package publishing is out of all four intents of this batch (owner, 2026-11-13), so it is not taken here.
-- No CI change and no code-owner file. The repository has no `CODEOWNERS` file, and the owner did not ask for one.
+- No CI change (D-1) and no code-owner file. The repository has no `CODEOWNERS` file, and the owner did not ask for one.
 - No enforcement of a hook. Server rules and the local hooks of intent 0028 are separate layers.
 
 ## Desired outcome
 
-- At initial setup, the owner is offered the protection. If accepted, the rules in question 1 exist on the server and the setup reads them back and reports what it sees. If declined, the setup records the decision in memory and does not ask again in that project.
+- At initial setup, the owner is offered the protection. If accepted, the rules in the Decided table exist on the server and the setup reads them back and reports what it sees. If declined, the setup records the decision in memory and does not ask again in that project.
 - After setup, a direct push to `dev` or `main`, a force-push to either, and a deletion of either are refused by the server, whoever holds the token.
 - A pull request into `dev` cannot merge until the reviewer's two statuses are green on its head.
 - When the service or plan lacks a rule, setup says so in one line per missing rule and continues. Nothing fails silently.
@@ -77,23 +89,29 @@ Non-goals:
 - TRD 9.1 (`docs/product/TRD.md:373`): the `repository_host` contract already lists open PR, comment, status, merge and delete branch. A protection operation is one more operation of that contract, which the owner must accept as a contract change.
 - The single-user model: agents and the owner share one login and admin rights (see the Problem), so no rule may depend on telling them apart.
 - Task Size item 5 (delivery or environment): repository settings are an environment change, so the spec and its tasks carry the matching risk line.
-- Owner's own docs: `docs/cloud-agent-flow.md:17` says GitHub forbids self-approval, so a required approval that the owner's account must give cannot be met by the reviewer's own PR.
+- `docs/cloud-agent-flow.md:17` says GitHub forbids self-approval, so a required approval that the owner's account must give cannot be met by the reviewer's own PR.
+
+## Decided (owner, 2026-11-13)
+
+| # | was question | decision | basis |
+|---|---|---|---|
+| 1 | 2, which branches | Both `main` and `dev` are protected. Agents reach only `dev`. | D-2. The playbook: "Branch protection turns anything the agent writes into a PR, with no direct path to main." |
+| 2 | 4, which statuses, and where | `reviewer/tests` and `reviewer/review` required on `dev`; none on `main`. | D-2: the reviewer merges only into `dev`. The reviewer posts both on PRs into `dev` (`common.sh:163-164`). |
+| 3 | 1, the rules part | A pull request before merge, no force-push, no deletion, on both branches. | D-2 and the playbook's "no direct path to main". The coder rules already forbid force-push and deletion (`.claude/skills/gabo-repository-host-github/SKILL.md:15-17`). |
 
 ## Open questions
 
-Each question has a **Proposed (auto)** option with a one-line reason. None is accepted.
+Each question has a **Proposed (auto)** option with a one-line reason. None is accepted. Answers go into the spec, which the owner accepts (D-6).
 
 | # | question | status |
 |---|---|---|
-| 1 | Which operations do the rules require: a pull request, the reviewer's statuses, no force-push, no deletion, and how many approvals? | open. **Proposed (auto): on each protected branch, a pull request before merge, no force-push, no deletion; the statuses `reviewer/tests` and `reviewer/review` on `dev` only; zero required approvals.** Reason: a required approval cannot be met on a single-owner repository, because GitHub forbids approving one's own PR (`docs/cloud-agent-flow.md:17`), and every PR the agents open uses the owner's login. Options: (b) the same plus one required approval (blocks every merge until a second human exists); (c) the same plus code-owner review, which needs a `CODEOWNERS` file that does not exist (playbook, extraction: "Branch protection policies that require a code owner's approval are also worthwhile."). |
-| 2 | Which branches: `main` only, `dev` only, or both? | open. **Proposed (auto): both, with the rules of question 1 and the statuses on `dev` only.** Reason: `dev` receives the reviewer's merges, and `main` receives the owner's releases through a pull request; the reviewer never reviews a PR into `main`, so a status required on `main` would block the owner's release forever. Options: (a) `main` only, which leaves the reviewer's merges into `dev` unprotected on the server; (b) `dev` only, which leaves a direct push to `main` open. |
-| 3 | Is there a bypass list, and does it include the owner's admin role? | open. **Proposed (auto): no bypass. The owner merges into `main` and `dev` through a pull request like anyone else.** Reason: agents use the owner's login with admin rights, so an admin bypass is a bypass for every agent. Option (b): a bypass for the admin role, which keeps the owner's direct pushes and gives agents the same path. Option (c): a bypass with a named GitHub App or team, which needs a second identity that does not exist today. |
-| 4 | Which statuses are required, and where? | open. **Proposed (auto): `reviewer/tests` and `reviewer/review` required on `dev`, none on `main`.** Reason: the reviewer posts both on PRs into `dev` (`common.sh:163-164`), and a required context that never appears blocks the merge. Option (b): both required on `main` too, which needs the reviewer to review the release PR (out of its scope today). Option (c): none, which keeps only the pull-request and no-force-push rules. |
-| 5 | What happens on a plan or service that lacks a rule, such as GitLab or a private repository on a plan without it? | open. **Proposed (auto): setup warns with one line per missing rule, names the local hook layer as the only enforcement left (intent 0028), and continues.** Reason: the owner said it should warn, and a failed setup would block the repository's first wave. Option (b): refuse setup until the rule exists, which blocks a plan that cannot ever have it. Option (c): silent skip, which the owner did not ask for. For GitLab, the operation reports `unsupported` until an adapter exists (GitLab's protected branches page: push, merge and force-push settings on Free; code owner approval on Premium and Ultimate; the approval tier not stated). |
-| 6 | Is the protection offered at initial setup, and what if it is declined? | open. **Proposed (auto): offered as optional at initial setup, with the rule list shown before any write; a decline is recorded in memory (decision record, `gabo-memory`) and the setup does not ask again in that project.** Reason: the owner said "recommend and offer as optional". Option (b): recommend only, without a memory record. Option (c): on by default, which the owner did not ask for. |
-| 7 | Which labels are recovered: the retired set, the set the tracker adapter reads, or both? | open. **Proposed (auto): the labels the tracker adapter reads today (`status:in-progress`, `status:blocked`, `needs-user`); `mode:cloud` and `mode:local` are not recreated.** Reason: nothing reads the `mode:*` labels in the repository today (searched 2026-11-13), so recreating them would add an unread label. Option (b): recreate the retired `mode:cloud` and `mode:local` as well, with no reader. Option (c): the retired set only, which leaves the adapter's status labels missing on a new project. |
-| 8 | Does `gabo check` read the protection? | open. **Proposed (auto): no. `gabo check` stays offline; setup and the adapter's read-back are the only checks.** Reason: `gabo check` validates files offline by design (`docs/product/intents/README.md`, Checks). Option (b): `gabo check` calls the service and warns when a rule is missing, which adds a network call to a read-only check. |
-| 9 | Where is the owner's decision on each rule recorded after setup? | open. **Proposed (auto): a decision record in memory (`gabo/decision/global/branch-protection`, per the gabo-memory records) holding the rule list and the read-back result; the rules themselves stay on the server.** Reason: the decision must survive a new session, and the server is the only place the rules are enforced. Option (b): re-read the rules at every wave start, which adds a service call per wave. |
+| 1 | Required approving reviews on `main` and `dev`: zero or one? | open. **Proposed (auto): zero.** Reason: the owner's own merge of a PR into `main` is the human approval (D-2); GitHub forbids approving one's own PR (`docs/cloud-agent-flow.md:17`), and every agent PR uses the owner's login, so one required approval blocks every merge until a second human exists. Option: one approval (needs a second human); code-owner review with a `CODEOWNERS` file (the playbook calls it "worthwhile", not required; none exists today). |
+| 2 | Is there a bypass list, and does it include the owner's admin role? | open. **Proposed (auto): no bypass.** Reason: agents use the owner's admin login, so an admin bypass is a bypass for every agent. Option: a bypass for the admin role, which keeps the owner's direct pushes and gives agents the same path; a bypass with a named GitHub App or team, which needs a second identity that does not exist today. |
+| 3 | What happens on a plan or service that lacks a rule, such as GitLab or a private repository without it? | open. **Proposed (auto): setup warns with one line per missing rule, names the local hook layer (intent 0028) as the only enforcement left, and continues.** Reason: a failed setup would block the repository's first wave. Option: refuse setup until the rule exists. |
+| 4 | Is the protection offered at initial setup, and what if it is declined? | open. **Proposed (auto): offered as optional, with the rule list shown before any write; a decline is recorded in memory and setup does not ask again in that project.** Reason: the owner asked to recommend and offer it as optional. Option: recommend only, with no memory record. |
+| 5 | Which labels are recovered: the set the tracker adapter reads, the retired set, or both? | open. **Proposed (auto): the labels the tracker adapter reads today (`status:in-progress`, `status:blocked`, `needs-user`); `mode:cloud` and `mode:local` are not recreated.** Reason: nothing reads the `mode:*` labels in the repository today (searched 2026-11-13). Option: recreate `mode:cloud` and `mode:local` too, with no reader. |
+| 6 | Does `gabo check` read the protection? | open. **Proposed (auto): no. `gabo check` stays offline; setup and the adapter's read-back are the only checks.** Reason: `gabo check` validates files offline by design (`docs/product/intents/README.md`, Checks). Option: `gabo check` calls the service and warns when a rule is missing. |
+| 7 | Where is the owner's decision on each rule recorded after setup? | open. **Proposed (auto): a decision record in memory (`gabo/decision/global/branch-protection`, per the gabo-memory records) holding the rule list and the read-back result; the rules themselves stay on the server.** Reason: the decision must survive a new session, and the server is the only place the rules are enforced. Option: re-read the rules at every wave start, which adds a service call per wave. |
 
 ## Links
 
@@ -109,4 +127,4 @@ Each question has a **Proposed (auto)** option with a one-line reason. None is a
 | TRD | [TRD](../../TRD.md) section 9.1 (`repository_host`, line 373), D13 (line 595), D18 (line 600) |
 | spec | none yet; written only after the owner reviews this intent |
 | plan | none yet |
-| sources | commits `f15d326`, `94e3f48`, `1d59a61` in this repository; `gh api` read-only checks of 2026-11-13; [GitHub, About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) (extraction); [GitHub, About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) (extraction, plan not stated); [GitLab, Protected branches](https://docs.gitlab.com/user/project/repository/branches/protected/) (extraction); [Anthropic, The AI-native SDLC playbook](https://claude.com/resources/articles/the-ai-native-sdlc-playbook) (extraction) |
+| sources | commits `f15d326`, `94e3f48`, `1d59a61` in this repository; `gh api` read-only checks of 2026-11-13; [GitHub, About protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) (extraction); [GitHub, About rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/about-rulesets) (extraction, plan not stated); [GitLab, Protected branches](https://docs.gitlab.com/user/project/repository/branches/protected/) (extraction); [Anthropic, The AI-native SDLC playbook](https://claude.com/resources/articles/the-ai-native-sdlc-playbook) (quotes byte-checked 2026-11-13) |
