@@ -84,7 +84,7 @@ check "checks run on the merge result" grep -qE "^go-argc=.* head=$MERGE_SHA$" "
 check "checks get no credential" bash -c "! grep '^check-env' '$work/clean/calls.log' | grep -q secret"
 check "checks get the reviewer's own HOME" grep -qF "HOME=$work/clean/state/check-home CI=true" "$work/clean/calls.log"
 check "gabo check is not run when review.checks does not list it" bash -c "! grep -q '^gabo-call check' '$work/clean/calls.log'"
-check "review runs in the head checkout" grep -qE "^claude -p .* cwd=$work/clean/state/worktrees/pr-7$" "$work/clean/calls.log"
+check "review runs in the head checkout" grep -qE "^claude -p .* cwd=$work/clean/state/worktrees/example-org__example-repo__pr-7$" "$work/clean/calls.log"
 check "review gets only the Claude token" grep -qE "^cc-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=secret-claude HOME=$work/clean/state/review-home$" "$work/clean/calls.log"
 check "review is read-only" grep -qE '^claude -p .*--permission-mode dontAsk --tools Read,Grep,Glob,Bash' "$work/clean/calls.log"
 check "prompt carries the PR diff" grep -q 'func main' "$work/clean/prompt_seen.txt"
@@ -206,7 +206,7 @@ check "the Pi comment carries the findings" grep -qF 'All files comply.' "$work/
 check "the Pi comment names the engine" grep -qF 'then a Pi review' "$work/pi_clean/posted_7.md"
 expect_match '^reviewer/review success pi: no blocking issues found' "$(status_line pi_clean reviewer/review)" "the review status names the engine"
 check "claude never runs for a Pi reviewer" bash -c "! grep -q '^claude ' '$work/pi_clean/calls.log'"
-check "the Pi review runs in the head checkout" grep -qE "^pi .* cwd=$work/pi_clean/state/worktrees/pr-7$" "$work/pi_clean/calls.log"
+check "the Pi review runs in the head checkout" grep -qE "^pi .* cwd=$work/pi_clean/state/worktrees/example-org__example-repo__pr-7$" "$work/pi_clean/calls.log"
 check "the Pi review is one-shot JSON without a saved session" grep -qE '^pi --mode json --no-session ' "$work/pi_clean/calls.log"
 check "the Pi review is read-only: only read, grep, find and ls" grep -qE '^pi .* --tools read,grep,find,ls --exclude-tools bash,edit,write,mcp__\* ' "$work/pi_clean/calls.log"
 check "the Pi review skips project files, extensions, skills, prompt templates, themes, context files and MCP" \
@@ -277,7 +277,7 @@ echo "# codex reviewer (runtimes.reviewer: codex)"
 origin codex O_REVIEWER=codex O_AUTO_MERGE=true
 v="$(scenario codex_clean)"
 cx="$work/codex_clean"
-cwt="$cx/state/worktrees/pr-7"
+cwt="$cx/state/worktrees/example-org__example-repo__pr-7"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" "a clean Codex review ends with the same VERDICT line and merges"
 expect_eq "No blocking issues found." "$(first_line codex_clean)" "the Codex comment opens with the clean verdict"
 expect_eq "<!-- gbai-reviewer-bot sha=$HEAD_SHA -->|🤖 gabo reviewer" "$(footer codex_clean)" "the Codex comment ends with the marker and the footer"
@@ -335,8 +335,8 @@ echo '{"openai": {"type": "oauth"}}' >"$fake_home/.local/share/opencode/auth.jso
 oc() { scenario "$1" REVIEWER_OPENCODE="$work/bin/opencode" "${@:2}"; }
 v="$(oc opencode_clean)"
 ox="$work/opencode_clean"
-owt="$ox/state/worktrees/pr-7"
-oxh="$ox/state/review-home/opencode/pr-7"
+owt="$ox/state/worktrees/example-org__example-repo__pr-7"
+oxh="$ox/state/review-home/opencode/example-org__example-repo__pr-7"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" \
   "a clean OpenCode review ends with the same VERDICT line and merges"
 expect_eq "No blocking issues found." "$(first_line opencode_clean)" "the OpenCode comment opens with the clean verdict"
@@ -413,8 +413,8 @@ expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$(oc openco
 expect_eq "opencode-project=none" "$(grep '^opencode-project=' "$op/calls.log")" \
   "opencode.json and .opencode/ above the state dir are not loaded"
 check "the run directory is the root of a git repository with a commit" \
-  git -C "$op/state/opencode-run/pr-7" rev-parse --verify -q HEAD
-expect_eq "$op/state/opencode-run/pr-7" "$(git -C "$op/state/opencode-run/pr-7" rev-parse --show-toplevel)" \
+  git -C "$op/state/opencode-run/example-org__example-repo__pr-7" rev-parse --verify -q HEAD
+expect_eq "$op/state/opencode-run/example-org__example-repo__pr-7" "$(git -C "$op/state/opencode-run/example-org__example-repo__pr-7" rev-parse --show-toplevel)" \
   "the git root of the run is the run directory"
 check "without REVIEWER_OPENCODE_MODEL the owner's default model is used" bash -c "! grep -qE '^opencode run .* -m ' '$ox/calls.log'"
 oc opencode_model REVIEWER_OPENCODE_MODEL=openai/gpt-5.5 >/dev/null

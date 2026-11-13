@@ -27,11 +27,18 @@ state_dir() {
   echo owner >"$d/fx/user_login"
   echo "$d"
 }
-# add_wt <dir> <n> <state>: worktree pr-<n> in the mirror; the PR is <state>
-# ("none": unreadable).
+# qname <n>: the name of PR <n>'s worktree in REVIEWER_REPO (example-org/example-repo).
+qname() { echo "example-org__example-repo__pr-$1"; }
+# add_wt <dir> <n> <state>: worktree <owner>__<repo>__pr-<n> in the mirror; the
+# PR is <state> ("none": unreadable).
 add_wt() {
-  git -C "$1/repo.git" worktree add -q --detach "$1/worktrees/pr-$2" "$(cat "$1/commit")"
+  git -C "$1/repo.git" worktree add -q --detach "$1/worktrees/$(qname "$2")" "$(cat "$1/commit")"
   [[ "$3" == none ]] || jq -n --arg s "$3" '{state:$s}' >"$1/fx/pr_$2.json"
+}
+# add_legacy <dir> <n>: an unqualified worktree pr-<n> (made before the names
+# were qualified), of no known repository.
+add_legacy() {
+  git -C "$1/repo.git" worktree add -q --detach "$1/worktrees/pr-$2" "$(cat "$1/commit")"
 }
 # run_prune <dir> [current pr] [VAR=value...]: runs prune_worktrees from the
 # installed common.sh; prints its output.
@@ -48,8 +55,8 @@ run_prune() {
     echo "rc=$?"
   ) 2>&1
 }
-exists() { [[ -e "$1/worktrees/pr-$2" ]]; }
-gone() { [[ ! -e "$1/worktrees/pr-$2" ]]; }
+exists() { [[ -e "$1/worktrees/$(qname "$2")" ]]; }
+gone() { [[ ! -e "$1/worktrees/$(qname "$2")" ]]; }
 
 echo "# prune_worktrees"
 d="$(state_dir rules)"
@@ -57,22 +64,22 @@ add_wt "$d" 1 MERGED
 add_wt "$d" 2 CLOSED
 add_wt "$d" 3 OPEN
 add_wt "$d" 4 OPEN
-touch -d '10 days ago' "$d/worktrees/pr-4"
+touch -d '10 days ago' "$d/worktrees/$(qname 4)"
 add_wt "$d" 5 OPEN
-touch -d '10 days ago' "$d/worktrees/pr-5"
+touch -d '10 days ago' "$d/worktrees/$(qname 5)"
 add_wt "$d" 6 MERGED
 add_wt "$d" 7 none
 add_wt "$d" 8 CLOSED
 add_wt "$d" 9 MERGED
-mkdir "$d/worktrees/pr-10" "$d/outside"
+mkdir "$d/worktrees/$(qname 10)" "$d/outside"
 jq -n '{state:"CLOSED"}' >"$d/fx/pr_10.json"
 echo keep >"$d/outside/file"
-ln -s "$d/outside" "$d/worktrees/pr-11"
+ln -s "$d/outside" "$d/worktrees/$(qname 11)"
 jq -n '{state:"CLOSED"}' >"$d/fx/pr_11.json"
 mkdir "$d/worktrees/pr-x"
 git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/merge-pr-3-abc.1p1" "$(cat "$d/commit")"
 # pr-6 is the current PR and not open; pr-5 is the current PR, open and old; pr-8 is locked.
-( exec 9>"$d/state/locks/pr-8.lock"; flock 9; sleep 30 ) &
+( exec 9>"$d/state/locks/$(qname 8).lock"; flock 9; sleep 30 ) &
 holder=$!
 sleep 0.3
 out="$(run_prune "$d" 5)"
@@ -89,9 +96,9 @@ check "a worktree of a run in progress (lock held) stays" exists "$d" 8
 check "a merged PR after the locked one is still processed" gone "$d" 9
 check "a directory that is not a worktree of the mirror stays" exists "$d" 10
 expect_match 'WARN refusing to remove .*pr-10: not a worktree of the mirror' "$(cat "$d/state/reviewer.log")" "the foreign directory is refused with a WARN"
-check "a symlink stays and its target is untouched" bash -c "[[ -L '$d/worktrees/pr-11' && -f '$d/outside/file' ]]"
+check "a symlink stays and its target is untouched" bash -c "[[ -L '$d/worktrees/$(qname 11)' && -f '$d/outside/file' ]]"
 expect_match 'WARN refusing to remove .*pr-11' "$(cat "$d/state/reviewer.log")" "the symlink is refused with a WARN"
-check "a non-numeric pr-* name is ignored" exists "$d" x
+check "a non-numeric pr-* name is ignored" test -d "$d/worktrees/pr-x"
 check "merge-pr-* worktrees are not touched by prune" test -d "$d/worktrees/merge-pr-3-abc.1p1"
 expect_match 'WARN prune: could not read the state of PR #7' "$(cat "$d/state/reviewer.log")" "an unreadable state is logged"
 expect_match 'rc=0$' "$out" "prune ends 0 although some paths were refused"
@@ -99,7 +106,7 @@ expect_match 'rc=0$' "$out" "prune ends 0 although some paths were refused"
 echo "# REVIEWER_KEEP_DAYS"
 d="$(state_dir keep)"
 add_wt "$d" 1 OPEN
-touch -d '3 days ago' "$d/worktrees/pr-1"
+touch -d '3 days ago' "$d/worktrees/$(qname 1)"
 run_prune "$d" "" >/dev/null
 check "default keeps a 3 day old open worktree" exists "$d" 1
 run_prune "$d" "" REVIEWER_KEEP_DAYS=2 >/dev/null
@@ -112,7 +119,7 @@ add_wt "$d" 1 CLOSED
 cat >"$work/bin/gh-race" <<RACE
 #!/usr/bin/env bash
 # a review that starts while prune reads the PR state: it must not get the lock
-if (exec 5>"$d/state/locks/pr-1.lock"; flock -n 5); then echo free >"$d/probe"; else echo busy >"$d/probe"; fi
+if (exec 5>"$d/state/locks/$(qname 1).lock"; flock -n 5); then echo free >"$d/probe"; else echo busy >"$d/probe"; fi
 exec "$work/bin/gh" "\$@"
 RACE
 chmod +x "$work/bin/gh-race"
@@ -124,12 +131,53 @@ echo "# 349 worktrees of closed PRs"
 d="$(state_dir many)"
 for n in $(seq 1 349); do
   mkdir -p "$d/worktrees"
-  git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/pr-$n" "$(cat "$d/commit")"
+  git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/$(qname "$n")" "$(cat "$d/commit")"
   echo '{"state":"CLOSED"}' >"$d/fx/pr_$n.json"
 done
 add_wt "$d" 400 OPEN
 run_prune "$d" "" >/dev/null
-expect_eq "pr-400" "$(ls "$d/worktrees" | paste -sd' ')" "only the worktree of the open PR is left"
+expect_eq "$(qname 400)" "$(ls "$d/worktrees" | paste -sd' ')" "only the worktree of the open PR is left"
+
+echo "# worktrees are named by repository and number (intent 0025 S7, D5)"
+d="$(state_dir qualified)"
+git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/a-b__c__pr-12" "$(cat "$d/commit")"
+git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/a__b-c__pr-12" "$(cat "$d/commit")"
+jq -n '{state:"MERGED"}' >"$d/fx/pr_12_a-b__c.json"
+jq -n '{state:"CLOSED"}' >"$d/fx/pr_12_a__b-c.json"
+check "PR 12 of a-b/c and of a/b-c are two directories" test -d "$d/worktrees/a-b__c__pr-12" -a -d "$d/worktrees/a__b-c__pr-12"
+run_prune "$d" "" REVIEWER_REPO=a-b/c >/dev/null
+check "a prune of a-b/c removes the merged PR 12 of a-b/c" test ! -e "$d/worktrees/a-b__c__pr-12"
+check "a prune of a-b/c keeps the PR 12 of a/b-c and never asks about it" test -d "$d/worktrees/a__b-c__pr-12"
+check "gh is never asked about the repository a/b-c" bash -c "! grep -qsF -- '--repo a/b-c' '$d/calls.log'"
+
+d="$(state_dir pr_locks)"
+git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/a-b__c__pr-12" "$(cat "$d/commit")"
+jq -n '{state:"CLOSED"}' >"$d/fx/pr_12_a-b__c.json"
+cat >"$work/bin/gh-pair" <<PAIR
+#!/usr/bin/env bash
+# a prune of a-b/c reads its PR 12 state: its own lock is held, the other repository's is free
+if (exec 5>"$d/state/locks/a-b__c__pr-12.lock"; flock -n 5); then echo free >"$d/own"; else echo busy >"$d/own"; fi
+if (exec 5>"$d/state/locks/a__b-c__pr-12.lock"; flock -n 5); then echo free >"$d/other"; else echo busy >"$d/other"; fi
+exec "$work/bin/gh" "\$@"
+PAIR
+chmod +x "$work/bin/gh-pair"
+run_prune "$d" "" REVIEWER_REPO=a-b/c REVIEWER_GH="$work/bin/gh-pair" >/dev/null
+expect_eq "busy" "$(cat "$d/own" 2>/dev/null)" "the lock of PR 12 of a-b/c is held while its state is read"
+expect_eq "free" "$(cat "$d/other" 2>/dev/null)" "the lock of PR 12 of a/b-c is not held by a prune of a-b/c"
+
+echo "# unqualified worktrees: judged by age only (intent 0025 S7, D5)"
+d="$(state_dir legacy)"
+for n in $(seq 1 74); do
+  add_legacy "$d" "$n"
+  echo '{"state":"CLOSED"}' >"$d/fx/pr_$n.json"
+done
+add_legacy "$d" 900
+touch -d '10 days ago' "$d/worktrees/pr-900"
+run_prune "$d" "" >/dev/null
+expect_eq "74" "$(ls "$d/worktrees" | grep -c '^pr-[0-9]*$')" "74 unqualified worktrees younger than the limit are all kept"
+check "one unqualified worktree older than the limit is removed" test ! -e "$d/worktrees/pr-900"
+expect_match 'legacy worktree' "$(cat "$d/state/reviewer.log")" "the removal of a legacy worktree is logged as legacy worktree"
+check "prune never asks gh about an unqualified worktree" bash -c "! grep -qs 'pr view' '$d/calls.log'"
 
 echo "# prune_caches (S12)"
 mkdir -p "$work/gobin" "$work/gobin2"
@@ -248,6 +296,7 @@ merge_case() {
   d="$(state_dir "$name")"
   fx="$d/fx"
   add_wt "$d" 7 OPEN
+  add_legacy "$d" 7
   jq -n '{number:7, state:"OPEN", baseRefName:"dev", isDraft:false, isCrossRepository:false, headRefOid:"0123456789abcdef0123456789abcdef01234567"}' >"$fx/pr_7.json"
   local sha=0123456789abcdef0123456789abcdef01234567
   jq -n '[{context:"reviewer/tests",state:"success",creator:{login:"owner"}},{context:"reviewer/review",state:"success",creator:{login:"owner"}}]' >"$fx/statuses_$sha.json"
@@ -267,7 +316,8 @@ merge_case() {
 }
 d="$(merge_case merged)"
 expect_match ' MERGED #7 ' "$(tail -n 1 "$d/out.log")" "the merge succeeds and its line stays last"
-check "the pr-<n> worktree is removed after a successful merge" gone "$d" 7
+check "the qualified pr worktree is removed after a successful merge" gone "$d" 7
+check "the merge removes only its qualified worktree: an unqualified pr-7 stays" test -d "$d/worktrees/pr-7"
 d="$(merge_case notmerged MERGE_FAIL=1)"
 expect_match ' MERGE-FAILED ' "$(tail -n 1 "$d/out.log")" "a refused merge is MERGE-FAILED"
 check "the pr-<n> worktree stays when the merge fails" exists "$d" 7
@@ -315,7 +365,7 @@ seed() {
   git -C "$d/repo.git" remote add origin "$origin_dir"
   git -C "$d/repo.git" fetch -q --no-tags origin "+refs/heads/dev:refs/remotes/origin/dev"
   for n in 1 2; do
-    git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/pr-$n" "$DEV_SHA"
+    git -C "$d/repo.git" worktree add -q --detach "$d/worktrees/$(qname "$n")" "$DEV_SHA"
   done
   echo '{"state":"CLOSED"}' >"$d/fx/pr_1.json"
   echo '{"state":"OPEN"}' >"$d/fx/pr_2.json"
@@ -333,6 +383,28 @@ d="$(reviewer head_run head)"
 expect_match "VERDICT PR #7 head $HEAD_SHA verdict=" "$(tail -n 2 "$d/out.log" | head -n 1)" "head still ends with its VERDICT line"
 check "head prunes the closed PR's worktree at its start" gone "$d" 1
 check "head keeps the open PR's worktree" exists "$d" 2
+
+echo "# a second head round of an open PR reuses its worktree (intent 0025 S7)"
+seed head_reuse
+git -C "$work/head_reuse/repo.git" worktree add -q --detach "$work/head_reuse/worktrees/$(qname 7)" "$DEV_SHA"
+touch "$work/head_reuse/worktrees/$(qname 7)/reuse-marker"
+d="$(reviewer head_reuse head)"
+check "the qualified worktree of the open PR is reused, not recreated" test -e "$d/worktrees/$(qname 7)/reuse-marker"
+check "head creates no unqualified pr-7 worktree" test ! -e "$d/worktrees/pr-7"
+
+echo "# head holds its qualified PR lock during the review (intent 0025 S7)"
+seed head_pr_lock
+cat >"$work/bin/claude-prlock" <<PRLOCK
+#!/usr/bin/env bash
+# the review's own PR lock is held; the unqualified pr-7.lock is not used any more
+if (exec 5>"$work/head_pr_lock/state/locks/$(qname 7).lock"; flock -x -n 5); then echo free >"$work/head_pr_lock/qualified"; else echo busy >"$work/head_pr_lock/qualified"; fi
+if (exec 5>"$work/head_pr_lock/state/locks/pr-7.lock"; flock -x -n 5); then echo free >"$work/head_pr_lock/legacy"; else echo busy >"$work/head_pr_lock/legacy"; fi
+exec "$work/bin/claude" "\$@"
+PRLOCK
+chmod +x "$work/bin/claude-prlock"
+d="$(reviewer head_pr_lock head REVIEWER_CLAUDE="$work/bin/claude-prlock")"
+expect_eq "busy" "$(cat "$work/head_pr_lock/qualified" 2>/dev/null)" "the qualified PR lock is held during the review"
+expect_eq "free" "$(cat "$work/head_pr_lock/legacy" 2>/dev/null)" "the unqualified pr-7.lock is not taken"
 
 echo "# head holds cache.lock shared during the review"
 seed head_lock
