@@ -61,8 +61,8 @@ func TestCycleRunsWaveRecordStamps(t *testing.T) {
 		"${XDG_STATE_HOME:-$HOME/.local/state}/gabo/waves/<run id>/stamps",
 		"as one more entry of `gabo/trace/<run id>`, never replacing the entries above",
 		"adds the content of the stamps file (",
-		waveRecord + " saves add <topic key> <observation id>` after each `mem_save`",
-		waveRecord + " saves read <topic key>` after each read-back that matched",
+		waveRecord + " saves add '<topic key>#<entry>' <observation id>` after every memory write of the wave",
+		waveRecord + " saves read '<topic key>#<entry>'` after each read-back whose observation shows that entry's text",
 	})
 	requireIn(t, "gabo-cycle", doc, []string{failureRule})
 }
@@ -107,7 +107,7 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	re := regexp.MustCompile("`sh \\.gabo/skills/gabo-wave-report/scripts/wave-record\\.sh ([^`]*)`")
-	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
+	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "'<topic key>#<entry>'", "k#start", "'<topic key>#start'", "k#start", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
 	seen := 0
 	for _, name := range []string{"gabo-cycle", "gabo-wave-report", "gabo-assistant"} {
 		for _, m := range re.FindAllStringSubmatch(readCatalog(t, name+"/SKILL.md"), -1) {
@@ -122,10 +122,12 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 			seen++
 			state := t.TempDir()
 			env := append(os.Environ(), "XDG_STATE_HOME="+state)
-			seed := exec.Command("sh", script, "--wave", "w1", "saves", "add", "k", "1")
-			seed.Env = env
-			if out, err := seed.CombinedOutput(); err != nil {
-				t.Fatalf("seed: %v: %s", err, out)
+			for _, key := range []string{"k", "k#start"} {
+				seed := exec.Command("sh", script, "--wave", "w1", "saves", "add", key, "1")
+				seed.Env = env
+				if out, err := seed.CombinedOutput(); err != nil {
+					t.Fatalf("seed: %v: %s", err, out)
+				}
 			}
 			cmd := exec.Command("sh", append([]string{script}, args...)...)
 			cmd.Env = env
