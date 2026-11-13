@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0026-pi-probe-follow-ups](intent.md) |
 | spec | [spec](spec.md) |
-| status | Accepted |
+| status | Done |
 | owner | gabo-dev-lead |
 | date | 2026-11-13 |
 
@@ -129,13 +129,15 @@ Engines: Pi 1.5.2 with gentle-pi 4.7.0 (model `openai/gpt-6.1-terra`, `pi --mode
 
 No part failed, so no adjustment task was created and the bound of PD9 was not used. Parts (a) to (i) passed except part (b) S8, which is `not observed` (no grant dialog reached the driver), and that is not a pass. The status therefore stays `Accepted`, not `Done`, until the owner accepts S8 as not observed or a grant dialog is observed; no engine probe was rerun. S4 is the observed leftover path and S16 is `unknown` on all three engines, both as the spec allows.
 
+Owner decision, 2026-11-13: the owner accepted S8 as `not observed`. The assistant asked "¿Aceptas la S8 como \"no observado\" para cerrar la 0026?" and the owner replied, verbatim: "si". Relayed unedited by the assistant from the owner's own message. The status is therefore `Done`.
+
 ### Findings for the owner
 
 1. **Run-id fallback on a full page (S15).** On the real store the 20-hit page held one run-id key while newer run keys existed beyond it; the session took `gabo/trace/i0001-20261113t150111z` and warned it may not be the newest. S15 covers only a full page with no run-id key. Proposed adjustment (text, `gabo-assistant` resume fallback and `memory-engram.md`): a full page is incomplete whenever a newer run key could be beyond it, so narrow the query to the run-id shape (`gabo/trace/<I####>-<YYYY>`, then the newest month) or read the claim comment first. Not created as a task.
 2. **OpenCode token line wording (S16).** The OpenCode wave saved `tokens: unknown (the trace holds no token counts)` instead of `unknown (opencode: not verified)`. Proposed adjustment (text): pin the exact line. Not created as a task.
 3. **Remote delete on Pi (S4).** gentle-pi 4.7.0 blocks `git push origin --delete` in a subagent even with `autonomousMode: true` (`Gentle AI safety policy blocked the command because it was not confirmed.`); the 0023 S9 leftover path works. Codex and OpenCode delete the branch. No gabo change; the two Pi branches `wave/I0001-T001` and `wave/I0001-T002` stay on `testeos-z/gabo-repo` (owner command: `git push origin --delete wave/I0001-T001 wave/I0001-T002`), and they would collide with a later wave that reuses those task ids.
 4. **Pi drivers (S6).** A driver that stops at the first `agent_settled` leaves the wave unfinished; the first agent build of this probe did exactly that (driver outside the catalog, as S6 says). Not fixed here.
-5. **`docs/compatibility.md:126` still names Pi 1.4.0** (found by T10: `| Pi | 1.4.0 | 2026-11-03 | gabo-runtime-pi skill, Sources |`), and the installed Pi is 1.5.2 (gentle-pi 4.7.0), the version the `gabo-runtime-pi` Sources were rechecked on. The version table row is not changed here (edit surface).
+5. **`docs/compatibility.md:126` still names Pi 1.4.0** (found by T10: `| Pi | 1.4.0 | 2026-11-03 | gabo-runtime-pi skill, Sources |`), and the installed Pi is 1.5.2 (gentle-pi 4.7.0), the version the `gabo-runtime-pi` Sources were rechecked on. Resolved by PR #754, which sets the row to Pi 1.5.2, checked 2026-11-13.
 6. **Probe environment facts, no product change.** The owner's user-level reviewer copy is stale (finding of (f)); `gabo check` in a scratch data home reports the owner's `~/.claude/skills/gabo-reviewer` link as pointing elsewhere; Codex's first run hit its usage limit and its coders name `$HOME/.agents/skills/gabo-reviewer` (the stale link), so its prompt pointed them at the scratch copy; the first Codex wave start stopped with `session engine unknown (rebuild the agents)` until a second build wrote the main-session block; the Pi default model of the owner's settings (`gpt-5.5`) is refused by the account, so the scratch Pi settings used `gpt-6.1-terra`.
 7. **Probe repository state.** `dev` was not reset (force-push forbidden): a fast-forward commit restored its content to the seed (`dev` 1e3d7dd, empty tree diff against `seed`). Probe card and intent issues #221, #222, #227, #228, #233 and #234 were closed as not planned; the task issues were closed by the waves; no PR is open. The probes left session files in the owner's Pi (`gentle-agents/sessions`), Codex and OpenCode data dirs and Engram observations (traces `I0001-20261113T171255Z`, `...T174227Z`, `...T180159Z`).
 

@@ -123,6 +123,6 @@ Each runtime skill rechecks its sources when the installed version differs.
 |---|---|---|---|
 | Claude Code | 2.1.302 | 2026-10-28 | `gabo-runtime-claude` skill, Sources |
 | Codex (`codex-cli`) | 0.163.0 | 2026-11-03 | `gabo-runtime-codex` skill, Sources |
-| Pi | 1.4.0 | 2026-11-03 | `gabo-runtime-pi` skill, Sources |
+| Pi | 1.5.2 | 2026-11-13 | `gabo-runtime-pi` skill, Sources |
 | gentle-pi | 4.7.0 | 2026-11-13 | `gabo-runtime-pi` skill, Sources |
 | OpenCode | 2.2.6 | 2026-11-11 | `gabo-runtime-opencode` skill, Sources |
