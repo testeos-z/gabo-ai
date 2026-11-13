@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0026-pi-probe-follow-ups |
-| status | Draft |
+| status | Done |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-13 |
@@ -81,4 +81,5 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 | PRD | [PRD](../../PRD.md), R21, R23, R31, R32 |
 | TRD | [TRD](../../TRD.md), D7, D24 |
 | spec | [spec](spec.md) |
-| plan | — (written only after the spec is accepted) |
+| probe results | [#740](https://github.com/testeos-z/gabo-ai/issues/740) (T9 probe comments (a) to (i)); token reporting also on [#712](https://github.com/testeos-z/gabo-ai/issues/712) |
+| plan | [plan](plan.md) |
