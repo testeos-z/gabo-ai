@@ -7,12 +7,13 @@ Notes:
 - Records live under fixed topic keys so later agents find them. Update an existing topic with `mem_update` instead of saving a duplicate.
 - Project scope (`scope: project`) for everything but personal preferences.
 - Read back every save with `mem_get_observation` on the returned id.
+- In the ledger and trace rows below `<run id>` is the wave's run id `<I####>-<YYYYMMDDTHHMMSSZ>`, as in the operations. The decision row keeps `<wave>`, the wave id (the intent id), so a resumed run finds the decisions of earlier runs; the planning record keeps the intent id too.
 
 | record | topic key |
 |---|---|
 | decision | `gabo/decision/<wave>/<task or global>/<slug>` |
-| resource ledger | `gabo/ledger/<wave>` |
-| wave trace | `gabo/trace/<wave>` |
+| resource ledger | `gabo/ledger/<run id>` |
+| wave trace | `gabo/trace/<run id>` |
 | planning record | `gabo/trace/<I####>/planning` |
 | preference | `user/preferences` |
 
@@ -36,19 +37,19 @@ Notes:
 
 ### save ledger
 
-`mem_search` for `gabo/ledger/<wave>`; if found, `mem_get_observation`, append the new lines and `mem_update`; otherwise `mem_save` with `topic_key: gabo/ledger/<wave>`. Line format: `<kind> <name or path> creator=<agent> task=<T###> state=<live|removed|leftover>`.
+`mem_search` for `gabo/ledger/<run id>`; if found, `mem_get_observation`, append the new lines and `mem_update`; otherwise `mem_save` with `topic_key: gabo/ledger/<run id>`. Line format: `<kind> <name or path> creator=<agent> task=<T###> state=<live|removed|leftover>`.
 
 ### read ledger
 
-`mem_search` for `gabo/ledger/<wave>`, then `mem_get_observation`.
+`mem_search` for `gabo/ledger/<run id>`, then `mem_get_observation`.
 
 ### save wave trace
 
-Same pattern as `save ledger` on `gabo/trace/<wave>`; the content is one line per task: `<T###> status=<s> pr=#<n> verdict=<v> questions=<n>`. The observation whose topic key is exactly `gabo/trace/<wave>` is the wave's trace; the planning topic `gabo/trace/<I####>/planning` is a separate record saved with the same operation, which a wave never reads or overwrites; its content is a separate format (the lines the assistant defines), not the one line per task above.
+Same pattern as `save ledger` on `gabo/trace/<run id>`; the content is one line per task: `<T###> status=<s> pr=#<n> verdict=<v> questions=<n>`. The observation whose topic key is exactly `gabo/trace/<run id>` is the wave's trace; the planning topic `gabo/trace/<I####>/planning` is a separate record saved with the same operation, which a wave never reads or overwrites; its content is a separate format (the lines the assistant defines), not the one line per task above.
 
 ### read wave trace
 
-`mem_search` for `gabo/trace/<wave>` (or `gabo/trace/` for the latest), then `mem_get_observation`. Select the observation whose topic key is exactly `gabo/trace/<wave>`; the reader must treat the "latest" fallback as ignoring keys with a segment after the wave id, so that it never returns a `.../planning` record.
+`mem_search` for `gabo/trace/<run id>` (for the newest run of an intent, `gabo/trace/<I####>-`: take the observation whose topic key starts with that text and sorts last, else read `gabo/trace/<I####>` (a trace written before the run id)), then `mem_get_observation`. Select the observation whose topic key is exactly `gabo/trace/<run id>` (or the one the prefix lookup selected); the reader must treat the "latest" fallback as ignoring keys with a segment after the wave id, so that it never returns a `.../planning` record.
 
 ### save preference
 
