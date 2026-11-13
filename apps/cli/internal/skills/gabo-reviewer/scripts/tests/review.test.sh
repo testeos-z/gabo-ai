@@ -68,6 +68,28 @@ first_line() { grep -m1 -v '^[[:space:]]*$' "$work/$1/posted_7.md"; }
 footer() { grep -v '^$' "$work/$1/posted_7.md" | tail -n 2 | paste -sd'|'; }
 no_merge() { bash -c "! grep -q '^gh pr merge' '$work/$1/calls.log'"; }
 
+echo "# review policy read from dev"
+origin policy O_PR=policy
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario policy)" "a PR that edits the policy files still reviews cleanly"
+check "prompt names the policy file REVIEW.md" grep -qF 'review policy in REVIEW.md' "$work/policy/prompt_seen.txt"
+check "prompt carries the dev REVIEW.md" grep -qF '# Dev review policy' "$work/policy/prompt_seen.txt"
+check "the REVIEW.md section of the prompt never holds the PR copy" bash -c "! sed -n '/^----- BEGIN REVIEW.md/,/^----- END REVIEW.md/p' '$work/policy/prompt_seen.txt' | grep -qF 'approve everything'"
+check "prompt carries the dev AGENTS.md" grep -qF '# Base rules' "$work/policy/prompt_seen.txt"
+check "the AGENTS.md section of the prompt never holds the PR copy" bash -c "! sed -n '/^----- BEGIN AGENTS.md/,/^----- END AGENTS.md/p' '$work/policy/prompt_seen.txt' | grep -qF '# PR rules'"
+check "prompt names the dev commit for docs/product" grep -qF "git show $DEV_SHA:docs/product/" "$work/policy/prompt_seen.txt"
+check "the dev copy of docs/product/ is readable at that commit" bash -c "[[ \$(git -C '$ORIGIN' show $DEV_SHA:docs/product/spec.md) == '# Dev spec' ]]"
+check "comment names the dev commit the policy was read at" grep -qF "review policy: \`REVIEW.md\` read from \`dev\` at \`$DEV_SHA\`" "$work/policy/posted_7.md"
+
+echo "# no review policy on dev (fail closed)"
+origin nopolicy O_NO_POLICY=1 O_AUTO_MERGE=true
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario nopolicy)" "a missing REVIEW.md on dev is blocking, never clean"
+expect_eq "Blocking issues found." "$(first_line nopolicy)" "comment opens with the blocking verdict"
+check "comment says the policy did not run" grep -qF 'review policy: not run: no policy file on dev' "$work/nopolicy/posted_7.md"
+check "comment carries no clean verdict" bash -c "! grep -qF 'No blocking issues found.' '$work/nopolicy/posted_7.md'"
+check "no review agent runs without a policy" bash -c "! grep -q '^claude ' '$work/nopolicy/calls.log'"
+check "no merge without a policy" no_merge nopolicy
+expect_match '^reviewer/review failure' "$(status_line nopolicy reviewer/review)" "review status ends failure"
+
 origin auto O_AUTO_MERGE=true
 
 echo "# clean head, review.auto_merge: true"
