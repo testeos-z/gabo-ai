@@ -680,10 +680,11 @@ pr_worktree_name() { echo "${REPO/\//__}__pr-$1"; }
 # $WORKDIR/worktrees with one of those names, a symlink, or not registered in
 # the reviewer's own mirror. The mirror is picked per worktree: the repository's
 # own <owner>__<repo>.git for <owner>__<repo>__pr-<n>, the run's repository
-# for merge-pr-*, and the unqualified repo.git only for the legacy pr-<n>. The
+# for merge-pr-*, and the unqualified repo.git for the legacy pr-<n> and for a
+# qualified worktree that only repo.git lists (made before this change). The
 # caller holds the mirror lock.
 remove_run_worktree() {
-  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$MIRROR_DIR" real_p line listed=false name
+  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$MIRROR_DIR" real_p line listed=false name m
   local qualified_re='^[^/]+__[^/]+__pr-[0-9]+$'
   [[ -n "$p" ]] || return 0
   name="${p#"$base"/}"
@@ -698,13 +699,23 @@ remove_run_worktree() {
   fi
   if [[ -e "$p" ]]; then
     real_p="$(realpath -e -- "$p" 2>/dev/null)" || real_p=""
-    while IFS= read -r line; do
-      [[ "$line" == "worktree "* ]] || continue
-      if [[ -n "$real_p" && "$(realpath -e -- "${line#worktree }" 2>/dev/null)" == "$real_p" ]]; then
-        listed=true
+    # A qualified worktree made before the mirrors were qualified is still
+    # registered in the unqualified repo.git: look there when its own mirror
+    # does not list it.
+    for m in "$mirror_dir" "$WORKDIR/repo.git"; do
+      [[ "$m" == "$mirror_dir" || "$name" =~ $qualified_re ]] || continue
+      while IFS= read -r line; do
+        [[ "$line" == "worktree "* ]] || continue
+        if [[ -n "$real_p" && "$(realpath -e -- "${line#worktree }" 2>/dev/null)" == "$real_p" ]]; then
+          listed=true
+          break
+        fi
+      done < <(git -C "$m" worktree list --porcelain 2>/dev/null)
+      if [[ "$listed" == true ]]; then
+        mirror_dir="$m"
         break
       fi
-    done < <(git -C "$mirror_dir" worktree list --porcelain 2>/dev/null)
+    done
     if [[ "$listed" != true ]]; then
       log_event "WARN" "refusing to remove $p: not a worktree of the mirror $mirror_dir" >/dev/null
       return 1

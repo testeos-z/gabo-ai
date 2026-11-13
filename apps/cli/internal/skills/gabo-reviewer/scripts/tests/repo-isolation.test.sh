@@ -65,7 +65,8 @@ check "no unqualified mirror repo.git is created" test ! -e "$state/repo.git"
 check "no unqualified base checkout is created" test ! -e "$state/base"
 check "A has its own base checkout" test -f "$state/base-org-a__shared/gabo.yaml"
 check "B has its own base checkout" test -f "$state/base-org-b__shared/gabo.yaml"
-check "the base checkouts differ" test "$state/base-org-a__shared" != "$state/base-org-b__shared"
+check "the base checkouts have different git dirs" test \
+  "$(realpath "$(git -C "$state/base-org-a__shared" rev-parse --git-common-dir)")" != "$(realpath "$(git -C "$state/base-org-b__shared" rev-parse --git-common-dir)")"
 expect_eq "$A_HEAD" "$(git -C "$ma" rev-parse refs/remotes/pr/org-a__shared/7 2>/dev/null)" "A's mirror holds A's head of PR 7 under a qualified ref"
 expect_eq "$B_HEAD" "$(git -C "$mb" rev-parse refs/remotes/pr/org-b__shared/7 2>/dev/null)" "B's mirror holds B's head of PR 7 under a qualified ref"
 check "A's mirror does not hold B's head" bash -c "! git -C '$ma' cat-file -e '$B_HEAD^{commit}' 2>/dev/null"
@@ -91,6 +92,9 @@ git -C "$legacy/repo.git" worktree add -q --detach "$legacy/base" "$lc"
 echo keep >"$legacy/base/legacy-marker"
 git -C "$legacy/repo.git" worktree add -q --detach "$legacy/worktrees/pr-9" "$lc"
 touch -d '10 days ago' "$legacy/worktrees/pr-9"
+# a qualified head worktree of PR 7 made before the mirrors were qualified: it is
+# registered in repo.git, which never receives the new head
+git -C "$legacy/repo.git" worktree add -q --detach "$legacy/worktrees/org-a__shared__pr-7" "$lc"
 state_saved="$state"
 state="$legacy"
 expect_eq 1 "$(review c org-a/shared "$A_ORIGIN" "$work/a-caller" "$A_HEAD")" "a review runs beside the unqualified names"
@@ -99,6 +103,9 @@ check "the unqualified mirror keeps its ref" test "$(git -C "$legacy/repo.git" r
 check "the unqualified mirror keeps its origin" test "$(git -C "$legacy/repo.git" remote get-url origin)" = "$work/legacy-origin.git"
 check "the unqualified base checkout is untouched" test -f "$legacy/base/legacy-marker"
 check "the run created the qualified mirror beside them" test -d "$legacy/org-a__shared.git"
+check "the old qualified head worktree is made again from the repository's mirror" test \
+  "$(realpath "$(git -C "$legacy/worktrees/org-a__shared__pr-7" rev-parse --git-common-dir)")" = "$(realpath "$legacy/org-a__shared.git")"
+expect_eq "$A_HEAD" "$(git -C "$legacy/worktrees/org-a__shared__pr-7" rev-parse HEAD)" "it is at the new head"
 check "the legacy pr-9 worktree was removed by prune_legacy from repo.git" test ! -e "$legacy/worktrees/pr-9"
 check "repo.git no longer lists pr-9" bash -c "! git -C '$legacy/repo.git' worktree list --porcelain | grep -q 'worktrees/pr-9'"
 
@@ -118,6 +125,7 @@ git -C "$rm_state/org-a__shared.git" worktree add -q --detach "$rm_state/worktre
 t="$(git -C "$rm_state/repo.git" mktree </dev/null)"
 c="$("${g[@]}" -C "$rm_state/repo.git" commit-tree "$t" -m c)"
 git -C "$rm_state/repo.git" worktree add -q --detach "$rm_state/worktrees/pr-5" "$c"
+git -C "$rm_state/repo.git" worktree add -q --detach "$rm_state/worktrees/org-a__shared__pr-6" "$c"
 rm_wt() {
   (
     export HOME="$fake_home" GABO_REVIEWER_STATE_DIR="$rm_state" REVIEWER_REPO=org-a/shared
@@ -134,5 +142,7 @@ check "the merge-pr-* worktree of the run is removed from the run's mirror" rm_w
 check "the merge-pr-* worktree is gone" test ! -e "$rm_state/worktrees/merge-pr-5-abc.1p1"
 check "a legacy pr-5 worktree is removed from the unqualified repo.git" rm_wt pr-5
 check "the legacy worktree is gone" test ! -e "$rm_state/worktrees/pr-5"
+check "a qualified worktree that only repo.git lists is removed from repo.git" rm_wt org-a__shared__pr-6
+check "that worktree is gone" test ! -e "$rm_state/worktrees/org-a__shared__pr-6"
 
 finish

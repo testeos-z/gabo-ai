@@ -153,6 +153,14 @@ if [[ -z "$merge_sha" ]]; then
   exit 1
 fi
 base="$(git -C "$mirror" merge-base "$base_ref" "$sha")" || skip "no merge base with $BASE_BRANCH"
+# A head worktree made before the mirrors were qualified belongs to the old
+# repo.git, which never receives the new head: drop it (the mirror lock is held)
+# and make it again from this repository's mirror.
+if [[ -d "$wt" && ! -L "$wt" && -d "$WORKDIR/repo.git" &&
+  "$(realpath -e -- "$(git -C "$wt" rev-parse --git-common-dir 2>/dev/null)" 2>/dev/null)" == "$(realpath -e -- "$WORKDIR/repo.git")" ]]; then
+  git -C "$WORKDIR/repo.git" worktree remove --force "$wt" >>"$logs/fetch.log" 2>&1
+  git -C "$WORKDIR/repo.git" worktree prune >>"$logs/fetch.log" 2>&1 || true
+fi
 if [[ -d "$wt" ]]; then
   git -C "$wt" checkout -q --detach --force "$sha" >>"$logs/fetch.log" 2>&1 && touch "$wt"
 else
