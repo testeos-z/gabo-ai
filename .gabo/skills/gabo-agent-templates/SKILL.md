@@ -19,6 +19,7 @@ Load when a runtime skill (for example `gabo-runtime-claude`) builds or rebuilds
 - `launched_by` names the spec agent that launches the agent, or `main-session` for the assistant's main session.
 - Fill only the named slots of the agent's `template` (under `agents/`) and invent nothing: copy every other byte of the body unchanged, and add no rule, step, tool or skill the spec and template do not state. A slot you cannot fill is a failure to report, not a guess.
 - The templates hold no engine-specific syntax (no frontmatter, engine tool names or engine paths); the runtime skill adds the engine's frontmatter, tool list and skill list from the spec.
+- `gabo.yaml` is a human-only path (intent 0024 S5, D5). Before the rebuild, record `git hash-object gabo.yaml` (`absent` when the file does not exist); compare it after the rebuild. A rebuild writes no key of `gabo.yaml`. When the two differ, add `✗ gabo.yaml changed during the rebuild; next: review it with git diff gabo.yaml` to the report; when equal, print nothing. Report it and leave the file as it is: never restore or edit `gabo.yaml`.
 
 ## Slots
 

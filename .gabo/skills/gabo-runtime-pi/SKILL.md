@@ -38,6 +38,7 @@ Load when a value of `runtimes.*` in `gabo.yaml` is `pi` and the gabo agents mus
 - Never place `gabo-reviewer` in the project, not as a copy and not as a link (D20): PR code must not reach the scripts that review it.
 - Read the spec, templates and version from the project copy (`.gabo/`), never from memory or the binary. Fill only the template slots (`gabo-agent-templates`); invent no rule, tool or skill.
 - Write only `.pi/agents/<id>.md` for spec ids, `.agents/skills/` links, the `.agents/skills/gabo-assistant` link and the scoped block of the Main-session entry, and the user-level reviewer link; remove only the `.pi/skills/gabo-*` links of the Migration step, the `.agents/skills/gabo-*` links the shared-directory rule allows and the main-session entries of other engines that section removes. Leave every other file in `.pi/` and `.agents/` untouched.
+- `gabo.yaml` is a human-only path (intent 0024 S5, D5). Before the rebuild, record `git hash-object gabo.yaml` (`absent` when the file does not exist); compare it after the rebuild. A rebuild writes no key of `gabo.yaml`. When the two differ, add `✗ gabo.yaml changed during the rebuild; next: review it with git diff gabo.yaml` to the report; when equal, print nothing. Report it and leave the file as it is: never restore or edit `gabo.yaml`.
 
 ## Prerequisite
 
