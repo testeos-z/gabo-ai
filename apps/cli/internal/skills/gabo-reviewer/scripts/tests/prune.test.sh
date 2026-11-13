@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for the reviewer's worktree cleanup (intent 0024 S11): prune_worktrees
 # in common.sh, `reviewer.sh prune`, the prune at the start of `head`, and the
-# removal of pr-<n> after a merge. Offline, on scratch state dirs only.
+# removal of <owner>__<repo>__pr-<n> after a merge. Offline, on scratch state dirs only.
 # Run: bash tests/prune.test.sh
 set -uo pipefail
 source "$(dirname "$0")/lib.sh"
@@ -84,7 +84,7 @@ ln -s "$d/outside" "$d/worktrees/$(qname 11)"
 jq -n '{state:"CLOSED"}' >"$d/fx/pr_11.json"
 mkdir "$d/worktrees/pr-x"
 git -C "$(mirror "$d" example-org__example-repo)" worktree add -q --detach "$d/worktrees/merge-pr-3-abc.1p1" "$(cat "$d/commit")"
-# pr-6 is the current PR and not open; pr-5 is the current PR, open and old; pr-8 is locked.
+# pr-6 is the current PR and not open; pr-5 is the current PR, open and old; pr-8 is locked (all qualified: <owner>__<repo>__pr-<n>).
 ( exec 9>"$d/state/locks/$(qname 8).lock"; flock 9; sleep 30 ) &
 holder=$!
 sleep 0.3
@@ -130,7 +130,7 @@ exec "$work/bin/gh" "\$@"
 RACE
 chmod +x "$work/bin/gh-race"
 run_prune "$d" "" REVIEWER_GH="$work/bin/gh-race" >/dev/null
-expect_eq "busy" "$(cat "$d/probe" 2>/dev/null)" "pr-<n>.lock is held while the PR state is read"
+expect_eq "busy" "$(cat "$d/probe" 2>/dev/null)" "<owner>__<repo>__pr-<n>.lock is held while the PR state is read"
 check "the race fixture's worktree is still pruned" gone "$d" 1
 
 echo "# 349 worktrees of closed PRs"
@@ -278,7 +278,7 @@ PROBE
 chmod +x "$work/gobin2/go"
 run_caches "$d" REVIEWER_CACHE_MAX=1M PATH="$work/gobin2:$PATH" >/dev/null
 expect_eq "busy" "$(cat "$d/probe" 2>/dev/null)" "cache.lock is held exclusive while the cache is removed"
-check "prune does not take any pr-<n>.lock (open PRs are not skipped)" bash -c "! ls '$d/state/locks' | grep -q '^pr-'"
+check "prune does not take any <owner>__<repo>__pr-<n>.lock (open PRs are not skipped)" bash -c "! ls '$d/state/locks' | grep -q '__pr-'"
 
 d="$(state_dir caches_gomod)"
 fill "$d/cache/go-mod" 3000
@@ -357,7 +357,7 @@ cp "$skill"/*.sh "$nocfg/"
 out="$(run_caches "$d" CACHES_SCRIPTS="$nocfg")"
 check "without config.env the fallback in common.sh is 1G: 1.5G is pruned" test ! -e "$d/cache/go-mod/blob"
 
-echo "# the guard accepts only direct children named pr-* or merge-pr-*"
+echo "# the guard accepts only direct children named pr-* or merge-pr-* (and <owner>__<repo>__pr-*)"
 d="$(state_dir guard)"
 out="$(
   export HOME="$fake_home" GABO_REVIEWER_STATE_DIR="$d" REVIEWER_REPO=example-org/example-repo
@@ -399,12 +399,12 @@ merge_case() {
 d="$(merge_case merged)"
 expect_match ' MERGED #7 ' "$(tail -n 1 "$d/out.log")" "the merge succeeds and its line stays last"
 check "the qualified pr worktree is removed after a successful merge" gone "$d" 7
-check "the merge removes only its qualified worktree: an unqualified pr-7 stays" test -d "$d/worktrees/pr-7"
+check "the merge removes only its qualified worktree: an unqualified legacy pr-7 stays" test -d "$d/worktrees/pr-7"
 d="$(merge_case notmerged MERGE_FAIL=1)"
 expect_match ' MERGE-FAILED ' "$(tail -n 1 "$d/out.log")" "a refused merge is MERGE-FAILED"
-check "the pr-<n> worktree stays when the merge fails" exists "$d" 7
+check "the <owner>__<repo>__pr-<n> worktree stays when the merge fails" exists "$d" 7
 d="$(merge_case skipped REVIEWER_AUTO_MERGE=false)"
-check "the pr-<n> worktree stays when the merge is skipped" exists "$d" 7
+check "the <owner>__<repo>__pr-<n> worktree stays when the merge is skipped" exists "$d" 7
 
 echo "# reviewer.sh prune and head"
 origin_dir="$work/origin.git"
