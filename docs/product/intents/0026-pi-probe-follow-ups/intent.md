@@ -20,7 +20,7 @@ The probes found that an unattended Pi wave does not do what the 0023 spec says,
 - **Remote delete.** With `autonomousMode` true, gentle-pi deleted a merged remote branch with no confirmation, where 0023 S9 says gentle-pi asks even in autonomous mode.
 - **Grants and waits.** gentle-pi 4.7.0 has no project-level grant key, so the outside paths of a wave could only be granted in the session prompt, and 0023 S4 does not name the wave's stamps folder. A Pi session also emitted `agent_settled` while a background coder return was still pending.
 
-The wave probe ran with gabo built from dev `d8dcaea` (stamped 0.2.10) on testeos-z/gabo-repo, not on a disposable repository, by the owner's decision on [#585](https://github.com/testeos-z/gabo-ai/issues/585#issuecomment-6841235718) ([#599 comment](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718), 2026-11-13). Several 0023 checks were never observed: the grant dialog (no dialog reached the driver), the status labels of closed tasks (no task reached Task Close) and a denied remote delete (none was denied).
+The wave probe ran with gabo built from dev `d8dcaea` (stamped 0.2.10) on testeos-z/gabo-repo, not on a disposable repository, by the owner's decision of 2026-11-12 on [#585](https://github.com/testeos-z/gabo-ai/issues/585#issuecomment-6831839550). Its results, recorded on 2026-11-13, are in the [#599 comment](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718). Several 0023 checks were never observed: the grant dialog (no dialog reached the driver), the status labels of closed tasks (no task reached Task Close) and a denied remote delete (none was denied).
 
 ## Who is affected
 
