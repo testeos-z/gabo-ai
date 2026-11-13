@@ -4,7 +4,7 @@
 #   reviewer.sh head <pr> <sha>      reviews that head (40-hex) if it is due
 #   reviewer.sh due <pr> <sha>       exit 0 when that head is due, else 1
 #   reviewer.sh list-due             prints "<pr> <sha>" for each due head
-#   reviewer.sh prune                removes the pr-<n> worktrees of PRs that are not open and
+#   reviewer.sh prune                removes the <owner>__<repo>__pr-<n> worktrees of PRs that are not open and
 #                                    the stale ones (REVIEWER_KEEP_DAYS) and keeps the caches under
 #                                    REVIEWER_CACHE_MAX; also runs at the start of head
 #   reviewer.sh once                 reviews every due head, one at a time
