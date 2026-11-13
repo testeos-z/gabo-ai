@@ -8,7 +8,7 @@ import (
 
 // Intent 0025 S1 (plan T6): the wave run id `<I####>-<UTC start>` keys the
 // trace, the ledger and `--wave`; the claim comment carries it; a resume reads
-// it from the newest claim comment, then by `mem_search`, then the old key.
+// it from the claim comment that holds the intent, then by `mem_search`, then the old key.
 func TestWaveRunIDAssistant(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
