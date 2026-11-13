@@ -142,7 +142,7 @@ MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
 # Days an open PR's worktree may stay unused before prune removes it.
 KEEP_DAYS="${REVIEWER_KEEP_DAYS:-7}"
 # Size the Go caches and check-home may reach together before prune trims them.
-CACHE_MAX="${REVIEWER_CACHE_MAX:-2G}"
+CACHE_MAX="${REVIEWER_CACHE_MAX:-1G}"
 MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
 REMOTE_URL="${REVIEWER_REMOTE_URL:-https://github.com/$REPO.git}"
 # The trusted install locations: the engine-neutral user-level copy (TRD 9.4)
@@ -799,58 +799,96 @@ human_bytes() {
   awk -v b="${1:-0}" 'BEGIN { if (b >= 1073741824) printf "%.1fG", b / 1073741824; else if (b >= 1048576) printf "%.1fM", b / 1048576; else printf "%dK", b / 1024 }'
 }
 
+# dir_bytes <dir>: apparent size in bytes of one cache folder; 0 when it is
+# missing or a symlink.
+dir_bytes() {
+  local b
+  [[ -d "$1" && ! -L "$1" ]] || { echo 0; return 0; }
+  b="$(du -sb "$1" 2>/dev/null | cut -f1)"
+  echo "${b:-0}"
+}
+
 # cache_bytes: size in bytes of cache/go-build, cache/go-mod and check-home
 # together.
 cache_bytes() {
-  local d total=0 b
-  for d in "$WORKDIR/cache/go-build" "$WORKDIR/cache/go-mod" "$WORKDIR/check-home"; do
-    [[ -d "$d" && ! -L "$d" ]] || continue
-    b="$(du -sb "$d" 2>/dev/null | cut -f1)"
-    total=$((total + ${b:-0}))
-  done
-  echo "$total"
+  echo $(($(dir_bytes "$WORKDIR/cache/go-build") + $(dir_bytes "$WORKDIR/cache/go-mod") + $(dir_bytes "$WORKDIR/check-home")))
+}
+
+# trim_check_home <days>: removes the check-home files not modified for more
+# than <days> days, then the directories left empty. A symlink is never
+# followed. Called under the cache.lock of prune_caches.
+trim_check_home() {
+  local d="$WORKDIR/check-home"
+  [[ -d "$d" && ! -L "$d" ]] || return 0
+  { find "$d" -type f -mmin "+$(($1 * 1440))" -delete &&
+    find "$d" -mindepth 1 -type d -empty -delete; } >/dev/null 2>&1 ||
+    log_event "WARN" "prune: could not trim check-home" >/dev/null
 }
 
 # prune_caches: when cache/go-build, cache/go-mod and check-home together
-# exceed CACHE_MAX, runs `go clean -cache` with the reviewer's own GOCACHE and
-# removes the check-home files older than KEEP_DAYS (then its empty
-# directories), then prints one line `pruned: <what> (<size freed>)`. Under the
-# limit it does nothing and prints nothing. The checks of a review run under a
-# shared cache.lock (reviewer.sh, review_head); prune takes it exclusive
-# without waiting and skips when it is held, so it never trims while a review
-# runs and a review that starts meanwhile waits for it. Only paths under
-# $WORKDIR are touched. Best effort: every problem is logged and never changes
-# the exit code.
+# exceed CACHE_MAX, prunes step by step, each step only while the total is
+# still over the limit: `go clean -cache` with the reviewer's own GOCACHE, the
+# check-home files older than KEEP_DAYS, `go clean -modcache` with the
+# reviewer's own GOMODCACHE, and the check-home files older than one day (each
+# trim also removes the directories it leaves empty). It prints one line
+# `pruned: <what> (<size freed>)` per step that freed something; when the total
+# is still over the limit after every step it logs one WARN with the size of
+# each folder. Under the limit it does nothing and prints nothing. The checks of
+# a review run under a shared cache.lock (reviewer.sh, review_head); prune takes
+# it exclusive without waiting and skips when it is held, so it never trims
+# while a review runs and a review that starts meanwhile waits for it. Only
+# paths under $WORKDIR are touched. Best effort: every problem is logged and
+# never changes the exit code.
 prune_caches() {
-  local max days="$KEEP_DAYS" before line
+  local max days="$KEEP_DAYS" before lines line
   max="$(size_bytes "$CACHE_MAX")" || { log_event "WARN" "prune: REVIEWER_CACHE_MAX '$CACHE_MAX' is not a size; caches not pruned" >/dev/null; return 0; }
   [[ "$days" =~ ^[0-9]+$ ]] || days=7
   before="$(cache_bytes)"
   ((before > max)) || return 0
   mkdir -p "$STATE/locks"
-  line="$(
+  lines="$(
     exec 5>"$STATE/locks/cache.lock"
     if ! flock -n -x 5; then
       log_event "WARN" "prune: a review is in progress (cache.lock held); caches not pruned" >/dev/null
       exit 0
     fi
-    if ! command -v go >/dev/null 2>&1; then
-      log_event "WARN" "prune: go clean -cache failed (go not found)" >/dev/null
-    elif ! GOCACHE="$WORKDIR/cache/go-build" go clean -cache >/dev/null 2>&1; then
-      log_event "WARN" "prune: go clean -cache failed" >/dev/null
+    cur="$before"
+    # step <what>: prints `pruned: <what> (<size freed>)` when the step freed bytes.
+    step() {
+      local now
+      now="$(cache_bytes)"
+      ((cur > now)) && echo "pruned: $1 ($(human_bytes $((cur - now))) freed)"
+      cur="$now"
+    }
+    # go_clean <flag> <cache assignment>: a failure is logged, never fatal.
+    go_clean() {
+      if ! command -v go >/dev/null 2>&1; then
+        log_event "WARN" "prune: go clean $1 failed (go not found)" >/dev/null
+      elif ! env "$2" go clean "$1" >/dev/null 2>&1; then
+        log_event "WARN" "prune: go clean $1 failed" >/dev/null
+      fi
+    }
+    go_clean -cache "GOCACHE=$WORKDIR/cache/go-build"
+    step "go-build cache"
+    trim_check_home "$days"
+    step "check-home files older than $days days"
+    if ((cur > max)); then
+      go_clean -modcache "GOMODCACHE=$WORKDIR/cache/go-mod"
+      step "go-mod cache"
     fi
-    if [[ -d "$WORKDIR/check-home" && ! -L "$WORKDIR/check-home" ]]; then
-      { find "$WORKDIR/check-home" -type f -mmin "+$((days * 1440))" -delete &&
-        find "$WORKDIR/check-home" -mindepth 1 -type d -empty -delete; } >/dev/null 2>&1 ||
-        log_event "WARN" "prune: could not trim check-home" >/dev/null
+    if ((cur > max)); then
+      trim_check_home 1
+      step "check-home files older than 1 day"
     fi
-    after="$(cache_bytes)"
-    ((after <= max)) || log_event "WARN" "prune: caches still over REVIEWER_CACHE_MAX ($(human_bytes "$after")); go-mod is never trimmed" >/dev/null
-    ((after < before)) || exit 0
-    echo "pruned: go-build cache, check-home files older than $days days ($(human_bytes $((before - after))) freed)"
+    if ((cur > max)); then
+      log_event "WARN" "prune: caches still over REVIEWER_CACHE_MAX ($CACHE_MAX): go-build $(human_bytes "$(dir_bytes "$WORKDIR/cache/go-build")"), go-mod $(human_bytes "$(dir_bytes "$WORKDIR/cache/go-mod")"), check-home $(human_bytes "$(dir_bytes "$WORKDIR/check-home")")" >/dev/null
+    fi
   )" || true
-  [[ -z "$line" ]] || log_event "PRUNED" "${line#pruned: }" >/dev/null
-  [[ -z "$line" ]] || echo "$line"
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    log_event "PRUNED" "${line#pruned: }" >/dev/null
+    echo "$line"
+  done <<<"$lines"
   return 0
 }
 
