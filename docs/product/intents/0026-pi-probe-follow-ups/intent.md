@@ -32,7 +32,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 
 - Each of the eight questions of [#700](https://github.com/testeos-z/gabo-ai/issues/700) has either an answer in the spec or an open decision for the owner with a recommended option.
 - A Pi wave stops at a gate only when gabo owns that gate. gentle-pi's default model, its approval label and its remote delete never stop a wave silently.
-- Two repositories that share one reviewer state dir never share a mirror, a PR ref or a base checkout, and no reviewer script comment or test description names the old `pr-<n>` layout (S11, S12).
+- Two repositories that share one reviewer state dir never share a mirror, a PR ref or a base checkout, and no reviewer script comment or test description names the old `pr-<n>` layout as the current one; the legacy-worktree descriptions and the test cases that name them stay (S11, S12).
 - Each 0023 check that did not pass, or was not observed, is either observed on a probe or recorded as a known limit with its owner decision. A check not run reads `not run: <reason>`, never a pass.
 - The owner can tell from a wave report which Pi facts were observed, with the Pi and gentle-pi versions and the gabo build under test.
 
@@ -44,7 +44,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 - gabo never creates a label to pass a gate. A `status:approved` label added to fake an approval is not a fix.
 - The CLI keeps `gabo init`, `gabo check`, `gabo version` and `gabo prompt` (PRD R31; TRD D24). The owner's preference (2026-11-12) is to keep custom scripts to a minimum and to prefer engine-native features.
 - The probes run on testeos-z/gabo-repo, by the owner's decision on #585. Its `dev` is reset to seed `73ec699` before and after each run, and runs are coordinated so that only one uses the repository at a time.
-- The reviewer changes of S11 and S12 widen S10 of the spec for the reviewer's scripts they name only. No other S10 limit changes.
+- The reviewer changes of S11 to S14 widen S10 of the spec for the reviewer's scripts they name only. No other S10 limit changes.
 
 ## Open questions
 
@@ -59,7 +59,9 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 | 7 | Is the user-level reviewer copy that a Pi wave runs current? | carried to spec (S7) |
 | 8 | Is the reviewer folder grant asked at most once per path? | carried to spec (S8, S9) |
 | 9 | What happens to an existing unqualified reviewer mirror, its PR refs and its base checkout after the change? | carried to spec (S11, spec question 9). **Proposed (auto)**: leave them in place and create the qualified ones beside them. Owner decides. |
-| 10 | Does the title still fit the intent? | **Proposed (auto)**: keep the title for this PR and retitle at acceptance to "Pi probe follow-ups and reviewer state isolation", because S11 and S12 are not Pi facts. The folder keeps its name; no rename here. Owner decides. |
+| 10 | Does the title still fit the intent? | **Proposed (auto)**: keep the title for this PR and retitle at acceptance to "Pi probe follow-ups and reviewer state isolation", because S11 to S14 are not Pi facts. The folder keeps its name; no rename here. Owner decides. |
+| 11 | Should `prune` clear the Go module cache while the caches stay over `REVIEWER_CACHE_MAX` (advisory R4, Gentle AI review of PR #723)? | carried to spec (S13, spec question 11). **Proposed (auto)**: no; prune logs the WARN and the owner clears it by hand. Owner decides. |
+| 12 | Should the check-home age trim run after the go-build clean has brought the caches under `REVIEWER_CACHE_MAX` (advisory R3, Gentle AI review of PR #723)? | carried to spec (S14, spec question 12). **Proposed (auto)**: no; the trim is guarded by the over-cap check, as the README says. Owner decides. |
 
 ## Links
 
