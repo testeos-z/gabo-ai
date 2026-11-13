@@ -30,7 +30,7 @@ func TestAssistantSavesPlanningRecord(t *testing.T) {
 		"`agent`", "`roles: separate`", "`gaps: <n> (<ids>)`", "`gaps: none`",
 		"`proposals: <n>`", "`proposals: none`", "UTC time",
 		"traceability gaps (or none)", "never recomputes", "unverified",
-		"exempt from the intent-claim check", "never touches `gabo/trace/<wave>`",
+		"exempt from the intent-claim check", "never touches `gabo/trace/<run id>`",
 	})
 	for _, p := range []string{"denied board moves", "merged tasks still open", "interaction count with reasons", "plan-change proposals"} {
 		if strings.Contains(strings.ToLower(sec), p) {

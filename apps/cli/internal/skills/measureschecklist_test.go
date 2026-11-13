@@ -58,7 +58,7 @@ func TestCycleLaunchStepAppendsTheSessionStartedLine(t *testing.T) {
 		t.Fatal("gabo-cycle: steps 5 and 6 not found")
 	}
 	requireIn(t, "gabo-cycle step 5", doc[i:j], []string{
-		"before the launch call, append `session started <agent> <task id> <UTC time>` to `gabo/trace/<wave>` yourself (a coder resumed by its handle appends none)",
+		"before the launch call, append `session started <agent> <task id> <UTC time>` to `gabo/trace/<run id>` yourself (a coder resumed by its handle appends none)",
 	})
 }
 

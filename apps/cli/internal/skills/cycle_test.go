@@ -140,7 +140,7 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	const (
-		claim   = "`intent claimed by session <session id> (engine <engine>)`"
+		claim   = "`intent claimed by session <session id> (engine <engine>) run <run id>`"
 		refusal = "`intent <I####> is claimed by session <session id> (engine <engine>) since <UTC time>; it is released when that wave closes`"
 		release = "`intent released by session <session id>`"
 		owner   = "`intent released by owner for session <session id>`"
@@ -148,7 +148,7 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
 		"intent 0013 S8",
 		// the session id: made once per wave start, kept in the trace.
-		"`<engine>-<8 hex>`", "once per wave start", "`gabo/trace/<wave>`",
+		"`<engine>-<8 hex>`", "once per wave start", "`gabo/trace/<run id>`",
 		// the claim goes through existing operations on the intent issue.
 		"`log progress`", "`read one`", "on the intent issue", claim,
 		"no new `tasks` operation (D4)",
@@ -165,7 +165,7 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 		// the trace is shared: a resume keeps a claim only with its own id,
 		// and a refused session writes nothing to it.
 		"`resume <session id>`", "never adopted on its own",
-		"that id equals the session id in the trace", "never adopting the trace's id",
+		"that id equals the session id in the trace", "never adopting the trace's session id",
 		"`session id: <session id>`", "a refused session writes nothing to the trace",
 		// one refusal form; an owner release stops the next coder launch.
 		"returns only three lines", "re-checks it with `read one` before each coder launch",
@@ -207,7 +207,7 @@ func TestCycleKeepsAndCleansOnlyItsOwnWave(t *testing.T) {
 		"`<repo-parent>/<repo-name>-worktrees/<wave>/<task>`",
 		"`git worktree add <repo-parent>/<repo-name>-worktrees/<wave>/<task> -b <branch> origin/dev`",
 		// the sweep touches only this wave's ledger.
-		"only entries of this wave's ledger (`gabo/ledger/<wave>`)",
+		"only entries of this wave's ledger (`gabo/ledger/<run id>`)",
 		"A resource of another wave",
 		"is neither removed nor reported as a leftover of this wave",
 	})
@@ -344,7 +344,7 @@ func TestCycleResumeRulesStayPinned(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
-		"3. Resume (D17), only as the holder: read `gabo/trace/<wave>` and `gabo/ledger/<wave>`",
+		"3. Resume (D17), only as the holder: read `gabo/trace/<run id>` and `gabo/ledger/<run id>`",
 		"The cycle skips DONE tasks (closed issues).",
 		"An open PR (`repository_host` read status) or a live ledger worktree ⇒ reattach: resume its coder by its handle, or launch a new coder on that worktree and branch.",
 		"When tracker, host and trace disagree (for example the trace says HANDED and the issue has no PR), record the disagreement in the report and leave that task alone; never guess.",
