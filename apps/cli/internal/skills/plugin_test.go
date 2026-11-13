@@ -264,7 +264,7 @@ func TestPluginPreWriteHookScript(t *testing.T) {
 
 // releaseVersion is the gabo release the plugin manifests and the Pi package
 // carry (intent 0006 S14).
-const releaseVersion = "0.2.10"
+const releaseVersion = "0.4.0"
 
 // The Claude Code and Codex plugin manifests and the @gabo-ai/pi package all
 // read the current release version (intent 0006 S14).
