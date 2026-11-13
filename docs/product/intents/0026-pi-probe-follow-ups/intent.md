@@ -61,7 +61,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 | 9 | What happens to an existing unqualified reviewer mirror, its PR refs and its base checkout after the change? | carried to spec (S11, spec question 9). **Proposed (auto)**: leave them in place and create the qualified ones beside them. Owner decides. |
 | 10 | Does the title still fit the intent? | **Proposed (auto)**: keep the title for this PR and retitle at acceptance to "Pi probe follow-ups and reviewer state isolation", because S11 to S14 are not Pi facts. The folder keeps its name; no rename here. Owner decides. |
 | 11 | Should `prune` clear the Go module cache while the caches stay over `REVIEWER_CACHE_MAX` (advisory R4, Gentle AI review of PR #723)? | carried to spec (S13, spec question 11). **Proposed (auto)**: no; prune logs the WARN and the owner clears it by hand. Owner decides. |
-| 12 | Should the check-home age trim run while the caches are under `REVIEWER_CACHE_MAX` (advisory R3, Gentle AI review of PR #723)? | carried to spec (S14, spec question 12). **Proposed (auto)**: no; the trim runs only over the cap, as the README says. Owner decides. |
+| 12 | Should the check-home age trim run after the go-build clean has brought the caches under `REVIEWER_CACHE_MAX` (advisory R3, Gentle AI review of PR #723)? | carried to spec (S14, spec question 12). **Proposed (auto)**: no; the trim is guarded by the over-cap check, as the README says. Owner decides. |
 
 ## Links
 
