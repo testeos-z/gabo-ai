@@ -32,7 +32,7 @@ The owner, who starts Pi waves and expects them to reach the merge without a que
 
 - Each of the eight questions of [#700](https://github.com/testeos-z/gabo-ai/issues/700) has either an answer in the spec or an open decision for the owner with a recommended option.
 - A Pi wave stops at a gate only when gabo owns that gate. gentle-pi's default model, its approval label and its remote delete never stop a wave silently.
-- Two repositories that share one reviewer state dir never share a mirror, a PR ref or a base checkout, and no reviewer comment names the old `pr-<n>` layout (S11, S12).
+- Two repositories that share one reviewer state dir never share a mirror, a PR ref or a base checkout, and no reviewer script comment or test description names the old `pr-<n>` layout (S11, S12).
 - Each 0023 check that did not pass, or was not observed, is either observed on a probe or recorded as a known limit with its owner decision. A check not run reads `not run: <reason>`, never a pass.
 - The owner can tell from a wave report which Pi facts were observed, with the Pi and gentle-pi versions and the gabo build under test.
 
