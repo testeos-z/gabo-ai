@@ -1,9 +1,9 @@
-# Intent 0027 Coders follow gentle-ai ODD and RDD
+# Intent 0027 Coders and product QA share one definition of done
 
 | field | value |
 |---|---|
 | intent id | 0027-coders-follow-gentle-ai-odd-and-rdd |
-| status | Draft |
+| status | Accepted (spec, owner, 2026-11-13) |
 | owner | gabo-pm |
 | scope | one intent for the whole quality flow: the coder's engineering with gentle-ai ODD and RDD, and the gabo reviewer as product QA (owner, 2026-11-13) |
 | product card | none open: [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) is closed, so no card was created; the intent issue is linked under #492 as #703 was |
@@ -82,28 +82,28 @@ Result: a clean verdict says the code has no visible defect in the diff and the 
 
 ## Open questions
 
-Each question has a **Proposed (auto)** option in the spec, section 6. None is decided.
+The owner accepted the spec on 2026-11-13 with the recommended option of each question (spec, section 7). Each question is decided in the spec, section 6, with its option record. Question 8 option (b) is the one open question: the cost cap is not set.
 
 | # | question | status |
 |---|---|---|
-| 1 | How does a per-candidate RDD consent reach the owner when a coder cannot give it, and what happens to the task meanwhile? | open; **Proposed (auto)** in the spec, section 6.1 |
-| 2 | Does the ODD feature document (`odd/tasks/<feature>.md` and its Engram mirror) get created per task, or do the gabo plan row and the task issue act as it? | open; **Proposed (auto)** in the spec, section 6.2 |
-| 3 | Who reads the code: does coder-side RDD own the code read while the reviewer runs product QA only, or do both still read the code? | open; **Proposed (auto)** in the spec, section 6.3 |
-| 4 | Is the RDD candidate each work-unit commit before the push, or the PR head? | open; **Proposed (auto)** in the spec, section 6.4 |
-| 5 | What happens when RDD is unavailable or its assessment fails? | open; **Proposed (auto)** in the spec, section 6.5 |
-| 6 | Beyond visibility, does a gate enforce the coder's ODD, RDD and done contract? | open; **Proposed (auto)** in the spec, section 6.6 |
-| 7 | Where does the product QA get what the product must do: the spec's acceptance criteria, the task issue, a done contract agreed before coding, or a combination? | open; **Proposed (auto)** in the spec, section 6.7 |
-| 8 | How does QA test a product that is a CLI plus skills with no web UI, and at what cost per PR? | open; **Proposed (auto)** in the spec, section 6.8 |
-| 9 | Who gates the merge when QA does not read the code, and what happens to `review.checks` (build, vet, test)? | open; **Proposed (auto)** in the spec, section 6.9 |
-| 10 | What happens when RDD did not run or was not due, and nobody reviewed the code? | open; **Proposed (auto)** in the spec, section 6.10 |
-| 11 | The intent title no longer names both roles. Keep "Coders follow gentle-ai ODD and RDD", or propose a new title with the folder unchanged? | open; **Proposed (auto)** in the spec, section 6.11 |
+| 1 | How does a per-candidate RDD consent reach the owner when a coder cannot give it, and what happens to the task meanwhile? | decided (owner): option (a), spec section 6.1 |
+| 2 | Does the ODD feature document (`odd/tasks/<feature>.md` and its Engram mirror) get created per task, or do the gabo plan row and the task issue act as it? | decided (owner): option (b), spec section 6.2 |
+| 3 | Who reads the code: does coder-side RDD own the code read while the reviewer runs product QA only, or do both still read the code? | decided (owner): option (a), spec section 6.3 |
+| 4 | Is the RDD candidate each work-unit commit before the push, or the PR head? | decided (owner): option (a), spec section 6.4 |
+| 5 | What happens when RDD is unavailable or its assessment fails? | decided (owner): option (c), spec section 6.5 |
+| 6 | Beyond visibility, does a gate enforce the coder's ODD, RDD and done contract? | decided (owner): option (a), revisit (b) after two waves, spec section 6.6 |
+| 7 | Where does the product QA get what the product must do: the spec's acceptance criteria, the task issue, a done contract agreed before coding, or a combination? | decided (owner): option (d), spec section 6.7 |
+| 8 | How does QA test a product that is a CLI plus skills with no web UI, and at what cost per PR? | decided in part (owner): (a) on every product PR and (c) once per wave; **open: option (b) and its cost cap**, spec section 6.8 |
+| 9 | Who gates the merge when QA does not read the code, and what happens to `review.checks` (build, vet, test)? | decided (owner): option (a), spec section 6.9 |
+| 10 | What happens when RDD did not run or was not due, and nobody reviewed the code? | decided (owner), narrowed: (c) for high-risk changes, (a) for the rest, spec section 6.10 |
+| 11 | The intent title no longer names both roles. Keep "Coders follow gentle-ai ODD and RDD", or propose a new title with the folder unchanged? | decided (owner): option (b), title "Coders and product QA share one definition of done", spec section 6.11 |
 
 ## Links
 
 | kind | reference |
 |---|---|
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) (closed; intent issue linked under it) |
-| intent issue | [#758 I0027: Coders follow gentle-ai ODD and RDD](https://github.com/testeos-z/gabo-ai/issues/758) |
+| intent issue | [#758 I0027: Coders and product QA share one definition of done](https://github.com/testeos-z/gabo-ai/issues/758) |
 | PRD | [PRD](../../PRD.md) |
 | TRD | [TRD](../../TRD.md) sections 9.1 (methodology slot), 9.2 (coder outcome, wave report), D6, D20 (reviewer) |
 | spec | [spec](spec.md) |
