@@ -84,6 +84,7 @@ Skills: before work read `.agents/skills/<name>/SKILL.md` for each of <spec skil
 
 - `description` is the spec `role` in double quotes, so a colon in it stays plain text.
 - The agent file has no turn-limit key: the coder gets no engine key for the turn limit; it travels in the launch input as `turn limit: <n>` and is advisory.
+- The agent file carries no `model` key, and gabo names no model in the agent, this skill or the coder: a Pi coder takes the model of the owner's Pi configuration (intent 0026 S2, D4).
 - `gabo-version: <version>` is the template's version line, moved into the frontmatter with the value of `.gabo/VERSION`; `gabo check` compares it with the stamp.
 - `gabo-engine: pi` is the template's engine line, moved into the frontmatter with `pi`, the engine as written in `gabo.yaml`; `gabo check` fails an agent file whose filled engine is not `pi` (intent 0013 S6).
 - The `Skills:` line is the spec's `skills` written where Pi can see it (a Pi agent has no skill-list field; the body is its system prompt). Omit the line when the list is empty.
@@ -156,6 +157,8 @@ gentle-pi asks before deleting a remote branch, even in autonomous mode, and the
 ## Launching Agents
 
 On Pi the main session launches each coder as one first-level `subagent_run` of `gabo-coder` and resumes it with `subagent_continue`; the run id is the handle. No built agent launches another (intent 0015 S6, D7): the agent files carry no `subagent_*` tool.
+
+A coder launch the account refuses for its model stops the task with the engine's error on its ledger line, and no other model is tried (intent 0026 S2). A Pi coder opens its PR without the `status:approved` label and stops on no approval gate: the gabo coder contract has no approval-label gate, and gabo never creates, adds or requires that label (intent 0026 S3, PD4).
 
 ## Verify
 
