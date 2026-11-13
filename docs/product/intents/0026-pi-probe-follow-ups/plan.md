@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0026-pi-probe-follow-ups](intent.md) |
 | spec | [spec](spec.md) |
-| status | Accepted |
+| status | Done |
 | owner | gabo-dev-lead |
 | date | 2026-11-13 |
 
