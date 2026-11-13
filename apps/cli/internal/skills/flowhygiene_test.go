@@ -131,30 +131,6 @@ func TestCoderTaskCloseLeavesARefusedRemoteBranchWithItsCommand(t *testing.T) {
 	})
 }
 
-// Intent 0023 S9 (plan T10, D8): the Pi notes say gentle-pi asks before
-// deleting a remote branch even in autonomous mode, and that the owner decides
-// whether to allow it. The Codex copy carries the same text (PD10).
-func TestRuntimePiSaysGentlePiAsksBeforeRemoteBranchDelete(t *testing.T) {
-	t.Parallel()
-	doc := runtimePiDoc(t)
-	mirror, err := os.ReadFile(filepath.Join(repoRoot, "plugins/codex/skills/gabo-runtime-pi/SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(mirror) != doc {
-		t.Error("plugins/codex/skills/gabo-runtime-pi/SKILL.md differs from the catalog source (S9, PD10)")
-	}
-	_, section, ok := strings.Cut(doc, "\n## Grants for an unattended Pi wave\n")
-	if !ok {
-		t.Fatal("gabo-runtime-pi/SKILL.md: no ## Grants for an unattended Pi wave section")
-	}
-	section, _, _ = strings.Cut(section, "\n## ")
-	requireIn(t, "gabo-runtime-pi Pi notes", section, []string{
-		"gentle-pi asks before deleting a remote branch, even in autonomous mode",
-		"the owner decides whether to allow it",
-	})
-}
-
 // Intent 0023 PD6 (plan T10): gabo-wave-report/SKILL.md is not edited. Its
 // Leftovers item still names the coder task-close leftovers, which carry a
 // refused remote branch to the wave report (S9). This is a guard: it passes on

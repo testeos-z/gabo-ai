@@ -144,15 +144,16 @@ Earlier builds placed the links in `.pi/skills/` (intent 0003). On every build, 
 
 ## Grants for an unattended Pi wave
 
-The three grants an unattended Pi wave needs are the owner's to give for the session, not gabo's:
+The four grants an unattended Pi wave needs are the owner's to give for the session, in the session prompt, not gabo's:
 
 1. the worktree root `worktree.dir` of `gabo.yaml`, where each task worktree is created;
-2. the user file `${XDG_CONFIG_HOME:-~/.config}/gabo/config.yaml`, which the assistant reads at session start;
-3. the user-level reviewer skill folder `${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer` and its state directory `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer`, which the coder's review runs from.
+2. the user file `${XDG_CONFIG_HOME:-~/.config}/gabo/config.yaml`, which must exist before a wave and which the assistant reads at session start;
+3. the user-level reviewer skill folder `${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer` and its state directory `${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer`, which the coder's review runs from;
+4. `${XDG_STATE_HOME:-~/.local/state}/gabo/waves`, the stamps folder of the wave.
 
-The grant is the owner's: gabo grants none of them and writes no permission to the user's engine config. The only file this skill writes under the agent home is the reviewer link above.
+The grant is the owner's: gabo grants none of them, gabo writes no grant file, and gabo writes no permission to the user's engine config. The only file this skill writes under the agent home is the reviewer link above.
 
-gentle-pi asks before deleting a remote branch, even in autonomous mode, and the owner decides whether to allow it. A coder whose remote branch delete is asked or refused does not retry it: its Task Close lists the branch under `leftovers:` with the command for the owner (`gabo-coder`, Task Close step 4).
+gentle-pi deleted a remote branch without asking under `autonomousMode: true` ([#599](https://github.com/testeos-z/gabo-ai/issues/599#issuecomment-6841235718), I0023 T15). In `mode: auto` a coder's Task Close deletes the remote branch of its own merged task and no other branch (`gabo-coder`, Task Close step 4). A delete that is refused, or asked with nobody to answer, is a leftover: its Task Close lists the branch under `leftovers:` with the command for the owner, and the task still closes.
 
 ## Launching Agents
 
@@ -167,17 +168,17 @@ A coder launch the account refuses for its model stops the task with the engine'
 
 ## Sources
 
-Checked 2026-11-03 against Pi 1.4.0 and gentle-pi 4.5.1 (installed packages and their docs; 4.5.1 still registers the seven `subagent_*` tools above and discovers `<cwd>/.pi/agents/`):
+Checked 2026-11-13 against Pi 1.5.2 and gentle-pi 4.7.0 (installed packages and their docs). Where a fact no longer holds at 4.7.0 its row says so: gentle-pi 4.7.0 registers more `subagent_*` tools than the seven of the 4.5.1 check, and still discovers `<cwd>/.pi/agents/`:
 
 | fact | source |
 |---|---|
-| project skills in `.pi/skills/` and `.agents/skills/`, linked directories followed, same file skipped, the first of two same-name skills kept with a warning | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md; Pi 1.4.0 `dist/core/skills.js` |
-| `pi list`, `pi install <source> [-l]`; npm packages under `<agent-home>/npm/`; git packages cloned to `<agent-home>/git/<host>/<path>` (user) and `.pi/git/<host>/<path>` (project, after trust) | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md; Pi 1.4.0 `dist/core/package-manager.js` `getGitInstallPath`, `getGitInstallRoot`; gentle-pi 4.5.1 `docs/readme-reference.md` (Git-managed `agent-home/git/github.com/Gentleman-Programming/gentle-pi`) |
-| agents in `<cwd>/.pi/agents/`, `<cwd>/.pi/subagents/` and the home's `agents/`, `subagents/` (project beats global); frontmatter `name`, `description`, `tools`; `subagent_*` tools; `subagents.json` owned by the package | gentle-pi 4.5.1 `docs/gentle-shell.md` (Subagents), `lib/agents-config.ts` |
-| Pi 1.4.0 loads only the first existing file per directory of its context files, in the order `AGENTS.override.md`, then `AGENTS.md`, then `CLAUDE.md`, into every Pi process in the project, `pi --print` included (the Main-session entry file order, intent 0009 D6) | Pi 1.4.0 `dist/core/resource-loader.js` (line 116), probed with `pi --print`: https://github.com/testeos-z/gabo-ai/issues/324#issuecomment-6690677042 |
-| a subagent starts as `pi --tools <its tools list>` (`childArguments`); `--tools` with plain names replaces the whole selection, so an unnamed tool, MCP or extension, is not declared; the `subagent_*` tools are registered only in the primary session, not in a child (`GENTLE_PI_AGENTS_CHILD=1`) | Pi 1.4.0 `docs/cli.md` (Tools), `docs/mcp.md`; gentle-pi 4.5.1 `lib/agents-runner.ts` `childArguments`, `extensions/gentle-agents.ts`; probe P2a: https://github.com/testeos-z/gabo-ai/issues/414#issuecomment-6701730785 |
-| the Engram tools `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` (with the other `mem_*` tools) registered by the gentle-engram Pi package | gentle-engram 0.4.2 `index.ts` `ENGRAM_TOOLS` |
-| agent home `GENTLE_PI_AGENT_HOME`, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`; `gentle-shell` home `~/.gentle-shell/agent`, `--link` | gentle-pi 4.5.1 `docs/gentle-shell.md`, `docs/readme-reference.md`, `lib/agent-home.ts` |
+| project skills in `.pi/skills/` and `.agents/skills/`, linked directories followed, same file skipped, the first of two same-name skills kept with a warning | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md; Pi 1.5.2 `docs/skills.md` (name collisions keep the first and warn; `.agents/skills/` through the ancestors), `dist/core/resource-loader.js` (lines 772 and 778, `skills` under the agent dir and `<cwd>/.pi`); the linked-directory and same-file clauses are not re-checked at 1.5.2 |
+| `pi list`, `pi install <source> [-l]`; npm packages under `<agent-home>/npm/`; git packages cloned to `<agent-home>/git/<host>/<path>` (user) and `.pi/git/<host>/<path>` (project, after trust) | https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md; Pi 1.5.2 `dist/core/package-manager.js` `getGitInstallPath`, `getGitInstallRoot`; gentle-pi 4.7.0 `docs/readme-reference.md` (Git-managed `agent-home/git/github.com/Gentleman-Programming/gentle-pi`) |
+| agents in `<cwd>/.pi/agents/`, `<cwd>/.pi/subagents/` and the home's `agents/`, `subagents/` (project beats global); frontmatter `name`, `description`, `tools`; `subagent_*` tools; `subagents.json` owned by the package | gentle-pi 4.7.0 `docs/gentle-shell.md` (Subagents, line 331: the directories, project beats global, `subagents/` beats `agents/`, `subagents.json`), `lib/agents-config.ts`; the frontmatter fields and the package ownership of `subagents.json` are not re-checked at 4.7.0 |
+| Pi 1.5.2 loads only the first existing file per directory of its context files, in the order `AGENTS.override.md`, then `AGENTS.md`, then `CLAUDE.md`, into every Pi process in the project, `pi --print` included (the Main-session entry file order, intent 0009 D6) | Pi 1.5.2 `dist/core/resource-loader.js` (line 130), candidate order unchanged, probed with `pi --print` under Pi 1.4.0: https://github.com/testeos-z/gabo-ai/issues/324#issuecomment-6690677042 |
+| a subagent starts as `pi --mode rpc` with `--tools <its tools list>` (`childArguments`); `--tools` with plain names replaces the whole selection, so an unnamed tool, MCP or extension, is not declared; the `subagent_*` tools are registered only in the primary session, not in a child (`GENTLE_PI_AGENTS_CHILD=1` turns `agentsEnabled` off), but at 4.7.0 a child still registers `subagent_parent_message` (`registerChildMessaging`), so this clause does not hold for that one tool | Pi 1.5.2 `docs/cli.md` (Tools), `docs/mcp.md`; gentle-pi 4.7.0 `lib/agents-runner.ts` `childArguments`, `extensions/gentle-agents.ts`; probe P2a: https://github.com/testeos-z/gabo-ai/issues/414#issuecomment-6701730785 |
+| the Engram tools `mem_search`, `mem_save`, `mem_update`, `mem_get_observation` (with the other `mem_*` tools) registered by the gentle-engram Pi package | gentle-engram 0.7.0 `index.ts` `ENGRAM_TOOLS` |
+| agent home `GENTLE_PI_AGENT_HOME`, then `PI_CODING_AGENT_DIR`, then `~/.pi/agent`; `gentle-shell` home `~/.gentle-shell/agent`, `--link` | gentle-pi 4.7.0 `docs/readme-reference.md`, `lib/agent-home.ts`, `lib/gentle-shell-launcher.ts` (the `~/.gentle-shell/agent` home and `--link`) |
 
 Recheck these against `pi --version` and the installed gentle-pi when either is newer, and update this table.
 
