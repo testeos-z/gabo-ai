@@ -3,11 +3,11 @@
 | field | value |
 |---|---|
 | intent id | 0027-coders-follow-gentle-ai-odd-and-rdd |
-| status | Accepted (spec, owner, 2026-11-13); question 3 corrected by the owner on 2026-11-13, awaiting the owner's confirmation |
+| status | Accepted (spec, owner, 2026-11-13); question 3 corrected by the owner on 2026-11-13, awaiting the owner's confirmation; five coder hooks added to this intent and its spec on 2026-11-13 (owner instruction; S16 to S24, questions 12 to 21, Proposed (auto), not accepted), awaiting the owner's single confirmation of the whole spec |
 | owner | gabo-pm |
 | scope | one intent for the whole quality flow: the coder's engineering with gentle-ai ODD and RDD, and the gabo reviewer as product QA (owner, 2026-11-13) |
 | product card | none open: [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) is closed, so no card was created; the intent issue is linked under #492 as #703 was |
-| date | 2026-11-13 (rewritten for the wider scope) |
+| date | 2026-11-13 (rewritten for the wider scope; hooks added the same day) |
 
 ## Problem
 
@@ -51,6 +51,20 @@ The gabo reviewer is the merge gate today, and its checks cover the code, not th
 
 Result: a clean verdict says the code has no visible defect in the diff and the build passes. It does not say that a user can do what the spec says.
 
+### The coder's actions are not judged by any gabo hook (added 2026-11-13)
+
+The owner asked that five deterministic hooks join this intent, relayed 2026-11-13 by the owner's local assistant, verbatim: "no, espera, a ese spec, a ese intent vamos a meterle también estos hooks". The five, as the local assistant proposed them (its attribution in brackets; each one checked in the spec's evidence base):
+
+1. **Shell guard**: before each command, block publishing to production, pushing to main, force-push, and deleting worktrees or temp dirs by pattern (glob). [Attributed to the playbook; the playbook supports hooks as gates and branch protection, not these commands, which come from gabo's own coder rules.]
+2. **Release gate**: no version or tag creation without a recorded human authorization. [Attributed to the playbook; the playbook's production deploy hook is the matching pattern.]
+3. **Coder done gate**: the coder cannot hand off unless it ran `review.checks` and pasted the output. [Attributed to wave failures, reported by the assistant, not re-checked here.]
+4. **Methodology-report gate**: block a coder report that misses required fields (RED/GREEN evidence or exception, S# covered, RDD outcome). [Attributed to wave failures, reported, not re-checked.]
+5. **Folder boundary**: block writes outside the task worktree and into `review.human_only_paths`. [Attributed to wave failures, reported, not re-checked.]
+
+Verified today (spec, evidence base): no engine hook judges a shell command or a coder's hand-off in gabo's configs. The Claude Code and Codex hooks cover only `Write|Edit` and `apply_patch` on gabo paths; the OpenCode stage gate exists and covers `edit`, `write` and `patch` only; the Pi extension covers `write` and `edit` only. The coder's rules against pushing to main, force-push and removing worktrees are text in `gabo-coder` and the repository host skill, not a gate.
+
+Design rule (owner, and TRD 2 on the thin-layer rule): the rule lives in gabo, in Go; each engine's hook is a thin layer that relays facts and applies gabo's answer.
+
 ## Who is affected
 
 - The owner, who wants the coders to build the way gentle-ai builds, who wants the reviewer to test the product the way a user does, and who needs to see both in each wave report.
@@ -69,10 +83,12 @@ Result: a clean verdict says the code has no visible defect in the diff and the 
 - Every wave report shows the RDD outcome and the ODD line for each task, so the owner can count how many tasks ran RDD, and with what result, without reading the coder transcripts.
 - A coder never answers a consent envelope, never toggles RDD, and never lowers a risk tier. A consent envelope reaches the owner through a route the owner decides.
 - The gabo reviewer stays the only merge gate (PRD R9). RDD and product QA add outside views and never merge anything.
+- Five deterministic hooks judge a coder's actions before they happen or at its hand-off, with the rule in gabo and a thin layer per engine: the shell guard, the release gate, the coder done gate, the methodology-report gate and the folder boundary (spec S16 to S20). Every block or warning names its rule and route and appears in the wave trace (S24). Which commands are blocked, which hooks block or only warn, and what happens on engines without an event are the owner's decisions (questions 12 to 21); none is assumed.
 - Measure: the share of tasks whose wave report line carries an RDD outcome, per wave; and the share of product PRs whose reviewer comment carries a product QA result. The targets are set by the owner at acceptance. Cost per PR rises against today (the reviewer adds product QA and a code read to every head); it is not yet measured.
 
 ## Constraints
 
+- Hooks (added 2026-11-13): PRD R31 allows four CLI commands and one additive hook mode, so a second mode or a new command needs the owner's amendment (question 12); PRD R32 keeps engine config writes to project level and never the user's global config, so hooks ship in each engine's plugin or package (spec S21); PRD R15 gives auto mode no prompts, so no hook asks a human during a run; intent 0001 S7 and intents 0003 and 0004 keep the current write-only hook scope, which the new hooks extend for their own rules only. The gentle-ai guardrail keys named in the relay (`gitPush`, `gitBranchDeleteForce`, `npmPublish` and others) were not found in the installed gentle-ai binary or the repository; they stay unverified until the probe reads them.
 - PRD R8: the coder uses the methodology declared in the methodology slot. R9: two layers, an optional coder-side review per methodology and a mandatory reviewer-side merge gate, which never merges into main, and PR code cannot change the scripts that review it (separation: the PRD does not use the phrase "separation of duties"; R9 is the rule in substance). R5: every question a coder raises reaches the assistant and the wave report. R15: in auto mode the human receives no prompts, only the final answer. R25: an interrupted wave resumes from tracker state and traces. R26: the reviewer reviews each pushed head at most once. R29: every wave produces a report. R31: the CLI keeps `gabo init`, `gabo check`, `gabo version` and `gabo prompt`, so this intent adds no CLI command.
 - gentle-ai rules, as the adapter and the orchestration rules of gentle-ai state them: global RDD on never grants consent for a candidate, consent is candidate-scoped; a coder never runs `gentle-ai review mode enable|disable`; an unavailable or failed assessment never lowers the risk tier.
 - `gabo.yaml:53` lists `.claude/` in `review.human_only_paths`, and the user-level reviewer scripts merge a change to such a path only by hand (`common.sh:256-257`). The adapter and the coder agent live under `.claude/`, so their change merges by a human, not by the reviewer.
@@ -85,7 +101,7 @@ Result: a clean verdict says the code has no visible defect in the diff and the 
 
 ## Open questions
 
-The owner accepted the spec on 2026-11-13 with the recommended option of each question (spec, section 7). Each question is decided in the spec, section 6, with its option record. Question 8 option (b) is the one open question: the cost cap is not set. On 2026-11-13 the owner corrected question 3 to option (b), and question 10 is superseded (spec Log).
+The owner accepted the spec on 2026-11-13 with the recommended option of each question (spec, section 7). Each question is decided in the spec, section 6, with its option record. Question 8 option (b) is still open: the cost cap is not set. Question 3's correction of 2026-11-13 awaits the owner's confirmation. Questions 12 to 21 (the five hooks, added 2026-11-13) are open, each with a Proposed (auto) option and none accepted; the spec section 6 records them, and the whole spec awaits one confirmation. On 2026-11-13 the owner corrected question 3 to option (b), and question 10 is superseded (spec Log).
 
 | # | question | status |
 |---|---|---|
