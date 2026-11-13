@@ -165,7 +165,7 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 		// the trace is shared: a resume keeps a claim only with its own id,
 		// and a refused session writes nothing to it.
 		"`resume <session id>`", "never adopted on its own",
-		"that id equals the session id in the trace", "never adopting the trace's id",
+		"that id equals the session id in the trace", "never adopting the trace's session id",
 		"`session id: <session id>`", "a refused session writes nothing to the trace",
 		// one refusal form; an owner release stops the next coder launch.
 		"returns only three lines", "re-checks it with `read one` before each coder launch",

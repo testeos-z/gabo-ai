@@ -20,6 +20,8 @@ func TestWaveRunIDAssistant(t *testing.T) {
 		"take the observation whose topic key starts with that text and sorts last",
 		"read `gabo/trace/<I####>` (a trace written before the run id)",
 		"`gabo/trace/<I####>/planning`",
+		"`resume <session id>` together with the run id you read when you resume",
+		"then the run id is the intent id `<I####>`, so the ledger is `gabo/ledger/<I####>` and `--wave <I####>`",
 		"`gabo/trace/<run id>`",
 		"--wave <run id>",
 	})
@@ -36,6 +38,8 @@ func TestWaveRunIDCycleAndReport(t *testing.T) {
 		"extended with `save wave trace` (search the key, then `mem_update`, else `mem_save`)",
 		"no save of one run overwrites another's",
 		"gabo/waves/<run id>/stamps",
+		"a new run id built from it as `<I####>-<YYYYMMDDTHHMMSSZ>`, never adopting the trace's session id or the passed run id",
+		"the stamps are kept per run id, so a new start never finds an earlier run's stamps",
 	})
 	report := readCatalog(t, "gabo-wave-report/SKILL.md")
 	requireIn(t, "gabo-wave-report", report, []string{

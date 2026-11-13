@@ -41,7 +41,7 @@ func TestCycleRunsWaveRecordStamps(t *testing.T) {
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	steps := section(t, doc, "\n2. Intent claim", "\n3. Resume")
 	requireIn(t, "gabo-cycle step 2", steps, []string{waveRecord + " stamp wave-started`", "paste each output unchanged", "On a wave start only (never when the holder resumes)",
-		waveRecord + " stamp session-started gabo-assistant main`", "an earlier run of the same wave id stay in the file and count"})
+		waveRecord + " stamp session-started gabo-assistant main`", "the stamps are kept per run id"})
 	launch := section(t, doc, "\n5. Per task:", "\n6. On each outcome")
 	requireIn(t, "gabo-cycle step 5", launch, []string{
 		waveRecord + " stamp session-started <agent> <task id>` before the launch call",
