@@ -3,12 +3,12 @@
 | field | value |
 |---|---|
 | intent id | 0027-coders-follow-gentle-ai-odd-and-rdd |
-| status | Narrowed to scope A on 2026-11-13 (this rewrite). The owner accepted the cut, not the open questions: the narrowed spec awaits one owner confirmation. Pending the owner's confirmation: the question 3 correction (2026-11-13) and the review-policy requirements S25 to S27. No plan, wave or code starts from this text. The earlier acceptance of 2026-11-13 (spec section 7) is kept as the record. |
+| status | Narrowed to scope A on 2026-11-13, and changed again the same day by the owner's playbook decisions (second change; spec section 0 and its Log). The owner's one confirmation is for the spec only (decision 6); it does not accept this intent. The earlier acceptance of 2026-11-13 (spec section 7) is kept as the record. No plan, wave or code starts from this text. |
 | owner | gabo-pm |
 | scope | scope A of the four-intent cut of 2026-11-13: what done means and who checks it |
 | sister intents | 0028 deterministic hooks (locks), 0029 branch protection, 0030 agent evals (written by a sister agent in parallel; cited by number, their folders land on dev separately) |
 | product card | none open: [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) is closed, so no card was created; the intent issue is linked under #492 as #703 was |
-| date | 2026-11-13 (narrowed to scope A; the wider scope and the hooks of the same day are in the spec's Log) |
+| date | 2026-11-13 (narrowed to scope A; second change the same day with the playbook decisions) |
 
 ## Problem
 
@@ -20,8 +20,9 @@ Scope A, in four parts:
 
 - **(a) The coder follows its methodology.** The coder uses gentle-ai ODD and RDD through the methodology slot, and reports its evidence: RED and GREEN or the stated exception, the spec ids it covered, and the RDD outcome.
 - **(b) Two gates on the coder's report.** Done gate: the coder runs the checks of `review.checks` and pastes their output. Report gate: a task does not close with an incomplete coder report. Owner, verbatim, relayed 2026-11-13 for the report gate: "esa sí la vamos a meter como una mejora. Que el coder tiene que reportar" [that one we will add as an improvement. The coder has to report]. Their enforcement mechanism and whether they block are open (spec, questions 26 and 27).
-- **(c) The reviewer's main job is product QA.** It runs the product as a user would and checks each line of the task's done contract. It still reads the code, after the product QA (owner correction, 2026-11-13, pending the owner's confirmation).
-- **(d) A review policy.** A versioned policy file, read from the integration branch and never from the PR head, sets three review passes, what counts as Important, and a cap of five nits. The owner's general phrase, relayed: "ya las de Anthropic van" [the ones from Anthropic go in]. The owner did not approve these values point by point: they are pending the owner's confirmation (spec S25 to S27).
+- **(c) The reviewer's main job is product QA.** It runs the product as a user would and checks each line of the task's done contract. It still reads the code, after the product QA (owner correction, 2026-11-13; the playbook's review also reads the code, so the criterion settles it).
+- **(d) A review policy.** A versioned policy file, read from the integration branch and never from the PR head, sets three review passes, what counts as Important, and a cap of five nits. Decided 2026-11-13 by the owner's criterion: "si está en el documento de Anthropic, úsalo. Vamos a cumplir ese documento estrictamente" [if it is in Anthropic's document, use it; we will comply with that document strictly]. The read from `dev` is the owner's direction. Open: questions 22 and 23 (the missing-file rule and the other rule sources) and question 24 (which findings block) (spec S25 to S27).
+- **(e) A fresh-context verifier before the PR.** Before a coder opens its PR, a verifier that starts without the coder's conversation exercises the changed behavior and the two nearest neighboring flows, and reports only to the coder. It never approves or blocks; the reviewer stays the gate (spec S28). Owner, relayed 2026-11-13 (verbatim): "no, ponlo antes, ponlo... no lo dejaremos afuera, porque yo veo que esto cumple opciones diferentes al revisor" [no, put it before, put it... we will not leave it out, because I see that it covers options different from the reviewer's].
 
 Primary reference: Anthropic, [The AI-native SDLC playbook](https://claude.com/resources/articles/the-ai-native-sdlc-playbook), Louis Claxton, August 21, 2026. Its verifier exercises the changed behavior and the two nearest neighboring flows without fixing anything, its builder pastes the output of build, test and lint before reporting done, and its REVIEW.md sets the review passes. Each fact in the spec's evidence base is marked verbatim (checked byte for byte against the fetched page) or summary.
 
@@ -68,6 +69,7 @@ Result: a clean verdict says the diff has no visible defect and the build passes
 - Every wave report shows the RDD outcome, the ODD line and the gate outcomes for each task, so the owner can count them without reading the coder transcripts (S9).
 - A coder never answers a consent envelope, never toggles RDD, and never lowers a risk tier. A consent envelope reaches the owner through a route the owner decides (S4).
 - The gabo reviewer stays the only merge gate (PRD R9). RDD, product QA and the gates add outside views and never merge anything (S5).
+- Before a coder opens its PR, a fresh-context verifier runs the changed behavior and the two nearest neighboring flows and reports to the coder only (S28). It never approves or blocks; the reviewer stays the gate.
 - Measure: the share of tasks whose wave report line carries an RDD outcome, per wave; and the share of product PRs whose reviewer comment carries a product QA result. Cost per PR rises against today; it is not yet measured and has no target (question 31).
 
 ## What moved out (2026-11-13)
@@ -78,10 +80,11 @@ Result: a clean verdict says the diff has no visible defect and the build passes
 | Hook 2, release gate | intent 0028 | S17, questions 17, 20 | |
 | Hook 5, folder boundary | dropped by the owner | S20, question 21 | Owner, verbatim, relayed 2026-11-13: "La carpeta es la única que dejaremos fuera... cada coder debe trabajar en su propio work tree, entonces no veo el choque". Not in 0027 and not in 0028 by this decision. |
 | The engine probe, the hook design rule, the engine events, the failure mapping, hook observability | intent 0028 | S21 to S24, D8 to D13 | Their full text and the engine evidence stay in git at `63b36df` (this file's history and the spec's), for the sister agent to read. |
-| CI and package publishing | out of this cut | none | Owner decision 2026-11-13: out of scope. Question 9 option (b), moving the checks to CI, is therefore not offered. |
-| Maintain stage, permissions and isolation, CLAUDE.md practices, fresh-context verifier, metrics and traces, Design-stage security skills | not in 0027 | none | Not yet discussed with the owner. Not included here. |
+| CI and package publishing | out of this cut; CI on PRs stays out as a separate item | none | Owner decisions 2026-11-13: out of scope. Question 9 option (b), moving the checks to CI, is therefore not offered. |
+| Maintain stage: a small version to intent 0030 (owner decision 3); the rest (permissions and isolation, CLAUDE.md practices, metrics and traces, Design-stage security skills) is not in 0027 | 0030 (small part); none (the rest) | Not yet discussed with the owner for the rest. The fresh-context verifier moved in: S28 |
 | Hook 3, coder done gate | stays in 0027 as a gate | S18 (rewritten), questions 18, 26, 27 | Its mechanism (cycle check, engine hook or reviewer) and whether it blocks are open. |
 | Hook 4, methodology-report gate | stays in 0027 as a gate | S19 (rewritten), questions 19, 26, 27 | Same open questions as hook 3. |
+| Test-file hook (owner decision 4) | intent 0028; it warns and never blocks | S29 reads its record | The playbook's primary mechanism blocks; the owner chose warn. Flagged in spec section 5 |
 
 ## Constraints
 
@@ -90,7 +93,7 @@ Result: a clean verdict says the diff has no visible defect and the build passes
 - `gabo.yaml:53` lists `.claude/`, `AGENTS.md`, `CLAUDE.md` and `gabo.yaml` in `review.human_only_paths`, and the user-level reviewer scripts merge a change to such a path only by hand. The adapter and the coder agent live under `.claude/`, so their change merges by a human.
 - The reviewer runs in a clean, credential-free environment (`review.checks` run with a scrubbed environment; TRD D20). A product QA that drives an engine session needs credentials, which this rule does not allow in that environment.
 - The reviewer's binary is the installed one, at least the base branch's `.gabo/VERSION`, and it never self-updates (TRD D24). A product QA run on the PR's build uses a different binary than the installed one.
-- The review policy is read from the integration branch (owner direction, pending confirmation). The reviewer's other rule sources are open (question 23).
+- The review policy is read from the integration branch (owner direction, 2026-11-13). The reviewer's other rule sources are open (question 23).
 - The methodology contract (`apps/cli/internal/skills/gabo-contract-methodology/SKILL.md`) requires an adapter to declare its coder-side review explicitly and never to weaken the coder's hard rules.
 - Accepted specs 0023, 0025 and 0026 are not reopened. Their behavior changes only through this intent's spec.
 - Owner preference (intent 0026, #700 comment): few custom scripts; prefer the engine's own features.
@@ -100,12 +103,10 @@ Result: a clean verdict says the diff has no visible defect and the build passes
 
 The spec, section 6, is the list. Status in short:
 
-- Decided with the spec on 2026-11-13 and still applying: questions 1, 2, 4, 5, 7, 9 and 11. Title decision 11 still fits scope A, so the title is kept.
-- Pending the owner's confirmation: question 3, the correction to option (b) on 2026-11-13.
-- Open, with a Proposed (auto) option each: question 8 option (b) and its cost cap; questions 14, 18, 19, 26 and 27 (the gates); questions 22 to 25 (the review policy); questions 28 to 31 (auto-merge, lint, the term "high risk", cost per PR).
-- Partly superseded: question 6 (visibility only), where the owner's gates instruction changes its scope for gates 3 and 4; question 10, superseded by the question 3 correction.
-- Moved out with the hooks: questions 12, 13, 15, 16, 17, 20 and 21.
-
+- Decided on 2026-11-13 and still applying: questions 1, 2, 3, 4, 5, 7, 9, 11, 18, 25, 28 and 29 (spec section 6). Question 3 is settled by the owner's criterion; question 28 by owner decision 2; question 29 by owner decision 5.
+- Open, each with a Proposed (auto) option: question 8 (option (b) and its cost cap); questions 19 and 26 (the gates' mechanism; 19 is merged into 26); questions 22 and 23 (the rule sources read from dev, and the missing-file rule); question 24 (which findings block the verdict); question 27 (gates 3 and 4 block or warn); question 31 (cost per PR); questions 32 to 34 (the form of the test-edit rule, and the verifier's placement and model).
+- Partly superseded: question 6 (visibility only), where the owner's gates instruction changes its scope for gates 3 and 4; question 10, superseded by the question 3 correction. Question 30 is dropped.
+- Moved out with the hooks: questions 12, 13, 15, 16, 17 and 20; question 14 is split (its hook part moved, its gate part is question 27); question 21 was dropped by the owner.
 ## Links
 
 | kind | reference |
