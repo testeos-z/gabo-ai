@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0026-pi-probe-follow-ups |
-| status | Done |
+| status | Accepted |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-13 |

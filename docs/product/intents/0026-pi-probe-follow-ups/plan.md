@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0026-pi-probe-follow-ups](intent.md) |
 | spec | [spec](spec.md) |
-| status | Done |
+| status | Accepted |
 | owner | gabo-dev-lead |
 | date | 2026-11-13 |
 
@@ -127,7 +127,7 @@ Engines: Pi 1.5.2 with gentle-pi 4.7.0 (model `openai/gpt-6.1-terra`, `pi --mode
 | (h) token reporting, one wave each (S16) | Codex, OpenCode, Pi | Codex: saved line `Tokens: unknown (codex: not verified)`, engine output the `codex exec` footer `tokens used 107,737`; OpenCode: saved line `tokens: unknown (the trace holds no token counts)`, engine output `step-finish` events with `tokens` in `opencode run --format json`; Pi: saved line `tokens: unknown (pi: not verified)`, engine output `usage.totalTokens` on each assistant `message_end` in the rpc stream. Each figure reaches the driver only, none reaches the wave; nothing estimated or summed |
 | (i) reviewer S11 to S14, scratch data and state, two repositories | script | PASS: qualified mirrors, bases and PR refs per repository, `origin` of each mirror its own remote; `prune` ran no `go clean -modcache` and logged the WARN once per run; the check-home age trim stayed while the go-build clean brought the total under the cap and ran when still over; catalog tests `repo-isolation` 39 and `prune` 103 passed |
 
-Every part passed or was observed as the spec allows (S8 is `not observed`, S4 is the observed leftover path, S16 is `unknown` on all three engines); no part failed, so no adjustment task was created and the bound of PD9 was not used. The status is Done on that basis.
+No part failed, so no adjustment task was created and the bound of PD9 was not used. Parts (a) to (i) passed except part (b) S8, which is `not observed` (no grant dialog reached the driver), and that is not a pass. The status therefore stays `Accepted`, not `Done`, until the owner accepts S8 as not observed or a grant dialog is observed; no engine probe was rerun. S4 is the observed leftover path and S16 is `unknown` on all three engines, both as the spec allows.
 
 ### Findings for the owner
 
