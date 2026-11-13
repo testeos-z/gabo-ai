@@ -51,7 +51,7 @@ The owner, who reads the wave report and its `Measures` section and cannot trust
 
 - Two waves of one intent keep separate stamps, traces and ledgers, and no save overwrites a previous wave; every memory write of a wave is in the save ledger; the per-event stamp times are the times the events happened.
 - A cap label states what the built agent really does; `gabo-cycle` says each thing once; the planning record carries a full UTC time.
-- The reviewer never judges a worktree by a repository it does not belong to, and its caches end a prune under the limit or the log names the folder that is still over.
+- The reviewer never judges a worktree by a repository it does not belong to, and its caches end a prune under the limit or the log lists their sizes.
 - A probe runs the build under test, and says which build it ran.
 
 ## Constraints
