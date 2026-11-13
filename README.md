@@ -29,7 +29,9 @@ From then on, open your agent and talk to the assistant: describe a change, acce
 
 Each change is one **intent**. There is no big upfront plan: the tracker is the global view, and each intent moves through the same lifecycle.
 
-The [per-change SDLC flow](docs/product/diagrams/sdlc-flow.md) is a Mermaid chart: owner, assistant, directiva, the wave with one coder per task, the reviewer script, merge and release. It also shows the floating-questions path and the plan-change loop. The [team flow](docs/product/diagrams/team-flow.md) shows the single subagent layer.
+<a href="docs/product/diagrams/sdlc-flow.html"><img src="docs/product/diagrams/sdlc-flow.png" alt="Per-change SDLC flow: owner, directiva, main session, coders and reviewer script" width="800"></a>
+
+The image is the per-change SDLC flow: owner, directiva, the wave with one coder per task, the reviewer script, merge and release, with the floating-questions path and the plan-change loop. Open the [interactive HTML](docs/product/diagrams/sdlc-flow.html) to explore it. The Mermaid source is in [sdlc-flow.md](docs/product/diagrams/sdlc-flow.md), and the [team flow](docs/product/diagrams/team-flow.md) shows the single subagent layer.
 
 | step | who | produces | gate |
 |---|---|---|---|
