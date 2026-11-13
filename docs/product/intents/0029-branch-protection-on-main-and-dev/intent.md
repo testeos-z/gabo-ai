@@ -27,6 +27,8 @@ Today, read-only, 2026-11-13, `gh` as the owner:
 
 The worktree does not show when or why the ruleset went. The result: the server does not refuse a push to `main` or `dev`, a force-push, or a deletion of either branch. The reviewer's script waits for its two statuses before it merges (`~/.local/share/gabo/skills/gabo-reviewer/scripts/merge-head.sh:55-59`, and it posts them with `common.sh:163-164` and `:630`), but nothing on the server requires them.
 
+Labels: the current tracker adapter reads `status:in-progress`, `status:blocked` and `needs-user` (`.claude/skills/gabo-tasks-github/SKILL.md`). Nothing in the repository reads `mode:cloud` or `mode:local` (searched 2026-11-13). `needs-user` exists on the repository today.
+
 Why it was not configured before: intent 0011 recorded that branch protection and GitHub Environments "are not available on this private repository's plan" (`docs/product/intents/0011-docs-for-the-public-repository/intent.md:38`). On 2026-11-06 it checked the public facts: "available but not configured" (`0011/spec.md:33`, S4). The repository is now public, so that reason no longer holds.
 
 Plan and visibility facts, from GitHub and GitLab documentation, read 2026-11-13 through a page extraction (not byte-checked):

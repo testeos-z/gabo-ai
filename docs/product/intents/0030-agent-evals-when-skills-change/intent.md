@@ -58,7 +58,7 @@ Non-goals:
 - Package publishing (out of all four intents of this batch).
 - A new CLI command (PRD R31). The runner is a skill or a script under the catalog, not `gabo eval`.
 - Measuring product QA. Product QA of the product is intent 0027's reviewer work; the evals measure agent behavior on fixed tasks.
-- A merge gate in this intent. A pass-rate drop is reviewed before merge; no automatic check blocks it (Decided table).
+- A merge gate in this intent. A pass-rate drop is reviewed before merge; whether a check blocks it is open question 7.
 - The rest of the playbook's Maintain stage: detection bands, scheduled scans, and the on-call channel. The fresh-context verifier, metrics and traces, and Design-stage security skills are not in this intent either.
 
 ## Desired outcome
@@ -84,12 +84,11 @@ Non-goals:
 |---|---|---|---|
 | 1 | 2, what triggers a run | A change to a `gabo-*` skill, the methodology adapter, CLAUDE.md or a hook (intent 0028). Not every merge. | Playbook: "The suite runs non-interactively in CI on a schedule and on any change to CLAUDE.md, skills or hooks," The CI part is out (D-1); the trigger list is kept. |
 | 2 | 3, where a run happens | On the owner's machine, started by the owner or by the assistant when the trigger fires. Never on a PR. | D-1 (CI on PRs stays out). |
-| 3 | 5, pass threshold and merge gate | No automatic merge check and no absolute number now. A drop in pass rate is reviewed before merge; the owner decides. | Playbook: "A skill change that drops the pass rate gets reviewed before it merges." The merge check in the playbook ("The pass-rate threshold is enforced as a merge check") is a CI check, out by D-1. |
-| 4 | 6, where tasks come from and who accepts them | The assistant proposes each task from finished gabo work (its issue, PR and wave record); the owner accepts the task and its expected outcome. | Playbook: "The platform engineer collects 20 to 50 real tasks from recent work with its expected/accepted outcome." |
-| 5 | 10, is an eval the same as product QA | No. An eval measures the agent on a fixed task. | Playbook: the eval suite "says whether the agent still does the work to the same standard." |
-| 6 | Maintain timing | An eval task is added when the incident's fix ships, not when the incident happens. | Playbook: "When a fix ships, add an eval for the incident (the continuous evals play) to ensure that such issues are protected against going forwards." |
-| 7 | CLAUDE.md, the two-times rule and the commands block | Adopted as written in scope (b1, b2). | Playbook: "When Claude makes a mistake twice, the correction goes into CLAUDE.md."; "list each command with an example of a healthy output." |
-| 8 | CLAUDE.md, review findings | Adopted with the owner's acceptance step (b3). The playbook says the correction goes in "as part of that review". | Owner decision (the CLAUDE.md choice above). Playbook: "When a review flags a mistake for the second time, the correction goes into CLAUDE.md as part of that review". |
+| 3 | 6, where tasks come from and who accepts them | The assistant proposes each task from finished gabo work (its issue, PR and wave record); the owner accepts the task and its expected outcome. | Playbook: "The platform engineer collects 20 to 50 real tasks from recent work with its expected/accepted outcome." |
+| 4 | 10, is an eval the same as product QA | No. An eval measures the agent on a fixed task. | Playbook: the eval suite "says whether the agent still does the work to the same standard." |
+| 5 | Maintain timing | An eval task is added when the incident's fix ships, not when the incident happens. | Playbook: "When a fix ships, add an eval for the incident (the continuous evals play) to ensure that such issues are protected against going forwards." |
+| 6 | CLAUDE.md, the two-times rule and the commands block | Adopted as written in scope (b1, b2). | Playbook: "When Claude makes a mistake twice, the correction goes into CLAUDE.md."; "list each command with an example of a healthy output." |
+| 7 | CLAUDE.md, review findings | Adopted with the owner's acceptance step (b3). The playbook says the correction goes in "as part of that review". | Owner decision (the CLAUDE.md choice above). Playbook: "When a review flags a mistake for the second time, the correction goes into CLAUDE.md as part of that review". |
 
 ## Open questions
 
@@ -103,7 +102,8 @@ Each question has a **Proposed (auto)** option with a one-line reason. None is a
 | 4 | How many runs per task, and how are they reported? | open. **Proposed (auto): three runs per task, reported as passes out of three; a task passes only when it passes all three.** Reason: one run of an agent is noisy, and "every run" is the strict reading of "must not fail". Option: one run per task, which is cheap and noisy. |
 | 5 | Which engine runs the set? | open. **Proposed (auto): the coder engine in `gabo.yaml` (`runtimes.coder`, `claude` today), one engine per run.** Reason: the set measures the skill on the engine that runs it in waves. Option: every full-tier engine (intent 0013), which multiplies the cost by the number of engines. |
 | 6 | What is an incident in a wave? | open. **Proposed (auto): a coder run that reported done and was later found wrong by the owner, the assistant or the reviewer, recorded in the wave trace.** Reason: the Maintain version needs a trigger the assistant can see in the trace. Option: only a reviewer blocker, which misses the failures the reviewer does not see. |
-| 7 | Retitle intent 0030? | open. **Proposed (auto): keep the folder name; retitle to "Agent evals, incident lessons and CLAUDE.md practices" (the README row changes with it).** Reason: CLAUDE.md practices and the Maintain version are not evals, so the current title no longer fits. Option: keep the title and open the CLAUDE.md practices as a sibling intent (no folder is created by this document). |
+| 7 | Is a pass-rate drop an automatic merge check, or only a review? | open. **Proposed (auto): only a review. A drop in pass rate is reviewed before merge, and the owner decides; no absolute number now.** Reason: the playbook says "A skill change that drops the pass rate gets reviewed before it merges."; an absolute threshold needs a baseline that does not exist yet. Option: a threshold set by the owner after the first baseline, enforced as a merge check; the playbook's sentence "The pass-rate threshold is enforced as a merge check" does not name CI, so the owner also decides where that check runs. |
+| 8 | Retitle intent 0030? | open. **Proposed (auto): keep the folder name; retitle to "Agent evals, incident lessons and CLAUDE.md practices" (the README row changes with it).** Reason: CLAUDE.md practices and the Maintain version are not evals, so the current title no longer fits. Option: keep the title and open the CLAUDE.md practices as a sibling intent (no folder is created by this document). |
 
 ## Links
 
