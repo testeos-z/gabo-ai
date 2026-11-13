@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Intent 0023 S4 (plan T5, finding #563): the Pi notes name the three grants an
+// Intent 0023 S4 (plan T5, finding #563; four paths by intent 0026 S5, plan T6): the Pi notes name the four grants an
 // unattended Pi wave needs, say the grant is the owner's and that gabo writes no
 // permission to the user's engine config. A missing section makes every
 // assertion fail on its own, so each one is seen red separately.
@@ -19,12 +19,13 @@ func TestRuntimePiNamesTheUnattendedWaveGrants(t *testing.T) {
 	section, _, _ = strings.Cut(section, "\n## ")
 
 	for _, s := range []string{
-		// the three grants, each named by its path as the owner grants it.
-		"three grants an unattended Pi wave needs",
+		// the four grants, each named by its path as the owner grants it.
+		"four grants an unattended Pi wave needs",
 		"`worktree.dir`",
 		"`${XDG_CONFIG_HOME:-~/.config}/gabo/config.yaml`",
 		"`${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer`",
 		"`${XDG_STATE_HOME:-~/.local/state}/gabo/reviewer`",
+		"`${XDG_STATE_HOME:-~/.local/state}/gabo/waves`",
 		// the grant belongs to the owner; gabo grants none of it and writes no permission.
 		"The grant is the owner's",
 		"gabo grants none of them",

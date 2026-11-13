@@ -71,7 +71,7 @@ func TestRuntimePiSkill(t *testing.T) {
 		// sources and versions (former TRD 9.6 rows), and the confirmed git clone path.
 		"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/skills.md",
 		"https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/packages.md",
-		"Pi 1.4.0", "gentle-pi 4.5.1", "`<agent-home>/git/<host>/<path>`", "`.pi/git/<host>/<path>`",
+		"Pi 1.5.2", "gentle-pi 4.7.0", "`<agent-home>/git/<host>/<path>`", "`.pi/git/<host>/<path>`",
 	} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("gabo-runtime-pi/SKILL.md: missing %q", s)
@@ -328,7 +328,7 @@ func TestRuntimePiNamesTheMainSessionEntry(t *testing.T) {
 		"the main-session entries of other engines that section removes",
 	)
 	mustContainIn(t, "## Sources", piSection(t, doc, "## Sources"),
-		"Pi 1.4.0 loads only the first existing file per directory",
+		"Pi 1.5.2 loads only the first existing file per directory",
 		"`AGENTS.override.md`, then `AGENTS.md`, then `CLAUDE.md`",
 		"`dist/core/resource-loader.js`",
 		"https://github.com/testeos-z/gabo-ai/issues/324#issuecomment-6690677042",
@@ -454,9 +454,9 @@ func TestRuntimePiDeclaresToolRequirements(t *testing.T) {
 func TestRuntimePiNamesTheToolSources(t *testing.T) {
 	t.Parallel()
 	mustContainIn(t, "## Sources", piSection(t, runtimePiDoc(t), "## Sources"),
-		"gentle-engram 0.4.2 `index.ts` `ENGRAM_TOOLS`",
-		"Pi 1.4.0 `docs/cli.md` (Tools)",
-		"gentle-pi 4.5.1 `lib/agents-runner.ts` `childArguments`",
+		"gentle-engram 0.7.0 `index.ts` `ENGRAM_TOOLS`",
+		"Pi 1.5.2 `docs/cli.md` (Tools)",
+		"gentle-pi 4.7.0 `lib/agents-runner.ts` `childArguments`",
 		"`extensions/gentle-agents.ts`",
 	)
 }
