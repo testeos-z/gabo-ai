@@ -17,6 +17,6 @@ func TestCycleWaveTraceCarriesStampsSessionLinesAndStartLedger(t *testing.T) {
 func TestAssistantWaveStartNamesTheStartEntryLedgerLines(t *testing.T) {
 	doc := readCatalog(t, "gabo-assistant/SKILL.md")
 	requireIn(t, "gabo-assistant", doc, []string{
-		"followed by `saves add <topic key> <observation id>` and, after its read-back matched, `saves read <topic key>` of `wave-record.sh`",
+		"followed by `saves add '<topic key>#<entry>' <observation id>` and, after its read-back showed that entry, `saves read '<topic key>#<entry>'` of `wave-record.sh`",
 	})
 }

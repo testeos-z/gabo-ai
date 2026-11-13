@@ -44,7 +44,10 @@ func TestMemoryExampleNamesPlanningTopic(t *testing.T) {
 	doc := readCatalog(t, "gabo-contract-memory/examples/memory-engram.md")
 	requireIn(t, "memory-engram.md", doc, []string{
 		"| planning record | `gabo/trace/<I####>/planning` |",
-		"topic key is exactly `gabo/trace/<wave>`",
+		"topic key is exactly `gabo/trace/<run id>`",
+		"`gabo/trace/<I####>-`",
+		"sorts last",
+		"read `gabo/trace/<I####>` (a trace written before the run id)",
 		"ignoring keys with a segment after the wave id",
 		"separate record saved with the same operation",
 	})

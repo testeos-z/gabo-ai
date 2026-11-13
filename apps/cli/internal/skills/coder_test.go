@@ -15,7 +15,7 @@ func TestCoderClosesOnlyItsOwnWaveResources(t *testing.T) {
 	requireIn(t, "gabo-coder/SKILL.md", doc, []string{
 		"intent 0013 S9", "D6",
 		"`<repo-parent>/<repo-name>-worktrees/<wave>/<task>`",
-		"only entries of your own wave's ledger (`gabo/ledger/<wave>`)",
+		"only entries of your own wave's ledger (`gabo/ledger/<run id>`)",
 		"A resource of another wave",
 		"is neither removed nor reported as a leftover of this wave",
 		// the scope keeps a kept worktree and a refused branch as leftovers.
