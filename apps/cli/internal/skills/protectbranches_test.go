@@ -51,7 +51,7 @@ func TestProtectBranchesGitHubAdaptersCoverTheOperation(t *testing.T) {
 		}
 		// The rule list is stated in each adapter too (S2, D3, D6).
 		requireIn(t, name, doc, protectRuleList)
-		// D2: rulesets by default; the T1 probe confirmed the mechanism.
+		// D2: rulesets are the default mechanism; the host acceptance is checked by T1, not by this text.
 		requireIn(t, name, doc, []string{
 			"repository rulesets", "gabo-protect-", "/rulesets", "\"type\": \"pull_request\"",
 			"\"type\": \"non_fast_forward\"", "\"type\": \"deletion\"", "\"type\": \"required_status_checks\"",

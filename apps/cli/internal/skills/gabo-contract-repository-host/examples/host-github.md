@@ -65,7 +65,7 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
 2. Find the ruleset of the branch by name; no output means none exists:
 
    ```bash
-   gh api --paginate repos/$R/rulesets --jq '.[]|select(.name=="gabo-protect-<branch>")|.id'
+   gh api --paginate "repos/$R/rulesets?includes_parents=false" --jq '.[]|select(.name=="gabo-protect-<branch>")|.id'
    ```
 
 3. Write the body to a file in `mktemp -d`, one per branch:
@@ -91,10 +91,10 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
    {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": false, "required_status_checks": [{"context": "reviewer/tests"}, {"context": "reviewer/review"}]}}
    ```
 
-   `actor_id` 5 is the repository administrator role (`RepositoryRole`); the bypass names that role only.
+   `actor_id` 5 is the repository administrator role (`RepositoryRole`); the bypass names that role only. The required statuses carry no `integration_id`, so any login that posts `reviewer/tests` or `reviewer/review` satisfies them; agents use the owner's login (D6), so that gap is accepted.
 
 4. Write: no ruleset found, `gh api -X POST repos/$R/rulesets --input <file>`; one found, `gh api -X PUT repos/$R/rulesets/<id> --input <file>` with the same body; more than one found, write nothing and report `missing` with the ids.
-5. Not offered: when the host refuses the write and names one rule type or the bypass, remove that rule from the body, send once more, and report that rule `not offered` with the host's reason. Any other refusal is `missing` with the host's reason, with no retry.
+5. Not offered: when the host refuses the write and names one rule type or the bypass, remove that rule from the body, resend, and report that rule `not offered` with the host's reason. Repeat for each rule the host names, at most once per rule in the list. A refusal that names no rule is `missing` with the host's reason, with no retry.
 6. Read back and compare with the rule list, one result per rule and branch (`set` or `missing`):
 
    ```bash
