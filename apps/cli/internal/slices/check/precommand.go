@@ -36,24 +36,47 @@ func (u *UseCase) JudgeShell(call ShellCall) (ShellVerdict, error) {
 	default:
 		return ShellVerdict{}, err
 	}
-	violations := ShellViolations(call.Command, CoderSession(call.AgentID, u.s.Engine))
+	coder := CoderSession(call.AgentID, u.s.Engine)
+	shell := u.judgeLock(cfg, config.LockShellGuard, ShellViolations(call.Command, coder))
+	release := u.judgeReleaseGate(cfg, call.Command, coder)
+	return joinVerdicts(shell, release), nil
+}
+
+// judgeLock judges the violations of one lock in its state: the first
+// violation's decision is recorded, and when the call is blocked or asked each
+// violation prints its Explain block (intent 0028 S10 to S12, S16). A lock at
+// off or warn, or no violation, exits 0 with no output.
+func (u *UseCase) judgeLock(cfg config.Config, lock config.LockName, violations []ShellViolation) ShellVerdict {
 	if len(violations) == 0 {
-		return ShellVerdict{}, nil
+		return ShellVerdict{}
 	}
-	d := Decide(cfg.Lock(config.LockShellGuard), cfg.Mode)
-	if err := u.RecordDecision(config.LockShellGuard, violations[0].Rule, d); err != nil {
+	d := Decide(cfg.Lock(lock), cfg.Mode)
+	if err := u.RecordDecision(lock, violations[0].Rule, d); err != nil {
 		return ShellVerdict{
 			Exit: ExitFailed,
-			Out:  Explain(config.LockShellGuard, "the outcome record cannot be written ("+err.Error()+")", "fix the outcome file named by GABO_OUTCOME_FILE, then retry", Decision{}) + "\n",
-		}, nil
+			Out:  Explain(lock, "the outcome record cannot be written ("+err.Error()+")", "fix the outcome file named by GABO_OUTCOME_FILE, then retry", Decision{}) + "\n",
+		}
 	}
 	if d.Exit == 0 {
-		return ShellVerdict{}, nil
+		return ShellVerdict{}
 	}
 	var b strings.Builder
 	for _, v := range violations {
-		b.WriteString(Explain(config.LockShellGuard, v.Rule, v.Route, d))
+		b.WriteString(Explain(lock, v.Rule, v.Route, d))
 		b.WriteString("\n")
 	}
-	return ShellVerdict{Exit: d.Exit, Out: b.String()}, nil
+	return ShellVerdict{Exit: d.Exit, Out: b.String()}
+}
+
+// joinVerdicts joins the verdicts of two locks: a block wins over an ask and
+// an ask over a run, and the messages keep their order.
+func joinVerdicts(a, b ShellVerdict) ShellVerdict {
+	exit := 0
+	switch {
+	case a.Exit == ExitFailed || b.Exit == ExitFailed:
+		exit = ExitFailed
+	case a.Exit == ExitAsk || b.Exit == ExitAsk:
+		exit = ExitAsk
+	}
+	return ShellVerdict{Exit: exit, Out: a.Out + b.Out}
 }
