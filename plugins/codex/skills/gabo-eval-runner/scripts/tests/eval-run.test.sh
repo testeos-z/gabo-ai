@@ -49,10 +49,32 @@ echo "$n" >"$FAKE_COUNT"
 cat >/dev/null
 echo "run $n pwd=$(pwd) enterprise=${GH_ENTERPRISE_TOKEN:-unset}/${GITHUB_ENTERPRISE_TOKEN:-unset} ssh=${SSH_AUTH_SOCK:-unset} token=${GH_TOKEN:-unset}/${GITHUB_TOKEN:-unset}" >>"$FAKE_RUNS"
 if [[ "$n" == "${FAKE_FAIL_RUN:-0}" ]]; then echo broken >out.txt; else echo done >out.txt; fi
+# The coder's final answer is its report, which the runner judges (intent 0030 S5).
+cat "${FAKE_REPORT:-$(dirname "$0")/report-full.txt}"
 exit 0
 EOF
 chmod +x "$work/bin/fake-engine"
 fake="$work/bin/fake-engine"
+
+# Coder report fixtures: the 0027 report gate fields (S19) in their order, with
+# the not-run and not-applicable forms, which count as present.
+cat >"$work/bin/report-full.txt" <<'EOF'
+odd: RED fixture report judged before the runner read it; GREEN the same fixture passes
+spec S4: covered (the runner reads the report and the checks pass)
+RDD: not run: consent pending
+contract: written on the task issue
+tests: runner judges report fields: pass
+integration: not applicable: no CLI command changed
+commits: 1234567 feat(eval): judge coder method evidence
+verifier: not applicable: no behavior change
+EOF
+# The same report as bullets with backticks, the form a coder writes in its outcome.
+sed -e 's/^/- `/' -e 's/$/`/' "$work/bin/report-full.txt" >"$work/bin/report-bullets.txt"
+# Two linked S#: the second one covered by its own line.
+{
+  cat "$work/bin/report-full.txt"
+  echo "spec S5: not covered: fixture for the second linked S# only"
+} >"$work/bin/report-two.txt"
 
 # A gh shim that logs and fails: the runner must never call gh.
 mkdir -p "$work/shim"
@@ -65,9 +87,10 @@ chmod +x "$work/shim/gh"
 
 # task <starting-commit>: one accepted task with three outcome checks.
 task() {
-  jq -n --arg c "$1" '{
+  local specs="${TASK_SPECS:-[\"S4\"]}"
+  jq -n --arg c "$1" --argjson s "$specs" '{
     id: "eval-001", source_issue: 821, source_pr: 849, source_wave: "I0030-fixture",
-    starting_commit: $c, task_input: "Change the rule to new.", spec_refs: ["S4"],
+    starting_commit: $c, task_input: "Change the rule to new.", spec_refs: $s,
     outcome_checks: ["grep -qx \"rule: new\" AGENTS.md", "grep -qx a src/app.txt", "grep -qx done out.txt"],
     acceptance: {accepted_by: "owner", accepted_on: "2026-11-14"}
   }'
@@ -90,7 +113,7 @@ printf 'runtimes:\n  coder: claude\n' >"$cfg_min2"
 # fake engine and the gh shim first on PATH; prints its output, returns its code.
 run_eval() {
   local name="$1" evals="$2" cfg="$3" fail="${4:-0}" h="${5:-$head}"
-  FAKE_COUNT="$work/$name.count" FAKE_RUNS="$work/$name.runs" FAKE_FAIL_RUN="$fail" \
+  FAKE_COUNT="$work/$name.count" FAKE_RUNS="$work/$name.runs" FAKE_FAIL_RUN="$fail" FAKE_REPORT="${REPORT_FILE:-}" \
     GH_ENTERPRISE_TOKEN=ghe-secret GITHUB_ENTERPRISE_TOKEN=ghe-secret SSH_AUTH_SOCK=/tmp/agent.sock \
     GH_TOKEN=gh-secret GITHUB_TOKEN=gh-secret \
     GABO_EVAL_ENGINE_CMD="$fake" PATH="$work/shim:$PATH" \
@@ -195,6 +218,66 @@ else
   ok "S4 a check that did not run never reads pass"
 fi
 has "S4 the not-run checks are reported as not run" "$code" 1 "not run" "$out"
+
+# --- S5: method evidence judged like the 0027 report gate (S19) ---------------
+
+# A report missing one field reads fail and names the field: one fixture per
+# field, in the gate's order (odd, spec, RDD, contract, tests, integration,
+# commits, verifier). The field's line is removed from the complete report.
+for pair in "odd:|odd" "spec S4:|spec S4" "RDD:|RDD" "contract:|contract" "tests:|tests" \
+  "integration:|integration" "commits:|commits" "verifier:|verifier"; do
+  IFS='|' read -r prefix label <<<"$pair"
+  slug="${label// /-}"
+  e="$work/missing-$slug/evals"
+  mkdir -p "$e"
+  task "$start" >"$e/eval-001.json"
+  grep -v -F "$prefix" "$work/bin/report-full.txt" >"$work/report-missing-$slug.txt"
+  out="$(REPORT_FILE="$work/report-missing-$slug.txt" run_eval "missing-$slug" "$e" "$cfg_coder")"
+  code=$?
+  has "S5 a report with no $label line reads fail and names the field" "$code" 1 \
+    "task eval-001: fail (0 of 1 runs): $label line missing" "$out"
+  has "S5 the run line carries the same reason as fail: $label line missing" "$code" 1 \
+    "run 1: fail: $label line missing" "$out"
+done
+
+# A complete report passes; not run and not applicable forms count as present.
+e="$work/evidence-full/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(run_eval evidence-full "$e" "$cfg_coder")"
+code=$?
+has "S5 a report with every field passes (not run and not applicable count as present)" "$code" 0 \
+  "task eval-001: pass (1 of 1 runs)" "$out"
+
+# The gate reads the same fields when the coder writes them as bullets with
+# backticks, the form of its outcome.
+e="$work/evidence-bullets/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(REPORT_FILE="$work/bin/report-bullets.txt" run_eval evidence-bullets "$e" "$cfg_coder")"
+code=$?
+has "S5 a report written as backticked bullets passes" "$code" 0 "task eval-001: pass (1 of 1 runs)" "$out"
+
+# Each linked S# needs its own spec line.
+e="$work/evidence-two/evals"
+mkdir -p "$e"
+TASK_SPECS='["S4","S5"]' task "$start" >"$e/eval-001.json"
+out="$(REPORT_FILE="$work/bin/report-two.txt" run_eval evidence-two "$e" "$cfg_coder")"
+code=$?
+has "S5 two linked S# with a covered or not-covered line each pass" "$code" 0 "task eval-001: pass (1 of 1 runs)" "$out"
+out="$(run_eval evidence-two-missing "$e" "$cfg_coder")"
+code=$?
+has "S5 a linked S# with no spec line reads fail and names it" "$code" 1 \
+  "task eval-001: fail (0 of 1 runs): spec S5 line missing" "$out"
+
+# A failing outcome check with complete evidence reads fail with the observed result.
+e="$work/evidence-check/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(run_eval evidence-check "$e" "$cfg_coder" 1)"
+code=$?
+has "S5 a failing check with complete evidence reads fail: check, with its exit code" "$code" 1 \
+  "run 1: fail: check grep -qx done out.txt failed (exit 1)" "$out"
 
 # --- isolation: the engine sees no GitHub or agent credentials ---------------
 
