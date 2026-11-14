@@ -133,7 +133,7 @@ Runnable at once: T1 only. After T2 and T3: T4. After T4: T5, T6, T7 (T7 edits `
 | Locks default to `block` on upgrade | existing projects see new blocks | PD2 is the owner's decision 1; the message names the switch (S11) |
 | Session kind (coder or other) is not given by an engine | the stricter coder rules apply to every session there | T1 item (b); the spec states this reading |
 | T4 and T7 both edit the `check` slice wiring | merge conflicts | order T4 then T7 (G2, G3) |
-| 0027/T12 waits for T8 and T14 | the reviewer's test-edit rule is late | T8 is early in the chain (after T7), small |
+| 0027/T12 waits for T8 and T14 | the reviewer's test-edit rule is late | T8 is early (after T7), but T14 is late (after T3, the relays T10 to T13 and a human merge), so `0027/T12` starts late |
 | Four human-merged or engine-specific PRs queue | T9, T14 wait for a person | T9 and T14 are late; T10 to T13 are not human-only |
 
 ## Open questions

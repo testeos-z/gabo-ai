@@ -10,7 +10,7 @@
 
 Mode is `auto` (owner's standing order, 2026-11-13: apply the recommended option to every doubt and record it; merges to `main`, versions, publishing, secrets and the owner's own values stay with the owner). Every fixed question below is answered by `gabo-dev-lead` and marked **Proposed (auto)** with a one-line reason. The plan is not accepted by any agent: it changes nothing until a human reviews the plan PR.
 
-The spec is not edited. Two items need the owner before their tasks can start: the TRD D24 reconciliation that product QA needs (task T11) and the owner's permission to use `testeos-z/gabo-repo` for the final probe (task T14). One item waits for intent 0028 (task T12). The blocked tasks are marked in their titles and in the tracker.
+The spec is not edited. Two items need the owner before their tasks can start: the TRD D24 reconciliation that product QA needs (task T11) and the owner's permission to use `testeos-z/gabo-repo` for the final probe (task T14). One item waits for `0028/T8` and `0028/T14` (task T12). The blocked tasks are marked in their titles and in the tracker.
 
 Human merge: every task that touches `.claude/` or `.gabo/skills/` is merged by a person, not by the reviewer. Those paths are human-only (`gabo.yaml:53`, and `.gabo/skills/` by built-in rule, TRD D20 and 9.4). Each such row says so in its acceptance cell.
 
@@ -34,7 +34,7 @@ Human merge: every task that touches `.claude/` or `.gabo/skills/` is merged by 
 2. **Gates and trace.** T4 (cycle gates, S18 and S19) follows T2, since the gates read the report fields. T5 (trace and wave report lines, S9) follows T4, since both edit step 6 of `gabo-cycle`. T6 (TRD 9.2 fields) follows T5.
 3. **Review policy before review logic.** T7 (`REVIEW.md` at the repository root) must merge to `dev` before T8. Reason: T8 makes the reviewer read `REVIEW.md` from `dev` and fail closed when it is missing, so merging T8 first would refuse every head.
 4. **Reviewer logic in one chain.** T8 (policy read from `dev`), then T9 (three passes, Important-only verdict, nit cap), then T10 (comment order and the `code read:` line), then T13 (docs). All four edit `review-head.sh` or its tests, so they run one at a time.
-5. **Product QA and the test-edit rule wait.** T11 (product QA, S11) waits for the owner's D24 decision, then runs after T10. T12 (test-edit rule, S29) waits for intent 0028's record, then runs after T9.
+5. **Product QA and the test-edit rule wait.** T11 (product QA, S11) waits for the owner's D24 decision, then runs after T10. T12 (test-edit rule, S29) waits for `0028/T8` and `0028/T14`, then runs after T9.
 6. **Final probe.** T14 runs one wave on `testeos-z/gabo-repo` with RDD on, after every other task. It needs the owner's permission to use that repository. Before it runs, the owner refreshes the user-level reviewer install (`gabo init`, intent 0016 S4), so the reviewer runs the merged scripts.
 
 The spec's end-to-end acceptance is checked by T14, not by any single task.
@@ -87,7 +87,7 @@ How each spec item lands on the tree at `dev` (`fb6fe19`, 2026-11-13). The spec 
 | S26 | three passes tagged, one reviewer run | T7 (text), T9 (prompt) |
 | S27 | Important blocks, nit cap of five, do-not-report | T7 (text), T9 (verdict and cap) |
 | S28 | fresh-context verifier before the PR | T3 |
-| S29 | loosened test without a reason is an Important finding | T12 (blocked on 0028) |
+| S29 | loosened test without a reason is an Important finding | T12 (blocked on 0028/T8 and 0028/T14) |
 
 ## Plan decisions
 
@@ -115,7 +115,7 @@ Edit surfaces are disjoint between groups. Inside a group the order is the `depe
 | G2 cycle and report | T4, then T5, then T6 | `apps/cli/internal/skills/gabo-cycle/SKILL.md` and its copies (T4, T5), `gabo-wave-report/SKILL.md` and its copies (T5), `docs/product/TRD.md` (T6) |
 | G3 reviewer | T7, then T8, then T9, then T10, then T13; T11 after T10; T12 after T9 | `REVIEW.md` (T7); `apps/cli/internal/skills/gabo-reviewer/scripts/` and its tests (T8 to T11); `apps/cli/internal/skills/gabo-reviewer/SKILL.md` and `README.md` and `gabo-reviewer-notes` and its copy (T13) |
 
-Runnable at once (pairwise disjoint): T1, T2, T7. T3 follows T2. T4 follows T2. T5 follows T4. T6 follows T5. T8 follows T7. T9 follows T8. T10 follows T9. T11 waits for the owner. T12 waits for 0028. T13 follows T10. T14 waits for all (its `depends_on` lists the leaves T1, T3, T6, T11, T12 and T13; the rest are reached through them).
+Runnable at once (pairwise disjoint): T1, T2, T7. T3 follows T2. T4 follows T2. T5 follows T4. T6 follows T5. T8 follows T7. T9 follows T8. T10 follows T9. T11 waits for the owner. T12 waits for `0028/T8` and `0028/T14`. T13 follows T10. T14 waits for all (its `depends_on` lists the leaves T1, T3, T6, T11, T12 and T13; the rest are reached through them).
 
 ## Risks to the plan
 
@@ -128,7 +128,7 @@ Runnable at once (pairwise disjoint): T1, T2, T7. T3 follows T2. T4 follows T2. 
 | The Important-only verdict depends on the model tagging findings | an under-tagged defect does not block | T9's fixture with seven nits and one Important; T14 probe on one seeded defect |
 | Cost per PR rises (three passes, QA, a code read on every head) | the owner's budget | not measured here; T14 records the reviewer's run time and count per PR (Q31: no target until two waves) |
 | D24 blocks product QA (T11) | S11 has no build under test until the owner decides | owner question 1; T11 is `blocked`; the other tasks do not depend on it except T14, which waits |
-| S29 waits for 0028 (T12) | the probe (T14) waits too | owner question 3; T14 may run without S29 only if the owner says so |
+| S29 waits for `0028/T8` and `0028/T14` (T12) | the probe (T14) waits too | owner question 3; T14 may run without S29 only if the owner says so |
 
 ## Open questions
 
