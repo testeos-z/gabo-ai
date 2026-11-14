@@ -27,3 +27,11 @@ type OutcomeAppender interface {
 type PRBaseReader interface {
 	PRBase(repo, ref string) (string, error)
 }
+
+// BaseTracker reports whether a project-relative path is tracked at the
+// worktree's base commit, the merge base of HEAD and ref (intent 0028 D6). An
+// error means the base cannot be read; the caller then counts the path as not
+// tracked.
+type BaseTracker interface {
+	Tracked(ref, rel string) (bool, error)
+}
