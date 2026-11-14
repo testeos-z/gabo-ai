@@ -1,0 +1,7 @@
+{
+  "status": "proposed, not run",
+  "catalog_commit": "6b3bfac440c63c816e53b1c4923bf6a3b164b378",
+  "tasks": ["eval-001", "eval-002", "eval-003"],
+  "run": "not run: needs real engine runs on the owner's machine; after the owner accepts the tasks, the owner starts the run with eval-run.sh run evals --head <sha> --config gabo.yaml and accepts its report as the baseline",
+  "note": "A proposal only. The runner reads evals/baseline/baseline.json alone, and that file exists only after the owner accepts a baseline."
+}

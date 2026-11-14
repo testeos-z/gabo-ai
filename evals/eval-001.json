@@ -1,0 +1,13 @@
+{
+  "id": "eval-001",
+  "source_issue": 832,
+  "source_pr": 859,
+  "source_wave": "pending: wave record id is not in the repository; fill it from the wave record before the owner accepts",
+  "starting_commit": "07665b1d6a1097fe1eca6e4059a979d42f2d429d",
+  "task_input": "Task issue #832 (I0030/T9): \"Assistant trigger rule: run the set when agent configuration changes\", with intent 0030 spec S3 at the starting commit. The verbatim launch prompt is not kept in the repository.",
+  "spec_refs": ["S3"],
+  "outcome_checks": [
+    "grep -qF '## Agent Eval Trigger' apps/cli/internal/skills/gabo-assistant/SKILL.md",
+    "go -C apps/cli test ./internal/skills/"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "eval-003",
+  "source_issue": 839,
+  "source_pr": 852,
+  "source_wave": "pending: wave record id is not in the repository; fill it from the wave record before the owner accepts",
+  "starting_commit": "04e15b515b13d0498f4a3afc94d18210a947a062",
+  "task_input": "Task issue #839 (I0030/T15): \"Catalog template of the three blocks and the setup offer\", with intent 0030 spec S19 at the starting commit. The verbatim launch prompt is not kept in the repository.",
+  "spec_refs": ["S19"],
+  "outcome_checks": [
+    "grep -qF '## Commands' apps/cli/internal/skills/gabo-setup/instruction-blocks.md",
+    "grep -qF '## Repeated mistakes' apps/cli/internal/skills/gabo-setup/instruction-blocks.md",
+    "grep -qF '## Review findings' apps/cli/internal/skills/gabo-setup/instruction-blocks.md",
+    "go -C apps/cli test ./internal/skills/"
+  ]
+}

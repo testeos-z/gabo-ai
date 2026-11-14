@@ -1,0 +1,13 @@
+{
+  "id": "eval-002",
+  "source_issue": 837,
+  "source_pr": 860,
+  "source_wave": "pending: wave record id is not in the repository; fill it from the wave record before the owner accepts",
+  "starting_commit": "a62e37b4a5d96cd8240b8305660b3025ec15495f",
+  "task_input": "Task issue #837 (I0030/T13): \"Assistant rules for incidents, two occurrences and review findings\", with intent 0030 spec S13, S15, S17 and S18 at the starting commit. The verbatim launch prompt is not kept in the repository.",
+  "spec_refs": ["S13", "S15", "S17", "S18"],
+  "outcome_checks": [
+    "grep -qF '## Incidents and Repeated Mistakes' apps/cli/internal/skills/gabo-assistant/SKILL.md",
+    "go -C apps/cli test ./internal/skills/"
+  ]
+}
