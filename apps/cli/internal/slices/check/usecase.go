@@ -83,6 +83,16 @@ type Settings struct {
 	// CI (CI set) skips the user-level reviewer link: the reviewer scripts
 	// and CI run with their own HOME.
 	CI bool
+	// OutcomePath is the file the cycle names for the run's outcome records
+	// (GABO_OUTCOME_FILE); empty means no record is written (intent 0028 S16).
+	OutcomePath string
+	// Outcomes appends the records to OutcomePath; RecordDecision needs it
+	// only when OutcomePath is set.
+	Outcomes OutcomeAppender
+	// Task and Engine name the run's task and engine on every record
+	// (GABO_TASK, GABO_ENGINE).
+	Task   string
+	Engine string
 }
 
 // Report is the human-readable result. Failed is true when any check failed.
