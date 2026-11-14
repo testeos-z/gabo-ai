@@ -5,8 +5,10 @@
 #
 #   eval-set.sh check <evals-dir> [--config <gabo.yaml>]
 #   eval-set.sh propose <evals-dir> <candidate.json> [--config <gabo.yaml>]
+#   eval-set.sh config <min_tasks|max_tasks|runs_per_task> [--config <gabo.yaml>]
 #
-# eval.min_tasks (default 2) and eval.max_tasks (default 10) are read from the
+# eval.min_tasks (default 2), eval.max_tasks (default 10) and eval.runs_per_task
+# (default 1) are read from the
 # --config file, which must exist when it is given. The eval block must be in
 # block style (eval: then indented keys). A config the script cannot read the
 # way config.Load reads it is refused; it never falls back to the defaults.
@@ -18,14 +20,23 @@ shopt -s nullglob
 usage() {
   echo "usage: eval-set.sh check <evals-dir> [--config <gabo.yaml>]" >&2
   echo "       eval-set.sh propose <evals-dir> <candidate.json> [--config <gabo.yaml>]" >&2
+  echo "       eval-set.sh config <min_tasks|max_tasks|runs_per_task> [--config <gabo.yaml>]" >&2
   exit 2
 }
 
 mode="${1:-}"
-case "$mode" in check | propose) shift ;; *) usage ;; esac
-dir="${1:-}"
-[[ -n "$dir" ]] || usage
-shift
+case "$mode" in check | propose | config) shift ;; *) usage ;; esac
+dir=""
+key=""
+if [[ "$mode" == config ]]; then
+  key="${1:-}"
+  case "$key" in min_tasks | max_tasks | runs_per_task) ;; *) usage ;; esac
+  shift
+else
+  dir="${1:-}"
+  [[ -n "$dir" ]] || usage
+  shift
+fi
 candidate=""
 if [[ "$mode" == propose ]]; then
   candidate="${1:-}"
@@ -77,8 +88,10 @@ cfg_int() {
 
 min_raw="$(cfg_int min_tasks 2)" || exit 1
 max_raw="$(cfg_int max_tasks 10)" || exit 1
+runs_raw="$(cfg_int runs_per_task 1)" || exit 1
 min=$((10#$min_raw))
 max=$((10#$max_raw))
+runs=$((10#$runs_raw))
 ((min >= 1)) || {
   echo "refused config: eval.min_tasks must be at least 1" >&2
   exit 1
@@ -91,6 +104,21 @@ max=$((10#$max_raw))
   echo "refused config: eval.min_tasks is above eval.max_tasks" >&2
   exit 1
 }
+((runs >= 1)) || {
+  echo "refused config: eval.runs_per_task must be at least 1" >&2
+  exit 1
+}
+
+# config <key>: prints the validated count, for the runner (eval-run.sh), which
+# reads the same keys the same way instead of parsing gabo.yaml itself.
+if [[ "$mode" == config ]]; then
+  case "$key" in
+    min_tasks) echo "$min" ;;
+    max_tasks) echo "$max" ;;
+    runs_per_task) echo "$runs" ;;
+  esac
+  exit 0
+fi
 
 # A token or key pattern in the raw bytes, in any decoded string, or in any key
 # of a task file refuses it (S11). The match is never printed.
@@ -169,13 +197,20 @@ problem() {
       echo "acceptance must be an object"
       return
     }
-    for k in accepted_by accepted_on; do
-      v="$(jq -r --arg k "$k" '.acceptance[$k] // empty' "$f")"
-      [[ -n "$v" ]] || {
-        echo "missing acceptance.$k"
-        return
-      }
-    done
+    v="$(jq -c '.acceptance.accepted_by | select(. != null and . != "")' "$f")"
+    [[ -n "$v" ]] || {
+      echo "missing acceptance.accepted_by"
+      return
+    }
+    jq -e '.acceptance.accepted_by | type == "string"' "$f" >/dev/null || {
+      echo "acceptance.accepted_by must be a string"
+      return
+    }
+    v="$(jq -r '.acceptance.accepted_on // empty' "$f")"
+    [[ -n "$v" ]] || {
+      echo "missing acceptance.accepted_on"
+      return
+    }
     jq -e --arg re "$date_re" '.acceptance.accepted_on | type == "string" and test($re)' "$f" >/dev/null || {
       echo "acceptance.accepted_on must be YYYY-MM-DD"
       return
