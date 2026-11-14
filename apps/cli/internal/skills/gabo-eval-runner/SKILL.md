@@ -42,10 +42,17 @@ Load when a gabo agent proposes, validates or runs the agent eval set of intent 
 - The engine runs in `tree` with the task input as its prompt. The GitHub tokens (github.com and enterprise) and `SSH_AUTH_SOCK` are removed from its environment, and `gh` reads an empty config directory of the scratch. It is bounded by `GABO_EVAL_ENGINE_TIMEOUT` seconds (default 600) when `timeout` exists.
 - Not a sandbox: the engine keeps the owner's `HOME`, its login and the filesystem, and the head's `.claude` hooks run with the owner's privileges. Run the set only on the owner's machine, for a configuration the owner is reviewing (intent 0030 S3).
 - Then each outcome check runs as a script (`bash -c`) in `tree`. Exit 0 reads `pass`, any other exit `fail`. A check the runner did not execute reads `not run (<reason>)`, never `pass`.
-- A run passes when the engine exits 0 and every check passes. A task passes only when all of its runs pass. With two runs and one failing it reads `fail (1 of 2 runs)`, and both run lines are kept.
+- A run passes when the engine exits 0, every check passes and the coder's report holds the method evidence (see Method evidence). A task passes only when all of its runs pass. With two runs and one failing it reads `fail (1 of 2 runs)`, both run lines are kept, and the task line names the reason of the first failing run.
 - The report names the engine and `runs per task: <n>`, lists each run with its scratch path, and lists each check. The runner prints every scratch path and never removes one: the parent removes them after use.
 - Command: `bash <skill dir>/scripts/eval-run.sh run evals --head <pr head> --config gabo.yaml [--repo <dir>] [--config-path <path>]...`. Exit 0 when every task passes, 1 on a refusal or a failing task, 2 on bad usage.
 - The per-engine command lines are not yet probed against a real engine; that probe is a later task of the same intent. The fixture tests use `GABO_EVAL_ENGINE_CMD`, a fake command that the report labels as such.
+
+## Method evidence
+
+- The coder's report is its engine output. A run passes only when that report holds the fields of the report gate of intent 0027 (S19), judged as `gabo-cycle` step 6 judges them: `odd:` (RED and GREEN, or the exception), one `spec S<n>:` line for each of the task's `spec_refs` (covered or not covered), `RDD:`, `contract:`, `tests:`, `integration:`, `commits:` and `verifier:`.
+- A missing field reads `fail: <field> line missing`, for example `fail: RDD line missing` or `fail: spec S5 line missing`. A field present as `not run: <reason>` or `not applicable: <reason>` counts as present: the rule asks for the line, not for a pass.
+- A failing outcome check with complete evidence reads `fail: check <cmd> failed (exit <n>)` with the observed exit code. The checks are judged before the report, so a failing check gives its own reason.
+- A line counts with or without a list marker and backticks, as a coder writes it. The field list is pinned to the gate text by a Go test (`evalreport_test.go`), so the runner and the gate cannot drift.
 
 ## Commands
 

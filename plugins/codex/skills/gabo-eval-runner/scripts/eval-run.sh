@@ -20,6 +20,9 @@
 # reads the task input on stdin. It is for fixture tests only, and the report
 # says so when it is set. The engine is bounded by GABO_EVAL_ENGINE_TIMEOUT
 # seconds (default 600) when timeout(1) exists.
+# A run also passes only when the coder's report (its engine output) holds every
+# field of the 0027 report gate (intent 0030 S5); a missing field reads
+# `fail: <field> line missing`, a failing check reads `fail: check <cmd> failed`.
 # Exit 0 when every task passes, 1 on a refusal or a failing task, 2 on bad usage.
 set -uo pipefail
 shopt -s nullglob
@@ -144,12 +147,42 @@ engine_run() {
   ) <"$prompt" >"$log" 2>&1
 }
 
+# The fields of the 0027 report gate (S19), in the gate's order. The coder's
+# report is its engine output; report_gap reads each field from it.
+gate_fields=("odd:" "spec S" "RDD:" "contract:" "tests:" "integration:" "commits:" "verifier:")
+
+# report_gap <task-file> <report>: the first gate field the report lacks, named
+# as the reason `<field> line missing`; nothing when every field is present. A
+# field counts as present with any value, so `not run: <reason>` and `not
+# applicable: <reason>` pass. Each linked S# of the task needs its own spec line.
+# A line counts with or without a list marker and backticks, as a coder writes it.
+report_gap() {
+  local file="$1" report="$2" text field s
+  text="$(sed -e 's/^[[:space:]]*//' -e 's/^[-*][[:space:]]*//' -e 's/`//g' "$report")"
+  for field in "${gate_fields[@]}"; do
+    if [[ "$field" == "spec S" ]]; then
+      while IFS= read -r s; do
+        grep -q "^spec $s:" <<<"$text" || {
+          echo "spec $s"
+          return 0
+        }
+      done < <(jq -r '.spec_refs[]' "$file")
+    else
+      grep -q "^$field" <<<"$text" || {
+        echo "${field%:}"
+        return 0
+      }
+    fi
+  done
+}
+
 # run_one <task-file> <id> <starting-commit> <run-no> <task-input>: one run in a
 # fresh scratch copy. Prints the run line and one line per outcome check, and
 # returns 0 only when the run passes. A check that did not run is `not run`.
+# The run's reason, when it fails, is left in run_why.
 run_one() {
   local file="$1" id="$2" start="$3" n="$4" input="$5"
-  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" tag="" c rc detail=""
+  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" check_why="" gap="" c rc detail=""
   local -a checks
   mapfile -t checks < <(jq -r '.outcome_checks[]' "$file")
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/gabo-eval-run.XXXXXX")"
@@ -178,6 +211,7 @@ run_one() {
       else
         detail+="    check: $c: fail (exit $rc)"$'\n'
         checks_ok=0
+        [[ -n "$check_why" ]] || check_why="check $c failed (exit $rc)"
       fi
     done
   else
@@ -195,11 +229,21 @@ run_one() {
     why="engine exit $ecode"
   elif ((checks_ok == 0)); then
     verdict=fail
-    why="a check failed"
+    why="$check_why"
+  else
+    gap="$(report_gap "$file" "$scratch/engine.log")"
+    if [[ -n "$gap" ]]; then
+      verdict=fail
+      why="$gap line missing"
+    fi
   fi
-  [[ -z "$why" ]] || tag=" ($why)"
   printf '%s\n' "$verdict" >"$scratch/result"
-  printf '  run %s: %s%s (scratch %s)\n' "$n" "$verdict" "$tag" "$scratch"
+  run_why="$why"
+  if [[ "$verdict" == pass ]]; then
+    printf '  run %s: pass (scratch %s)\n' "$n" "$scratch"
+  else
+    printf '  run %s: fail: %s (scratch %s)\n' "$n" "$why" "$scratch"
+  fi
   printf '%s' "$detail"
   [[ "$verdict" == pass ]]
 }
@@ -219,15 +263,18 @@ for f in "${accepted_files[@]}"; do
   input="$(jq -r '.task_input' "$f")"
   echo "task $id: starting $start"
   passed=0
+  first_why=""
   for ((n = 1; n <= runs; n++)); do
     if run_one "$f" "$id" "$start" "$n" "$input"; then
       passed=$((passed + 1))
+    elif [[ -z "$first_why" ]]; then
+      first_why="$run_why"
     fi
   done
   if ((passed == runs)); then
     echo "task $id: pass ($passed of $runs runs)"
   else
-    echo "task $id: fail ($passed of $runs runs)"
+    echo "task $id: fail ($passed of $runs runs): $first_why"
     failed_tasks=$((failed_tasks + 1))
   fi
 done
