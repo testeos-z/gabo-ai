@@ -505,12 +505,45 @@ check "no merge call for an upgrade PR" no_merge upgrade
 check "the CLI runs with GABO_UPGRADE_PR=1" grep -qE '^gabo-call check GABO_UPGRADE_PR=1 ' "$work/upgrade/calls.log"
 check "the comment reports the upgrade PR" grep -qxF 'upgrade PR: only config validated, human merge required' "$work/upgrade/all_posted_7.md"
 check "the output reports the upgrade PR" grep -qF 'upgrade PR: only config validated, human merge required' "$work/upgrade/out.log"
-up="$(sed -n '/^### Upgrade PR/,/^### Review/p' "$work/upgrade/all_posted_7.md")"
+up="$(sed -n '/^### Upgrade PR/,/^### Code read/p' "$work/upgrade/all_posted_7.md")"
 expect_match '`apps/cli/main.go`' "$up" "the report lists changed paths outside the catalog and agent directories"
 expect_match '`.gabo/VERSION`' "$up" "the report lists the stamp"
 check "the report leaves out the catalog subtree" bash -c "! grep -q '^- \`.gabo/skills/' <<<\"\$1\"" _ "$up"
 check "the report leaves out the declared agent directory" bash -c "! grep -q '^- \`.claude/agents/' <<<\"\$1\"" _ "$up"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario upgrade_old GABO_VERSION=0.3.0)" \
   "an upgrade PR still needs the base minimum"
+
+# line_no <name> <fixed text>: the first line of fixture <name>'s comment that holds the text.
+line_no() { grep -nF -m1 -- "$2" "$work/$1/posted_7.md" | cut -d: -f1; }
+# last_before_marker <name>: the last non-empty line before the marker and footer.
+last_before_marker() { grep -v '^$' "$work/$1/posted_7.md" | tail -n 3 | head -n 1; }
+# in_order <name> <first text> <second text>: both texts are present and the first starts on an earlier line.
+in_order() {
+  local a b
+  a="$(line_no "$1" "$2")"
+  b="$(line_no "$1" "$3")"
+  [[ -n "$a" && -n "$b" ]] && ((a < b))
+}
+
+echo "# comment order and the code read line (S13, S14)"
+expect_eq "No blocking issues found." "$(first_line clean)" "the comment opens with the VERDICT line"
+check "the checks section comes before the code read section" in_order clean '### Checks (' '### Code read ('
+expect_eq "code read: pass" "$(last_before_marker clean)" "a clean comment ends with the code read line"
+expect_eq "<!-- gbai-reviewer-bot sha=$(jq -r .headRefOid "$work/clean/pr_7.json") -->|🤖 gabo reviewer" "$(footer clean)" \
+  "the marker and footer follow the code read line"
+check "the nits are listed above the code read line" in_order nits7 'Nits not listed: 2' 'code read: pass'
+expect_eq "code read: pass" "$(last_before_marker nits7)" "a comment with only nits reads code read: pass"
+expect_eq "code read: fail: [security] Important: apps/cli/main.go:3 secret in log" "$(last_before_marker imp_clean)" \
+  "an Important finding is named on the code read line"
+expect_eq "code read: fail: [bugs] Important: apps/cli/main.go:3 nil dereference" "$(last_before_marker review_fail)" \
+  "a blocking review names its finding on the code read line"
+check "a failed review.checks command is named above the code read section" \
+  in_order failing '| `go -C apps/cli vet ./...` | failed' '### Code read ('
+check "the failure output of a failed check sits in the checks section" in_order failing 'Failure output:' '### Code read ('
+expect_eq "code read: pass" "$(last_before_marker failing)" "a failed check does not change the code read line"
+expect_eq "code read: not run: no policy file on dev" "$(last_before_marker nopolicy)" \
+  "a missing policy file reads code read: not run"
+expect_eq "code read: not run: the review agent modified the checkout" "$(last_before_marker modify)" \
+  "an agent that edits the checkout reads code read: not run"
 
 finish

@@ -160,6 +160,16 @@ func (c Config) validateProjectKeys() []error {
 		fail("plan_change.scope", "must be %q, %q or %q, got %q", ScopeTask, ScopeGroup, ScopeGlobal, c.PlanChange.Scope)
 	}
 
+	approvals := c.Repo.Protection.RequiredApprovals
+	for _, b := range []struct {
+		name string
+		n    int
+	}{{"integration", approvals.Integration}, {"main", approvals.Main}} {
+		if b.n < 0 {
+			fail("repo.protection.required_approvals."+b.name, "must be zero or more, got %d", b.n)
+		}
+	}
+
 	switch c.Wave.After {
 	case "", AfterNext, AfterWait:
 	default:
