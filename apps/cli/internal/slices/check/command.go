@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 )
 
 // Exit codes (TRD 9.4): 0 nothing failed, 1 a check failed, 2 a usage or
@@ -44,12 +46,16 @@ type Factory func(ctx context.Context) (*UseCase, error)
 // preWriteFlag is the hook mode flag (intent 0001 S11).
 const preWriteFlag = "pre-write"
 
-// NewCommand builds the `check` driving adapter. Without --pre-write it takes
-// no arguments and no flags; with it, the paths of the pending writes.
+// preCommandFlag is the shell hook mode flag (intent 0028 S2).
+const preCommandFlag = "pre-command"
+
+// NewCommand builds the `check` driving adapter. Without a hook mode it takes
+// no arguments and no flags; --pre-write takes the paths of the pending
+// writes, and --pre-command takes no arguments and reads a shell call on stdin.
 func NewCommand(factory Factory) *cobra.Command {
-	var preWrite bool
+	var preWrite, preCommand bool
 	cmd := &cobra.Command{
-		Use:   "check [--pre-write [<path>...]]",
+		Use:   "check [--pre-write [<path>...] | --pre-command]",
 		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
 		Long: "Validate the project read-only, engine-neutral except for the keys below (PRD R33):\n" +
 			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
@@ -157,11 +163,31 @@ func NewCommand(factory Factory) *cobra.Command {
 			"\"warning\" or \"info\", \"text\": ...}], \"block\": null or {\"reason\": ...}},\n" +
 			"and exits 0 without a block, 1 with one, 2 with one usage line on a bad\n" +
 			"object (malformed, unknown schema version, engine or event, or a tool_call\n" +
-			"without target_paths).",
+			"without target_paths).\n" +
+			"\n" +
+			"Hook mode, gabo check --pre-command < tool-call.json, judges one shell call before\n" +
+			"it runs, for the engines' shell-call hooks. It takes no arguments and reads the\n" +
+			"hook's tool-call JSON from stdin: the command of tool_input.command (a string, or\n" +
+			"an argv read as one command line) and the agent_id of a subagent call. The\n" +
+			"shell_guard lock judges every command of the line (a list, a pipe, a substitution\n" +
+			"or a group), unwraps one level of sh -c or bash -c, and writes no project file.\n" +
+			"Exit 0 with no output when the call passes; 1 with one \"✗ shell_guard: <rule>\"\n" +
+			"line and its \"next: <route>\" line per violation when it is blocked; 3 when the\n" +
+			"lock asks (the engine shows its prompt; with mode auto a block instead, exit 1);\n" +
+			"2 on a usage error or stdin that is no tool call; 1 when the project or gabo.yaml\n" +
+			"cannot be read, so the hook fails closed.",
 		// The command parses its own flags, so a flag error knows the mode
 		// wherever --pre-write stands among the arguments.
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, raw []string) error {
+			// The shell hook mode takes no arguments: anything beside its own
+			// bare flag is a usage error, before the project is read.
+			if hasPreCommand(raw) {
+				if len(raw) != 1 || raw[0] != "--"+preCommandFlag {
+					return &ExitError{Code: ExitUsage, Err: ErrPreCommandUsage}
+				}
+				return judgePreCommand(cmd, factory)
+			}
 			flags, paths := splitPreWrite(raw)
 			if err := cmd.Flags().Parse(flags); err != nil {
 				if hasPreWrite(raw) {
@@ -202,7 +228,65 @@ func NewCommand(factory Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths, or to the paths of the tool-call JSON on stdin, with the intent stage gate (hook mode)")
+	cmd.Flags().BoolVar(&preCommand, preCommandFlag, false, "judge the shell call of the tool-call JSON on stdin with the shell guard (hook mode)")
 	return cmd
+}
+
+// hasPreCommand reports whether raw names the shell hook mode flag, bare or
+// with a value, before any --pre-write: every argument after --pre-write is a
+// path (TRD 9.4), so a later --pre-command is one.
+func hasPreCommand(raw []string) bool {
+	for _, a := range raw {
+		if a == "--"+preWriteFlag || strings.HasPrefix(a, "--"+preWriteFlag+"=") {
+			return false
+		}
+		if a == "--"+preCommandFlag || strings.HasPrefix(a, "--"+preCommandFlag+"=") {
+			return true
+		}
+	}
+	return false
+}
+
+// judgePreCommand runs the shell hook mode: silent exit 0 when the call
+// passes, the message and exit 3 or 1 otherwise, exit 2 on a usage error. A
+// project or config that cannot be read blocks the call with exit 1 (fail
+// closed); the factory is not called before stdin has passed its usage check.
+func judgePreCommand(cmd *cobra.Command, factory Factory) error {
+	data, err := io.ReadAll(cmd.InOrStdin())
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: fmt.Errorf("%w: stdin cannot be read (%v)", ErrPreCommandUsage, err)}
+	}
+	call, err := ParseShellCall(data)
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	uc, err := factory(cmd.Context())
+	if err != nil {
+		return printShellBlock(cmd, "the project cannot be read ("+err.Error()+"); the call counts as blocked")
+	}
+	v, err := uc.JudgeShell(call)
+	if err != nil {
+		return printShellBlock(cmd, "the project config cannot be read ("+err.Error()+"); the call counts as blocked")
+	}
+	if v.Out != "" {
+		if _, err := fmt.Fprint(cmd.OutOrStdout(), v.Out); err != nil {
+			return &ExitError{Code: ExitFailed, Err: err}
+		}
+	}
+	if v.Exit == 0 {
+		return nil
+	}
+	return &ExitError{Code: v.Exit}
+}
+
+// printShellBlock prints one blocked shell call with its lock and route and
+// exits 1: the hook fails closed.
+func printShellBlock(cmd *cobra.Command, reason string) error {
+	out := Explain(config.LockShellGuard, reason, "fix the project, its gabo.yaml or the working directory, then retry", Decision{Exit: ExitFailed, Outcome: OutcomeBlocked})
+	if _, err := fmt.Fprintln(cmd.OutOrStdout(), out); err != nil {
+		return &ExitError{Code: ExitFailed, Err: err}
+	}
+	return &ExitError{Code: ExitFailed}
 }
 
 // splitPreWrite splits raw after the first --pre-write in any form (bare or
