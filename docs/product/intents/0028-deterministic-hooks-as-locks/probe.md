@@ -14,7 +14,7 @@ No person has read this record. The assistant (session claude-c9bdd54d, wave I00
 - "si doy permiso quiero que cierren todos los issues pronto"
 - "habla con gabo-b para que paralelicen todo lo posible y aprueben solos lo necesario"
 
-The record cites those orders as the basis of that read, because they delegate approval to the agents. Spec S1 and plan 0028 name a human read before the remaining tasks start; this section does not claim that read happened.
+Those orders are the assistant's basis for that read. They are not recorded here as a waiver of S1's human read. Spec S1 and plan 0028 still require a person's read before the remaining tasks start, unless the owner waives it in writing. T2 has not started.
 
 ## Record
 
@@ -27,9 +27,9 @@ Items: (a) a pre-command hook fires for a shell call inside a coder subagent and
 | claude | 2.1.302 (Claude Code) | yes | yes | yes | no |
 | codex | codex-cli 0.167.2 | yes | yes | yes | no |
 | pi | 1.5.2 | not testable: the delegated gentle-agents runner was not driven; only an emulated child process ran, so no subagent call was observed | not testable: no call inside a delegated subagent was observed; the session id was seen only on the emulated child's call | no | no |
-| opencode | opencode v2.2.6 | no | not testable: no hook was invoked for any call, so no id reached one | not testable: no subagent hand-off hook fired, so blocking cannot be observed | no |
+| opencode | opencode v2.2.6 | yes | yes | yes | no |
 
-Consequence for the plan: item (a) is `no` for opencode. S14 applies to opencode. Every lock that needs a pre-command hook on opencode shows `not run: <reason>` in the wave report, and no task stops for it. Claude and codex show (a) `yes` in a delegated run, so no S14 fallback is stated for them. Pi's (a) and (b) are `not testable` on this record, so no S14 statement is made for pi either, and the Pi relay (T12) rests on an unobserved assumption: T12 and T16 must observe a delegated pi run before relying on it.
+Consequence for the plan: item (a) is `yes` for claude, codex and opencode in a delegated run, and `not testable` for pi. No engine has item (a) `no` on this record, so S14 is not triggered by it. The Pi relay (T12) rests on an unobserved assumption: T12 and T16 must observe a delegated pi run before relying on it. Codex (d) rests on the bypass run alone.
 
 ## How each cell was observed
 
@@ -56,23 +56,23 @@ Every run used a `mktemp -d` scratch project and hook scripts in a second `mktem
 - Model: `--provider opencode-go --model beam-free`; the default `openai` credential reported `invalid` and was not refreshed.
 - Command: `pi --no-extensions -e <probe.ts> --provider opencode-go --model beam-free --mode json -p "<call bash echo probe-deny-1>"`, with `GENTLE_PI_AGENTS_CHILD=1`.
 - Seen: `tool_call` fired for the bash call with a session id (`sessionId`); the `tool_execution_end` result was `probe: denied by pre-command hook` with `isError: true`. The event carries no agent id.
-- (c): the `agent_end` event fired at the end of the child run, but its handler type is `ExtensionHandler<AgentEndEvent>` with no result type (installed typings `dist/core/extensions/types.d.ts`), so a handler cannot block it. The hand-off cannot block.
+- (c): the `agent_end` event fired at the end of the child run, but its handler type is `ExtensionHandler<AgentEndEvent>` with no result type (installed typings `dist/core/extensions/types.d.ts`), so a handler cannot block it. The hand-off cannot block. This is read from the typings, not from a run.
 - (d): a primary session (no child marker) ran `echo probe-ok > <file>` with no prompt; the file was written and the stream held no permission event. pi has no permission prompt and no bypass switch for bash.
 
 ### opencode (v2.2.6)
 
-- Two configurations were tried, both in a scratch project, and neither invoked a hook on any call:
-  - `.claude/settings.json` with the same `PreToolUse` and `SubagentStop` command hooks as claude. The subagent completed, `echo probe-deny-1` ran, and no hook log was written.
-  - A project plugin under `.opencode/plugin/` and `.opencode/plugins/`, listed by `opencode plugin list` and referenced from `opencode.json`, with a `tool.before` hook in both the plain and the `hooks` object shape. It logged nothing, and it logged nothing for a parent-level bash call either, so the hook was not invoked.
+- An earlier pass recorded (a) as `no` and (b) and (c) as `not testable`. That pass is withdrawn: its plugin used the `tool.before` shape, and not even a parent-level call logged anything, so its silence was no evidence that the hook was missing. The shape that matters is the one below; the stagegate tests of this repository record that opencode 2.2.6 refuses other plugin shapes. The rerun below uses the shape this version loads: a default export with an `id` and a `setup(ctx)` that registers `ctx.tool.hook("execute.before", ...)` (the shape of the shipped `gabo-stage-gate` plugin). The shipped plugin itself was not run.
+- Scratch project with `.opencode/plugins/probe-hook.js`: `execute.before` logs each event and throws `probe: denied by pre-command hook` for a shell command containing `probe-deny`; `execute.after` logs each event and throws `probe: handoff blocked` for a `subagent` tool result. Each log line is written to a file in the scratch directory.
+- Positive control, parent level: `opencode run --auto --format json --model opencode/beam-free "Run exactly this shell command with the bash tool and report its output: echo probe-deny-0"`. The `execute.before` hook fired for the `shell` call with the command and the call was denied; the parent reported the denial.
+- (a) and (b): `opencode run --auto --format json --model opencode/beam-free "Launch the gentle-ai-worker subagent to run echo probe-deny-1 and report what it returned."`. The subagent's `shell` call reached `execute.before` with `sessionID` and `agent: gentle-ai-worker` (the parent's calls carry `agent: gentle-orchestrator`), and the hook denied it. The subagent reported the denial and no output. So (a) is `yes` and (b) is `yes`.
+- (c): the `execute.after` hook fired for the parent's `subagent` tool call with the subagent's `status` and `result`. Throwing there replaced the hand-off: the parent reported `probe: handoff blocked` and no subagent output. So (c) is `yes`.
 - The subagent had to be launched as `gentle-ai-worker`: the default agent denies the `subagent` action except for named agents.
-- Command: `opencode run --auto --format json --model opencode/beam-free "<launch the gentle-ai-worker subagent to run echo probe-deny-1>"`.
-- Seen: the subagent ran the command and returned `probe-deny-1`; no pre-command hook fired, so (a) is `no`. Because no hook received any call, (b) cannot be observed. No `SubagentStop` hook fired, so the hand-off cannot be observed, and no typed hand-off hook for subagents was found.
 - (d): a bash call that the global config asks about (`find ... -delete`) ran under `--auto` with no permission event, and the file was deleted. Under default mode the stream showed `permission requested: shell ...; auto-rejecting` and the file was kept, so a prompt is requested when permissions are not bypassed.
 
 ## Open after this record
 
-- The read that gates T2 is the assistant's, under the standing orders in the Reading section. No person has read this record.
+- The S1 human read is open. T2 waits for a person's read or the owner's written waiver. The assistant's read is recorded in the Reading section and is not the gate.
 - The native credential-list formats of codex, pi and opencode (plan PD5 and risk 3) are not covered by this record. T9 must establish them. The plan's T1 row still says T1 verifies them until a plan PR corrects it (D7).
 - Pi (a) and (b) need one delegated gentle-agents run to be observed. T12 and T16 run it.
 - Codex (d) is weaker evidence than the other engines' (d): the bypass run is the only observation. S12's assumption depends on it, so T2 and T9 treat it as provisional.
-- The codex hook trust condition and the opencode hook result are inputs to T9 and T10 and to S14 for opencode.
+- The codex hook trust condition and the opencode hook shape (`execute.before` in a V2 definition, with `execute.after` for the hand-off) are inputs to T9 and T10.
