@@ -20,6 +20,8 @@ var coderVerifierRule = []string{
 	"never approves or blocks",
 	"`verifier: <commands and what it saw>`",
 	"`verifier: not applicable: no behavior change`",
+	"what it saw for the changed behavior and for each of the two flows",
+	"lists each behavior that does not match a linked S# or a done-contract line",
 }
 
 func TestCoderSkillNamesTheFreshContextVerifier(t *testing.T) {
@@ -38,7 +40,7 @@ func TestCoderSkillNamesTheFreshContextVerifier(t *testing.T) {
 func TestCoderTemplateNamesTheVerifierField(t *testing.T) {
 	t.Parallel()
 	doc := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
-	for _, s := range []string{"`verifier:`", "fresh-context verifier", "`verifier: not applicable: no behavior change`", "Before you open the PR", "starts without your conversation", "changes no file and never approves or blocks", "`commits:`, `verifier:`"} {
+	for _, s := range []string{"`verifier:`", "fresh-context verifier", "`verifier: not applicable: no behavior change`", "Before you open the PR", "starts without your conversation", "each mismatch against a linked S# or the done contract", "changes no file and never approves or blocks", "`commits:`, `verifier:`"} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("gabo-coder template: missing %q", s)
 		}
@@ -60,14 +62,26 @@ func TestCoderVerifierAddsNoAgentFile(t *testing.T) {
 	}
 }
 
-// Q34: gabo pins no model for the verifier; the engine chooses it.
+// Q34: gabo pins no model for the verifier; the engine chooses it. The whole
+// verifier rule and the template carry no model or engine-model name.
 func TestCoderVerifierPinsNoModel(t *testing.T) {
 	t.Parallel()
 	skill := readCatalog(t, "gabo-coder/SKILL.md")
+	_, rule, ok := strings.Cut(skill, "### Fresh-context verifier")
+	if !ok {
+		t.Fatal("gabo-coder/SKILL.md: no Fresh-context verifier section")
+	}
+	rule, _, _ = strings.Cut(rule, "## Output Contract")
 	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
-	for name, doc := range map[string]string{"SKILL.md": skill, "template": tmpl} {
-		for _, s := range []string{"small model", "no stronger than", "uses a small"} {
-			if strings.Contains(doc, s) {
+	_, verifierBullet, _ := strings.Cut(tmpl, "- Before you open the PR")
+	verifierBullet, _, _ = strings.Cut(verifierBullet, "\n- ")
+	for name, doc := range map[string]string{"SKILL.md rule": rule, "template bullet": verifierBullet} {
+		lower := strings.ToLower(doc)
+		for _, s := range []string{
+			"small model", "cheaper model", "stronger than", "model:",
+			"haiku", "sonnet", "opus", "fable", "gpt", "gemini", "claude-",
+		} {
+			if strings.Contains(lower, s) {
 				t.Errorf("gabo-coder %s: must not pin a model (%q)", name, s)
 			}
 		}

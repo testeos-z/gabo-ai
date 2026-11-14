@@ -64,9 +64,9 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. L
 Fixed gabo rule (intent 0027 S28), no configuration. When the change alters behavior, run a fresh-context verifier before you open the PR, after your own checks pass and the head is committed. When the change alters no behavior (documentation or text only), skip it and report `verifier: not applicable: no behavior change`.
 
 - Launch it through your engine's subagent mechanism, or, with no such mechanism, as a separate fresh session; it runs on your engine in a fresh context and gabo pins no model for it (intent 0027 Q34). It starts without your conversation: give it only the task issue, the done contract, the worktree path, the diff range and the command forms to run.
-- It exercises the changed behavior and the two nearest neighboring flows (the existing behavior that shares the code you changed), and reports the commands it ran and what it saw.
+- It exercises the changed behavior and the two nearest neighboring flows (the existing behavior that shares the code you changed), reports the commands it ran and what it saw for the changed behavior and for each of the two flows, and lists each behavior that does not match a linked S# or a done-contract line.
 - It runs in the worktree as is, changes no file and leaves no scratch there (its scratch goes in a `mktemp -d` dir), and never approves or blocks: it reports, you decide. The reviewer stays the only merge gate.
-- A difference it reports that nobody asked for is a regression: fix it and pin it with a test before the PR. Put the report in the outcome as `verifier: <commands and what it saw>`.
+- A difference it reports that nobody asked for is a regression: fix it and pin it with a test before the PR. Put the report in the outcome as `verifier: <commands and what it saw>`, with one result per flow and each mismatch against the S# or the done contract.
 
 ## Output Contract
 
