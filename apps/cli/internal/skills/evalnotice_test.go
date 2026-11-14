@@ -53,5 +53,12 @@ func TestEvalRunnerSkillStatesTheNotice(t *testing.T) {
 		"`notice: none (paused run",
 		"never on a paused run",
 		"the only write",
+		"`notice: none (baseline: none",
+		"no accepted baseline",
+		"`gh api user`",
+		"only comments by the authenticated login",
+		"Conservative rule",
+		"never posted on a head that carries its own notice",
+		"only clears an earlier head's notice",
 	})
 }

@@ -707,13 +707,20 @@ done
 # A gh shim for the notice tests. It serves the PR head (pr-head) and the PR
 # comments (comments.json) from its state directory, stores a posted comment
 # unless the state holds no-store, fails a post when it holds fail-post, and
-# logs every call. Only the notice tests use it; the other tests keep their shim.
+# logs every call. The authenticated login is "owner" (fail with no-user). A
+# posted comment is written by owner. Only the notice tests use it.
 mkdir -p "$work/notice-shim"
 cat >"$work/notice-shim/gh" <<'EOF'
 #!/usr/bin/env bash
 echo "gh $*" >>"$GH_STATE/gh.log"
 case "$1" in
-  api) cat "$GH_STATE/comments.json" ;;
+  api)
+    if [[ "$2" == user ]]; then
+      [[ -e "$GH_STATE/no-user" ]] && exit 1
+      echo owner
+    else
+      cat "$GH_STATE/comments.json"
+    fi ;;
   pr)
     case "$2" in
       view) cat "$GH_STATE/pr-head" ;;
@@ -721,7 +728,7 @@ case "$1" in
         [[ -e "$GH_STATE/fail-post" ]] && exit 1
         file="${*: -1}"
         if [[ ! -e "$GH_STATE/no-store" ]]; then
-          jq --rawfile b "$file" '. + [{body: $b}]' "$GH_STATE/comments.json" >"$GH_STATE/comments.next" &&
+          jq --rawfile b "$file" '. + [{body: $b, user: {login: "owner"}}]' "$GH_STATE/comments.json" >"$GH_STATE/comments.next" &&
             mv "$GH_STATE/comments.next" "$GH_STATE/comments.json"
         fi
         echo "https://example.invalid/pull/42#issuecomment-1" ;;
@@ -744,11 +751,17 @@ two_tasks() {
 # notice_run <name> <evals-dir> <config> [fail-run] [pr]: the runner with --pr,
 # the fake engine and the notice shim. Its state is $work/<name>.gh; a state
 # file the test wrote first (pr-head, comments.json, fail-post, no-store) stays.
+# The task set gets an accepted baseline (intent 0030 S6) unless the state holds
+# no-baseline; the notice runs need one (S6: no baseline, no notice).
 notice_run() {
   local name="$1" evals="$2" cfg="$3" fail="${4:-0}" pr="${5:-42}" st="$work/$1.gh"
   mkdir -p "$st"
   [[ -f "$st/comments.json" ]] || echo '[]' >"$st/comments.json"
   [[ -f "$st/pr-head" ]] || printf '%s\n' "$head" >"$st/pr-head"
+  if [[ ! -e "$st/no-baseline" ]]; then
+    mkdir -p "$evals/baseline"
+    jq -n --arg c "$start" '{commit: $c, tasks: {"eval-001": "pass"}}' >"$evals/baseline/baseline.json"
+  fi
   : >"$st/gh.log"
   FAKE_COUNT="$work/$name.count" FAKE_RUNS="$work/$name.runs" FAKE_FAIL_RUN="$fail" \
     GABO_EVAL_ENGINE_CMD="$fake" GH_STATE="$st" PATH="$work/notice-shim:$PATH" \
@@ -818,7 +831,7 @@ e="$work/notice-again/evals"
 two_tasks "$e"
 mkdir -p "$work/notice-again.gh"
 jq -n --arg b "<!-- gabo-eval-notice sha=$head -->
-earlier notice" '[{body: $b}]' >"$work/notice-again.gh/comments.json"
+earlier notice" '[{body: $b, user: {login: "owner"}}]' >"$work/notice-again.gh/comments.json"
 out="$(notice_run notice-again "$e" "$cfg_notice" 2)"
 code=$?
 has "S9 a second run on the same head reads that the notice is already posted" "$code" 1 \
@@ -894,7 +907,7 @@ mkdir -p "$e"
 task "$start" >"$e/eval-001.json"
 mkdir -p "$work/notice-cleared.gh"
 jq -n --arg b "<!-- gabo-eval-notice sha=$old_head -->
-earlier notice" '[{body: $b}]' >"$work/notice-cleared.gh/comments.json"
+earlier notice" '[{body: $b, user: {login: "owner"}}]' >"$work/notice-cleared.gh/comments.json"
 out="$(notice_run notice-cleared "$e" "$cfg_notice")"
 code=$?
 has "PD5 the cleared marker is posted on the PR for the head" "$code" 0 \
@@ -998,6 +1011,89 @@ if [[ ! -e "$work/notice-badpr.count" ]]; then
   ok "S9 --pr 0 starts no engine"
 else
   bad "S9 --pr 0 starts no engine"
+fi
+
+# S6 no accepted baseline: a run with --pr posts no notice and says so (fix round 1).
+e="$work/notice-nobase/evals"
+two_tasks "$e"
+mkdir -p "$work/notice-nobase.gh"
+touch "$work/notice-nobase.gh/no-baseline"
+out="$(notice_run notice-nobase "$e" "$cfg_notice" 2)"
+code=$?
+has "S6 with no accepted baseline the run reads baseline: none and posts no notice" "$code" 1 \
+  "notice: none (baseline: none" "$out"
+if [[ "$(posted notice-nobase)" == 0 ]]; then
+  ok "S6 with no accepted baseline a run with --pr makes zero gh pr comment calls"
+else
+  bad "S6 with no accepted baseline a run with --pr makes zero gh pr comment calls (posted $(posted notice-nobase))"
+fi
+
+# Login (fix round 1): only comments by the authenticated login count, so another
+# commenter's text never blocks a notice or a cleared marker.
+e="$work/notice-stranger/evals"
+two_tasks "$e"
+mkdir -p "$work/notice-stranger.gh"
+jq -n --arg b "<!-- gabo-eval-notice sha=$head -->
+pasted by someone else" '[{body: $b, user: {login: "mallory"}}]' >"$work/notice-stranger.gh/comments.json"
+out="$(notice_run notice-stranger "$e" "$cfg_notice" 2)"
+code=$?
+has "login: a notice pasted by another commenter does not count, the notice is posted" "$code" 1 \
+  "notice: posted notice on PR #42 for head $head" "$out"
+if [[ "$(posted notice-stranger)" == 1 ]]; then
+  ok "login: exactly one notice is posted when the only matching text is another commenter's"
+else
+  bad "login: exactly one notice is posted (posted $(posted notice-stranger))"
+fi
+e="$work/notice-stranger-clear/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+mkdir -p "$work/notice-stranger-clear.gh"
+jq -n --arg b "<!-- gabo-eval-notice sha=$old_head -->
+pasted" '[{body: $b, user: {login: "mallory"}}]' >"$work/notice-stranger-clear.gh/comments.json"
+out="$(notice_run notice-stranger-clear "$e" "$cfg_notice")"
+code=$?
+has "login: another commenter's notice does not earn a cleared marker" "$code" 0 \
+  "notice: none (at or above the threshold; no notice on PR #42)" "$out"
+if [[ "$(posted notice-stranger-clear)" == 0 ]]; then
+  ok "login: no cleared marker is posted for another commenter's notice"
+else
+  bad "login: no cleared marker is posted for another commenter's notice (posted $(posted notice-stranger-clear))"
+fi
+if [[ "$(grep -c '^gh api user' "$work/notice-stranger-clear.gh/gh.log")" == 1 ]]; then
+  ok "login: the authenticated login is read once per run"
+else
+  bad "login: the authenticated login is read once per run (got $(grep -c '^gh api user' "$work/notice-stranger-clear.gh/gh.log"))"
+fi
+e="$work/notice-nouser/evals"
+two_tasks "$e"
+mkdir -p "$work/notice-nouser.gh"
+touch "$work/notice-nouser.gh/no-user"
+out="$(notice_run notice-nouser "$e" "$cfg_notice" 2)"
+code=$?
+has "login: an unreadable login posts nothing and says so" "$code" 1 \
+  "notice: not posted: could not read the authenticated login" "$out"
+if [[ "$(posted notice-nouser)" == 0 ]]; then
+  ok "login: an unreadable login makes zero posts"
+else
+  bad "login: an unreadable login makes zero posts (posted $(posted notice-nouser))"
+fi
+
+# Rule (fix round 1, T8): a cleared marker never goes on a head that already
+# carries a notice for that head; a cleared marker only clears an earlier head's notice.
+e="$work/notice-rule/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+mkdir -p "$work/notice-rule.gh"
+jq -n --arg b "<!-- gabo-eval-notice sha=$head -->
+notice of this head" '[{body: $b, user: {login: "owner"}}]' >"$work/notice-rule.gh/comments.json"
+out="$(notice_run notice-rule "$e" "$cfg_notice")"
+code=$?
+has "rule: a passing run on a head that carries its own notice reads no cleared marker" "$code" 0 \
+  "notice: none (head $head already carries a notice; no cleared marker for it)" "$out"
+if [[ "$(posted notice-rule)" == 0 ]]; then
+  ok "rule: no cleared marker is posted for a head that carries its own notice"
+else
+  bad "rule: no cleared marker is posted for a head that carries its own notice (posted $(posted notice-rule))"
 fi
 
 echo "passes: $passes failures: $failures"

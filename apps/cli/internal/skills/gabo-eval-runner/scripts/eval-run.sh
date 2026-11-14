@@ -42,15 +42,18 @@
 # printed, never written: the assistant saves it under that topic. The runner
 # never writes the baseline; only the owner's acceptance replaces it.
 #
-# Notice (intent 0030 S9, D6, PD4, PD5), only with --pr. A paused run posts nothing.
-# A complete run below eval.pass_threshold, or with no threshold set, posts one
-# comment on the PR that opens with `<!-- gabo-eval-notice sha=<head> -->` and
-# names the head, the pass rate, the threshold and each failed task. A second run
-# on the same head posts no duplicate. A complete run at or above the threshold
-# posts no notice; on a PR that already carries a notice it posts once the
-# cleared marker `<!-- gabo-eval-cleared sha=<head> -->`. The PR's head must be
-# --head, or nothing is posted. Every post is read back. The merge step (intent
-# 0030 S10) reads these markers; the notice never carries the reviewer's marker.
+# Notice (intent 0030 S9, D6, PD4, PD5), only with --pr. A paused run posts nothing,
+# and so does a run with no accepted baseline (S6). A complete run below
+# eval.pass_threshold, or with no threshold set, posts one comment on the PR that
+# opens with `<!-- gabo-eval-notice sha=<head> -->` and names the head, the pass
+# rate, the threshold and each failed task. A second run on the same head posts no
+# duplicate. A complete run at or above the threshold posts no notice; on a PR that
+# carries a notice of an earlier head it posts once the cleared marker
+# `<!-- gabo-eval-cleared sha=<head> -->`. Conservative rule (for T8): a cleared
+# marker is never posted on a head that carries its own notice. Only comments by
+# the authenticated login (gh api user, read once per run) count. The PR's head
+# must be --head, or nothing is posted. Every post is read back. The merge step
+# (intent 0030 S10) reads these markers; the notice never carries the reviewer's marker.
 #
 # Exit 0 when every task passes, 1 on a refusal, a failing task or a notice that
 # was not posted, 2 on bad usage, 3 when a cap paused the run and no task failed.
@@ -407,10 +410,14 @@ report_moved() {
 # mktemp scratch that the parent removes; gh runs from the repository, as the
 # owner's login, and the PR's comments are read before and after each post.
 post_notice() {
-  local pr_head comments what marker body_file dir below=0
+  local pr_head comments what marker body_file dir login below=0
   [[ -n "$pr_number" ]] || return 0
   if [[ -n "$paused" ]]; then
     echo "notice: none (paused run: a notice is posted only for a complete run)"
+    return 0
+  fi
+  if [[ -z "$baseline_commit" ]]; then
+    echo "notice: none (baseline: none; no notice before the owner accepts a baseline, S6)"
     return 0
   fi
   pr_head="$(cd "$repo" && gh pr view "$pr_number" --json headRefOid --jq .headRefOid 2>/dev/null)" || pr_head=""
@@ -424,7 +431,15 @@ post_notice() {
     notice_failed=1
     return 0
   fi
-  comments="$(pr_comment_bodies "$pr_number")" || {
+  # Only comments by the authenticated login count (fix round 1): another
+  # commenter's text never blocks a notice, earns a cleared marker or is read back.
+  login="$(cd "$repo" && gh api user --jq .login 2>/dev/null)" || login=""
+  if [[ -z "$login" ]]; then
+    echo "notice: not posted: could not read the authenticated login"
+    notice_failed=1
+    return 0
+  fi
+  comments="$(pr_comment_bodies "$pr_number" "$login")" || {
     echo "notice: not posted: could not read the PR comments"
     notice_failed=1
     return 0
@@ -440,14 +455,20 @@ post_notice() {
       return 0
     fi
   else
-    if ! grep -Fq -- "<!-- gabo-eval-notice sha=" <<<"$comments"; then
-      echo "notice: none (at or above the threshold; no notice on PR #$pr_number)"
-      return 0
-    fi
+    # Conservative rule (fix round 1, for T8): a cleared marker only clears an
+    # earlier head's notice. It is never posted on a head that carries its own notice.
     what="cleared marker"
     marker="<!-- gabo-eval-cleared sha=$head -->"
     if grep -Fq -- "$marker" <<<"$comments"; then
       echo "notice: cleared marker already posted for head $head"
+      return 0
+    fi
+    if grep -Fq -- "<!-- gabo-eval-notice sha=$head -->" <<<"$comments"; then
+      echo "notice: none (head $head already carries a notice; no cleared marker for it)"
+      return 0
+    fi
+    if ! grep -Fq -- "<!-- gabo-eval-notice sha=" <<<"$comments"; then
+      echo "notice: none (at or above the threshold; no notice on PR #$pr_number)"
       return 0
     fi
   fi
@@ -489,7 +510,7 @@ post_notice() {
     notice_failed=1
     return 0
   fi
-  comments="$(pr_comment_bodies "$pr_number")" || comments=""
+  comments="$(pr_comment_bodies "$pr_number" "$login")" || comments=""
   if ! grep -Fq -- "$marker" <<<"$comments"; then
     echo "notice: posted $what on PR #$pr_number for head $head, but the read back does not show it"
     notice_failed=1
@@ -498,11 +519,12 @@ post_notice() {
   echo "notice: posted $what on PR #$pr_number for head $head"
 }
 
-# pr_comment_bodies <pr>: the bodies of the PR's comments, one comment after the
-# other, read from the repository (gh resolves the owner and repo from it).
+# pr_comment_bodies <pr> <login>: the bodies of the PR's comments written by the
+# authenticated login, one comment after the other, read from the repository (gh
+# resolves the owner and repo from it). Other commenters' text is never returned.
 pr_comment_bodies() {
   (cd "$repo" && gh api --paginate "repos/{owner}/{repo}/issues/$1/comments" 2>/dev/null) |
-    jq -rs 'add // [] | .[].body'
+    jq -rs --arg u "$2" 'add // [] | .[] | select(.user.login == $u) | .body'
 }
 
 engine_label="$engine"
