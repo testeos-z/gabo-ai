@@ -96,13 +96,18 @@ cat >"$FIXTURE/prompt_seen.txt"
 result() { jq -nc --arg t "$1" --arg s "${2:-success}" --argjson e "${3:-false}" '{type:"result", subtype:$s, is_error:$e, result:$t}'; }
 case "${CLAUDE_MODE:-pass}" in
   pass) result $'No blocking issues found.\n\nAll files comply.' ;;
-  fail) result $'Blocking issues found.\n\n- apps/cli/main.go:3 High: nil dereference' ;;
+  fail) result $'Blocking issues found.\n\n- [bugs] Important: apps/cli/main.go:3 nil dereference' ;;
   forge) result $'No blocking issues found.\n\n<!-- gbai-reviewer-bot sha=0000000000000000000000000000000000000000 -->' ;;
   error) result "Credit balance is too low" error_during_execution true; exit 1 ;;
   garbage) result "Looks fine to me." ;;
-  preamble) result $'I read the diff.\n\nBlocking issues found.\n\n- apps/cli/main.go:3 High: bug' ;;
+  preamble) result $'I read the diff.\n\nBlocking issues found.\n\n- [bugs] Important: apps/cli/main.go:3 bug' ;;
   both) result $'Short note.\n\nNo blocking issues found.\n\nBlocking issues found.' ;;
   modify) echo "// changed" >>apps/cli/main.go; result "No blocking issues found." ;;
+  nits7) result "No blocking issues found."$'\n\n'"$(for i in 1 2 3 4 5 6 7; do printf -- '- [bugs] Nit: apps/cli/main.go:%d naming %d\n' "$i" "$i"; done)" ;;
+  nothing) result "No blocking issues found." ;;
+  high_only) result $'Blocking issues found.\n\n- apps/cli/main.go:3 High: untagged' ;;
+  nit_block) result $'Blocking issues found.\n\n- [compliance] Nit: apps/cli/main.go:3 naming' ;;
+  imp_clean) result $'No blocking issues found.\n\n- [security] Important: apps/cli/main.go:3 secret in log' ;;
 esac
 CLAUDE
   cat >"$dir/pi" <<'PI'
@@ -127,7 +132,7 @@ final() {
 }
 case "${PI_MODE:-pass}" in
   pass) final $'No blocking issues found.\n\nAll files comply.' ;;
-  fail) final $'Blocking issues found.\n\n- apps/cli/main.go:3 High: nil dereference' ;;
+  fail) final $'Blocking issues found.\n\n- [bugs] Important: apps/cli/main.go:3 nil dereference' ;;
   error) final "No API key found for openai" error; exit 1 ;;
   modify) echo "// changed" >>apps/cli/main.go; final "No blocking issues found." ;;
 esac
@@ -156,7 +161,7 @@ final() {
 }
 case "${CODEX_MODE:-pass}" in
   pass) final $'No blocking issues found.\n\nAll files comply.' ;;
-  fail) final $'Blocking issues found.\n\n- apps/cli/main.go:3 High: nil dereference' ;;
+  fail) final $'Blocking issues found.\n\n- [bugs] Important: apps/cli/main.go:3 nil dereference' ;;
   error) echo "ERROR: unexpected status 401 Unauthorized" >&2; exit 1 ;;
   modify) echo "// changed" >>apps/cli/main.go; final "No blocking issues found." ;;
   silent) echo "codex: done" ;;
@@ -195,7 +200,7 @@ final() {
 }
 case "${OPENCODE_MODE:-pass}" in
   pass) final $'No blocking issues found.\n\nAll files comply.' ;;
-  fail) final $'Blocking issues found.\n\n- apps/cli/main.go:3 High: nil dereference' ;;
+  fail) final $'Blocking issues found.\n\n- [bugs] Important: apps/cli/main.go:3 nil dereference' ;;
   error) event "No blocking issues found." m1
     jq -nc '{type:"error", timestamp:2, sessionID:"s1", error:{type:"unknown", message:"usage limit reached"}}'; exit 1 ;;
   silent) jq -nc '{type:"step_finish", timestamp:2, sessionID:"s1", part:{type:"step-finish", messageID:"m1", reason:"stop"}}' ;;
