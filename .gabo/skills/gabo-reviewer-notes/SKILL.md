@@ -27,7 +27,12 @@ Use when an agent needs to understand or explain a review result. Agents never r
 
 - After every push the coder runs the scripts of the user-level `gbai-reviewer` skill itself (`~/.claude/skills/gbai-reviewer/scripts/`) through its shell, no relay agent in between (intent 0015 S3, S4, D5): it validates `PR #<n> head <40-hex sha>` (or `PR #<n> head <40-hex sha> engine <engine>`, see Review engine), runs the script and acts on its final `VERDICT` line (D20). It never reviews, edits, comments or merges as the reviewer.
 - The scripts live outside every repository, so PR code cannot modify the code that reviews it. They refuse to run when they are not under the user-level skills dir or are writable by others.
-- Each run has two parts: the repository checks (`review.checks` in `gabo.yaml`) and an agent review of the diff. Both must pass for a clean verdict.
+- Each run has two parts: the repository checks (`review.checks` in `gabo.yaml`) and the code read of the diff. Both must pass for a clean verdict.
+- The code read follows the review policy in `REVIEW.md`, read from the integration branch (`dev`) at the base commit the comment names, never from the PR head, so a PR that edits it is judged by the `dev` copy. Without `REVIEW.md` on `dev` the review fails closed: the comment says review policy: not run: no policy file on `dev`, and no clean verdict is given.
+- The code read runs three passes in one review: `bugs`, `security` and `compliance` (the compliance pass compares the diff with spec.md, plan.md and the design principles). Each finding carries its pass tag, `[bugs]`, `[security]` or `[compliance]`, and is marked Important or Nit.
+- Only an Important finding caused by the pull request is blocking. Style and naming are nits; at most five nits are listed, with the count of the rest. A nit never blocks.
+- The comment opens with the `VERDICT` line, then the checks section, then the code read section, which ends with its `code read:` line: `code read: pass`, `code read: fail: <finding>` or `code read: not run: <reason>`.
+- RDD never replaces the reviewer: a coder-side RDD outcome, granted or not, is never a substitute for the checks, the code read or the merge gate.
 
 ### Review engine
 
