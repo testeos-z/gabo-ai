@@ -84,9 +84,18 @@ func TestRuntimeOpenCodeInstallsTheStageGate(t *testing.T) {
 		"a default definition with an `id` and a `setup` function",
 		"`ctx.tool.hook(\"execute.before\", ...)`",
 		"`event.tool` and `event.input`",
+		"A `shell` call goes to `gabo check --pre-command` with the tool-call JSON on stdin",
+		"both run with `GABO_ENGINE=opencode`",
+		"exit 3 adds that OpenCode shows no prompt for an ask",
+		"any other exit or a signal blocks the call and names the failure",
 	} {
 		if !strings.Contains(steps, want) {
 			t.Errorf("## Build Steps: missing %q", want)
+		}
+	}
+	for _, stale := range []string{"or exits otherwise, the call runs", "A `shell` call that writes files is not gated"} {
+		if strings.Contains(steps, stale) {
+			t.Errorf("## Build Steps: still says %q", stale)
 		}
 	}
 	if !strings.Contains(openCodeSection(t, doc, "Output Contract"), "`.opencode/plugins/gabo-stage-gate.js`") {
@@ -135,7 +144,7 @@ process.stdout.write(JSON.stringify(out));
 const fakeGabo = `#!/bin/sh
 while IFS= read -r line || [ -n "$line" ]; do printf '%s\n' "$line"; done > "$FAKE_GABO_LOG.stdin"
 for a in "$@"; do printf '%s\n' "$a" >> "$FAKE_GABO_LOG"; done
-printf 'cwd=%s\nengine=%s\n--\n' "$PWD" "$GABO_ENGINE" >> "$FAKE_GABO_LOG"
+printf 'cwd=%s\nengine=%s\ntask=%s\noutcome=%s\n--\n' "$PWD" "$GABO_ENGINE" "$GABO_TASK" "$GABO_OUTCOME_FILE" >> "$FAKE_GABO_LOG"
 printf '%s' "$FAKE_GABO_OUT"
 if [ "$FAKE_GABO_EXIT" = killed ]; then kill -KILL $$; fi
 exit "$FAKE_GABO_EXIT"
@@ -151,6 +160,8 @@ type stageGateRun struct {
 	calls    [][]string
 	cwds     []string
 	engines  []string
+	tasks    []string
+	outcomes []string
 	stdin    string
 }
 
@@ -172,7 +183,12 @@ func runStageGate(t *testing.T, node string, call map[string]any, withGabo bool,
 		t.Fatal(err)
 	}
 	if withGabo {
-		if err := os.WriteFile(filepath.Join(bin, "gabo"), []byte(fakeGabo), 0o755); err != nil {
+		// "noexec" leaves the fake without its execute bit: the spawn fails with EACCES.
+		mode := os.FileMode(0o755)
+		if exit == "noexec" {
+			mode = 0o644
+		}
+		if err := os.WriteFile(filepath.Join(bin, "gabo"), []byte(fakeGabo), mode); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -196,7 +212,7 @@ func runStageGate(t *testing.T, node string, call map[string]any, withGabo bool,
 	cmd.Dir = dir
 	// The ambient GABO_ENGINE names another engine: the plugin must still
 	// tell gabo the call comes from opencode.
-	cmd.Env = []string{"SESSION_DIR=" + session, "PATH=" + bin, "HOME=" + dir, "GABO_ENGINE=claude", "FAKE_GABO_LOG=" + log, "FAKE_GABO_EXIT=" + exit, "FAKE_GABO_OUT=" + out}
+	cmd.Env = []string{"SESSION_DIR=" + session, "PATH=" + bin, "HOME=" + dir, "GABO_ENGINE=claude", "GABO_TASK=I0028/T13", "GABO_OUTCOME_FILE=/nonexistent/outcome.jsonl", "FAKE_GABO_LOG=" + log, "FAKE_GABO_EXIT=" + exit, "FAKE_GABO_OUT=" + out}
 	stdout, err := cmd.Output()
 	if ctx.Err() != nil {
 		t.Fatalf("node driver timed out after 60s")
@@ -232,6 +248,14 @@ func runStageGate(t *testing.T, node string, call map[string]any, withGabo bool,
 			}
 			if v, ok := strings.CutPrefix(l, "engine="); ok {
 				r.engines = append(r.engines, v)
+				continue
+			}
+			if v, ok := strings.CutPrefix(l, "task="); ok {
+				r.tasks = append(r.tasks, v)
+				continue
+			}
+			if v, ok := strings.CutPrefix(l, "outcome="); ok {
+				r.outcomes = append(r.outcomes, v)
 				continue
 			}
 			cur = append(cur, l)
@@ -294,6 +318,8 @@ func TestStageGatePluginRelaysCallsToGabo(t *testing.T) {
 			wantCalls: [][]string{{"check", "--pre-write", target}}, wantThrow: true, wantMsg: "gabo check --pre-write failed (exit 2); the call is blocked\nusage"},
 		{name: "write gabo killed by a signal blocks", call: map[string]any{"tool": "write", "args": map[string]any{"path": target}}, withGabo: true, exit: "killed",
 			wantCalls: [][]string{{"check", "--pre-write", target}}, wantThrow: true, wantMsg: "gabo check --pre-write was killed by signal SIGKILL; the call is blocked"},
+		{name: "write gabo not executable blocks", call: map[string]any{"tool": "write", "args": map[string]any{"path": target}}, withGabo: true, exit: "noexec",
+			wantThrow: true, wantMsg: "gabo check --pre-write could not run (spawn gabo EACCES); the call is blocked"},
 		{name: "write gabo missing runs with one warning", call: map[string]any{"tool": "edit", "args": map[string]any{"path": target}}, withGabo: false, wantWarn: 1},
 		{name: "shell passes", call: map[string]any{"tool": "shell", "args": map[string]any{"command": shellCmd}}, withGabo: true, exit: "0",
 			wantCalls: [][]string{{"check", "--pre-command"}}, wantStdin: `{"tool_input":{"command":"git push origin feat/x"}}`},
@@ -321,6 +347,19 @@ func TestStageGatePluginRelaysCallsToGabo(t *testing.T) {
 			}
 			if len(r.engines) != len(r.calls) {
 				t.Errorf("gabo ran %d times with %d engine records", len(r.calls), len(r.engines))
+			}
+			for _, task := range r.tasks {
+				if task != "I0028/T13" {
+					t.Errorf("gabo ran with GABO_TASK=%q, want the cycle's task", task)
+				}
+			}
+			for _, outcome := range r.outcomes {
+				if outcome != "/nonexistent/outcome.jsonl" {
+					t.Errorf("gabo ran with GABO_OUTCOME_FILE=%q, want the cycle's outcome file", outcome)
+				}
+			}
+			if len(r.tasks) != len(r.calls) || len(r.outcomes) != len(r.calls) {
+				t.Errorf("gabo ran %d times with %d task and %d outcome records", len(r.calls), len(r.tasks), len(r.outcomes))
 			}
 			if r.stdin != tc.wantStdin {
 				t.Errorf("gabo stdin = %q, want %q", r.stdin, tc.wantStdin)
