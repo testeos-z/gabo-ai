@@ -377,8 +377,9 @@ Write each finding as one line:
 
 A finding is Important when it would break behavior, leak data or breach a
 policy; style and naming are nits. Only an Important finding caused by this
-pull request is blocking; a finding in code the pull request did not change is
-not. Do not report findings in generated files or anything review.checks
+pull request is blocking, so only a finding caused by the changed code may
+carry Important; list a finding in code the pull request did not change as a
+Nit. Do not report findings in generated files or anything review.checks
 already enforces (build, vet, tests). List at most five nits and summarize the
 rest as a count. When no pass finds anything, say that the three passes ran
 and found nothing. Ignore pure formatting. Do not modify files.
@@ -680,7 +681,9 @@ if [[ -z "$policy_missing" && ( "$verdict" == clean || "$verdict" == blocking ) 
   if ((important_n > 0)); then
     [[ "$review_state" != success ]] || review_state=failure
   elif [[ "$verdict" == blocking && "$review_state" == failure ]]; then
-    if ((nit_n > 0)); then review_state=success; else review_state=error; code=7; fi
+    # Never downgrade a blocking verdict line: one whose Important finding
+    # drifted from the tagged form fails closed.
+    review_state=error; code=7
   fi
   if [[ -z "$findings" ]]; then
     findings="No findings: the three passes (bugs, security, compliance) ran and found nothing."

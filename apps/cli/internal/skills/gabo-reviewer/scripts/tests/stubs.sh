@@ -107,6 +107,8 @@ case "${CLAUDE_MODE:-pass}" in
   nothing) result "No blocking issues found." ;;
   high_only) result $'Blocking issues found.\n\n- apps/cli/main.go:3 High: untagged' ;;
   nit_block) result $'Blocking issues found.\n\n- [compliance] Nit: apps/cli/main.go:3 naming' ;;
+  drift) result $'Blocking issues found.\n\n1. [security] Important: apps/cli/main.go:3 leak\n- [bugs] Nit: apps/cli/main.go:4 naming' ;;
+  nitcont) result "No blocking issues found."$'\n\n'"$(for i in 1 2 3 4 5 6; do printf -- '- [bugs] Nit: apps/cli/main.go:%d naming\n  continuation of nit %d\n' "$i" "$i"; done)" ;;
   imp_clean) result $'No blocking issues found.\n\n- [security] Important: apps/cli/main.go:3 secret in log' ;;
 esac
 CLAUDE
