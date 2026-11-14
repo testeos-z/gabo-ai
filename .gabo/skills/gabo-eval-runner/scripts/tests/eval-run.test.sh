@@ -40,14 +40,17 @@ head="$(gitc "$repo" rev-parse HEAD)"
 missing_commit="ffffffffffffffffffffffffffffffffffffffff"
 
 # Fake coder engine: counts its runs, records its working directory, writes
-# out.txt (done, or broken on the run named by FAKE_FAIL_RUN).
+# out.txt (done, or broken on the run named by FAKE_FAIL_RUN). On the run named
+# by FAKE_CAP_RUN it stops at a turn cap, as claude prints it, and exits 1.
+# FAKE_STDIN keeps a copy of the prompt it received.
 mkdir -p "$work/bin"
 cat >"$work/bin/fake-engine" <<'EOF'
 #!/usr/bin/env bash
 n=$(( $(cat "$FAKE_COUNT" 2>/dev/null || echo 0) + 1 ))
 echo "$n" >"$FAKE_COUNT"
-cat >/dev/null
+cat >"${FAKE_STDIN:-/dev/null}"
 echo "run $n pwd=$(pwd) enterprise=${GH_ENTERPRISE_TOKEN:-unset}/${GITHUB_ENTERPRISE_TOKEN:-unset} ssh=${SSH_AUTH_SOCK:-unset} token=${GH_TOKEN:-unset}/${GITHUB_TOKEN:-unset}" >>"$FAKE_RUNS"
+if [[ "$n" == "${FAKE_CAP_RUN:-0}" ]]; then echo "Error: Reached max turns (2)"; exit 1; fi
 if [[ "$n" == "${FAKE_FAIL_RUN:-0}" ]]; then echo broken >out.txt; else echo done >out.txt; fi
 # The coder's final answer is its report, which the runner judges (intent 0030 S5).
 cat "${FAKE_REPORT:-$(dirname "$0")/report-full.txt}"
@@ -108,6 +111,16 @@ cfg_noruntime="$work/noruntime.yaml"
 printf 'eval:\n  min_tasks: 1\n' >"$cfg_noruntime"
 cfg_min2="$work/min2.yaml"
 printf 'runtimes:\n  coder: claude\n' >"$cfg_min2"
+cfg_runs_cap="$work/runs-cap.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  cap:\n    task_runs_per_eval_run: 1\n' >"$cfg_runs_cap"
+cfg_turn_cap="$work/turn-cap.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  cap:\n    turns_per_task_run: 2\n' >"$cfg_turn_cap"
+cfg_codex_cap="$work/codex-cap.yaml"
+printf 'runtimes:\n  coder: codex\neval:\n  min_tasks: 1\n  cap:\n    turns_per_task_run: 3\n' >"$cfg_codex_cap"
+cfg_cap_zero="$work/cap-zero.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  cap:\n    task_runs_per_eval_run: 0\n' >"$cfg_cap_zero"
+cfg_cap_inline="$work/cap-inline.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  cap: {turns_per_task_run: 2}\n' >"$cfg_cap_inline"
 
 # run_eval <name> <evals-dir> <config> [fail-run] [head]: the runner with the
 # fake engine and the gh shim first on PATH; prints its output, returns its code.
@@ -322,11 +335,170 @@ code=$?
 has "S4 a TMPDIR inside a git repository still gets the head configuration applied" "$code" 0 \
   "task eval-001: pass (1 of 1 runs)" "$out"
 
+# --- S8: caps pause the run; a cut task is never fail or pass ----------------
+
+# three_tasks <evals-dir>: three accepted tasks, eval-001 to eval-003.
+three_tasks() {
+  mkdir -p "$1"
+  local id
+  for id in eval-001 eval-002 eval-003; do
+    task "$start" | jq --arg id "$id" '.id = $id' >"$1/$id.json"
+  done
+}
+
+# S8 task_runs_per_eval_run of 1: the second task is the first not started.
+e="$work/caps-runs/evals"
+three_tasks "$e"
+out="$(run_eval caps-runs "$e" "$cfg_runs_cap")"
+code=$?
+has "S8 the first task runs and passes before the cap fires" "$code" 3 \
+  "task eval-001: pass (1 of 1 runs)" "$out"
+has "S8 the second task reads not run: cap <name>" "$code" 3 \
+  "task eval-002: not run: cap eval.cap.task_runs_per_eval_run" "$out"
+has "S8 the third task reads not run: cap <name>" "$code" 3 \
+  "task eval-003: not run: cap eval.cap.task_runs_per_eval_run" "$out"
+has "S8 the report is marked paused and names the cap" "$code" 3 \
+  "status: paused by cap eval.cap.task_runs_per_eval_run" "$out"
+has "S8 the pause asks the owner to continue or stop" "$code" 3 "continue or stop?" "$out"
+has "S8 the report names the cap value" "$code" 3 "cap: eval.cap.task_runs_per_eval_run 1" "$out"
+if grep -Eq "task eval-00[23]: (pass|fail)" <<<"$out" || grep -q "pass rate" <<<"$out"; then
+  bad "S8 a task stopped by a cap never reads fail or pass, and the set gets no pass rate: $out"
+else
+  ok "S8 a task stopped by a cap never reads fail or pass, and the set gets no pass rate"
+fi
+if grep -q "task eval-002: starting" <<<"$out"; then
+  bad "S8 a task the cap stops before its first run is not reported as starting"
+else
+  ok "S8 a task the cap stops before its first run is not reported as starting"
+fi
+if [[ "$(cat "$work/caps-runs.count" 2>/dev/null)" == 1 ]]; then
+  ok "S8 the engine runs once: the cap stops the next task run before it starts"
+else
+  bad "S8 the engine runs once (count $(cat "$work/caps-runs.count" 2>/dev/null))"
+fi
+
+# S8 turns_per_task_run of 2: the engine stops at its turn cap on the second run.
+e="$work/caps-turns/evals"
+three_tasks "$e"
+out="$(FAKE_CAP_RUN=2 run_eval caps-turns "$e" "$cfg_turn_cap")"
+code=$?
+has "S8 a task before the turn cap passes" "$code" 3 "task eval-001: pass (1 of 1 runs)" "$out"
+has "S8 the task the engine stopped at its turn cap reads not run: cap <name>" "$code" 3 \
+  "task eval-002: not run: cap eval.cap.turns_per_task_run" "$out"
+has "S8 the task after it reads not run: cap <name>, the run pauses" "$code" 3 \
+  "task eval-003: not run: cap eval.cap.turns_per_task_run" "$out"
+has "S8 the report is marked paused by the turn cap" "$code" 3 \
+  "status: paused by cap eval.cap.turns_per_task_run" "$out"
+if grep -Eq "task eval-00[23]: (pass|fail)" <<<"$out"; then
+  bad "S8 a turn-capped task never reads fail or pass: $out"
+else
+  ok "S8 a turn-capped task never reads fail or pass"
+fi
+if [[ "$(cat "$work/caps-turns.count" 2>/dev/null)" == 2 ]]; then
+  ok "S8 the engine runs twice: the turn cap pauses before the third task starts"
+else
+  bad "S8 the engine runs twice (count $(cat "$work/caps-turns.count" 2>/dev/null))"
+fi
+
+# S8 a failed run before a turn cut still makes the run exit 1 (the failure is
+# not hidden by the pause).
+cfg_fail_cut="$work/fail-cut.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  runs_per_task: 2\n  cap:\n    turns_per_task_run: 2\n' >"$cfg_fail_cut"
+e="$work/caps-failcut/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_CAP_RUN=2 run_eval caps-failcut "$e" "$cfg_fail_cut" 1)"
+code=$?
+has "S8 a cut task with an earlier failed run reads not run and names the failure" "$code" 1 \
+  "task eval-001: not run: cap eval.cap.turns_per_task_run (a run before the cap failed)" "$out"
+
+# S8 a cap block indented wider than two spaces still pauses the run.
+cfg_wide_cap="$work/wide-cap.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n    min_tasks: 1\n    cap:\n        task_runs_per_eval_run: 1\n' >"$cfg_wide_cap"
+e="$work/caps-wide/evals"
+three_tasks "$e"
+out="$(run_eval caps-wide "$e" "$cfg_wide_cap")"
+code=$?
+has "S8 a four-space cap block is read and pauses the run" "$code" 3 \
+  "task eval-002: not run: cap eval.cap.task_runs_per_eval_run" "$out"
+
+# S8 only claude's own error line is a turn-cap stop: codex printing the same
+# words is a failing run, not a cut one.
+e="$work/caps-echo/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_CAP_RUN=1 run_eval caps-echo "$e" "$cfg_codex_cap")"
+code=$?
+has "S8 a non-claude engine that prints the phrase is a failing run, not a turn cut" "$code" 1 \
+  "task eval-001: fail (0 of 1 runs)" "$out"
+
+# S8 claude gets its turn cap as --max-turns (its own print-mode flag); a fake
+# claude on PATH records its arguments and stops at the cap.
+mkdir -p "$work/claude-bin"
+cat >"$work/claude-bin/claude" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$work/claude.args"
+cat >/dev/null
+echo "Error: Reached max turns (2)"
+exit 1
+EOF
+chmod +x "$work/claude-bin/claude"
+e="$work/caps-claude/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(env -u GABO_EVAL_ENGINE_CMD PATH="$work/claude-bin:$work/shim:$PATH" \
+  bash "$script" run "$e" --repo "$repo" --head "$head" --config "$cfg_turn_cap" 2>&1)"
+code=$?
+if grep -q -- "--max-turns 2" "$work/claude.args" 2>/dev/null; then
+  ok "S8 claude is started with --max-turns 2 for eval.cap.turns_per_task_run"
+else
+  bad "S8 claude is started with --max-turns 2 (args: $(cat "$work/claude.args" 2>/dev/null))"
+fi
+has "S8 a claude run stopped at its turn cap reads not run: cap, not fail" "$code" 3 \
+  "task eval-001: not run: cap eval.cap.turns_per_task_run" "$out"
+has "S8 the report says the turn cap is enforced by the engine for claude" "$code" 3 \
+  "enforced by the engine" "$out"
+
+# S8 advisory engines: the launch input carries the limit (intent 0020 D2).
+e="$work/caps-codex/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_STDIN="$work/caps-codex.prompt" run_eval caps-codex "$e" "$cfg_codex_cap")"
+code=$?
+has "S8 codex's launch input carries the turn limit" "$code" 0 \
+  "Turn limit for this run: 3 turns." "$(cat "$work/caps-codex.prompt" 2>/dev/null)"
+has "S8 the report says the turn cap is advisory for codex" "$code" 0 "advisory" "$out"
+
+# S8 no cap set: the report says so, and the run is unchanged.
+e="$work/caps-none/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(run_eval caps-none "$e" "$cfg_coder")"
+code=$?
+has "S8 with no cap set the report reads cap: none set" "$code" 0 "cap: none set" "$out"
+if grep -q "status: \|not run" <<<"$out"; then
+  bad "S8 with no cap set the run is not paused and its summary line is unchanged"
+else
+  has "S8 with no cap set the summary line is unchanged" "$code" 0 "tasks: 1, failing: 0" "$out"
+fi
+has "S8 the report names the intent 0020 rule" "$code" 0 "intent 0020" "$out"
+has "S8 the report says gabo does not cap spend" "$code" 0 "spend is not capped by gabo" "$out"
+
 # --- refusals: no engine runs -------------------------------------------------
 
 e="$work/refuse/evals"
 mkdir -p "$e"
 task "$start" >"$e/eval-001.json"
+
+out="$(run_eval refuse-cap-zero "$e" "$cfg_cap_zero")"
+code=$?
+has "S8 eval.cap.task_runs_per_eval_run of 0 is refused before any run" "$code" 1 \
+  "refused config: eval.cap.task_runs_per_eval_run must be at least 1" "$out"
+
+out="$(run_eval refuse-cap-inline "$e" "$cfg_cap_inline")"
+code=$?
+has "S8 an inline eval.cap value is refused before any run" "$code" 1 \
+  "refused config: eval.cap must be a block" "$out"
 
 out="$(run_eval refuse-zero "$e" "$cfg_zero")"
 code=$?
@@ -352,7 +524,7 @@ out="$(run_eval refuse-head "$e" "$cfg_coder" 0 nope)"
 code=$?
 has "S4 a head that is not a commit is refused" "$code" 1 "refused --head: nope is not a commit" "$out"
 
-for n in refuse-zero refuse-engine refuse-noruntime refuse-min refuse-head; do
+for n in refuse-zero refuse-engine refuse-noruntime refuse-min refuse-head refuse-cap-zero refuse-cap-inline; do
   if [[ ! -e "$work/$n.count" ]]; then
     ok "S4 $n starts no engine"
   else
