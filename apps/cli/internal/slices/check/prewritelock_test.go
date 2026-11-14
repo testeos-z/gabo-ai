@@ -173,7 +173,7 @@ func TestWriteHumanOnlyPathJudgedThroughASymlink(t *testing.T) {
 	links := map[string]string{"/proj/notes.yml": "/proj/.github/x.yml"}
 	exists := []string{"/proj", "/proj/.github", "/proj/.github/x.yml"}
 	s := Settings{Root: preRoot, Layers: layers(), Engine: "claude", Resolve: fakeResolve(links, exists...), Readlink: fakeReadlink(links, exists...)}
-	v := NewUseCase(project(), configFiles{projectFile: validConfig}, goodUser(), s).JudgeWrites([]string{"notes.yml"}, "a1", true)
+	v := NewUseCase(project(), configFiles{projectFile: validConfig}, goodUser(), s).JudgeWrites([]string{"notes.yml"}, WriteCall{AgentID: "a1", Engine: "claude", CanAsk: true})
 	want := "✗ human_only_paths: a coder write to the human-only path .github/x.yml is blocked\nnext: " + humanOnlyRoute + "\n"
 	if v.Exit != ExitFailed || v.Out != want {
 		t.Fatalf("verdict = %+v, want exit %d and %q", v, ExitFailed, want)
@@ -241,5 +241,91 @@ func TestHumanOnlyPathMatch(t *testing.T) {
 		if got := humanOnlyPath(tt.rel, entries, tt.fold); got != tt.want {
 			t.Errorf("humanOnlyPath(%q, fold=%v) = %v, want %v", tt.rel, tt.fold, got, tt.want)
 		}
+	}
+}
+
+// I0028 S7 (review of PR #869, medium): the hooks of claude and codex give an
+// agent id to subagents only, and no hook names its engine: a human's own
+// main-session write to gabo.yaml must pass when GABO_ENGINE is unset.
+func TestWriteMainSessionWithoutEngineIsNotBlocked(t *testing.T) {
+	t.Parallel()
+	out := &fakeOutcomes{}
+	stdin := `{"tool_input":{"file_path":"gabo.yaml"}}`
+	got, err := runWriteHook(t, project(), configFiles{projectFile: validConfig}, "", out, stdin, "--pre-write")
+	if err != nil || got != "" || len(out.lines) != 0 {
+		t.Fatalf("err = %v, output = %q, records = %q; want nil, no output, no record", err, got, out.lines)
+	}
+}
+
+// I0028 S7 (review of PR #869, medium): a subagent's write is judged even
+// when no engine is named: its agent id alone makes it a coder's.
+func TestWriteSubagentWithoutEngineIsBlocked(t *testing.T) {
+	t.Parallel()
+	got, err := runWriteHook(t, project(), configFiles{projectFile: validConfig}, "", &fakeOutcomes{}, coderWriteJSON("gabo.yaml"), "--pre-write")
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != ExitFailed || !strings.Contains(got, "a coder write to the human-only path gabo.yaml is blocked") {
+		t.Fatalf("err = %v, output = %q; want the coder block", err, got)
+	}
+}
+
+// I0028 S7 (review of PR #869, finding 4): the path-argument form has no agent
+// id, so its session is the engine's: an engine that names itself (here
+// opencode, which gives no id) is a coder's, and an unnamed engine is not.
+func TestWritePathArgumentJudgedByItsEngine(t *testing.T) {
+	t.Parallel()
+	const path = ".github/workflows/x.yml"
+	tests := []struct {
+		name, engine string
+		blocked      bool
+	}{
+		{name: "unnamed engine is the main session", engine: "", blocked: false},
+		{name: "a named engine without ids is a coder's", engine: "opencode", blocked: true},
+		{name: "claude without an id is the main session", engine: "claude", blocked: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			out := &fakeOutcomes{}
+			got, err := runWriteHook(t, project(), configFiles{projectFile: validConfig}, tt.engine, out, "", "--pre-write", path)
+			if tt.blocked != (err != nil) || (tt.blocked && !strings.Contains(got, "a coder write to the human-only path "+path+" is blocked")) {
+				t.Fatalf("err = %v, output = %q; want blocked = %v", err, got, tt.blocked)
+			}
+		})
+	}
+}
+
+// I0028 S7 (review of PR #869, finding 4): a write that the stage gate and the
+// human-only lock both block prints both lines, in order, with one exit 1.
+func TestWriteGateAndLockBothBlockPrintsBoth(t *testing.T) {
+	t.Parallel()
+	cfg := strings.Replace(validConfig, "[.github/]", "[docs/product/]", 1)
+	out := &fakeOutcomes{}
+	got, err := runWriteHook(t, intentWith(unfilledMD), configFiles{projectFile: cfg}, "claude", out, coderWriteJSON(prePlan), "--pre-write")
+	var exit *ExitError
+	want := notAccepted + "\n" + "✗ human_only_paths: a coder write to the human-only path " + prePlan + " is blocked\nnext: " + humanOnlyRoute + "\n"
+	if !errors.As(err, &exit) || exit.Code != ExitFailed || got != want {
+		t.Fatalf("err = %v, output = %q, want exit %d and %q", err, got, ExitFailed, want)
+	}
+}
+
+// I0028 S10, S12 (review of PR #869, finding 3): when the stage gate blocks
+// the same write, a lock at ask is recorded as blocked, never as asked: no
+// prompt is shown for the call.
+func TestWriteAskUnderAStageGateIsRecordedBlocked(t *testing.T) {
+	t.Parallel()
+	cfg := strings.Replace(validConfig, "[.github/]", "[docs/product/]", 1) + "locks:\n  human_only_paths: ask\n"
+	out := &fakeOutcomes{}
+	_, err := runWriteHook(t, intentWith(unfilledMD), configFiles{projectFile: cfg}, "claude", out, coderWriteJSON(prePlan), "--pre-write")
+	var exit *ExitError
+	if !errors.As(err, &exit) || exit.Code != ExitFailed {
+		t.Fatalf("err = %v, want exit %d", err, ExitFailed)
+	}
+	for _, line := range out.lines {
+		if strings.Contains(line, `"outcome":"asked"`) {
+			t.Fatalf("records = %q, want no asked record for a call the gate blocks", out.lines)
+		}
+	}
+	if len(out.lines) != 1 || !strings.Contains(out.lines[0], `"outcome":"blocked"`) {
+		t.Fatalf("records = %q, want one blocked record", out.lines)
 	}
 }

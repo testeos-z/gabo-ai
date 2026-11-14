@@ -255,19 +255,48 @@ type WriteVerdict struct {
 	Out  string
 }
 
+// WriteCall is the part of a file-tool call the human-only lock judges.
+type WriteCall struct {
+	// AgentID is the subagent's id of the call, "" for the main session.
+	AgentID string
+	// Engine is the engine the call came from, "" when the hook does not name it.
+	Engine string
+	// CanAsk reports whether the engine can show its yes/no prompt for an ask.
+	CanAsk bool
+	// Gated reports that the stage gate already blocks the call, so no prompt
+	// is shown for it whatever the lock says.
+	Gated bool
+}
+
+// writeSession reports whether a file-tool call belongs to a coder session
+// (intent 0028 S7, decision 13). A call with an agent id is a subagent's. A
+// call without one whose engine is not named is the main session: no hook
+// names its engine yet, and the human's own edit of gabo.yaml must pass. A
+// named engine is judged as CoderSession judges it: claude and codex give an
+// id to subagents only, so their id-less calls are the main session, and every
+// other engine (pi, opencode) is a coder's.
+func writeSession(agentID, engine string) bool {
+	if agentID != "" {
+		return true
+	}
+	if engine == "" {
+		return false
+	}
+	return CoderSession(agentID, engine)
+}
+
 // JudgeWrites judges the paths one file-tool call writes under the
-// human_only_paths lock (intent 0028 S7, S10 to S12, S16). Only a coder
-// session is judged (CoderSession, decision 13). A path whose target is
-// gabo.yaml or lies under review.human_only_paths is a violation: its state
-// gives Decide's outcome, one record is written per violating path, and each
-// violation prints one Explain block. canAsk is false where the engine cannot
-// show a prompt (session facts): an ask then counts as blocked. A config that
-// cannot be read fails the coder's writes closed. It writes no project file;
-// the caller runs PreWrite (the stage gate) on the same paths, which also
-// blocks a path whose symlinks cannot be resolved, so such a path is not
-// judged here.
-func (u *UseCase) JudgeWrites(paths []string, agentID string, canAsk bool) WriteVerdict {
-	if !CoderSession(agentID, u.s.Engine) {
+// human_only_paths lock (intent 0028 S7, S10 to S12, S16). Only a coder session
+// is judged (writeSession). A path whose target is gabo.yaml or lies under
+// review.human_only_paths is a violation: its state gives Decide's outcome, one
+// record is written per violating path, and each violation prints one Explain
+// block. An ask counts as blocked where no prompt can be shown (CanAsk false)
+// or the stage gate blocks the call anyway (Gated). A config that cannot be read
+// fails the coder's writes closed. It writes no project file. The caller runs
+// PreWrite (the stage gate) on the same paths, which also blocks a path whose
+// symlinks cannot be resolved, so such a path is not judged here.
+func (u *UseCase) JudgeWrites(paths []string, call WriteCall) WriteVerdict {
+	if !writeSession(call.AgentID, call.Engine) {
 		return WriteVerdict{}
 	}
 	cfg, err := u.lockConfig()
@@ -283,8 +312,11 @@ func (u *UseCase) JudgeWrites(paths []string, agentID string, canAsk bool) Write
 		}
 		rule := "a coder write to the human-only path " + target + " is blocked"
 		d := Decide(cfg.Lock(config.LockHumanOnlyPaths), cfg.Mode)
-		if !canAsk && d.Exit == ExitAsk {
+		switch {
+		case d.Exit == ExitAsk && !call.CanAsk:
 			d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the engine cannot show its prompt here; it counts as blocked"}
+		case d.Exit == ExitAsk && call.Gated:
+			d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the stage gate blocks this write too; no prompt is shown"}
 		}
 		if err := u.RecordDecision(config.LockHumanOnlyPaths, rule, d); err != nil {
 			return WriteVerdict{Exit: ExitFailed, Out: Explain(config.LockHumanOnlyPaths, rule, "fix the outcome file named by GABO_OUTCOME_FILE, then retry", Decision{}) + "\n"}

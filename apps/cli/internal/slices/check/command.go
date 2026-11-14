@@ -376,7 +376,7 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 	if err != nil {
 		return &ExitError{Code: ExitUsage, Err: err}
 	}
-	return printWrites(cmd, rep, uc.JudgeWrites(paths, agentID, true))
+	return printWrites(cmd, rep, uc.JudgeWrites(paths, WriteCall{AgentID: agentID, Engine: uc.s.Engine, CanAsk: true, Gated: rep.Failed}))
 }
 
 // printWrites prints the stage gate's blocked lines, then the human-only

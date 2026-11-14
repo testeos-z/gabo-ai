@@ -164,9 +164,10 @@ func (u *UseCase) JudgeFacts(f Facts) FactsResult {
 			reasons = append(reasons, err.Error())
 		}
 		reasons = append(reasons, rep.Lines...)
-		// Facts carry no agent id: the session is judged as a coder's (the
-		// engine gives none), and no prompt can be shown, so an ask blocks.
-		if v := u.JudgeWrites(f.TargetPaths, "", false); v.Out != "" {
+		// Facts carry no agent id: the engine they name (pi) makes the session a
+		// coder's, and no prompt can be shown, so an ask blocks.
+		call := WriteCall{Engine: f.Engine, Gated: err != nil || rep.Failed}
+		if v := u.JudgeWrites(f.TargetPaths, call); v.Out != "" {
 			reasons = append(reasons, strings.Split(strings.TrimSuffix(v.Out, "\n"), "\n")...)
 		}
 		if len(reasons) > 0 {
