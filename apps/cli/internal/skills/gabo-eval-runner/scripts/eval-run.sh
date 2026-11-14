@@ -457,7 +457,9 @@ post_notice() {
   body_file="$dir/body.md"
   {
     echo "$marker"
-    if ((below)); then
+    if [[ -z "$threshold" ]]; then
+      echo "Eval run with no threshold set on this head (intent 0030 S9, PD4): a person merges this PR; the automatic merge is held."
+    elif ((below)); then
       echo "Eval run below the threshold on this head (intent 0030 S9): a person merges this PR; the automatic merge is held."
     else
       echo "Eval run at or above the threshold on this head (intent 0030 S9, PD5): the hold of the earlier notice ends for this head."

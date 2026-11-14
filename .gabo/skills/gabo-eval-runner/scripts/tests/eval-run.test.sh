@@ -860,6 +860,13 @@ else
 fi
 body="$(last_body notice-unset)"
 body_has "PD4 the notice says threshold: not set" "$body" "threshold: not set"
+body_has "PD4 the notice does not call a passing run below the threshold" "$body" \
+  "Eval run with no threshold set on this head (intent 0030 S9, PD4)"
+if grep -Fq "below the threshold" <<<"$body"; then
+  bad "PD4 the notice with no threshold set never says below the threshold"
+else
+  ok "PD4 the notice with no threshold set never says below the threshold"
+fi
 if [[ "$(head -n 1 <<<"$body")" == "<!-- gabo-eval-notice sha=$head -->" ]]; then
   ok "PD4 the notice opens with its marker line for the head"
 else
