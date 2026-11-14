@@ -62,8 +62,9 @@ func TestEvalRunnerSkillStatesTheRules(t *testing.T) {
 	}
 	for _, s := range []string{
 		"`evals/*.json`", "`not accepted`", "`set below minimum:", "`maximum reached:",
-		"`refused <file>: missing <field>`", "token or key pattern", "`eval.min_tasks`", "`eval.max_tasks`",
-		"`source_issue`", "`source_pr`", "`starting_commit`", "`spec_refs`", "`outcome_checks`", "`acceptance`",
+		"`refused <file>: missing <field>`", "`refused config:", "`duplicate id`", "token or key pattern",
+		"`eval.min_tasks`", "`eval.max_tasks`",
+		"`source_issue`", "`source_pr`", "`source_wave`", "`starting_commit`", "`spec_refs`", "`outcome_checks`", "`acceptance`",
 		"eval-set.sh check evals", "eval-set.sh propose evals",
 		"Never write a token", "no engine",
 	} {
@@ -90,9 +91,11 @@ func TestEvalRunnerShellTests(t *testing.T) {
 }
 
 // The script reads eval.min_tasks and eval.max_tasks itself, because a shell
-// script cannot call the config accessors. This pins its reading to the
-// config loader (T1) for the defaults and for raised values, so the two
-// cannot drift: the script must report the counts config.Load gives.
+// script cannot call the config accessors. This pins it to the config loader
+// (T1): where the loader accepts a config, the script reports the counts it
+// gives, defaults included; where the script refuses a config (a flow-style
+// block it cannot read, or a value the loader rejects), the loader must not
+// give it counts of its own, so the two cannot drift.
 func TestEvalRunnerReadsCountsLikeTheConfigLoader(t *testing.T) {
 	if testing.Short() {
 		t.Skip("shell script skipped in -short mode")
@@ -108,9 +111,18 @@ func TestEvalRunnerReadsCountsLikeTheConfigLoader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cases := []struct{ name, eval string }{
-		{"defaults", ""},
-		{"raised", "eval:\n  min_tasks: 3\n  max_tasks: 12\n"},
+	cases := []struct {
+		name, eval string
+		// refuse: the script must refuse this config, not run with other counts.
+		refuse bool
+		// loaderRejects: config.Load must reject the same config.
+		loaderRejects bool
+	}{
+		{name: "defaults"},
+		{name: "raised", eval: "eval:\n  min_tasks: 3\n  max_tasks: 12\n"},
+		{name: "flow style", eval: "eval: {min_tasks: 3, max_tasks: 12}\n", refuse: true},
+		{name: "minimum zero", eval: "eval:\n  min_tasks: 0\n", refuse: true, loaderRejects: true},
+		{name: "minimum above maximum", eval: "eval:\n  min_tasks: 5\n  max_tasks: 3\n", refuse: true, loaderRejects: true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -119,17 +131,27 @@ func TestEvalRunnerReadsCountsLikeTheConfigLoader(t *testing.T) {
 			if err := os.WriteFile(cfgPath, append(append([]byte{}, base...), c.eval...), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			cfg, err := config.Load(cfgPath)
-			if err != nil {
-				t.Fatalf("config.Load: %v", err)
+			cfg, loadErr := config.Load(cfgPath)
+			if c.loaderRejects != (loadErr != nil) {
+				t.Fatalf("config.Load error %v; want rejected=%v", loadErr, c.loaderRejects)
 			}
-			min, max := cfg.EvalMinTasks(), cfg.EvalMaxTasks()
 			evals := filepath.Join(dir, "evals")
 			if err := os.Mkdir(evals, 0o700); err != nil {
 				t.Fatal(err)
 			}
+			if c.refuse {
+				out, err := exec.Command("bash", script, "check", evals, "--config", cfgPath).CombinedOutput()
+				if err == nil || !strings.Contains(string(out), "refused config:") {
+					t.Fatalf("eval-set.sh check must refuse this config; got err %v, output %q", err, out)
+				}
+				return
+			}
+			if loadErr != nil {
+				t.Fatalf("config.Load: %v", loadErr)
+			}
+			min, max := cfg.EvalMinTasks(), cfg.EvalMaxTasks()
 			for i := 1; i <= min; i++ {
-				task := fmt.Sprintf(`{"id":"eval-%03d","source_issue":821,"source_pr":849,`+
+				task := fmt.Sprintf(`{"id":"eval-%03d","source_issue":821,"source_pr":849,"source_wave":"I0030-fixture",`+
 					`"starting_commit":"1b5c1a57d667744802aec1690bedd7cfe94803c2","task_input":"fixture",`+
 					`"spec_refs":["S1"],"outcome_checks":["true"],`+
 					`"acceptance":{"accepted_by":"owner","accepted_on":"2026-11-14"}}`, i)
