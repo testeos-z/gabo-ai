@@ -93,6 +93,41 @@ func TestEngineProbeRowsReportsDuplicateRow(t *testing.T) {
 	}
 }
 
+// probeS14Missing returns the engines, in probe order, whose item (a) is no but whose record
+// lacks the statement "S14 applies to <engine>".
+func probeS14Missing(doc string) []string {
+	rows, _ := probeRows(doc)
+	var missing []string
+	for _, engine := range probeEngines {
+		cells, ok := rows[engine]
+		if !ok || len(cells) < 3 || cells[2] != "no" {
+			continue
+		}
+		// A positive statement for this engine, not any line that mentions it.
+		statement := regexp.MustCompile(`S14 applies to ` + regexp.QuoteMeta(engine) + `\b`)
+		if !statement.MatchString(doc) {
+			missing = append(missing, engine)
+		}
+	}
+	return missing
+}
+
+// TestEngineProbeS14StatementNeedsItemANo checks the S14 rule on fixtures: a no on (a)
+// without the statement is reported, and the statement clears it.
+func TestEngineProbeS14StatementNeedsItemANo(t *testing.T) {
+	t.Parallel()
+	table := "| engine | version | (a) | (b) | (c) | (d) |\n" +
+		"|---|---|---|---|---|---|\n" +
+		"| claude | 2.1 | no | yes | yes | no |\n" +
+		"| codex | 0.1 | yes | yes | yes | no |\n"
+	if got := probeS14Missing(table); !slices.Equal(got, []string{"claude"}) {
+		t.Errorf("missing S14 statements = %v, want [claude]", got)
+	}
+	if got := probeS14Missing(table + "\nS14 applies to claude.\n"); len(got) != 0 {
+		t.Errorf("missing S14 statements = %v, want none once the statement is present", got)
+	}
+}
+
 // TestEngineProbeNoOnItemANamesS14 requires every engine whose item (a) is no to
 // state "S14 applies to <engine>" in the record, so the plan knows the fallback applies to it.
 func TestEngineProbeNoOnItemANamesS14(t *testing.T) {
@@ -101,16 +136,7 @@ func TestEngineProbeNoOnItemANamesS14(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read probe record: %v", err)
 	}
-	doc := string(raw)
-	rows, _ := probeRows(doc)
-	for engine, cells := range rows {
-		if len(cells) < 3 || cells[2] != "no" {
-			continue
-		}
-		// A positive statement for this engine, not any line that mentions it.
-		statement := regexp.MustCompile(`S14 applies to ` + regexp.QuoteMeta(engine) + `\b`)
-		if !statement.MatchString(doc) {
-			t.Errorf("%s has item (a) no but the record lacks the statement %q", engine, "S14 applies to "+engine)
-		}
+	for _, engine := range probeS14Missing(string(raw)) {
+		t.Errorf("%s has item (a) no but the record lacks the statement %q", engine, "S14 applies to "+engine)
 	}
 }
