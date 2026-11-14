@@ -702,5 +702,296 @@ for n in refuse-zero refuse-engine refuse-noruntime refuse-min refuse-head refus
   fi
 done
 
+# --- S9: the notice on the PR and the cleared marker (intent 0030 S9, D6, PD4, PD5)
+
+# A gh shim for the notice tests. It serves the PR head (pr-head) and the PR
+# comments (comments.json) from its state directory, stores a posted comment
+# unless the state holds no-store, fails a post when it holds fail-post, and
+# logs every call. Only the notice tests use it; the other tests keep their shim.
+mkdir -p "$work/notice-shim"
+cat >"$work/notice-shim/gh" <<'EOF'
+#!/usr/bin/env bash
+echo "gh $*" >>"$GH_STATE/gh.log"
+case "$1" in
+  api) cat "$GH_STATE/comments.json" ;;
+  pr)
+    case "$2" in
+      view) cat "$GH_STATE/pr-head" ;;
+      comment)
+        [[ -e "$GH_STATE/fail-post" ]] && exit 1
+        file="${*: -1}"
+        if [[ ! -e "$GH_STATE/no-store" ]]; then
+          jq --rawfile b "$file" '. + [{body: $b}]' "$GH_STATE/comments.json" >"$GH_STATE/comments.next" &&
+            mv "$GH_STATE/comments.next" "$GH_STATE/comments.json"
+        fi
+        echo "https://example.invalid/pull/42#issuecomment-1" ;;
+      *) exit 99 ;;
+    esac ;;
+  *) exit 99 ;;
+esac
+EOF
+chmod +x "$work/notice-shim/gh"
+
+# two_tasks <evals-dir>: two accepted tasks, eval-001 and eval-002.
+two_tasks() {
+  mkdir -p "$1"
+  local id
+  for id in eval-001 eval-002; do
+    task "$start" | jq --arg id "$id" '.id = $id' >"$1/$id.json"
+  done
+}
+
+# notice_run <name> <evals-dir> <config> [fail-run] [pr]: the runner with --pr,
+# the fake engine and the notice shim. Its state is $work/<name>.gh; a state
+# file the test wrote first (pr-head, comments.json, fail-post, no-store) stays.
+notice_run() {
+  local name="$1" evals="$2" cfg="$3" fail="${4:-0}" pr="${5:-42}" st="$work/$1.gh"
+  mkdir -p "$st"
+  [[ -f "$st/comments.json" ]] || echo '[]' >"$st/comments.json"
+  [[ -f "$st/pr-head" ]] || printf '%s\n' "$head" >"$st/pr-head"
+  : >"$st/gh.log"
+  FAKE_COUNT="$work/$name.count" FAKE_RUNS="$work/$name.runs" FAKE_FAIL_RUN="$fail" \
+    GABO_EVAL_ENGINE_CMD="$fake" GH_STATE="$st" PATH="$work/notice-shim:$PATH" \
+    bash "$script" run "$evals" --repo "$repo" --head "$head" --config "$cfg" --pr "$pr" 2>&1
+}
+
+# posted <name>: how many comments the runner posted on the PR in that run.
+posted() {
+  local n
+  n="$(grep -c '^gh pr comment' "$work/$1.gh/gh.log" 2>/dev/null)"
+  echo "${n:-0}"
+}
+
+# last_body <name>: the body of the last comment the run stored.
+last_body() { jq -r '.[-1].body' "$work/$1.gh/comments.json"; }
+
+# body_has <label> <body> <needle>: a substring of a posted body.
+body_has() {
+  if grep -Fq -- "$3" <<<"$2"; then ok "$1"; else bad "$1 (body lacks: $3)"; fi
+}
+
+cfg_notice="$work/notice.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  pass_threshold: 0.9\n' >"$cfg_notice"
+cfg_notice_unset="$work/notice-unset.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n' >"$cfg_notice_unset"
+cfg_notice_cap="$work/notice-cap.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  pass_threshold: 0.9\n  cap:\n    task_runs_per_eval_run: 1\n' >"$cfg_notice_cap"
+old_head="1234567890123456789012345678901234567890"
+other_head="2222222222222222222222222222222222222222"
+
+# S9 a complete run below the threshold posts one notice naming what it measured.
+e="$work/notice-below/evals"
+two_tasks "$e"
+out="$(notice_run notice-below "$e" "$cfg_notice" 2)"
+code=$?
+has "S9 a complete run below the threshold exits 1 for its failing task" "$code" 1 \
+  "task eval-002: fail (0 of 1 runs)" "$out"
+has "S9 the run reports the notice posted on the PR for the head" "$code" 1 \
+  "notice: posted notice on PR #42 for head $head" "$out"
+if [[ "$(posted notice-below)" == 1 ]]; then
+  ok "S9 exactly one comment is posted on the PR"
+else
+  bad "S9 exactly one comment is posted on the PR (posted $(posted notice-below))"
+fi
+body="$(last_body notice-below)"
+if [[ "$(head -n 1 <<<"$body")" == "<!-- gabo-eval-notice sha=$head -->" ]]; then
+  ok "S9 the notice opens with its marker line for the head"
+else
+  bad "S9 the notice opens with its marker line for the head: $(head -n 1 <<<"$body")"
+fi
+body_has "S9 the notice names the head commit" "$body" "head: $head"
+body_has "S9 the notice names the pass rate and the tasks" "$body" "pass rate: 0.50 (1 of 2 tasks)"
+body_has "S9 the notice names the threshold" "$body" "threshold: 0.9"
+body_has "S9 the notice names each failed task and its reason" "$body" \
+  "- eval-002: check grep -qx done out.txt failed (exit 1)"
+body_has "S9 the notice names the run id and its memory topic" "$body" "memory topic: gabo/eval/$head/"
+if grep -Fq gbai-reviewer-bot <<<"$body"; then
+  bad "D6 the notice never carries the reviewer's marker"
+else
+  ok "D6 the notice never carries the reviewer's marker"
+fi
+has "S9 the scratch holding the notice body is printed for the parent to remove" "$code" 1 \
+  "gabo-eval-notice." "$out"
+
+# S9 a second run on the same head posts no duplicate.
+e="$work/notice-again/evals"
+two_tasks "$e"
+mkdir -p "$work/notice-again.gh"
+jq -n --arg b "<!-- gabo-eval-notice sha=$head -->
+earlier notice" '[{body: $b}]' >"$work/notice-again.gh/comments.json"
+out="$(notice_run notice-again "$e" "$cfg_notice" 2)"
+code=$?
+has "S9 a second run on the same head reads that the notice is already posted" "$code" 1 \
+  "notice: already posted for head $head" "$out"
+if [[ "$(posted notice-again)" == 0 ]]; then
+  ok "S9 a second run on the same head posts no duplicate"
+else
+  bad "S9 a second run on the same head posts no duplicate (posted $(posted notice-again))"
+fi
+
+# S9 a complete run at or above the threshold posts no notice and keeps the report.
+e="$work/notice-above/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(notice_run notice-above "$e" "$cfg_notice")"
+code=$?
+has "S9 a complete run at or above the threshold passes" "$code" 0 "task eval-001: pass (1 of 1 runs)" "$out"
+has "S9 the report is kept for a run at or above the threshold" "$code" 0 "pass rate: 1.00 (1 of 1 tasks)" "$out"
+has "S9 the report keeps its run id" "$code" 0 "run id: eval-" "$out"
+has "S9 a run at or above the threshold on a PR with no notice reads no notice" "$code" 0 \
+  "notice: none (at or above the threshold; no notice on PR #42)" "$out"
+if [[ "$(posted notice-above)" == 0 ]]; then
+  ok "S9 a run at or above the threshold posts no comment"
+else
+  bad "S9 a run at or above the threshold posts no comment (posted $(posted notice-above))"
+fi
+
+# S9 threshold not set: the notice is posted and says so (PD4).
+e="$work/notice-unset/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(notice_run notice-unset "$e" "$cfg_notice_unset")"
+code=$?
+has "S9 with no threshold set the run reads threshold: not set" "$code" 0 "threshold: not set" "$out"
+if [[ "$(posted notice-unset)" == 1 ]]; then
+  ok "PD4 a complete run with no threshold set posts the notice"
+else
+  bad "PD4 a complete run with no threshold set posts the notice (posted $(posted notice-unset))"
+fi
+body="$(last_body notice-unset)"
+body_has "PD4 the notice says threshold: not set" "$body" "threshold: not set"
+if [[ "$(head -n 1 <<<"$body")" == "<!-- gabo-eval-notice sha=$head -->" ]]; then
+  ok "PD4 the notice opens with its marker line for the head"
+else
+  bad "PD4 the notice opens with its marker line for the head"
+fi
+
+# S9 a paused run posts nothing (the report says so).
+e="$work/notice-paused/evals"
+two_tasks "$e"
+out="$(notice_run notice-paused "$e" "$cfg_notice_cap")"
+code=$?
+has "S9 a paused run exits 3 and is marked paused" "$code" 3 \
+  "status: paused by cap eval.cap.task_runs_per_eval_run" "$out"
+has "S9 a paused run reads that no notice is posted" "$code" 3 "notice: none (paused run" "$out"
+if [[ "$(posted notice-paused)" == 0 ]]; then
+  ok "S9 a paused run posts nothing"
+else
+  bad "S9 a paused run posts nothing (posted $(posted notice-paused))"
+fi
+
+# PD5 a complete run at or above the threshold on a PR that carries a notice posts
+# the cleared marker once; a repeat on the same head posts none.
+e="$work/notice-cleared/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+mkdir -p "$work/notice-cleared.gh"
+jq -n --arg b "<!-- gabo-eval-notice sha=$old_head -->
+earlier notice" '[{body: $b}]' >"$work/notice-cleared.gh/comments.json"
+out="$(notice_run notice-cleared "$e" "$cfg_notice")"
+code=$?
+has "PD5 the cleared marker is posted on the PR for the head" "$code" 0 \
+  "notice: posted cleared marker on PR #42 for head $head" "$out"
+if [[ "$(posted notice-cleared)" == 1 ]]; then
+  ok "PD5 exactly one cleared marker is posted"
+else
+  bad "PD5 exactly one cleared marker is posted (posted $(posted notice-cleared))"
+fi
+cleared_count() {
+  jq '[.[] | select(.body | startswith("<!-- gabo-eval-cleared sha="))] | length' "$work/notice-cleared.gh/comments.json"
+}
+if [[ "$(cleared_count)" == 1 ]]; then
+  ok "PD5 one cleared marker is stored on the PR after the first run"
+else
+  bad "PD5 one cleared marker is stored on the PR after the first run (stored $(cleared_count))"
+fi
+if [[ "$(head -n 1 <<<"$(last_body notice-cleared)")" == "<!-- gabo-eval-cleared sha=$head -->" ]]; then
+  ok "PD5 the cleared marker names the head"
+else
+  bad "PD5 the cleared marker names the head: $(head -n 1 <<<"$(last_body notice-cleared)")"
+fi
+if grep -Fq gbai-reviewer-bot <<<"$(last_body notice-cleared)"; then
+  bad "D6 the cleared marker never carries the reviewer's marker"
+else
+  ok "D6 the cleared marker never carries the reviewer's marker"
+fi
+out="$(notice_run notice-cleared "$e" "$cfg_notice")"
+code=$?
+has "PD5 a repeat on the same head reads that the cleared marker is already posted" "$code" 0 \
+  "notice: cleared marker already posted for head $head" "$out"
+if [[ "$(posted notice-cleared)" == 0 && "$(cleared_count)" == 1 ]]; then
+  ok "PD5 a repeat on the same head posts no second cleared marker"
+else
+  bad "PD5 a repeat on the same head posts no second cleared marker (posted $(posted notice-cleared), stored $(cleared_count))"
+fi
+
+# S9 without --pr the runner posts nothing and calls no gh, even below the threshold.
+e="$work/notice-nopr/evals"
+two_tasks "$e"
+out="$(run_eval notice-nopr "$e" "$cfg_notice" 2)"
+code=$?
+has "S9 without --pr a run below the threshold still fails its task" "$code" 1 \
+  "task eval-002: fail (0 of 1 runs)" "$out"
+if grep -q 'notice' <<<"$out"; then
+  bad "S9 without --pr the run says nothing of a notice: $out"
+else
+  ok "S9 without --pr the run says nothing of a notice"
+fi
+if [[ ! -e "$work/gh.log" ]]; then
+  ok "S9 without --pr the runner calls no gh"
+else
+  bad "S9 without --pr the runner calls no gh: $(cat "$work/gh.log")"
+fi
+
+# S9 the PR head moved after the run: the notice is refused, never posted on
+# the wrong head.
+e="$work/notice-moved/evals"
+two_tasks "$e"
+mkdir -p "$work/notice-moved.gh"
+printf '%s\n' "$other_head" >"$work/notice-moved.gh/pr-head"
+out="$(notice_run notice-moved "$e" "$cfg_notice" 2)"
+code=$?
+has "S9 a PR whose head moved reads that the notice is not posted" "$code" 1 \
+  "notice: not posted: PR #42 head is $other_head, the run measured $head" "$out"
+if [[ "$(posted notice-moved)" == 0 ]]; then
+  ok "S9 a PR whose head moved gets no comment"
+else
+  bad "S9 a PR whose head moved gets no comment (posted $(posted notice-moved))"
+fi
+
+# S9 a failed post is reported, never silent, and exits 1.
+e="$work/notice-fail/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+mkdir -p "$work/notice-fail.gh"
+touch "$work/notice-fail.gh/fail-post"
+out="$(notice_run notice-fail "$e" "$cfg_notice" 1)"
+code=$?
+has "S9 a failed post reads that gh could not post the comment and exits 1" "$code" 1 \
+  "notice: not posted: gh could not post the comment" "$out"
+
+# S9 a post that the read back does not show is reported as unverified.
+e="$work/notice-noread/evals"
+two_tasks "$e"
+mkdir -p "$work/notice-noread.gh"
+touch "$work/notice-noread.gh/no-store"
+out="$(notice_run notice-noread "$e" "$cfg_notice" 2)"
+code=$?
+has "S9 a notice the read back does not show is reported and exits 1" "$code" 1 \
+  "but the read back does not show it" "$out"
+
+# S9 --pr takes a positive PR number; anything else is a usage error.
+e="$work/notice-badpr/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(bash "$script" run "$e" --repo "$repo" --head "$head" --config "$cfg_notice" --pr 0 2>&1)"
+code=$?
+has "S9 --pr 0 is a usage error before any run" "$code" 2 "usage:" "$out"
+if [[ ! -e "$work/notice-badpr.count" ]]; then
+  ok "S9 --pr 0 starts no engine"
+else
+  bad "S9 --pr 0 starts no engine"
+fi
+
 echo "passes: $passes failures: $failures"
 [[ "$failures" == 0 ]]
