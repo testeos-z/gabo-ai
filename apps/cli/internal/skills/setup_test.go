@@ -275,7 +275,7 @@ func productModel(t *testing.T) string {
 	if !ok {
 		t.Fatalf("%s: no **Product model.** step", setupSkill)
 	}
-	step, _, _ = strings.Cut(step, "\n9. ")
+	step, _, _ = strings.Cut(step, "\n10. Tell the owner")
 	return step
 }
 
