@@ -26,10 +26,10 @@ Items: (a) a pre-command hook fires for a shell call inside a coder subagent and
 |---|---|---|---|---|---|
 | claude | 2.1.302 (Claude Code) | yes | yes | yes | no |
 | codex | codex-cli 0.167.2 | yes | yes | yes | no |
-| pi | 1.5.2 | not testable: the delegated gentle-agents runner was not driven; only an emulated child process ran, so no subagent call was observed | not testable: no call inside a delegated subagent was observed; the session id was seen only on the emulated child's call | no | no |
+| pi | 1.5.2 | not testable: the delegated gentle-agents runner was not driven; only an emulated child process ran, so no subagent call was observed | not testable: no call inside a delegated subagent was observed; the session id was seen only on the emulated child's call | not testable: no delegated hand-off was observed; the installed typings suggest the handler cannot block it, but that was not run | no |
 | opencode | opencode v2.2.6 | yes | yes | yes | no |
 
-Consequence for the plan: item (a) is `yes` for claude, codex and opencode in a delegated run, and `not testable` for pi. No engine has item (a) `no` on this record, so S14 is not triggered by it. The Pi relay (T12) rests on an unobserved assumption: T12 and T16 must observe a delegated pi run before relying on it. Codex (d) rests on the bypass run alone.
+Consequence for the plan: item (a) is `yes` for claude, codex and opencode in a delegated run, and `not testable` for pi. No engine has item (a) `no` on this record, so S14 is not triggered by it. Pi's (a), (b) and (c) are `not testable`, so the Pi relay (T12) rests on unobserved assumptions: T12 and T16 must observe a delegated pi run, hand-off included, before relying on them. Codex (d) rests on the bypass run alone.
 
 ## How each cell was observed
 
@@ -56,7 +56,7 @@ Every run used a `mktemp -d` scratch project and hook scripts in a second `mktem
 - Model: `--provider opencode-go --model beam-free`; the default `openai` credential reported `invalid` and was not refreshed.
 - Command: `pi --no-extensions -e <probe.ts> --provider opencode-go --model beam-free --mode json -p "<call bash echo probe-deny-1>"`, with `GENTLE_PI_AGENTS_CHILD=1`.
 - Seen: `tool_call` fired for the bash call with a session id (`sessionId`); the `tool_execution_end` result was `probe: denied by pre-command hook` with `isError: true`. The event carries no agent id.
-- (c): the `agent_end` event fired at the end of the child run, but its handler type is `ExtensionHandler<AgentEndEvent>` with no result type (installed typings `dist/core/extensions/types.d.ts`), so a handler cannot block it. The hand-off cannot block. This is read from the typings, not from a run.
+- (c): the `agent_end` event fired at the end of the child run. Its handler type in the installed typings (`dist/core/extensions/types.d.ts`) is `ExtensionHandler<AgentEndEvent>` with no result type, which suggests a handler cannot block it. No run tested a block, and the emulated child is not a delegated hand-off, so the cell is `not testable`; the typings reading stays here as the reason to expect no block.
 - (d): a primary session (no child marker) ran `echo probe-ok > <file>` with no prompt; the file was written and the stream held no permission event. pi has no permission prompt and no bypass switch for bash.
 
 ### opencode (v2.2.6)
@@ -73,6 +73,6 @@ Every run used a `mktemp -d` scratch project and hook scripts in a second `mktem
 
 - The S1 human read is open. T2 waits for a person's read or the owner's written waiver. The assistant's read is recorded in the Reading section and is not the gate.
 - The native credential-list formats of codex, pi and opencode (plan PD5 and risk 3) are not covered by this record. T9 must establish them. The plan's T1 row still says T1 verifies them until a plan PR corrects it (D7).
-- Pi (a) and (b) need one delegated gentle-agents run to be observed. T12 and T16 run it.
+- Pi (a), (b) and (c) need one delegated gentle-agents run to be observed. T12 and T16 run it.
 - Codex (d) is weaker evidence than the other engines' (d): the bypass run is the only observation. S12's assumption depends on it, so T2 and T9 treat it as provisional.
 - The codex hook trust condition and the opencode hook shape (`execute.before` in a V2 definition, with `execute.after` for the hand-off) are inputs to T9 and T10.
