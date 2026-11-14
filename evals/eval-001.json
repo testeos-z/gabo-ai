@@ -2,12 +2,13 @@
   "id": "eval-001",
   "source_issue": 832,
   "source_pr": 859,
-  "source_wave": "pending: wave record id is not in the repository; fill it from the wave record before the owner accepts",
+  "source_wave": "I0030-20261114T184447Z",
   "starting_commit": "07665b1d6a1097fe1eca6e4059a979d42f2d429d",
-  "task_input": "Task issue #832 (I0030/T9): \"Assistant trigger rule: run the set when agent configuration changes\", with intent 0030 spec S3 at the starting commit. The verbatim launch prompt is not kept in the repository.",
-  "spec_refs": ["S3"],
+  "task_input": "### Change type\nTask of intent I0030 (plan task T9).\n\n### Summary\nAssistant trigger rule: run the set when agent configuration changes\n\n### Context and problem\nIntent #767, folder docs/product/intents/0030-agent-evals-when-skills-change/ (spec.md accepted by the owner 2026-11-14; plan.md in the plan PR). Spec refs: S3.\n\n### Proposed outcome\nSee the acceptance below and the plan row T9.\n\n### Scope and non-goals\nOne reviewable PR of about 400 changed lines. Nothing outside the files named in the plan's Parallel groups. Plan changes travel in their own PR (D7), never in this one. The pass-rate threshold and the eval cap are owner-set values: this task never writes a number for them.\n\n### Acceptance criteria\nHuman merge: `.gabo/skills/gabo-assistant/` is human-only. Test first: a text test fails until `gabo-assistant` names the path list (a `gabo-*` skill, an agent definition, the methodology adapter, the instruction file) and says a run happens on the owner's machine before the owner accepts the change, started by the owner or by the assistant, with `eval: not run: <reason>` as the stated alternative and no run for a PR that touches only product code; a grep test pins that no workflow under `.github/` names the runner. The hook entry is not in this task (T10). Probe on one configuration PR is part of T17.\n\n### Verification plan\nTest first (RED before GREEN). `go -C apps/cli build ./...`, `vet`, `test ./...` and `gabo check` pass. Size S.\n\n### Related issues, PRs, or references\nIntent #767. depends_on: T2. unblocks: T10, T13, T17. Local ids; the tracker blocked-by links match depends_on.\n\n",
+  "spec_refs": [
+    "S3"
+  ],
   "outcome_checks": [
-    "grep -qF '## Agent Eval Trigger' apps/cli/internal/skills/gabo-assistant/SKILL.md",
-    "go -C apps/cli test ./internal/skills/"
+    "grep -qF -- \"## Agent Eval Trigger\" apps/cli/internal/skills/gabo-assistant/SKILL.md"
   ]
 }

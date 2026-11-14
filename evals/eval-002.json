@@ -2,12 +2,16 @@
   "id": "eval-002",
   "source_issue": 837,
   "source_pr": 860,
-  "source_wave": "pending: wave record id is not in the repository; fill it from the wave record before the owner accepts",
+  "source_wave": "I0030-20261114T184447Z",
   "starting_commit": "a62e37b4a5d96cd8240b8305660b3025ec15495f",
-  "task_input": "Task issue #837 (I0030/T13): \"Assistant rules for incidents, two occurrences and review findings\", with intent 0030 spec S13, S15, S17 and S18 at the starting commit. The verbatim launch prompt is not kept in the repository.",
-  "spec_refs": ["S13", "S15", "S17", "S18"],
+  "task_input": "### Change type\nTask of intent I0030 (plan task T13).\n\n### Summary\nAssistant rules for incidents, two occurrences and review findings\n\n### Context and problem\nIntent #767, folder docs/product/intents/0030-agent-evals-when-skills-change/ (spec.md accepted by the owner 2026-11-14; plan.md in the plan PR). Spec refs: S13, S15, S17 (proposal), S18; D9.\n\n### Proposed outcome\nSee the acceptance below and the plan row T13.\n\n### Scope and non-goals\nOne reviewable PR of about 400 changed lines. Nothing outside the files named in the plan's Parallel groups. Plan changes travel in their own PR (D7), never in this one. The pass-rate threshold and the eval cap are owner-set values: this task never writes a number for them.\n\n### Acceptance criteria\nHuman merge (`gabo-assistant`). Test first: text tests fail until `gabo-assistant` states: an incident is a coder run that reported done and was later found wrong, a BLOCKED or refused task is not (S13); on an incident the assistant records one trace line and one lessons entry and asks `gabo-pm` for the Draft `intent.md` (D9); when the fix PR merges, one eval task is proposed that cites the lessons entry and the fix PR, `eval task: pending fix` otherwise, and the proposal says so when the set is at its maximum (S15); a mistake seen once is recorded in the seen-once section and a second occurrence opens one proposal PR that names both, never merged by the reviewer, and a decline is recorded in the lessons file (S17, S18).\n\n### Verification plan\nTest first (RED before GREEN). `go -C apps/cli build ./...`, `vet`, `test ./...` and `gabo check` pass. Size M.\n\n### Related issues, PRs, or references\nIntent #767. depends_on: T9, T12. unblocks: T14, T17. Local ids; the tracker blocked-by links match depends_on.\n\n",
+  "spec_refs": [
+    "S13",
+    "S15",
+    "S17",
+    "S18"
+  ],
   "outcome_checks": [
-    "grep -qF '## Incidents and Repeated Mistakes' apps/cli/internal/skills/gabo-assistant/SKILL.md",
-    "go -C apps/cli test ./internal/skills/"
+    "grep -qF -- \"## Incidents and Repeated Mistakes\" apps/cli/internal/skills/gabo-assistant/SKILL.md"
   ]
 }
