@@ -61,6 +61,7 @@ case "$args" in
     repo="$(awk '{for (i = 1; i < NF; i++) if ($i == "--repo") print $(i + 1)}' <<<"$args")"
     if [[ -f "$FIXTURE/pr_${n}_${repo//\//__}.json" ]]; then answer "pr_${n}_${repo//\//__}.json"; else answer "pr_$n.json"; fi ;;
   "pr merge "*) [[ -z "${MERGE_FAIL:-}" ]] || exit 1; echo merged ;;
+  "issue view "*) n="$(awk '{print $3}' <<<"$args")"; answer "issue_$n.json" ;;
   *"/pulls/"*"/files"*) n="$(grep -Eo 'pulls/[0-9]+' <<<"$args" | cut -d/ -f2)"; answer "files_$n" ;;
   *"-X POST repos/"*"/statuses/"*)
     sha="$(grep -Eo 'statuses/[0-9a-f]+' <<<"$args" | cut -d/ -f2)"
@@ -110,6 +111,12 @@ case "${CLAUDE_MODE:-pass}" in
   drift) result $'Blocking issues found.\n\n1. [security] Important: apps/cli/main.go:3 leak\n- [bugs] Nit: apps/cli/main.go:4 naming' ;;
   nitcont) result "No blocking issues found."$'\n\n'"$(for i in 1 2 3 4 5 6; do printf -- '- [bugs] Nit: apps/cli/main.go:%d naming\n  continuation of nit %d\n' "$i" "$i"; done)" ;;
   imp_clean) result $'No blocking issues found.\n\n- [security] Important: apps/cli/main.go:3 secret in log' ;;
+  qa_pass) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] S2: pass `gabo version` exit 0\n[qa] S3: pass\n[qa] neighbor 1 (gabo version): pass `gabo version` exit 0\n[qa] neighbor 2 (gabo check): pass' ;;
+  qa_exit1) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 1' ;;
+  qa_wrongcmd) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] S2: pass `gabo check` exit 0' ;;
+  qa_neighbor_fail) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] neighbor 1 (gabo version): fail: wrong output' ;;
+  qa_bare) result $'No blocking issues found.\n\n[qa] S1: pass\n[qa] S2: pass `gabo version` exit 0' ;;
+  qa_fail) result $'No blocking issues found.\n\n[qa] S1: fail: exit 1, "unknown flag --json"\n[qa] S2: pass `gabo version` exit 0' ;;
 esac
 CLAUDE
   cat >"$dir/pi" <<'PI'
@@ -224,13 +231,20 @@ if [[ -n "${FAIL_CHECK:-}" ]] && grep -Eq -- "$FAIL_CHECK" <<<"$args"; then
   [[ -z "${TEST_DB_URL:-}" ]] || echo "open ${TEST_DB_URL}: connection refused"
   exit 1
 fi
+out="" prev=""
+for a in "$@"; do [[ "$prev" == -o ]] && out="$a"; prev="$a"; done
+# A build with -o writes this stub as the binary under test, next to a copy of
+# the stub context (the QA run clears the environment, so it reads the file).
+if [[ -n "$out" ]]; then
+  cp "$(dirname "$0")/gabo" "$out" && cp "$(dirname "$0")/stub-context" "$(dirname "$out")/stub-context" || exit 1
+fi
 echo "ok: $args"
 GO
   cat >"$dir/gabo" <<'GABO'
 #!/usr/bin/env bash
 [[ -n "${STUB_LOG:-}" ]] || source "$(dirname "$0")/stub-context"
 args="gabo $*"
-echo "gabo-call $* GABO_UPGRADE_PR=${GABO_UPGRADE_PR:-unset} GH_TOKEN=${GH_TOKEN:-unset} HOME=$HOME" >>"$STUB_LOG"
+echo "gabo-call $* GABO_UPGRADE_PR=${GABO_UPGRADE_PR:-unset} GH_TOKEN=${GH_TOKEN:-unset} HOME=$HOME cwd=$PWD" >>"$STUB_LOG"
 case "${1:-}" in
   version) echo "gabo ${GABO_VERSION:-0.4.0}" ;;
   check)
@@ -340,6 +354,7 @@ make_origin() {
   "${g[@]}" -C "$src" checkout -qb feature
   case "${O_PR:-code}" in
     code) printf 'package main\n\nfunc main() {}\n' >"$src/apps/cli/main.go" ;;
+    docs) mkdir -p "$src/docs" && echo "# Notes" >"$src/docs/notes.md" ;;
     skills) echo "Edited coder rules." >>"$src/.gabo/skills/gabo-coder/SKILL.md" ;;
     upgrade)
       echo "${O_HEAD_STAMP:-9.9.9}" >"$src/.gabo/VERSION"
