@@ -156,8 +156,8 @@ if [[ "$mode" == config ]]; then
     min_tasks) echo "$min" ;;
     max_tasks) echo "$max" ;;
     runs_per_task) echo "$runs" ;;
-    turns_per_task_run) echo "$cap_turns" ;;
-    task_runs_per_eval_run) echo "$cap_runs" ;;
+    turns_per_task_run) [[ -z "$cap_turns" ]] || echo "$cap_turns" ;;
+    task_runs_per_eval_run) [[ -z "$cap_runs" ]] || echo "$cap_runs" ;;
   esac
   exit 0
 fi

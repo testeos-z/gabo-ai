@@ -318,12 +318,12 @@ for f in "${accepted_files[@]}"; do
   fi
 done
 
-echo "tasks: $total_tasks, failing: $failed_tasks, not run: $not_run_tasks"
 if [[ -n "$paused" ]]; then
+  echo "tasks: $total_tasks, failing: $failed_tasks, not run: $not_run_tasks"
   echo "status: paused by cap $paused; the tasks marked not run were cut or not started"
   echo "continue or stop?"
 else
-  echo "status: complete"
+  echo "tasks: $total_tasks, failing: $failed_tasks"
 fi
 echo "scratch copies, kept for the parent to remove:"
 for s in "${scratches[@]}"; do

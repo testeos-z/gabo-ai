@@ -361,7 +361,11 @@ task "$start" >"$e/eval-001.json"
 out="$(run_eval caps-none "$e" "$cfg_coder")"
 code=$?
 has "S8 with no cap set the report reads cap: none set" "$code" 0 "cap: none set" "$out"
-has "S8 with no cap set the run is complete, not paused" "$code" 0 "status: complete" "$out"
+if grep -q "status: \|not run" <<<"$out"; then
+  bad "S8 with no cap set the run is not paused and its summary line is unchanged"
+else
+  has "S8 with no cap set the summary line is unchanged" "$code" 0 "tasks: 1, failing: 0" "$out"
+fi
 has "S8 the report names the intent 0020 rule" "$code" 0 "intent 0020" "$out"
 has "S8 the report says gabo does not cap spend" "$code" 0 "spend is not capped by gabo" "$out"
 

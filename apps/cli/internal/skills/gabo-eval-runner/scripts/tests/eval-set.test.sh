@@ -280,16 +280,16 @@ expect "S8 a cap of 0 is refused (the loader requires at least 1)" 1 \
 expect "S8 an inline eval.cap value is refused (block style only)" 1 \
   "refused config: eval.cap must be a block (eval.cap then indented keys), not an inline value" bash "$script" check "$(fresh cap-inline)" --config "$cap_inline"
 
-out="$(bash "$script" config turns_per_task_run --config "$min1" 2>&1)"
+bash "$script" config turns_per_task_run --config "$min1" >"$work/unset.out" 2>&1
 code=$?
-if [[ "$code" == 0 && -z "$out" ]]; then
-  ok "S8 an unset cap prints nothing (no number is written by the script)"
+if [[ "$code" == 0 && ! -s "$work/unset.out" ]]; then
+  ok "S8 an unset cap prints nothing, not even a newline (no number is written by the script)"
 else
-  bad "S8 an unset cap prints nothing (exit $code, got: $out)"
+  bad "S8 an unset cap prints nothing, not even a newline (exit $code, bytes $(wc -c <"$work/unset.out"))"
 fi
-out="$(bash "$script" config turns_per_task_run --config "$cap_null" 2>&1)"
+bash "$script" config turns_per_task_run --config "$cap_null" >"$work/null.out" 2>&1
 code=$?
-if [[ "$code" == 0 && -z "$out" ]]; then
+if [[ "$code" == 0 && ! -s "$work/null.out" ]]; then
   ok "S8 a null cap reads as not set, as config.Load reads it"
 else
   bad "S8 a null cap reads as not set (exit $code, got: $out)"
