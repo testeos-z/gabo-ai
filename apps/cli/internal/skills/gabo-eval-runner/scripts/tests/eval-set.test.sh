@@ -236,5 +236,17 @@ else
   bad "S12 check changes no task file"
 fi
 
+# --- S4: the run count read from eval.runs_per_task -------------------------
+
+runs3="$work/runs3.yaml"
+printf 'eval:\n  runs_per_task: 3\n' >"$runs3"
+runs0="$work/runs0.yaml"
+printf 'eval:\n  runs_per_task: 0\n' >"$runs0"
+
+expect "S4 config runs_per_task defaults to one run" 0 "1" bash "$script" config runs_per_task --config "$min1"
+expect "S4 config runs_per_task reads eval.runs_per_task from gabo.yaml" 0 "3" bash "$script" config runs_per_task --config "$runs3"
+expect "S4 config runs_per_task of 0 is refused (the loader requires at least 1)" 1 \
+  "refused config: eval.runs_per_task must be at least 1" bash "$script" config runs_per_task --config "$runs0"
+
 echo "passes: $passes failures: $failures"
 [[ "$failures" == 0 ]]
