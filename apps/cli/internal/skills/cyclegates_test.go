@@ -50,7 +50,8 @@ func TestCycleStep6ReportGate(t *testing.T) {
 		"`odd:`", "`spec S<n>:`", "`contract:`", "`tests:`", "`commits:`", "`RDD:`",
 		"`integration: not applicable: <reason>`",
 		"`integration:`",
-		"as two required fields",
+		"and two more required fields",
+		"until then a missing `verifier:` line passes",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("gabo-cycle step 6: report gate lacks %q", want)
@@ -76,6 +77,42 @@ func TestCycleStep6GatesRunBeforeTheClose(t *testing.T) {
 	}
 	if strings.Contains(s, "before you write DONE") {
 		t.Error("gabo-cycle step 6: still says the cycle writes DONE")
+	}
+}
+
+// The gate and the coder contract name the same fields (S19, the S10
+// pattern): each field the gate requires is in the coder's methodology report
+// block. `verifier:` joins it with S28 (plan T3); the gate accepts its absence
+// until then, so it is checked only once the coder names it.
+func TestCycleGateFieldsAreInTheCoderReportBlock(t *testing.T) {
+	t.Parallel()
+	coder := readCatalog(t, "gabo-coder/SKILL.md")
+	_, block, ok := strings.Cut(coder, "### Methodology report block")
+	if !ok {
+		t.Fatal("gabo-coder/SKILL.md: no methodology report block")
+	}
+	gate := step6(t, readCatalog(t, "gabo-cycle/SKILL.md"))
+	for _, f := range []string{"`odd:", "`spec S<n>:", "`contract:", "`tests:", "`integration:", "`check:", "`commits:", "`RDD:"} {
+		if !strings.Contains(gate, f) {
+			t.Errorf("gabo-cycle step 6 does not require %s`", f)
+		}
+		if !strings.Contains(block, f) {
+			t.Errorf("gabo-coder report block lacks %s` that the gate requires", f)
+		}
+	}
+	if strings.Contains(block, "`verifier:") && !strings.Contains(gate, "`verifier:") {
+		t.Error("the coder names `verifier:` but the gate does not require it")
+	}
+}
+
+// A refused DONE reaches a coder that may be gone: the rule says how.
+func TestCycleStep6RefusedDoneSaysHowToReachTheCoder(t *testing.T) {
+	t.Parallel()
+	s := step6(t, readCatalog(t, "gabo-cycle/SKILL.md"))
+	for _, want := range []string{"resumed by its handle", "a new `gabo-coder` launched from the main checkout", "never as live code work and never as DONE"} {
+		if !strings.Contains(s, want) {
+			t.Errorf("gabo-cycle step 6: refused DONE lacks %q", want)
+		}
 	}
 }
 
