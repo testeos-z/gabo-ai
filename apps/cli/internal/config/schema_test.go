@@ -83,6 +83,11 @@ func TestSchemasHaveNoSecretValueFields(t *testing.T) {
 					continue
 				}
 				p, _ := v.(map[string]any)
+				// The lock named credentials (intent 0028 D2) holds one of the
+				// lock states, an enum, never a value: only that key is exempt.
+				if path == "/$defs/projectKeys/properties/locks" && key == "credentials" && p["enum"] != nil {
+					continue
+				}
 				if !strings.HasSuffix(key, "_env") || p["pattern"] != "^([A-Z_][A-Z0-9_]*)?$" {
 					t.Errorf("%s %s/properties/%s: secret-like key must be an env var name ending in _env", name, path, key)
 				}
@@ -136,6 +141,11 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"null eval values":        with("eval: {min_tasks: null, pass_threshold: null, cap: null}"),
 		"approvals per branch":    with("repo: {protection: {required_approvals: {integration: 0, main: 1}}}"),
 		"null approvals":          with("repo: {protection: {required_approvals: {integration: null, main: null}}}"),
+		"locks every state":       with("locks: {shell_guard: off, release_gate: warn, human_only_paths: ask, credentials: block, test_files: warn}"),
+		"locks test files off":    with("locks: {test_files: off}"),
+		"locks enabled false":     with("locks: {enabled: false}"),
+		"null locks":              with("locks:\n"),
+		"empty lock state":        with(`locks: {shell_guard: ""}`),
 	}
 	reject := map[string]string{
 		"missing runtimes.coder":      string(without(t, "runtimes.coder")),
@@ -226,6 +236,11 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"negative approvals":          with("repo: {protection: {required_approvals: {main: -1}}}"),
 		"string approvals":            with("repo: {protection: {required_approvals: {main: one}}}"),
 		"unknown approvals branch":    with("repo: {protection: {required_approvals: {dev: 1}}}"),
+		"unknown lock name":           with("locks: {shell_gard: block}"),
+		"unknown lock state":          with("locks: {shell_guard: deny}"),
+		"test files ask":              with("locks: {test_files: ask}"),
+		"test files block":            with("locks: {test_files: block}"),
+		"string lock enabled":         with("locks: {enabled: nope}"),
 		"not a mapping":               "- a\n- b\n",
 	}
 	run := func(name, doc string, want bool) {

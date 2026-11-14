@@ -9,7 +9,7 @@
     { "$ref": "#/$defs/complete" }
   ],
   "$comment": "The names below close the object; their rules live in $defs/projectKeys.",
-  "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "eval": true },
+  "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "eval": true, "locks": true },
   "additionalProperties": false,
   "$defs": {
     "projectKeys": {
@@ -281,6 +281,37 @@
               }
             }
           }
+        },
+        "locks": {
+          "description": "The deterministic hook locks (intent 0028). Each lock has one state: off, warn, ask or block. A missing key reads as block, and as warn for test_files; enabled false turns every lock off. test_files accepts off and warn only.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "description": "false turns every lock off, whatever its own key says. Unset means on.",
+              "type": ["boolean", "null"]
+            },
+            "shell_guard": {
+              "description": "The shell guard (S4, S6): pushes to main, master or dev, forced pushes, branch and worktree deletions by force, and recursive removals on globs. Unset means block.",
+              "enum": ["off", "warn", "ask", "block", "", null]
+            },
+            "release_gate": {
+              "description": "The release gate (S5): tags, publishing and releases in every agent session. Unset means block.",
+              "enum": ["off", "warn", "ask", "block", "", null]
+            },
+            "human_only_paths": {
+              "description": "Writes to human-only paths (S7, S13). Unset means block.",
+              "enum": ["off", "warn", "ask", "block", "", null]
+            },
+            "credentials": {
+              "description": "The credential list of the engine's own permission rules (S8). Unset means block.",
+              "enum": ["off", "warn", "ask", "block", "", null]
+            },
+            "test_files": {
+              "description": "The test-file warning (S9): an edit to an existing tracked test file is recorded and never blocked. Unset means warn.",
+              "enum": ["off", "warn", "", null]
+            }
+          }
         }
       }
     },
@@ -323,7 +354,7 @@
         { "$ref": "#/$defs/projectKeys" },
         { "$ref": "gabo.user.schema.json#/$defs/personalKeys" }
       ],
-      "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "eval": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
+      "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "eval": true, "locks": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
       "additionalProperties": false
     },
     "file": {
