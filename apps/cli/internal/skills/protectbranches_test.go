@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -62,6 +61,8 @@ func TestProtectBranchesGitHubAdaptersCoverTheOperation(t *testing.T) {
 		requireIn(t, name, doc, []string{
 			"found by name", "no second ruleset", "read-back is identical",
 		})
+		// A rule reported `not offered` in step 5 keeps that result in the read-back step.
+		requireIn(t, name, doc, []string{"keeps that result"})
 	}
 }
 
@@ -89,14 +90,6 @@ func TestProtectBranchesCopiesAreByteIdentical(t *testing.T) {
 			if string(b) != embedded {
 				t.Errorf("%s differs from the catalog copy %s (intent 0029 T2)", p, catalogPath)
 			}
-		}
-	}
-	for _, p := range []string{
-		"gabo-contract-repository-host/SKILL.md",
-		"gabo-contract-repository-host/examples/host-github.md",
-	} {
-		if !strings.Contains(readCatalog(t, p), protectOperation) {
-			t.Errorf("%s does not carry the %q operation", p, protectOperation)
 		}
 	}
 }

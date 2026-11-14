@@ -127,7 +127,7 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
 
 4. Write: no ruleset found, `gh api -X POST repos/$R/rulesets --input <file>`; one found, `gh api -X PUT repos/$R/rulesets/<id> --input <file>` with the same body; more than one found, write nothing and report `missing` with the ids.
 5. Not offered: when the host refuses the write and names one rule type or the bypass, remove that rule from the body, resend, and report that rule `not offered` with the host's reason. Repeat for each rule the host names, at most once per rule in the list. A refusal that names no rule is `missing` with the host's reason, with no retry.
-6. Read back and compare with the rule list, one result per rule and branch (`set` or `missing`):
+6. Read back and compare with the rule list, one result per rule and branch (`set` or `missing`); a rule already reported `not offered` in step 5 keeps that result and is not read back:
 
    ```bash
    gh api repos/$R/rulesets/<id> --jq '{name,enforcement,conditions,bypass_actors,rules:[.rules[]|{type,parameters}]}'
