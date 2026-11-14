@@ -96,6 +96,16 @@ valid_task | jq 'del(.acceptance.accepted_by)' >"$e/eval-001.json"
 expect "S1 acceptance without accepted_by is refused with the field named" 1 \
   "refused eval-001.json: missing acceptance.accepted_by" bash "$script" check "$e" --config "$min1"
 
+# R1-acceptance-type-lax (#821, fixed in I0030/T3): accepted_by must be a string.
+i=0
+for by in 42 true '["owner"]' '{"login": "owner"}'; do
+  i=$((i + 1))
+  e="$(fresh accepted-by-type-$i)"
+  valid_task | jq --argjson v "$by" '.acceptance.accepted_by = $v' >"$e/eval-001.json"
+  expect "S1 acceptance.accepted_by that is not a string is refused by name ($by)" 1 \
+    "refused eval-001.json: acceptance.accepted_by must be a string" bash "$script" check "$e" --config "$min1"
+done
+
 e="$(fresh bad-date)"
 valid_task | jq '.acceptance.accepted_on = "14/11/2026"' >"$e/eval-001.json"
 expect "S1 accepted_on that is not YYYY-MM-DD is refused by name" 1 \

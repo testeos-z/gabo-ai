@@ -197,13 +197,20 @@ problem() {
       echo "acceptance must be an object"
       return
     }
-    for k in accepted_by accepted_on; do
-      v="$(jq -r --arg k "$k" '.acceptance[$k] // empty' "$f")"
-      [[ -n "$v" ]] || {
-        echo "missing acceptance.$k"
-        return
-      }
-    done
+    v="$(jq -c '.acceptance.accepted_by | select(. != null and . != "")' "$f")"
+    [[ -n "$v" ]] || {
+      echo "missing acceptance.accepted_by"
+      return
+    }
+    jq -e '.acceptance.accepted_by | type == "string"' "$f" >/dev/null || {
+      echo "acceptance.accepted_by must be a string"
+      return
+    }
+    v="$(jq -r '.acceptance.accepted_on // empty' "$f")"
+    [[ -n "$v" ]] || {
+      echo "missing acceptance.accepted_on"
+      return
+    }
     jq -e --arg re "$date_re" '.acceptance.accepted_on | type == "string" and test($re)' "$f" >/dev/null || {
       echo "acceptance.accepted_on must be YYYY-MM-DD"
       return
