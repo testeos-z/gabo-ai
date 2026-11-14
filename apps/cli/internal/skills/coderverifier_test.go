@@ -20,6 +20,8 @@ var coderVerifierRule = []string{
 	"never approves or blocks",
 	"`verifier: <commands and what it saw>`",
 	"`verifier: not applicable: no behavior change`",
+	"in the engine's read-only mode (no write tool)",
+	"report `verifier: not run: <reason>`",
 	"what it saw for the changed behavior and for each of the two flows",
 	"lists each behavior that does not match a linked S# or a done-contract line",
 }
@@ -40,7 +42,7 @@ func TestCoderSkillNamesTheFreshContextVerifier(t *testing.T) {
 func TestCoderTemplateNamesTheVerifierField(t *testing.T) {
 	t.Parallel()
 	doc := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
-	for _, s := range []string{"`verifier:`", "fresh-context verifier", "`verifier: not applicable: no behavior change`", "Before you open the PR", "starts without your conversation", "each mismatch against a linked S# or the done contract", "changes no file and never approves or blocks", "`commits:`, `verifier:`"} {
+	for _, s := range []string{"`verifier:`", "fresh-context verifier", "`verifier: not applicable: no behavior change`", "Before you open the PR", "starts without your conversation", "each mismatch against a linked S# or the done contract", "changes no file and never approves or blocks", "`commits:`, `verifier:`", "`verifier: not run: <reason>`"} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("gabo-coder template: missing %q", s)
 		}
@@ -85,5 +87,21 @@ func TestCoderVerifierPinsNoModel(t *testing.T) {
 				t.Errorf("gabo-coder %s: must not pin a model (%q)", name, s)
 			}
 		}
+	}
+}
+
+// The block is listed "in this order": commits, then verifier, then RDD.
+func TestCoderSkillVerifierFieldOrder(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-coder/SKILL.md")
+	_, block, ok := strings.Cut(doc, "### Methodology report block")
+	if !ok {
+		t.Fatal("gabo-coder/SKILL.md: no Methodology report block")
+	}
+	c := strings.Index(block, "`commits: <sha> <message>`")
+	v := strings.Index(block, "- Verifier: `verifier:")
+	r := strings.Index(block, "`RDD: <granted")
+	if c < 0 || v < 0 || r < 0 || !(c < v && v < r) {
+		t.Errorf("the verifier line must sit between commits and RDD (commits %d, verifier %d, RDD %d)", c, v, r)
 	}
 }
