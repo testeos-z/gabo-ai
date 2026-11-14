@@ -39,7 +39,7 @@ The spec's end-to-end acceptance and the owner's target (spec question 3) are ch
 
 ## Tasks
 
-Task ids are local to the intent. A dependency in another intent is written `<NNNN>/T<n>`. `depends_on` and `unblocks` mirror each other; `—` means none. The tracker titles are `I0029/T<n>: <title>`. Tracker issues: filled in at creation (see the PR body). Labels: `m1-local-core`, the size label, `flow-improvements`; `status:blocked` and `needs-user` on the blocked rows.
+Task ids are local to the intent. A dependency in another intent is written `<NNNN>/T<n>`. `depends_on` and `unblocks` mirror each other; `—` means none. The tracker titles are `I0029/T<n>: <title>`. Tracker issues (verified by re-read, parent #766, blocked-by links match `depends_on`): T1 #824, T2 #829, T3 #827, T4 #831, T5 #833 (T5 is also blocked by 0028/T4, #805). Labels: `m1-local-core`, the size label, `flow-improvements`; `status:blocked` and `needs-user` on the blocked rows.
 
 | id | title | spec refs | depends_on | unblocks | acceptance | size |
 |---|---|---|---|---|---|---|
