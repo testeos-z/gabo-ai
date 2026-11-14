@@ -37,7 +37,7 @@ var contracts = map[string]struct {
 	"gabo-contract-repository-host": {
 		ops: []string{
 			"open PR", "comment on PR", "read PR status and checks",
-			"merge into integration branch", "delete branch",
+			"merge into integration branch", "delete branch", "protect branches",
 		},
 		examples: []string{"host-github.md"},
 	},
