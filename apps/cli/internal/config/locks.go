@@ -59,6 +59,12 @@ type Locks struct {
 // UnmarshalYAML decodes the block without the strict field check of the
 // loader, so an unknown lock name reaches validateLockKeys as one line.
 func (l *Locks) UnmarshalYAML(n *yaml.Node) error {
+	if n.Kind != yaml.MappingNode {
+		if n.ShortTag() == "!!null" {
+			return nil
+		}
+		return fmt.Errorf("line %d: locks must be a mapping of lock keys", n.Line)
+	}
 	type plain Locks
 	var p plain
 	if err := n.Decode(&p); err != nil {

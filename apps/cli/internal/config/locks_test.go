@@ -127,3 +127,16 @@ func TestUnknownLockStateFails(t *testing.T) {
 		t.Fatalf("Parse() error = %v; want a failure naming locks.shell_guard", err)
 	}
 }
+
+// A locks block that is not a mapping names the key, never a Go type; a null
+// block stays unset.
+func TestLocksNotAMappingNamesTheKey(t *testing.T) {
+	t.Parallel()
+	_, err := Parse([]byte(minimal + "locks: []\n"))
+	if err == nil || strings.Contains(err.Error(), "plain") || !strings.Contains(err.Error(), "locks") {
+		t.Fatalf("Parse(locks: []) error = %v; want one line naming locks, with no Go type", err)
+	}
+	if _, err := Parse([]byte(minimal + "locks:\n")); err != nil {
+		t.Fatalf("Parse(null locks) error = %v; want unset", err)
+	}
+}
