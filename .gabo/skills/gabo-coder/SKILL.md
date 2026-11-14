@@ -20,6 +20,7 @@ Load in a `gabo-coder` subagent launched by the main session (the assistant that
 - Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the script refuses it.
 - A coder whose input carries `turn limit: <n>` stops at it: it commits nothing new and reports `STOPPED at turn limit` with its resources (worktree, branch, containers) and the state of the work; the cycle then pauses the wave. The limit never changes the fix-round cap below.
 - A coder whose input carries `fix round limit: <n>` stops when it has used that many fix rounds in total without a clean review, counting from `fix rounds used: <k>` when the input carries it (a resumed or replacement coder; none means zero): it commits nothing new and reports `STOPPED at fix round limit` with its resources (worktree, branch, containers) and the state of the work; the cycle then pauses the wave. The limit never raises the fix-round cap: "Max 4 fix rounds" below is unchanged. When the review of the head you report is clean at the limit, you do not stop: a clean head at the limit is reported as finished at the limit, not as paused, with the status HANDED (or DONE after the Task Close), the head SHA and the words `finished at the fix round limit (clean head)`; the cycle also accepts `STOPPED at fix round limit` with a clean head SHA and treats it the same way.
+- Done contract (intent 0027 S12): before your first commit, write the done contract on the task issue through the `tasks` adapter (log progress): one line per linked S# with the observable check that proves it (command, input, expected output or exit code); a requirement that no observable check can prove reads `not provable: <reason>`. Re-read the issue to confirm it. When you could not write it, the report says `contract: not run: <reason>`.
 - Questions go back to the assistant in your outcome; never ask the owner directly.
 - Model and approval gate (intent 0026 S2, S3, PD4): the coder takes the model of the engine's configuration and names none; a coder launch the account refuses for its model stops the task with the engine's error on its ledger line, and no other model is tried. A gabo coder opens its PR without the `status:approved` label and stops on no approval gate: the gabo coder contract has no approval-label gate, and gabo never creates, adds or requires that label.
 - You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
@@ -68,7 +69,19 @@ The outcome to the cycle (TRD 9.2) holds, in this order:
 - open questions for the cycle, each with what it blocks;
 - resources created: worktrees, branches, containers and test databases, so the cycle can add them to the wave ledger;
 - fix rounds used (at most 4);
-- the `methodology` adapter's per-task report.
+- the methodology report block below, then the `methodology` adapter's per-task report.
+
+### Methodology report block
+
+The outcome carries this methodology report block (intent 0027 S1, S2, S8, S12, S15, S18), one line per item, in this order. A field you did not produce reads `not run: <reason>`, never as a pass; a field is never left out.
+
+- Test evidence: `odd: RED <test name and failure>; GREEN <test name and run>`, or, when no relevant deterministic test exists, `odd: exception: <reason>; checks: <proportional checks run>` (no RED or GREEN is claimed).
+- Spec lines: one line for every S# the task links, each `spec S<n>: covered` (with the acceptance criteria you verified) or `spec S<n>: not covered: <reason>`.
+- Done contract: `contract: written on the task issue` (the lines of the Hard Rule above), or `contract: not run: <reason>`.
+- Tests: `tests: <test name>: <result>` for the unit test of each changed rule; and, where the task crosses a boundary (a CLI command, a file, a skill that runs a command), `integration: <test name>: <result>` through the public interface, or `integration: not applicable: <reason>`.
+- Checks: for each command of `review.checks` in `gabo.yaml`, the line `check: <command line as listed in review.checks>`, its pasted output, then an `exit: <n>` line. The gate reads shape and command identity; the reviewer's own run stays the proof.
+- Commits: `commits: <sha> <message>` for each work-unit commit.
+- Review outcome: `RDD: <granted|declined|passive|off|unavailable>`, with `risk` and `review_due_reason` for each assessed commit.
 
 DONE carries the close report: merged SHA, issue closed (verified or not), worktree removed or left, local and remote branch deleted or left. Then always:
 
