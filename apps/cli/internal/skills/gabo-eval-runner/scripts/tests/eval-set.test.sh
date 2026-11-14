@@ -96,6 +96,16 @@ valid_task | jq 'del(.acceptance.accepted_by)' >"$e/eval-001.json"
 expect "S1 acceptance without accepted_by is refused with the field named" 1 \
   "refused eval-001.json: missing acceptance.accepted_by" bash "$script" check "$e" --config "$min1"
 
+# R1-acceptance-type-lax (#821, fixed in I0030/T3): accepted_by must be a string.
+i=0
+for by in 42 true '["owner"]' '{"login": "owner"}'; do
+  i=$((i + 1))
+  e="$(fresh accepted-by-type-$i)"
+  valid_task | jq --argjson v "$by" '.acceptance.accepted_by = $v' >"$e/eval-001.json"
+  expect "S1 acceptance.accepted_by that is not a string is refused by name ($by)" 1 \
+    "refused eval-001.json: acceptance.accepted_by must be a string" bash "$script" check "$e" --config "$min1"
+done
+
 e="$(fresh bad-date)"
 valid_task | jq '.acceptance.accepted_on = "14/11/2026"' >"$e/eval-001.json"
 expect "S1 accepted_on that is not YYYY-MM-DD is refused by name" 1 \
@@ -235,6 +245,18 @@ if [[ "$before" == "$after" ]]; then
 else
   bad "S12 check changes no task file"
 fi
+
+# --- S4: the run count read from eval.runs_per_task -------------------------
+
+runs3="$work/runs3.yaml"
+printf 'eval:\n  runs_per_task: 3\n' >"$runs3"
+runs0="$work/runs0.yaml"
+printf 'eval:\n  runs_per_task: 0\n' >"$runs0"
+
+expect "S4 config runs_per_task defaults to one run" 0 "1" bash "$script" config runs_per_task --config "$min1"
+expect "S4 config runs_per_task reads eval.runs_per_task from gabo.yaml" 0 "3" bash "$script" config runs_per_task --config "$runs3"
+expect "S4 config runs_per_task of 0 is refused (the loader requires at least 1)" 1 \
+  "refused config: eval.runs_per_task must be at least 1" bash "$script" config runs_per_task --config "$runs0"
 
 echo "passes: $passes failures: $failures"
 [[ "$failures" == 0 ]]

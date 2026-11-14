@@ -24,7 +24,10 @@ func TestEvalRunnerShipsItsScriptAndCopies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, rel := range []string{"SKILL.md", "scripts/eval-set.sh", "scripts/tests/eval-set.test.sh"} {
+	for _, rel := range []string{
+		"SKILL.md", "scripts/eval-set.sh", "scripts/tests/eval-set.test.sh",
+		"scripts/eval-run.sh", "scripts/tests/eval-run.test.sh",
+	} {
 		want := evalRunnerSkill + "/" + rel
 		var data []byte
 		for _, f := range files {
@@ -74,7 +77,8 @@ func TestEvalRunnerSkillStatesTheRules(t *testing.T) {
 	}
 }
 
-// The shell fixture tests run from the Go suite and need no engine.
+// The shell fixture tests run from the Go suite and need no engine (S4, S12):
+// eval-run.test.sh uses a fake engine command and a gh shim, never a real one.
 func TestEvalRunnerShellTests(t *testing.T) {
 	if testing.Short() {
 		t.Skip("shell tests skipped in -short mode")
@@ -84,9 +88,11 @@ func TestEvalRunnerShellTests(t *testing.T) {
 			t.Skipf("%s not found: %v", tool, err)
 		}
 	}
-	out, err := exec.Command("bash", evalRunnerSkill+"/scripts/tests/eval-set.test.sh").CombinedOutput()
-	if err != nil {
-		t.Fatalf("eval-set shell tests: %v\n%s", err, out)
+	for _, test := range []string{"eval-set.test.sh", "eval-run.test.sh"} {
+		out, err := exec.Command("bash", evalRunnerSkill+"/scripts/tests/"+test).CombinedOutput()
+		if err != nil {
+			t.Fatalf("%s: %v\n%s", test, err, out)
+		}
 	}
 }
 
