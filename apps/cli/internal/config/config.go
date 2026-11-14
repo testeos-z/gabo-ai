@@ -119,6 +119,8 @@ type Config struct {
 	Wave       Wave              `yaml:"wave,omitempty"`
 	// Eval is the agent eval set's configuration (intent 0030, see evalkeys.go).
 	Eval Eval `yaml:"eval,omitempty"`
+	// Locks are the deterministic hook locks (intent 0028, see locks.go).
+	Locks Locks `yaml:"locks,omitempty"`
 	// Personal keys (see PersonalKeys): read from the global layers only.
 	Alias            string `yaml:"alias,omitempty"`
 	InteractionLevel string `yaml:"interaction_level,omitempty"`
@@ -379,5 +381,6 @@ func (c Config) validate(parallelismSet bool) error {
 	errs = append(errs, c.validateKeyClasses()...)
 	errs = append(errs, c.validateProjectKeys()...)
 	errs = append(errs, c.validateEvalKeys()...)
+	errs = append(errs, c.validateLockKeys()...)
 	return withNextSetup(errors.Join(errs...), missing)
 }

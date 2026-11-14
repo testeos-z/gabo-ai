@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# eval-run.sh runs the accepted agent eval tasks (intent 0030 S4, S8, S12, D1). For
+# eval-run.sh runs the accepted agent eval tasks (intent 0030 S4, S12, D1). For
 # each accepted task it runs eval.runs_per_task times the coder engine of
 # runtimes.coder, in a mktemp scratch copy of the task's starting commit with
 # the PR head's changed configuration applied; then it runs the task's outcome
@@ -32,6 +32,9 @@
 #
 # Exit 0 when every task passes, 1 on a refusal or a failing task, 2 on bad usage,
 # 3 when a cap paused the run and no task failed.
+# A run also passes only when the coder's report (its engine output) holds every
+# field of the 0027 report gate (intent 0030 S5); a missing field reads
+# `fail: <field> line missing`, a failing check reads `fail: check <cmd> failed`.
 set -uo pipefail
 shopt -s nullglob
 
@@ -98,6 +101,8 @@ cfg_value() {
   ' "$config" | tr -d "\"'"
 }
 
+# The counts come from eval-set.sh, which validates the config the same way the
+# set check does (block style, every bound at least 1).
 # The counts and the caps come from eval-set.sh, which validates the config the
 # same way the set check does. An unset cap reads as an empty string.
 runs="$(bash "$set_script" config runs_per_task --config "$config")" || exit 1
@@ -121,8 +126,8 @@ while IFS= read -r line; do
 done <<<"$set_out"
 
 scratches=()
-limit="${GABO_EVAL_ENGINE_TIMEOUT:-600}"
 run_verdict=""
+limit="${GABO_EVAL_ENGINE_TIMEOUT:-600}"
 
 # run_bounded <cmd...>: the command under timeout(1) when it exists.
 run_bounded() {
@@ -163,13 +168,43 @@ engine_run() {
   ) <"$prompt" >"$log" 2>&1
 }
 
+# The fields of the 0027 report gate (S19), in the gate's order. The coder's
+# report is its engine output; report_gap reads each field from it.
+gate_fields=("odd:" "spec S" "RDD:" "contract:" "tests:" "integration:" "commits:" "verifier:")
+
+# report_gap <task-file> <report>: the first gate field the report lacks, named
+# as the reason `<field> line missing`; nothing when every field is present. A
+# field counts as present with any value, so `not run: <reason>` and `not
+# applicable: <reason>` pass. Each linked S# of the task needs its own spec line.
+# A line counts with or without a list marker and backticks, as a coder writes it.
+report_gap() {
+  local file="$1" report="$2" text field s
+  text="$(sed -e 's/^[[:space:]]*//' -e 's/^[-*][[:space:]]*//' -e 's/`//g' "$report")"
+  for field in "${gate_fields[@]}"; do
+    if [[ "$field" == "spec S" ]]; then
+      while IFS= read -r s; do
+        grep -q "^spec $s:" <<<"$text" || {
+          echo "spec $s"
+          return 0
+        }
+      done < <(jq -r '.spec_refs[]' "$file")
+    else
+      grep -q "^$field" <<<"$text" || {
+        echo "${field%:}"
+        return 0
+      }
+    fi
+  done
+}
+
 # run_one <task-file> <id> <starting-commit> <run-no> <task-input>: one run in a
-# fresh scratch copy. Prints the run line and one line per outcome check. Sets
-# run_verdict to pass, fail, or cut (a turn cap stopped the engine: the run is
-# not run, and no check runs on its tree). A check that did not run is `not run`.
+# fresh scratch copy. Prints the run line and one line per outcome check, and
+# returns 0 only when the run passes. A check that did not run is `not run`.
+# The run's reason, when it fails, is left in run_why. run_verdict is pass, fail,
+# or cut (a turn cap stopped the engine: the run is not run and no check runs).
 run_one() {
   local file="$1" id="$2" start="$3" n="$4" input="$5"
-  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" tag="" c rc detail="" nr turn_cut=0
+  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" check_why="" gap="" c rc detail="" nr turn_cut=0
   local -a checks
   mapfile -t checks < <(jq -r '.outcome_checks[]' "$file")
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/gabo-eval-run.XXXXXX")"
@@ -196,22 +231,21 @@ run_one() {
     if [[ -n "$cap_turns" && "$engine" == claude ]] && grep -Eq '^Error: Reached max turns' "$scratch/engine.log"; then
       turn_cut=1
     fi
-  fi
-
-  if [[ -z "$reason" && "$turn_cut" == 0 ]]; then
-    for c in "${checks[@]}"; do
-      rc=0
-      (cd "$tree" && run_bounded bash -c "$c") >>"$scratch/checks.log" 2>&1 || rc=$?
-      if ((rc == 0)); then
-        detail+="    check: $c: pass (exit 0)"$'\n'
-      else
-        detail+="    check: $c: fail (exit $rc)"$'\n'
-        checks_ok=0
-      fi
-    done
+    if ((turn_cut == 0)); then
+      for c in "${checks[@]}"; do
+        rc=0
+        (cd "$tree" && run_bounded bash -c "$c") >>"$scratch/checks.log" 2>&1 || rc=$?
+        if ((rc == 0)); then
+          detail+="    check: $c: pass (exit 0)"$'\n'
+        else
+          detail+="    check: $c: fail (exit $rc)"$'\n'
+          checks_ok=0
+          [[ -n "$check_why" ]] || check_why="check $c failed (exit $rc)"
+        fi
+      done
+    fi
   else
     nr="$reason"
-    ((turn_cut == 0)) || nr="cap eval.cap.turns_per_task_run"
     for c in "${checks[@]}"; do
       detail+="    check: $c: not run ($nr)"$'\n'
     done
@@ -219,10 +253,14 @@ run_one() {
 
   if ((turn_cut)); then
     run_verdict=cut
+    run_why="cap eval.cap.turns_per_task_run"
+    for c in "${checks[@]}"; do
+      detail+="    check: $c: not run (cap eval.cap.turns_per_task_run)"$'\n'
+    done
     printf '%s\n' cut >"$scratch/result"
     printf '  run %s: not run: cap eval.cap.turns_per_task_run (scratch %s)\n' "$n" "$scratch"
     printf '%s' "$detail"
-    return 0
+    return 1
   fi
 
   verdict=pass
@@ -234,14 +272,24 @@ run_one() {
     why="engine exit $ecode"
   elif ((checks_ok == 0)); then
     verdict=fail
-    why="a check failed"
+    why="$check_why"
+  else
+    gap="$(report_gap "$file" "$scratch/engine.log")"
+    if [[ -n "$gap" ]]; then
+      verdict=fail
+      why="$gap line missing"
+    fi
   fi
-  [[ -z "$why" ]] || tag=" ($why)"
   printf '%s\n' "$verdict" >"$scratch/result"
-  printf '  run %s: %s%s (scratch %s)\n' "$n" "$verdict" "$tag" "$scratch"
-  printf '%s' "$detail"
   run_verdict="$verdict"
-  return 0
+  run_why="$why"
+  if [[ "$verdict" == pass ]]; then
+    printf '  run %s: pass (scratch %s)\n' "$n" "$scratch"
+  else
+    printf '  run %s: fail: %s (scratch %s)\n' "$n" "$why" "$scratch"
+  fi
+  printf '%s' "$detail"
+  [[ "$verdict" == pass ]]
 }
 
 # report_caps: the cap lines of the report (intent 0030 S8, intent 0020 S7 and
@@ -295,6 +343,7 @@ for f in "${accepted_files[@]}"; do
   echo "task $id: starting $start"
   passed=0
   run_fails=0
+  first_why=""
   stop_cap=""
   for ((n = 1; n <= runs; n++)); do
     if [[ -n "$cap_runs" ]] && ((task_runs >= cap_runs)); then
@@ -302,12 +351,15 @@ for f in "${accepted_files[@]}"; do
       break
     fi
     task_runs=$((task_runs + 1))
-    run_one "$f" "$id" "$start" "$n" "$input"
-    case "$run_verdict" in
-      pass) passed=$((passed + 1)) ;;
-      fail) run_fails=$((run_fails + 1)) ;;
-      cut) stop_cap="eval.cap.turns_per_task_run"; break ;;
-    esac
+    if run_one "$f" "$id" "$start" "$n" "$input"; then
+      passed=$((passed + 1))
+    elif [[ "$run_verdict" == cut ]]; then
+      stop_cap="eval.cap.turns_per_task_run"
+      break
+    else
+      run_fails=$((run_fails + 1))
+      [[ -n "$first_why" ]] || first_why="$run_why"
+    fi
   done
   anyfail=$((anyfail + run_fails))
   if [[ -n "$stop_cap" ]]; then
@@ -319,7 +371,7 @@ for f in "${accepted_files[@]}"; do
   elif ((passed == runs)); then
     echo "task $id: pass ($passed of $runs runs)"
   else
-    echo "task $id: fail ($passed of $runs runs)"
+    echo "task $id: fail ($passed of $runs runs): $first_why"
     failed_tasks=$((failed_tasks + 1))
   fi
 done
