@@ -292,8 +292,19 @@ code=$?
 if [[ "$code" == 0 && ! -s "$work/null.out" ]]; then
   ok "S8 a null cap reads as not set, as config.Load reads it"
 else
-  bad "S8 a null cap reads as not set (exit $code, got: $out)"
+  bad "S8 a null cap reads as not set (exit $code, got: $(cat "$work/null.out"))"
 fi
+
+# S8 any indentation width is read the way config.Load reads it (a cap is never dropped)
+wide="$work/cap-wide.yaml"
+printf 'eval:\n    min_tasks: 1\n    cap:\n        turns_per_task_run: 5\n' >"$wide"
+expect "S8 a cap block indented four and eight spaces is read" 0 "5" \
+  bash "$script" config turns_per_task_run --config "$wide"
+wideinline="$work/cap-wide-inline.yaml"
+printf 'eval:\n    cap: {turns_per_task_run: 2}\n' >"$wideinline"
+expect "S8 an inline cap under a four-space eval block is refused" 1 \
+  "refused config: eval.cap must be a block (eval.cap then indented keys), not an inline value" \
+  bash "$script" config turns_per_task_run --config "$wideinline"
 
 echo "passes: $passes failures: $failures"
 [[ "$failures" == 0 ]]

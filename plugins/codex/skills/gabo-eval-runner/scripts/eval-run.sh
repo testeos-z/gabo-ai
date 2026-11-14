@@ -193,7 +193,7 @@ run_one() {
       printf 'Turn limit for this run: %s turns. Stop and report at this limit.\n' "$cap_turns" >>"$scratch/prompt.txt"
     fi
     engine_run "$engine" "$tree" "$scratch/prompt.txt" "$scratch/engine.log" "$scratch/gh-config" || ecode=$?
-    if [[ -n "$cap_turns" ]] && grep -Eqi 'reached max turns' "$scratch/engine.log"; then
+    if [[ -n "$cap_turns" && "$engine" == claude ]] && grep -Eq '^Error: Reached max turns' "$scratch/engine.log"; then
       turn_cut=1
     fi
   fi
@@ -274,6 +274,7 @@ echo "runs per task: $runs"
 report_caps
 
 failed_tasks=0
+anyfail=0
 total_tasks=0
 not_run_tasks=0
 task_runs=0
@@ -293,6 +294,7 @@ for f in "${accepted_files[@]}"; do
   fi
   echo "task $id: starting $start"
   passed=0
+  run_fails=0
   stop_cap=""
   for ((n = 1; n <= runs; n++)); do
     if [[ -n "$cap_runs" ]] && ((task_runs >= cap_runs)); then
@@ -303,12 +305,16 @@ for f in "${accepted_files[@]}"; do
     run_one "$f" "$id" "$start" "$n" "$input"
     case "$run_verdict" in
       pass) passed=$((passed + 1)) ;;
+      fail) run_fails=$((run_fails + 1)) ;;
       cut) stop_cap="eval.cap.turns_per_task_run"; break ;;
     esac
   done
+  anyfail=$((anyfail + run_fails))
   if [[ -n "$stop_cap" ]]; then
     paused="$stop_cap"
-    echo "task $id: not run: cap $stop_cap"
+    note=""
+    ((run_fails == 0)) || note=" (a run before the cap failed)"
+    echo "task $id: not run: cap $stop_cap$note"
     not_run_tasks=$((not_run_tasks + 1))
   elif ((passed == runs)); then
     echo "task $id: pass ($passed of $runs runs)"
@@ -329,6 +335,6 @@ echo "scratch copies, kept for the parent to remove:"
 for s in "${scratches[@]}"; do
   echo "  $s"
 done
-if ((failed_tasks > 0)); then exit 1; fi
+if ((failed_tasks > 0 || anyfail > 0)); then exit 1; fi
 if [[ -n "$paused" ]]; then exit 3; fi
 exit 0

@@ -101,15 +101,23 @@ cfg_cap() {
   local v=""
   if [[ -n "$config" ]]; then
     v="$(awk -v key="$1" '
-      /^[^[:space:]#]/ { in_eval = ($0 ~ /^eval:[[:space:]]*(#.*)?$/); in_cap = 0; next }
-      in_eval && /^  [^[:space:]#]/ {
-        in_cap = 0
-        if ($0 ~ /^  cap:[[:space:]]*(#.*)?$/) in_cap = 1
-        else if ($0 ~ /^  cap:[[:space:]]*[^[:space:]#]/ && $0 !~ /^  cap:[[:space:]]*(null|~)[[:space:]]*(#.*)?$/) { print "inline"; exit }
-        next
+      function indent(s) { match(s, /^ */); return RLENGTH }
+      /^[^[:space:]#]/ { in_eval = ($0 ~ /^eval:[[:space:]]*(#.*)?$/); cap_ind = -1; cap_child = -1; next }
+      !in_eval || /^[[:space:]]*(#.*)?$/ { next }
+      {
+        ind = indent($0)
+        body = substr($0, ind + 1)
+        if (cap_ind >= 0 && ind > cap_ind) {
+          if (cap_child < 0) cap_child = ind
+          if (ind == cap_child && $1 == key":") { print ($2 == "" ? "empty" : $2); exit }
+          next
+        }
+        cap_ind = -1
+        if (body ~ /^cap:[[:space:]]*(#.*)?$/) { cap_ind = ind; cap_child = -1; next }
+        if (body ~ /^cap:[[:space:]]*(null|~)[[:space:]]*(#.*)?$/) next
+        if (body ~ /^cap:/) { print "inline"; exit }
       }
-      in_eval && in_cap && /^    [^[:space:]#]/ && $1 == key":" { print ($2 == "" ? "empty" : $2); exit }
-    ' "$config")"
+    ' "$config" | tr -d "\"'")"
   fi
   case "$v" in
     inline)

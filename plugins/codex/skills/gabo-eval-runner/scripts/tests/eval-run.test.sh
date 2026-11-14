@@ -317,6 +317,38 @@ else
   bad "S8 the engine runs twice (count $(cat "$work/caps-turns.count" 2>/dev/null))"
 fi
 
+# S8 a failed run before a turn cut still makes the run exit 1 (the failure is
+# not hidden by the pause).
+cfg_fail_cut="$work/fail-cut.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  runs_per_task: 2\n  cap:\n    turns_per_task_run: 2\n' >"$cfg_fail_cut"
+e="$work/caps-failcut/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_CAP_RUN=2 run_eval caps-failcut "$e" "$cfg_fail_cut" 1)"
+code=$?
+has "S8 a cut task with an earlier failed run reads not run and names the failure" "$code" 1 \
+  "task eval-001: not run: cap eval.cap.turns_per_task_run (a run before the cap failed)" "$out"
+
+# S8 a cap block indented wider than two spaces still pauses the run.
+cfg_wide_cap="$work/wide-cap.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n    min_tasks: 1\n    cap:\n        task_runs_per_eval_run: 1\n' >"$cfg_wide_cap"
+e="$work/caps-wide/evals"
+three_tasks "$e"
+out="$(run_eval caps-wide "$e" "$cfg_wide_cap")"
+code=$?
+has "S8 a four-space cap block is read and pauses the run" "$code" 3 \
+  "task eval-002: not run: cap eval.cap.task_runs_per_eval_run" "$out"
+
+# S8 only claude's own error line is a turn-cap stop: codex printing the same
+# words is a failing run, not a cut one.
+e="$work/caps-echo/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_CAP_RUN=1 run_eval caps-echo "$e" "$cfg_codex_cap")"
+code=$?
+has "S8 a non-claude engine that prints the phrase is a failing run, not a turn cut" "$code" 1 \
+  "task eval-001: fail (0 of 1 runs)" "$out"
+
 # S8 claude gets its turn cap as --max-turns (its own print-mode flag); a fake
 # claude on PATH records its arguments and stops at the cap.
 mkdir -p "$work/claude-bin"
