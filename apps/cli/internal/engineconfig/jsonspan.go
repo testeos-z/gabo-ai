@@ -37,6 +37,9 @@ type jsonKV struct {
 // renderJSON renders v. Multiline puts each member on its own line at
 // indent+unit and the closing brace at indent; inline uses ": " and ", ".
 func renderJSON(v any, indent, unit string, multiline bool) string {
+	if list, ok := v.([]any); ok {
+		return renderArray(list, indent, unit, multiline)
+	}
 	obj, ok := v.(jsonObj)
 	if !ok {
 		b, _ := json.Marshal(v)
@@ -440,4 +443,103 @@ func splice(src []byte, from, to int, text string) []byte {
 	out = append(out, src[:from]...)
 	out = append(out, text...)
 	return append(out, src[to:]...)
+}
+
+// renderArray renders a JSON array of values. Multi-line puts one element per
+// line at indent+unit; single-line joins them with ", ".
+func renderArray(items []any, indent, unit string, multiline bool) string {
+	if len(items) == 0 {
+		return "[]"
+	}
+	parts := make([]string, len(items))
+	for i, item := range items {
+		parts[i] = renderJSON(item, indent+unit, unit, multiline)
+	}
+	if !multiline {
+		return "[" + strings.Join(parts, ", ") + "]"
+	}
+	return "[\n" + indent + unit + strings.Join(parts, ",\n"+indent+unit) + "\n" + indent + "]"
+}
+
+// spanArray is an array: the offsets of its brackets and of each element.
+type spanArray struct {
+	open, close int
+	elems       []spanElem
+}
+
+// spanElem is one array element's byte range.
+type spanElem struct {
+	start, end int
+}
+
+// scanSpanArray reads the array starting at src[open] == '['. src must be
+// valid JSON or JSONC (checked by the caller).
+func scanSpanArray(src []byte, open int) spanArray {
+	a := spanArray{open: open}
+	i := skipWS(src, open+1)
+	for src[i] != ']' {
+		if src[i] == ',' {
+			i = skipWS(src, i+1)
+			continue
+		}
+		end := skipValue(src, i)
+		a.elems = append(a.elems, spanElem{start: i, end: end})
+		i = skipWS(src, end)
+	}
+	a.close = i
+	return a
+}
+
+// appendElems returns src with entries added as the array's last elements,
+// rendered at the layout of the array (one line when it is on one line, one
+// element per line otherwise, after a trailing comma if it has one). Every
+// other byte is kept (D5). unit is the indentation step of the file.
+func appendElems(src []byte, a spanArray, entries []any, unit string) []byte {
+	if len(entries) == 0 {
+		return src
+	}
+	nl := newline(src)
+	multi := bytes.IndexByte(src[a.open:a.close], '\n') >= 0
+	if len(a.elems) == 0 {
+		if !multi {
+			return splice(src, a.open+1, a.close, joinRendered(entries, "", "", false, ", "))
+		}
+		indent := lineIndent(src, a.open)
+		body := ""
+		for i, e := range entries {
+			if i > 0 {
+				body += ","
+			}
+			body += nl + indent + unit + renderJSON(e, indent+unit, unit, true)
+		}
+		return splice(src, a.open+1, a.close, body+nl+indent)
+	}
+	last := a.elems[len(a.elems)-1]
+	if !multi {
+		return splice(src, last.end, last.end, ", "+joinRendered(entries, "", "", false, ", "))
+	}
+	indent := lineIndent(src, last.start)
+	j := skipBlank(src, last.end)
+	if j < len(src) && src[j] == ',' {
+		// A trailing comma (JSONC): every new element ends with its own comma.
+		var b strings.Builder
+		for _, e := range entries {
+			b.WriteString(nl + indent + renderJSON(e, indent, unit, true) + ",")
+		}
+		return splice(src, j+1, j+1, b.String())
+	}
+	var b strings.Builder
+	for _, e := range entries {
+		b.WriteString("," + nl + indent + renderJSON(e, indent, unit, true))
+	}
+	return splice(src, last.end, last.end, b.String())
+}
+
+// joinRendered renders each entry on one line and joins them with sep.
+func joinRendered(entries []any, indent, unit string, multiline bool, sep string) string {
+	parts := make([]string, len(entries))
+	for i, e := range entries {
+		parts[i] = renderJSON(e, indent, unit, multiline)
+	}
+	return strings.Join(parts, sep)
 }

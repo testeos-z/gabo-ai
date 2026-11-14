@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	claudeWrote     = `wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai"`
+	claudeWrote     = `wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai", permissions.deny`
+	claudeWroteDeny = "wrote .claude/settings.json: added permissions.deny"
 	claudeUnchanged = "unchanged .claude/settings.json"
 )
 
@@ -41,12 +42,13 @@ func TestClaudeRule(t *testing.T) {
 		{name: "empty-object", in: "empty-object.in.json", write: true, lines: []string{claudeWrote}},
 		{name: "tabs", in: "tabs.in.json", write: true, lines: []string{claudeWrote}},
 		{name: "compact", in: "compact.in.json", write: true, lines: []string{claudeWrote}},
-		{name: "unchanged", in: "unchanged.in.json", lines: []string{claudeUnchanged}},
-		{name: "kept", in: "kept.in.json", lines: []string{
+		{name: "unchanged", in: "unchanged.in.json", write: true, lines: []string{claudeWroteDeny}},
+		{name: "kept", in: "kept.in.json", write: true, lines: []string{
+			claudeWroteDeny,
 			`kept .claude/settings.json enabledPlugins."gabo@gabo-ai": false (your setting; gabo leaves it)`,
 		}},
 		{name: "fork", in: "fork.in.json", write: true, lines: []string{
-			`wrote .claude/settings.json: added enabledPlugins."gabo@gabo-ai"`,
+			`wrote .claude/settings.json: added enabledPlugins."gabo@gabo-ai", permissions.deny`,
 			`kept .claude/settings.json extraKnownMarketplaces."gabo-ai": {"source":{"source":"github","repo":"me/gabo-ai-fork"}} (your setting; gabo leaves it)`,
 		}},
 		{name: "invalid", in: "invalid.in.json", lines: []string{
@@ -104,7 +106,7 @@ func TestClaudeRule(t *testing.T) {
 // input up to the last member and the old members stay in their order.
 func TestClaudeRuleKeepsExistingBytesAndOrder(t *testing.T) {
 	in := readTestdata(t, "merge.in.json")
-	res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: in}})
+	res := claudeSettingsRule(Input{Files: map[string][]byte{ClaudeSettings: in}}, false)
 	got := string(res.Writes[ClaudeSettings])
 	keep := string(in)[:strings.Index(string(in), `"other@market": true`)+len(`"other@market": true`)]
 	if !strings.HasPrefix(got, keep) {
@@ -163,7 +165,7 @@ func TestClaudeRuleOutputHoldsTheKeys(t *testing.T) {
 		`{"extraKnownMarketplaces": {"other": {"source": {"source": "directory", "path": "../m"}}}, "n": [1, {"b": [2]}], "z": null}`,
 	}
 	for _, in := range inputs {
-		res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}})
+		res := claudeSettingsRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}}, false)
 		out := res.Writes[ClaudeSettings]
 		var before, after map[string]any
 		if err := json.Unmarshal([]byte(in), &before); err != nil {
@@ -203,7 +205,7 @@ func TestClaudeRuleRefusesNonObjects(t *testing.T) {
 		`{"extraKnownMarketplaces": "x"}`: "extraKnownMarketplaces is not a JSON object",
 		``:                                "invalid JSON (unexpected end of JSON input)",
 	} {
-		res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}})
+		res := claudeSettingsRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}}, false)
 		want := []string{"✗ .claude/settings.json: " + reason + "; fix it and run gabo init again"}
 		if len(res.Writes) != 0 || !slices.Equal(res.Section.Lines, want) {
 			t.Errorf("%q: writes %q lines %q, want none and %q", in, res.Writes, res.Section.Lines, want)
@@ -294,7 +296,7 @@ func TestClaudeRuleAgentKey(t *testing.T) {
 		{
 			name: "codex new file has no agent", assistant: "codex",
 			out:   integrationOnly,
-			lines: []string{claudeWrote},
+			lines: []string{`wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai"`},
 			steps: wantClaudeSteps,
 		},
 		{
@@ -312,7 +314,7 @@ func TestClaudeRuleAgentKey(t *testing.T) {
 			if c.built {
 				files[ClaudeAgentFile] = []byte("---\nname: gabo-assistant\n---\n")
 			}
-			res := claudeRule(Input{Files: files, Version: "0.2.6", Assistants: []string{c.assistant}})
+			res := claudeSettingsRule(Input{Files: files, Version: "0.2.6", Assistants: []string{c.assistant}}, false)
 			if !slices.Equal(res.Section.Lines, c.lines) {
 				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, c.lines)
 			}
@@ -334,7 +336,7 @@ func TestClaudeRuleAgentKey(t *testing.T) {
 			}
 			// A second run on the output is byte-identical: nothing written.
 			files[ClaudeSettings] = got
-			if again := claudeRule(Input{Files: files, Assistants: []string{c.assistant}}); len(again.Writes) != 0 {
+			if again := claudeSettingsRule(Input{Files: files, Assistants: []string{c.assistant}}, false); len(again.Writes) != 0 {
 				t.Errorf("second run writes %q, want none", again.Writes)
 			}
 		})
@@ -350,7 +352,7 @@ func TestClaudeRuleAgentRefusesUnreadableFiles(t *testing.T) {
 		`"gabo-assistant"`: "the top level is not a JSON object",
 	} {
 		for _, assistant := range []string{"claude", "codex"} {
-			res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{assistant}})
+			res := claudeSettingsRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{assistant}}, false)
 			want := []string{"✗ .claude/settings.json: " + reason + "; fix it and run gabo init again"}
 			if len(res.Writes) != 0 || !slices.Equal(res.Section.Lines, want) {
 				t.Errorf("%s %q: writes %q lines %q, want none and %q", assistant, in, res.Writes, res.Section.Lines, want)
@@ -362,7 +364,7 @@ func TestClaudeRuleAgentRefusesUnreadableFiles(t *testing.T) {
 // S1: the added member keeps every earlier byte, in a compact file too.
 func TestClaudeRuleAgentKeepsEarlierBytes(t *testing.T) {
 	in := `{"permissions": {"allow": []}, "enabledPlugins": {"gabo@gabo-ai": true}, "extraKnownMarketplaces": {"gabo-ai": {"source": {"source": "github", "repo": "testeos-z/gabo-ai"}}}}`
-	res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{"claude"}})
+	res := claudeSettingsRule(Input{Files: map[string][]byte{ClaudeSettings: []byte(in)}, Assistants: []string{"claude"}}, false)
 	want := strings.TrimSuffix(in, "}") + `, "agent": "gabo-assistant"}`
 	if got := string(res.Writes[ClaudeSettings]); got != want {
 		t.Errorf("wrote\n%s\nwant\n%s", got, want)
@@ -396,7 +398,7 @@ func TestClaudeRuleAssistantList(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			files := map[string][]byte{ClaudeSettings: []byte(c.in), ClaudeAgentFile: nil}
-			res := claudeRule(Input{Files: files, Version: "0.2.6", Assistants: c.assistants})
+			res := claudeSettingsRule(Input{Files: files, Version: "0.2.6", Assistants: c.assistants}, false)
 			if !slices.Equal(res.Section.Lines, c.lines) {
 				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, c.lines)
 			}
@@ -410,7 +412,7 @@ func TestClaudeRuleAssistantList(t *testing.T) {
 				t.Fatalf("writes = %q, want only %s =\n%s", res.Writes, ClaudeSettings, c.out)
 			}
 			files[ClaudeSettings] = res.Writes[ClaudeSettings]
-			if again := claudeRule(Input{Files: files, Assistants: c.assistants}); len(again.Writes) != 0 {
+			if again := claudeSettingsRule(Input{Files: files, Assistants: c.assistants}, false); len(again.Writes) != 0 {
 				t.Errorf("second run writes %q, want none", again.Writes)
 			}
 		})

@@ -68,7 +68,12 @@ func wantedKeys(in Input) []claudeKey {
 // engines (intent 0010 S1, S4; intent 0013 S3, D7): Claude Code listed
 // merges "gabo-assistant" with the same rule; Claude Code not listed removes
 // exactly that value.
-func claudeRule(in Input) Result {
+func claudeRule(in Input) Result { return claudeSettingsRule(in, true) }
+
+// claudeSettingsRule is the Claude Code rule. With deny, it also merges the
+// base credential deny list (intent 0028 S8); without, only the integration
+// and main-session keys change, which is what the key tests pin.
+func claudeSettingsRule(in Input, deny bool) Result {
 	res := Result{Section: Section{Steps: append([]string(nil), claudeSteps...)}}
 	fail := func(reason string) Result {
 		res.Section.Lines = []string{FailurePrefix + " " + ClaudeSettings + ": " + reason + "; fix it and run gabo init again"}
@@ -86,6 +91,10 @@ func claudeRule(in Input) Result {
 				top = append(top, jsonKV{k.parent, jsonObj{{k.child, k.value}}})
 			}
 			added = append(added, k.name())
+		}
+		if deny {
+			top = append(top, jsonKV{"permissions", jsonObj{{"deny", claudeDenyEntries()}}})
+			added = append(added, claudeDenyKey)
 		}
 		res.Writes = map[string][]byte{ClaudeSettings: []byte(renderJSON(top, "", "  ", true) + "\n")}
 		res.Section.Lines = []string{wroteLine(added)}
@@ -148,6 +157,17 @@ func claudeRule(in Input) Result {
 			out = insertMember(out, top, jsonKV{k.parent, jsonObj{{k.child, k.value}}}, indentUnit(out, top))
 		}
 		added = append(added, k.name())
+	}
+	if deny {
+		var denied bool
+		var reason string
+		out, denied, reason = claudeDenyMerge(out)
+		if reason != "" {
+			return fail(reason)
+		}
+		if denied {
+			added = append(added, claudeDenyKey)
+		}
 	}
 	var lines []string
 	if len(added) > 0 {

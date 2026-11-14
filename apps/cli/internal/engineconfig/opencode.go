@@ -47,8 +47,13 @@ const opencodeMainSessionStep = "ask your agent to build the agents (the main se
 // experimental.subagent_depth (intent 0015 S8, D6). Anything it cannot merge
 // without loss writes nothing and gets one ✗ line. Then it reports whether
 // the stage-gate plugin is in the project.
-func opencodeRule(in Input) Result {
-	res, agentIsGabo := opencodeKeys(in)
+func opencodeRule(in Input) Result { return opencodeSettingsRule(in, true) }
+
+// opencodeSettingsRule is the OpenCode rule. With deny, it also merges the
+// base credential deny rules (intent 0028 S8); without, only the main-session
+// key and the removal change, which is what the key tests pin.
+func opencodeSettingsRule(in Input, deny bool) Result {
+	res, agentIsGabo := opencodeKeys(in, deny)
 	failed := len(res.Section.Lines) > 0 && strings.HasPrefix(res.Section.Lines[0], FailurePrefix)
 	if _, ok := in.Files[OpencodeStageGate]; ok {
 		res.Section.Lines = append(res.Section.Lines, "stage-gate plugin in place (built by gabo-runtime-opencode)")
@@ -68,7 +73,7 @@ func opencodeRule(in Input) Result {
 
 // opencodeKeys decides every key before it writes, so a failure writes
 // nothing, and reports whether the main session runs gabo's agent.
-func opencodeKeys(in Input) (Result, bool) {
+func opencodeKeys(in Input, deny bool) (Result, bool) {
 	file := opencodeConfig(in)
 	fail := func(reason string) (Result, bool) {
 		return Result{Section: Section{Lines: []string{opencodeFailure(file, reason)}}}, false
@@ -94,6 +99,7 @@ func opencodeKeys(in Input) (Result, bool) {
 	case !in.lists(Opencode):
 	case !exists:
 		src = []byte(renderJSON(jsonObj{{opencodeAgentKey, opencodeAgentValue}}, "", "  ", true) + "\n")
+		exists = true
 		parts = append(parts, "added "+opencodeAgentKey)
 		agentIsGabo = true
 	default:
@@ -114,6 +120,24 @@ func opencodeKeys(in Input) (Result, bool) {
 		}
 		src = out
 	}
+	var notRun string
+	switch {
+	case !deny:
+	case !exists && !in.lists(Opencode):
+		// Intent 0015 S8: gabo creates no OpenCode config for a role engine
+		// that is not a listed assistant, so there is no file to hold the list.
+		notRun = opencodeNoConfigNotRun
+	default:
+		var denied bool
+		var reason string
+		src, denied, reason = opencodeDenyMerge(src, exists)
+		if reason != "" {
+			return fail(reason)
+		}
+		if denied {
+			parts = append(parts, "added permissions deny rules")
+		}
+	}
 
 	var res Result
 	if len(parts) > 0 {
@@ -122,6 +146,9 @@ func opencodeKeys(in Input) (Result, bool) {
 	}
 	res.Section.Lines = append(res.Section.Lines, removed...)
 	res.Section.Lines = append(res.Section.Lines, kept...)
+	if notRun != "" {
+		res.Section.Lines = append(res.Section.Lines, notRun)
+	}
 	if len(res.Section.Lines) == 0 && in.lists(Opencode) {
 		res.Section.Lines = []string{"unchanged " + file}
 	}
