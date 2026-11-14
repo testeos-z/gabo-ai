@@ -47,7 +47,7 @@ cat >"$work/bin/fake-engine" <<'EOF'
 n=$(( $(cat "$FAKE_COUNT" 2>/dev/null || echo 0) + 1 ))
 echo "$n" >"$FAKE_COUNT"
 cat >/dev/null
-echo "run $n pwd=$(pwd)" >>"$FAKE_RUNS"
+echo "run $n pwd=$(pwd) enterprise=${GH_ENTERPRISE_TOKEN:-unset}/${GITHUB_ENTERPRISE_TOKEN:-unset} ssh=${SSH_AUTH_SOCK:-unset} token=${GH_TOKEN:-unset}/${GITHUB_TOKEN:-unset}" >>"$FAKE_RUNS"
 if [[ "$n" == "${FAKE_FAIL_RUN:-0}" ]]; then echo broken >out.txt; else echo done >out.txt; fi
 exit 0
 EOF
@@ -91,6 +91,8 @@ printf 'runtimes:\n  coder: claude\n' >"$cfg_min2"
 run_eval() {
   local name="$1" evals="$2" cfg="$3" fail="${4:-0}" h="${5:-$head}"
   FAKE_COUNT="$work/$name.count" FAKE_RUNS="$work/$name.runs" FAKE_FAIL_RUN="$fail" \
+    GH_ENTERPRISE_TOKEN=ghe-secret GITHUB_ENTERPRISE_TOKEN=ghe-secret SSH_AUTH_SOCK=/tmp/agent.sock \
+    GH_TOKEN=gh-secret GITHUB_TOKEN=gh-secret \
     GABO_EVAL_ENGINE_CMD="$fake" PATH="$work/shim:$PATH" \
     bash "$script" run "$evals" --repo "$repo" --head "$h" --config "$cfg" 2>&1
 }
@@ -193,6 +195,49 @@ else
   ok "S4 a check that did not run never reads pass"
 fi
 has "S4 the not-run checks are reported as not run" "$code" 1 "not run" "$out"
+
+# --- isolation: the engine sees no GitHub or agent credentials ---------------
+
+if grep -q "enterprise=unset/unset ssh=unset token=unset/unset" "$work/one.runs" 2>/dev/null; then
+  ok "S4 the engine does not see GitHub tokens, enterprise tokens or the SSH agent"
+else
+  bad "S4 the engine does not see GitHub tokens, enterprise tokens or the SSH agent: $(cat "$work/one.runs" 2>/dev/null)"
+fi
+
+# --- installed catalog: scripts without the exec bit still run ---------------
+
+# The CLI writes catalog files as 0644. The runner calls its sibling eval-set.sh
+# through bash, so a copy with no exec bit runs the same way.
+noexec="$work/noexec"
+mkdir -p "$noexec/scripts"
+cp "$here/eval-run.sh" "$here/eval-set.sh" "$noexec/scripts/"
+chmod 644 "$noexec/scripts/eval-run.sh" "$noexec/scripts/eval-set.sh"
+e="$work/noexec/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_COUNT="$work/noexec.count" FAKE_RUNS="$work/noexec.runs" FAKE_FAIL_RUN=0 \
+  GABO_EVAL_ENGINE_CMD="$fake" PATH="$work/shim:$PATH" \
+  bash "$noexec/scripts/eval-run.sh" run "$e" --repo "$repo" --head "$head" --config "$cfg_coder" 2>&1)"
+code=$?
+has "S4 the runner works from a catalog copy with no exec bit (bash runs its sibling)" "$code" 0 \
+  "task eval-001: pass (1 of 1 runs)" "$out"
+
+# --- a parent repository does not swallow the head configuration -------------
+
+# TMPDIR inside a git repository: git apply must still apply to the scratch tree.
+outer="$work/outer"
+mkdir -p "$outer"
+gitc "$outer" init -q
+mkdir -p "$outer/tmp"
+e="$work/outer-case/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(TMPDIR="$outer/tmp" FAKE_COUNT="$work/outer.count" FAKE_RUNS="$work/outer.runs" FAKE_FAIL_RUN=0 \
+  GABO_EVAL_ENGINE_CMD="$fake" PATH="$work/shim:$PATH" \
+  bash "$script" run "$e" --repo "$repo" --head "$head" --config "$cfg_coder" 2>&1)"
+code=$?
+has "S4 a TMPDIR inside a git repository still gets the head configuration applied" "$code" 0 \
+  "task eval-001: pass (1 of 1 runs)" "$out"
 
 # --- refusals: no engine runs -------------------------------------------------
 

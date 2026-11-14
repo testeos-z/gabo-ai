@@ -89,7 +89,7 @@ cfg_value() {
 
 # The counts come from eval-set.sh, which validates the config the same way the
 # set check does (block style, every bound at least 1).
-runs="$("$set_script" config runs_per_task --config "$config")" || exit 1
+runs="$(bash "$set_script" config runs_per_task --config "$config")" || exit 1
 
 engine="$(cfg_value runtimes coder)"
 case "$engine" in
@@ -98,7 +98,7 @@ case "$engine" in
   *) echo "refused config: runtimes.coder must be claude, codex, pi or opencode" >&2; exit 1 ;;
 esac
 
-set_out="$("$set_script" check "$dir" --config "$config" 2>&1)" || {
+set_out="$(bash "$set_script" check "$dir" --config "$config" 2>&1)" || {
   printf '%s\n' "$set_out"
   exit 1
 }
@@ -120,14 +120,16 @@ run_bounded() {
 }
 
 # engine_run <engine> <tree> <prompt> <log> <gh-config>: one coder run in the
-# tree. The GitHub token is removed from the environment and gh reads an empty
-# config directory, so the engine cannot reach the owner's gh login.
+# tree. The GitHub tokens (github.com and enterprise) and the SSH agent socket
+# are removed from the environment and gh reads an empty config directory, so
+# the engine cannot reach the owner's gh login through them. This is not a
+# sandbox: the engine keeps the owner's HOME and filesystem access.
 engine_run() {
   local engine="$1" tree="$2" prompt="$3" log="$4" gh_cfg="$5" text
   text="$(cat "$prompt")"
   (
     cd "$tree" || exit 1
-    unset GH_TOKEN GITHUB_TOKEN
+    unset GH_TOKEN GITHUB_TOKEN GH_ENTERPRISE_TOKEN GITHUB_ENTERPRISE_TOKEN SSH_AUTH_SOCK
     export GH_CONFIG_DIR="$gh_cfg"
     if [[ -n "${GABO_EVAL_ENGINE_CMD:-}" ]]; then
       run_bounded bash -c "$GABO_EVAL_ENGINE_CMD"
@@ -161,7 +163,7 @@ run_one() {
     reason="starting commit could not be copied"
   elif ! git -C "$repo" diff --no-color --no-ext-diff --no-textconv --binary "$start" "$head" -- "${paths[@]}" >"$scratch/head-config.patch"; then
     reason="head configuration could not be read"
-  elif [[ -s "$scratch/head-config.patch" ]] && ! (cd "$tree" && git apply --whitespace=nowarn "$scratch/head-config.patch") 2>"$scratch/apply.log"; then
+  elif [[ -s "$scratch/head-config.patch" ]] && ! (cd "$tree" && GIT_CEILING_DIRECTORIES="$scratch" git apply --whitespace=nowarn "$scratch/head-config.patch") 2>"$scratch/apply.log"; then
     reason="head configuration does not apply"
   fi
 
