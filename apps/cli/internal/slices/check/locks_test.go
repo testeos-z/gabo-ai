@@ -98,22 +98,37 @@ func TestDecideReadsStateFromGaboYAML(t *testing.T) {
 	}
 }
 
-// I0028 S13: gabo check reports one unknown lock name as one failing ✗ line,
-// and names the key.
+// I0028 S13 golden: gabo check reports one unknown lock name as exactly one
+// failing ✗ line, then the config's next: line.
 func TestGaboCheckUnknownLockNameIsOneLine(t *testing.T) {
 	t.Parallel()
 	bad := validConfig + "locks:\n  shell_gard: block\n"
 	r := run(t, project(), configFiles{projectFile: bad}, Settings{})
-	wantFailedOneProjectLine(t, r, "locks")
+	wantOneFailureLine(t, r, projectFile, "✗ "+projectFile+": locks: additional properties 'shell_gard' not allowed")
 }
 
-// I0028 S13, question 1: gabo check fails test_files set to ask as one
-// failing line that names the key.
+// I0028 S13 golden, question 1: test_files set to ask is one exact failing line.
 func TestGaboCheckTestFilesAskIsOneLine(t *testing.T) {
 	t.Parallel()
 	bad := validConfig + "locks:\n  test_files: ask\n"
 	r := run(t, project(), configFiles{projectFile: bad}, Settings{})
-	wantFailedOneProjectLine(t, r, "test_files")
+	wantOneFailureLine(t, r, projectFile, "✗ "+projectFile+": locks.test_files: value must be one of 'off', 'warn', '', <nil>")
+}
+
+// I0028 S13 golden: an unknown lock state is one exact failing line.
+func TestGaboCheckUnknownLockStateIsOneLine(t *testing.T) {
+	t.Parallel()
+	bad := validConfig + "locks:\n  shell_guard: deny\n"
+	r := run(t, project(), configFiles{projectFile: bad}, Settings{})
+	wantOneFailureLine(t, r, projectFile, "✗ "+projectFile+": locks.shell_guard: value must be one of 'off', 'warn', 'ask', 'block', '', <nil>")
+}
+
+// Intent 0028 decision 9: a user config that sets locks fails gabo check, and
+// the failing line names the user file.
+func TestGaboCheckRefusesLocksInUserConfig(t *testing.T) {
+	t.Parallel()
+	r := run(t, project(), configFiles{userFile: "locks:\n  enabled: false\n", projectFile: validConfig}, Settings{})
+	wantOneFailureLine(t, r, userFile, "✗ "+userFile+": locks: only gabo.yaml may set it; remove the block from the user config")
 }
 
 // I0028 S13: valid lock keys pass gabo check with its unchanged passed line.
@@ -124,24 +139,21 @@ func TestGaboCheckValidLocksPass(t *testing.T) {
 	wantPassed(t, r, PassedLine)
 }
 
-// wantFailedOneProjectLine checks that the report failed with exactly one ✗
-// line for the project file and that line names key, plus NextFixConfig.
-func wantFailedOneProjectLine(t *testing.T, r Report, key string) {
+// wantOneFailureLine checks that the report failed with exactly one ✗ line for
+// file, that the line is want, and that the report ends with NextFixConfig.
+func wantOneFailureLine(t *testing.T, r Report, file, want string) {
 	t.Helper()
 	if !r.Failed {
 		t.Fatalf("Failed = false, want true; output:\n%s", joined(r))
 	}
 	var own []string
 	for _, l := range r.Lines {
-		if strings.HasPrefix(l, "✗ "+projectFile+": ") {
+		if strings.HasPrefix(l, "✗ "+file+": ") {
 			own = append(own, l)
 		}
 	}
-	if len(own) != 1 {
-		t.Fatalf("got %d ✗ lines for %s, want 1:\n%s", len(own), projectFile, joined(r))
-	}
-	if !strings.Contains(own[0], key) {
-		t.Fatalf("✗ line %q does not name %q", own[0], key)
+	if len(own) != 1 || own[0] != want {
+		t.Fatalf("✗ lines for %s = %q, want exactly %q; output:\n%s", file, own, want, joined(r))
 	}
 	wantLines(t, r, NextFixConfig)
 }

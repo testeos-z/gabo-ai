@@ -140,3 +140,32 @@ func TestLocksNotAMappingNamesTheKey(t *testing.T) {
 		t.Fatalf("Parse(null locks) error = %v; want unset", err)
 	}
 }
+
+// Intent 0028 decision 9: the switches live in gabo.yaml only. A user config
+// that sets locks is refused, so no file outside the repository can turn a
+// lock off in a project.
+func TestLocksInUserConfigIsRefused(t *testing.T) {
+	t.Parallel()
+	r := files{
+		"/home/o/.config/gabo/config.yaml": "locks:\n  enabled: false\n",
+		"/src/p/gabo.yaml":                 minimal,
+	}
+	_, err := LoadLayers(r, twoLayers())
+	if err == nil || !strings.Contains(err.Error(), "locks") || !strings.Contains(err.Error(), "/home/o/.config/gabo/config.yaml") {
+		t.Fatalf("LoadLayers() error = %v; want the user config refused for locks, naming its file", err)
+	}
+}
+
+// A lock key that is not a scalar (a sequence) is one validation line, not a
+// YAML decode failure: the name it cannot have is reported like an unknown one.
+func TestLocksNonScalarKeyIsOneLine(t *testing.T) {
+	t.Parallel()
+	_, err := Parse([]byte(minimal + "locks:\n  [a, b]: block\n"))
+	if err == nil {
+		t.Fatal("Parse() accepted a non-string lock key")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "\n") || !strings.Contains(msg, "locks keys must be lock names") {
+		t.Errorf("error = %q; want one line naming the locks key", msg)
+	}
+}

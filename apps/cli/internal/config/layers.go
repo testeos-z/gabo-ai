@@ -204,6 +204,11 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 		if l.Name == LayerProject {
 			res.Warnings = append(res.Warnings, dropPersonalKeys(doc, l.Path)...)
 		}
+		// The switches live in gabo.yaml only (intent 0028 decision 9): a user
+		// config that sets locks is refused, not merged into every project.
+		if _, ok := doc["locks"]; ok && l.Name == LayerUser {
+			return res, &FileError{File: l.Path, Err: errors.New("locks: only gabo.yaml may set it; remove the block from the user config")}
+		}
 		// Engine names get their own lines first, as in Parse (intent 0017
 		// S3, S6), so gabo check prints the same refusal for a bad name.
 		if err := layerRuntimeNames(doc); err != nil {

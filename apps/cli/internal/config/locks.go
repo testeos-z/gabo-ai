@@ -57,7 +57,8 @@ type Locks struct {
 }
 
 // UnmarshalYAML decodes the block without the strict field check of the
-// loader, so an unknown lock name reaches validateLockKeys as one line.
+// loader, so an unknown lock name reaches validateLockKeys as one line. A key
+// that is not a scalar is one line of its own (it names no lock at all).
 func (l *Locks) UnmarshalYAML(n *yaml.Node) error {
 	if n.Kind != yaml.MappingNode {
 		if n.ShortTag() == "!!null" {
@@ -65,22 +66,24 @@ func (l *Locks) UnmarshalYAML(n *yaml.Node) error {
 		}
 		return fmt.Errorf("line %d: locks must be a mapping of lock keys", n.Line)
 	}
+	var unknown []string
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		key := n.Content[i]
+		if key.Kind != yaml.ScalarNode {
+			return fmt.Errorf("line %d: locks keys must be lock names", key.Line)
+		}
+		if key.Value != "enabled" && !slices.Contains(lockNameStrings(), key.Value) {
+			unknown = append(unknown, key.Value)
+		}
+	}
 	type plain Locks
 	var p plain
 	if err := n.Decode(&p); err != nil {
 		return err
 	}
-	var keys map[string]yaml.Node
-	if err := n.Decode(&keys); err != nil {
-		return err
-	}
 	*l = Locks(p)
-	for k := range keys {
-		if k != "enabled" && !slices.Contains(lockNameStrings(), k) {
-			l.unknown = append(l.unknown, k)
-		}
-	}
-	sort.Strings(l.unknown)
+	sort.Strings(unknown)
+	l.unknown = unknown
 	return nil
 }
 
