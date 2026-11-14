@@ -19,3 +19,11 @@ type UserFS interface {
 type OutcomeAppender interface {
 	Append(name string, line []byte) error
 }
+
+// PRBaseReader reads the base branch of a pull request on the repository
+// host (intent 0028 D4). repo is the -R value of the command ("" for the
+// current repository) and ref the pull request as the command names it: a
+// number, a URL or a branch ("" is the current branch's pull request).
+type PRBaseReader interface {
+	PRBase(repo, ref string) (string, error)
+}
