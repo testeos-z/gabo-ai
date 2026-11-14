@@ -46,7 +46,7 @@ Human merge: T14 edits `.gabo/skills/` and T9 writes engine config files that ar
 
 ## Tasks
 
-Task ids are local to the intent. A dependency in another intent is written `<NNNN>/T<n>`. `depends_on` and `unblocks` mirror each other; `—` means none. The tracker titles are `I0028/T<n>: <title>`. Tracker issues (verified by re-read, parent #765, blocked-by links match `depends_on`): T1 #802, T2 #803, T3 #804, T4 #805, T5 #806, T6 #807, T7 #808, T8 #809, T9 #810, T10 #811, T11 #812, T12 #813, T13 #814, T14 #815, T15 #816, T16 #817; #790 (`0027/T12`) is also blocked by T8 (#809). Labels: `m1-local-core`, the size label, `flow-improvements`.
+Task ids are local to the intent. A dependency in another intent is written `<NNNN>/T<n>`. `depends_on` and `unblocks` mirror each other; `—` means none. The tracker titles are `I0028/T<n>: <title>`. Tracker issues (verified by re-read, parent #765, blocked-by links match `depends_on`): T1 #802, T2 #803, T3 #804, T4 #805, T5 #806, T6 #807, T7 #808, T8 #809, T9 #810, T10 #811, T11 #812, T12 #813, T13 #814, T14 #815, T15 #816, T16 #817; #790 (`0027/T12`) is also blocked by T8 (#809) and T14 (#815). Labels: `m1-local-core`, the size label, `flow-improvements`.
 
 | id | title | spec refs | depends_on | unblocks | acceptance | size |
 |---|---|---|---|---|---|---|
