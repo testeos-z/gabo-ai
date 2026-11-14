@@ -23,9 +23,8 @@ func TestCycleStep6DoneGate(t *testing.T) {
 	s := step6(t, readCatalog(t, "gabo-cycle/SKILL.md"))
 	for _, want := range []string{
 		"done gate",
-		"before you write DONE",
 		"each `review.checks` command of `gabo.yaml`",
-		"command line as listed",
+		"`check: <command line as listed in review.checks>`",
 		"`exit: <n>`",
 		"`refused: <command>`",
 		"`refused: exit line missing for <command>`",
@@ -50,10 +49,33 @@ func TestCycleStep6ReportGate(t *testing.T) {
 		"`not run: <reason>` passes the gate",
 		"`odd:`", "`spec S<n>:`", "`contract:`", "`tests:`", "`commits:`", "`RDD:`",
 		"`integration: not applicable: <reason>`",
+		"`integration:`",
+		"as two required fields",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("gabo-cycle step 6: report gate lacks %q", want)
 		}
+	}
+}
+
+// The gates run on the outcome text, before the Task Close writes DONE: the
+// cycle never writes DONE (D23), so a refused task is held or reopened.
+func TestCycleStep6GatesRunBeforeTheClose(t *testing.T) {
+	t.Parallel()
+	s := step6(t, readCatalog(t, "gabo-cycle/SKILL.md"))
+	for _, want := range []string{
+		"text of each HANDED or DONE outcome",
+		"the coder writes DONE in its Task Close, never you",
+		"do not resume the coder with `PR #<n> merged`",
+		"reopen the task issue",
+		"count the task as not DONE",
+	} {
+		if !strings.Contains(s, want) {
+			t.Errorf("gabo-cycle step 6: gate ordering lacks %q", want)
+		}
+	}
+	if strings.Contains(s, "before you write DONE") {
+		t.Error("gabo-cycle step 6: still says the cycle writes DONE")
 	}
 }
 
