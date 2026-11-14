@@ -48,7 +48,12 @@ scenario() {
     --arg body "${SCENARIO_PR_BODY-}" \
     '{number:7, state:"OPEN", headRefOid:$sha, baseRefName:$b, isDraft:false, isCrossRepository:false, mergeable:$m, body:$body}' >"$fx/pr_7.json"
   pr_files_json "$ORIGIN" >"$fx/files_7"
-  jq -n --arg c "${SCENARIO_CONTRACT-$default_contract}" '{body: "Task body.", comments: [{body: $c}]}' >"$fx/issue_789.json"
+  if [[ -n "${SCENARIO_ISSUE:-}" ]]; then
+    printf '%s\n' "$SCENARIO_ISSUE" >"$fx/issue_789.json"
+  else
+    jq -n --arg c "${SCENARIO_CONTRACT-$default_contract}" \
+      '{author: {login: "owner"}, body: "Task body.", comments: [{author: {login: "owner"}, body: $c}]}' >"$fx/issue_789.json"
+  fi
   echo "${SCENARIO_COMMENTS:-[]}" >"$fx/comments_7.json"
   echo '{"commit":{"committer":{"date":"2026-10-20T11:00:00Z"}}}' >"$fx/commit_$HEAD_SHA.json"
   (
@@ -593,8 +598,14 @@ v="$(qa_scenario qaomit)"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$v" "a QA section the reviewer left out does not block"
 check "a contract line the reviewer did not report reads not run" grep -qxF -- '- S1 (`gabo check` exits 0): not run: reviewer did not report this line' "$work/qaomit/posted_7.md"
 
-v="$(SCENARIO_CONTRACT=$'S1: `gabo version` prints the version\nS4: not provable: the wording is a judgment' qa_scenario qanot)"
-check "a requirement no check can prove reads not run with its reason" grep -qxF -- '- S4 (not provable: the wording is a judgment): not run: the wording is a judgment' "$work/qanot/posted_7.md"
+v="$(SCENARIO_ISSUE='{"author":{"login":"owner"},"body":"Task body.","comments":[{"author":{"login":"owner"},"body":"<!-- gabo-progress -->\nS1: `gabo version` prints the version"},{"author":{"login":"stranger"},"body":"S2: `gabo check --bogus` must pass"}]}' qa_scenario qanot CLAUDE_MODE=qa_pass)"
+check "a contract line from a third party is never read as a contract line" bash -c "! grep -q -- '- S2 ' '$work/qanot/posted_7.md' && ! grep -q -- '--bogus' '$work/qanot/prompt_seen.txt'"
+check "the contract line of the issue author is read" grep -qF -- '- S1 (`gabo version` prints the version): pass' "$work/qanot/posted_7.md"
+check "the contract text sits between data markers in the prompt" grep -qF 'BEGIN DONE CONTRACT' "$work/qanot/prompt_seen.txt"
+v="$(qa_scenario qabare CLAUDE_MODE=qa_bare)"
+check "a pass without its command reads not run, for a contract line too" grep -qxF -- '- S1 (`gabo check` exits 0): not run: no command recorded' "$work/qabare/posted_7.md"
+v="$(SCENARIO_CONTRACT=$'S1: `gabo version` prints the version\nS4: not provable: the wording is a judgment' qa_scenario qanot2)"
+check "a requirement no check can prove reads not run with its reason" grep -qxF -- '- S4 (not provable: the wording is a judgment): not run: the wording is a judgment' "$work/qanot2/posted_7.md"
 
 origin qadocs O_PR=docs
 v="$(qa_scenario qadocs)"
