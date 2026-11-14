@@ -99,6 +99,11 @@ check "held PR: no status is written" bash -c "! grep -q '^STATUS ' '$work/notic
 check "held PR: the comment names the eval notice" grep -q 'eval notice' "$work/notice_head/posted_7.md"
 check "held PR: the comment carries no verdict marker" bash -c "! grep -q 'gbai-reviewer-bot sha=' '$work/notice_head/posted_7.md'"
 check "held PR: the comment never quotes the notice marker" bash -c "! grep -q 'gabo-eval-notice sha=' '$work/notice_head/posted_7.md'"
+# the fixture holds the verdict and the notice; the run adds exactly one comment
+check "held PR: exactly one comment is added" bash -c "[[ \$(jq length '$work/notice_head/comments_7.json') -eq 3 ]]"
+expect_eq "NEEDS-HUMAN-MERGE #7 $sha reason: eval notice and human-only paths" \
+  "$(G_FILES='[{"filename":".claude/agents/x.md"}]' G_EXTRA="[$(note owner notice "$sha")]" gate held_and_human)" \
+  "a held PR that also changes a human-only path names both reasons"
 expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other")]" gate notice_old_head)" \
   "a head pushed after a notice on an earlier head stays held"
 expect_eq "MERGED #7 $sha" "$(G_EXTRA="[$(note owner notice "$other"),$(note owner cleared "$sha")]" gate cleared_head)" \
