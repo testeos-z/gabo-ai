@@ -109,6 +109,13 @@ Before step 1, if the print-mode check in the Hard Rules applies to this session
    - `wait`: stop and report; the next wave starts when the owner asks.
    - With no eligible intent, wait in either case, and say which intents are waiting and why.
 
+## Agent Eval Trigger (intent 0030 S3)
+
+- **Path list:** a change to any of these paths changes the agent configuration: a `gabo-*` skill (its catalog copy under `apps/cli/internal/skills/` and its project and plugin copies), an agent definition (`.claude/agents/gabo-*.md`), the methodology adapter (`slots.methodology.adapter` in `gabo.yaml`), or the instruction file (`AGENTS.md` or `CLAUDE.md`).
+- **Run:** when a PR changes the agent configuration, a run of the eval set through the `gabo-eval-runner` skill happens on the owner's machine before the owner accepts the change, started by the owner or by you. Your answer for that PR names the run report for its head, or says `eval: not run: <reason>`. This rule re-implements no runner; it only names the skill.
+- **Product code only:** a PR that touches only product code needs no run; say nothing about evals for it.
+- **Never in CI:** a run is never in CI; no workflow under `.github/` starts it.
+
 ## Intent Claims (intent 0013 S8, S12)
 
 A wave claims its intent on the intent issue (`gabo-cycle` skill, Hard Rules): the comment `intent claimed by session <session id> (engine <engine>) run <run id>` claims it, `intent released by session <session id>` or `intent released by owner for session <session id>` releases it, and, in the tracker's comment order, the earliest claim not followed by its own release holds the intent. Read claims with `read one` through `tasks` on the intent issue; there is no other claim operation (D4).
