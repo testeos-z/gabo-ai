@@ -71,7 +71,7 @@ func judgeRelease(argv []string) []ShellViolation {
 	switch path.Base(argv[0]) {
 	case "git":
 		rule = releaseGit(argv[1:])
-	case "npm", "bun":
+	case "npm", "bun", "pnpm", "yarn", "npx", "bunx":
 		if slices.Contains(argv[1:], "publish") {
 			rule = rulePublish
 		}
@@ -80,7 +80,7 @@ func judgeRelease(argv []string) []ShellViolation {
 			rule = rulePluginTag
 		}
 	case "gh":
-		if _, words := ghArgs(argv[1:]); len(words) >= 2 && words[0] == "release" && words[1] == "create" {
+		if _, words := ghArgs(argv[1:], nil, ""); len(words) >= 2 && words[0] == "release" && words[1] == "create" {
 			rule = ruleRelease
 		}
 	}
@@ -137,11 +137,16 @@ func tagCreates(args []string) bool {
 			}
 		case !endOfOpts && strings.HasPrefix(a, "-") && a != "-":
 			letters := a[1:]
-			if strings.ContainsAny(letters, "lndv") {
-				list = true
-			}
-			if k := strings.IndexAny(letters, "mFu"); k >= 0 && k == len(letters)-1 {
-				i++
+			for k, c := range letters {
+				if c == 'm' || c == 'F' || c == 'u' {
+					if k == len(letters)-1 {
+						i++
+					}
+					break
+				}
+				if c == 'l' || c == 'n' || c == 'd' || c == 'v' {
+					list = true
+				}
 			}
 		default:
 			name = true
@@ -173,9 +178,19 @@ func adjacent(args []string, a, b string) bool {
 	return false
 }
 
+// ghMergeValued are the long options of gh pr merge that take a value, and
+// ghMergeValuedShort the letters of its short options that do. Their values
+// are not words, so `gh pr merge -b feat/x 12` names pull request 12.
+var (
+	ghMergeValued      = map[string]bool{"--body": true, "--body-file": true, "--subject": true, "--author-email": true, "--match-head-commit": true}
+	ghMergeValuedShort = "bFtA"
+)
+
 // ghArgs returns the -R or --repo value of a gh command and its words that are
-// not options; an option's value is not a word.
-func ghArgs(args []string) (string, []string) {
+// not options. An option in valued takes the next word, or the rest of its
+// word after '=' (long) or in a short cluster; valuedShort lists the short
+// letters that take a value.
+func ghArgs(args []string, valued map[string]bool, valuedShort string) (string, []string) {
 	var repo string
 	var words []string
 	for i := 0; i < len(args); i++ {
@@ -190,7 +205,20 @@ func ghArgs(args []string) (string, []string) {
 			repo = strings.TrimPrefix(a, "--repo=")
 		case strings.HasPrefix(a, "-R") && len(a) > 2:
 			repo = a[2:]
+		case strings.HasPrefix(a, "--"):
+			if name, _, hasValue := strings.Cut(a, "="); !hasValue && valued[name] {
+				i++
+			}
 		case strings.HasPrefix(a, "-") && a != "-":
+			letters := a[1:]
+			for k, c := range letters {
+				if strings.ContainsRune(valuedShort, c) {
+					if k == len(letters)-1 {
+						i++
+					}
+					break
+				}
+			}
 		default:
 			words = append(words, a)
 		}
@@ -203,7 +231,7 @@ func mergeOf(argv []string) (mergeCall, bool) {
 	if path.Base(argv[0]) != "gh" {
 		return mergeCall{}, false
 	}
-	repo, words := ghArgs(argv[1:])
+	repo, words := ghArgs(argv[1:], ghMergeValued, ghMergeValuedShort)
 	if len(words) < 2 || words[0] != "pr" || words[1] != "merge" {
 		return mergeCall{}, false
 	}

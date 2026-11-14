@@ -58,6 +58,8 @@ func TestReleaseGateBlocksReleaseCommandsInEverySession(t *testing.T) {
 		{"bun publish --access public", "a package publish (npm publish, bun publish) is blocked in an agent session"},
 		{"claude plugin tag plugins/claude-code", "claude plugin tag is blocked in an agent session"},
 		{"gh release create v1", "gh release create is blocked in an agent session"},
+		{"git tag -a v1.2.0 -m\"Release 1.2\"", "git tag that creates a tag is blocked in an agent session"},
+		{"npx npm publish", "a package publish (npm publish, bun publish) is blocked in an agent session"},
 	}
 	for _, tt := range tests {
 		for _, s := range []struct{ name, engine, agent string }{
@@ -149,6 +151,8 @@ func TestReleaseGateMergeReadsTheBase(t *testing.T) {
 	}{
 		{name: "base main blocks", command: "gh pr merge 12", prs: &fakePRs{bases: map[string]string{"12": "main"}}, exit: ExitFailed, rule: mainRule, calls: []string{"#12"}},
 		{name: "base dev allowed", command: "gh pr merge 12", prs: &fakePRs{bases: map[string]string{"12": "dev"}}, exit: 0, calls: []string{"#12"}},
+		{name: "subject value is not the reference", command: "gh pr merge -t main 12", prs: &fakePRs{bases: map[string]string{"12": "dev", "main": "main"}}, exit: 0, calls: []string{"#12"}},
+		{name: "body value does not hide a main merge", command: "gh pr merge --body feat/x 12", prs: &fakePRs{bases: map[string]string{"12": "main", "feat/x": "dev"}}, exit: ExitFailed, rule: mainRule, calls: []string{"#12"}},
 		{name: "current branch pull request", command: "gh pr merge", prs: &fakePRs{bases: map[string]string{"": "main"}}, exit: ExitFailed, rule: mainRule, calls: []string{"#"}},
 		{name: "repo flag is passed", command: "gh -R o/r pr merge 12", prs: &fakePRs{bases: map[string]string{"12": "dev"}}, exit: 0, calls: []string{"o/r#12"}},
 		{name: "failed read blocks", command: "gh pr merge 12", prs: &fakePRs{err: errors.New("host down")}, exit: ExitFailed, rule: unreadRule, calls: []string{"#12"}},
@@ -266,6 +270,23 @@ func TestReleaseLineReading(t *testing.T) {
 		{command: "gh -R o/r release create v1", rules: []string{"gh release create is blocked in an agent session"}},
 		{command: "gh pr merge --squash 12", rules: nil, merges: []mergeCall{{Ref: "12"}}},
 		{command: "gh pr merge --repo=o/r 12", merges: []mergeCall{{Repo: "o/r", Ref: "12"}}},
+		// Option values are not words: the reference is the last positional.
+		{command: "gh pr merge -t x 12", merges: []mergeCall{{Ref: "12"}}},
+		{command: "gh pr merge --subject 7 12", merges: []mergeCall{{Ref: "12"}}},
+		{command: "gh pr merge -b feat/x 12", merges: []mergeCall{{Ref: "12"}}},
+		{command: "gh pr merge --body dev 12", merges: []mergeCall{{Ref: "12"}}},
+		{command: "gh pr merge --match-head-commit abc123 7", merges: []mergeCall{{Ref: "7"}}},
+		{command: "gh pr merge -bfeat 12", merges: []mergeCall{{Ref: "12"}}},
+		{command: "gh pr merge --body=dev 12", merges: []mergeCall{{Ref: "12"}}},
+		{command: "gh pr merge -sb feat/x 12", merges: []mergeCall{{Ref: "12"}}},
+		{command: "gh pr merge -d 12", merges: []mergeCall{{Ref: "12"}}},
+		// A short option with its value attached is not a list of flags.
+		{command: "git tag -mmsg v1", rules: []string{"git tag that creates a tag is blocked in an agent session"}},
+		{command: "git tag -a v1.2.0 -m\"Release 1.2\"", rules: []string{"git tag that creates a tag is blocked in an agent session"}},
+		{command: "git tag -Fnotes.txt v1", rules: []string{"git tag that creates a tag is blocked in an agent session"}},
+		{command: "git tag -dm x v1", rules: nil},
+		{command: "npx npm publish", rules: []string{"a package publish (npm publish, bun publish) is blocked in an agent session"}},
+		{command: "pnpm publish", rules: []string{"a package publish (npm publish, bun publish) is blocked in an agent session"}},
 		{command: "gh pr merge 12", coder: true, rules: []string{"gh pr merge is blocked in a coder session"}},
 		{command: "git status", rules: nil},
 	}
