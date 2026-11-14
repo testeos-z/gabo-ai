@@ -27,14 +27,14 @@ expect() {
   fi
 }
 
-# Fake gabo: appends "<cwd> <argv>" to $FAKE_GABO_LOG, copies its stdin to
-# $FAKE_GABO_STDIN, prints $FAKE_GABO_OUT to stdout (as the real gabo check
-# --pre-write does) and exits $FAKE_GABO_EXIT.
+# Fake gabo: appends "<cwd> <argv> engine=<GABO_ENGINE>" to $FAKE_GABO_LOG,
+# copies its stdin to $FAKE_GABO_STDIN, prints $FAKE_GABO_OUT to stdout (as the
+# real gabo check --pre-write does) and exits $FAKE_GABO_EXIT.
 fakebin="$work/bin"
 mkdir -p "$fakebin" "$work/empty"
 cat >"$fakebin/gabo" <<'GABO'
 #!/usr/bin/env bash
-echo "$PWD $*" >>"$FAKE_GABO_LOG"
+echo "$PWD $* engine=${GABO_ENGINE-unset}" >>"$FAKE_GABO_LOG"
 cat >"$FAKE_GABO_STDIN"
 [[ -n "${FAKE_GABO_OUT:-}" ]] && printf '%s\n' "$FAKE_GABO_OUT"
 exit "${FAKE_GABO_EXIT:-0}"
@@ -93,7 +93,7 @@ run_hook "$p" "$json" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="$fail_line"
 expect "S12 blocked write exits 2" "$code" 2
 expect "S12 blocked write relays gabo's line on stderr" "$err" "$fail_line"
 expect "S12 blocked write prints nothing on stdout" "$out" ""
-expect "S12 runs gabo check --pre-write once in the project root" "$calls" "$p check --pre-write"
+expect "S12 runs gabo check --pre-write once in the project root" "$calls" "$p check --pre-write engine=claude"
 expect "S12 pipes the tool-call JSON unchanged" "$stdin_seen" "$json"
 [[ -e "$p/$plan_rel" ]] && expect "S12 blocked plan.md does not exist" exists absent || expect "S12 blocked plan.md does not exist" absent absent
 
@@ -106,43 +106,49 @@ p=$(new_project accepted)
 json=$(write_json "$p" "$p/$plan_rel")
 run_hook "$p" "$json" FAKE_GABO_EXIT=0 FAKE_GABO_OUT=""
 expect "S12 accepted write exits 0 silent" "$code:$out:$err" "0::"
-expect "S12 accepted write asked gabo" "$calls" "$p check --pre-write"
+expect "S12 accepted write asked gabo" "$calls" "$p check --pre-write engine=claude"
 expect "S12 accepted write piped the JSON unchanged" "$stdin_seen" "$json"
 
 # An Edit call and a relative gabo path reach gabo too.
 edit_json=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"%s","old_string":"a","new_string":"b"}}' "$p/gabo.yaml")
 run_hook "$p" "$edit_json" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "an Edit of a gabo file asks gabo" "$code:$calls" "2:$p check --pre-write"
+expect "an Edit of a gabo file asks gabo" "$code:$calls" "2:$p check --pre-write engine=claude"
 expect "an Edit JSON is piped unchanged" "$stdin_seen" "$edit_json"
 run_hook "$p" "$(write_json "$p" "$plan_rel")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "a relative gabo path asks gabo" "$code:$calls" "2:$p check --pre-write"
+expect "a relative gabo path asks gabo" "$code:$calls" "2:$p check --pre-write engine=claude"
 
-# S7: gabo exit 2 -> exit 0 with exactly one warning line.
+# S15: gabo exit 2 (usage or error) blocks the write and names the failure.
 run_hook "$p" "$json" FAKE_GABO_EXIT=2 FAKE_GABO_OUT="usage: gabo check --pre-write"
-expect "S7 gabo exit 2 exits 0" "$code" 0
-expect "S7 gabo exit 2 prints nothing on stdout" "$out" ""
-lines=$(printf '%s\n' "$err" | grep -c .)
-expect "S7 gabo exit 2 prints one warning line" "$lines" 1
-[[ "$err" == *warning* ]] && expect "S7 warning line says warning" ok ok || expect "S7 warning line says warning" "$err" "*warning*"
+expect "S15 gabo exit 2 blocks the write" "$code" 2
+expect "S15 gabo exit 2 prints nothing on stdout" "$out" ""
+[[ "$err" == *"gabo check --pre-write failed (exit 2)"* ]] && expect "S15 gabo exit 2 names the failure" ok ok || expect "S15 gabo exit 2 names the failure" "$err" "*failed (exit 2)*"
 
-# S7: the four silent cases, each exit 0 with no output and no gabo call.
+# S3: every file path reaches gabo, gabo paths or not; gabo judges each one.
 p=$(new_project quiet)
-run_hook "$p" "$(write_json "$p" "$p/src/main.go")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "S7 non-gabo path is silent and skips gabo" "$code:$out:$err:$calls" "0:::"
-run_hook "$p" "$(write_json "$p" "$work/other/$plan_rel")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "S7 gabo-like path outside the project is silent" "$code:$out:$err:$calls" "0:::"
+run_hook "$p" "$(write_json "$p" "$p/src/main.go")" FAKE_GABO_EXIT=0
+expect "S3 a non-gabo path reaches gabo check --pre-write" "$calls" "$p check --pre-write engine=claude"
+expect "S3 a non-gabo path that gabo allows runs silently" "$code:$out:$err" "0::"
+run_hook "$p" "$(write_json "$p" "$work/other/$plan_rel")" FAKE_GABO_EXIT=0
+expect "S3 a path outside the project reaches gabo" "$calls" "$p check --pre-write engine=claude"
+
+# S3: GABO_ENGINE is claude on the call whatever the caller set.
+run_hook "$p" "$(write_json "$p" "$p/src/main.go")" FAKE_GABO_EXIT=0 GABO_ENGINE=codex
+expect "S3 GABO_ENGINE is claude even when the caller sets another" "$calls" "$p check --pre-write engine=claude"
 
 nv=$(new_project noversion no-version)
 run_hook "$nv" "$(write_json "$nv" "$nv/$plan_rel")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
 expect "S7 no .gabo/VERSION is silent and skips gabo" "$code:$out:$err:$calls" "0:::"
 
 run_hook "$p" "$(write_json "$p" "$p/$plan_rel")" PATH="$work/empty"
-expect "S7 no gabo on PATH is silent" "$code:$out:$err:$calls" "0:::"
+expect "S15 no gabo on PATH lets the write run" "$code:$out" "0:"
+lines=$(printf '%s\n' "$err" | grep -c .)
+expect "S15 no gabo on PATH prints one warning line" "$lines" 1
+[[ "$err" == *warning* ]] && expect "S15 the no-gabo line is a warning" ok ok || expect "S15 the no-gabo line is a warning" "$err" "*warning*"
 
 run_hook "$p" "$(write_json "$p" "$p/$plan_rel")" CLAUDE_PLUGIN_OPTION_CHECKS=false FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
 expect "S7 checks option off is silent and skips gabo" "$code:$out:$err:$calls" "0:::"
 run_hook "$p" "$(write_json "$p" "$p/$plan_rel")" CLAUDE_PLUGIN_OPTION_CHECKS=true FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "checks option on asks gabo" "$code:$calls" "2:$p check --pre-write"
+expect "checks option on asks gabo" "$code:$calls" "2:$p check --pre-write engine=claude"
 
 # Empty stdin never blocks.
 log="$work/gabo.log"; : >"$log"
