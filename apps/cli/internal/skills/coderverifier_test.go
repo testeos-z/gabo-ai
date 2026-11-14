@@ -38,7 +38,7 @@ func TestCoderSkillNamesTheFreshContextVerifier(t *testing.T) {
 func TestCoderTemplateNamesTheVerifierField(t *testing.T) {
 	t.Parallel()
 	doc := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
-	for _, s := range []string{"`verifier:`", "fresh-context verifier", "`verifier: not applicable: no behavior change`"} {
+	for _, s := range []string{"`verifier:`", "fresh-context verifier", "`verifier: not applicable: no behavior change`", "Before you open the PR", "starts without your conversation", "changes no file and never approves or blocks", "`commits:`, `verifier:`"} {
 		if !strings.Contains(doc, s) {
 			t.Errorf("gabo-coder template: missing %q", s)
 		}
@@ -56,6 +56,20 @@ func TestCoderVerifierAddsNoAgentFile(t *testing.T) {
 	for _, p := range []string{".claude/agents/gabo-verifier.md", ".claude/agents/verifier.md"} {
 		if _, err := os.Stat(filepath.Join(repoRoot, p)); err == nil {
 			t.Errorf("%s must not exist (PD4)", p)
+		}
+	}
+}
+
+// Q34: gabo pins no model for the verifier; the engine chooses it.
+func TestCoderVerifierPinsNoModel(t *testing.T) {
+	t.Parallel()
+	skill := readCatalog(t, "gabo-coder/SKILL.md")
+	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	for name, doc := range map[string]string{"SKILL.md": skill, "template": tmpl} {
+		for _, s := range []string{"small model", "no stronger than", "uses a small"} {
+			if strings.Contains(doc, s) {
+				t.Errorf("gabo-coder %s: must not pin a model (%q)", name, s)
+			}
 		}
 	}
 }
