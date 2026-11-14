@@ -117,6 +117,8 @@ type Config struct {
 	Developers map[string]string `yaml:"developers,omitempty"`
 	PlanChange PlanChange        `yaml:"plan_change,omitempty"`
 	Wave       Wave              `yaml:"wave,omitempty"`
+	// Eval is the agent eval set's configuration (intent 0030, see evalkeys.go).
+	Eval Eval `yaml:"eval,omitempty"`
 	// Personal keys (see PersonalKeys): read from the global layers only.
 	Alias            string `yaml:"alias,omitempty"`
 	InteractionLevel string `yaml:"interaction_level,omitempty"`
@@ -360,5 +362,6 @@ func (c Config) validate(parallelismSet bool) error {
 	}
 	errs = append(errs, c.validateKeyClasses()...)
 	errs = append(errs, c.validateProjectKeys()...)
+	errs = append(errs, c.validateEvalKeys()...)
 	return withNextSetup(errors.Join(errs...), missing)
 }

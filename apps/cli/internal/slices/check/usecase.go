@@ -142,6 +142,7 @@ func (u *UseCase) Run() (Report, error) {
 		if err := u.checkSlots(&r, cfg); err != nil {
 			return Report{}, err
 		}
+		u.checkEval(&r, cfg)
 	}
 	if err := u.checkIntents(&r); err != nil {
 		return Report{}, err
