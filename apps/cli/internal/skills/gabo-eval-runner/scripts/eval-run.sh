@@ -30,6 +30,15 @@
 # `status: paused by cap <name>` and asks `continue or stop?`. The runner never
 # continues by itself. gabo caps no spend.
 #
+# Run report (intent 0030 S6, S7, D3): the head, the changed configuration the
+# run measured, the engine, the runs per task, one line per task, the pass rate of
+# the set (none when paused), the threshold in effect (eval.pass_threshold, `not
+# set` when unset), the baseline compared with (evals/baseline/baseline.json, or
+# `none`), each task that moved from pass on the baseline to fail, the cap state,
+# and a run id with its memory topic gabo/eval/<head>/<run id>. The report is
+# printed, never written: the assistant saves it under that topic. The runner
+# never writes the baseline; only the owner's acceptance replaces it.
+#
 # Exit 0 when every task passes, 1 on a refusal or a failing task, 2 on bad usage,
 # 3 when a cap paused the run and no task failed.
 # A run also passes only when the coder's report (its engine output) holds every
@@ -108,6 +117,7 @@ cfg_value() {
 runs="$(bash "$set_script" config runs_per_task --config "$config")" || exit 1
 cap_turns="$(bash "$set_script" config turns_per_task_run --config "$config")" || exit 1
 cap_runs="$(bash "$set_script" config task_runs_per_eval_run --config "$config")" || exit 1
+threshold="$(bash "$set_script" config pass_threshold --config "$config")" || exit 1
 
 engine="$(cfg_value runtimes coder)"
 case "$engine" in
@@ -125,8 +135,48 @@ while IFS= read -r line; do
   [[ "$line" == "accepted "* ]] && accepted_files+=("$dir/${line#accepted }")
 done <<<"$set_out"
 
+# The baseline the owner accepted (intent 0030 S6, D2). It sits beside the task
+# set, not in it (evals/*.json holds tasks only). The runner reads it and never
+# writes it: a baseline is replaced only by the owner's acceptance.
+baseline="$dir/baseline/baseline.json"
+baseline_commit=""
+baseline_passed=""
+if [[ -e "$baseline" ]]; then
+  jq -e . "$baseline" >/dev/null 2>&1 || {
+    echo "refused baseline: not valid JSON" >&2
+    exit 1
+  }
+  bc="$(jq -r 'if type == "object" and (.commit | type) == "string" then .commit else "" end' "$baseline")"
+  [[ "$bc" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "refused baseline: commit is not a 40-hex commit" >&2
+    exit 1
+  }
+  jq -e '(.tasks | type) == "object"' "$baseline" >/dev/null 2>&1 || {
+    echo "refused baseline: tasks must be an object" >&2
+    exit 1
+  }
+  baseline_commit="$bc"
+  baseline_passed="$(jq -r '.tasks | to_entries[] | select(.value == "pass") | .key' "$baseline")"
+fi
+
+# The changed configuration the run measured: the configuration paths the head
+# changes against each accepted task's starting commit, as one list.
+changed_cfg=""
+for f in "${accepted_files[@]}"; do
+  s="$(jq -r '.starting_commit' "$f")"
+  git -C "$repo" cat-file -e "$s^{commit}" 2>/dev/null || continue
+  changed_cfg+="$(git -C "$repo" diff --name-only "$s" "$head" -- "${paths[@]}")"$'\n'
+done
+changed_cfg="$(sed '/^$/d' <<<"$changed_cfg" | sort -u | paste -sd, - | sed 's/,/, /g')"
+[[ -n "$changed_cfg" ]] || changed_cfg=none
+
+# The run id names this run's report: its memory topic is gabo/eval/<head>/<run id>.
+run_id="eval-$(date -u +%Y%m%dT%H%M%SZ)-$(od -An -N3 -tx1 /dev/urandom | tr -d ' \n')"
+
 scratches=()
 run_verdict=""
+passing_tasks=0
+failures_rec=""
 limit="${GABO_EVAL_ENGINE_TIMEOUT:-600}"
 
 # run_bounded <cmd...>: the command under timeout(1) when it exists.
@@ -314,11 +364,43 @@ report_caps() {
   echo "spend is not capped by gabo"
 }
 
+# report_moved: each task that passed on the baseline and fails now, one line with
+# its failed check and what was observed (intent 0030 S7). Without a baseline the
+# comparison is not made, and the report says so.
+report_moved() {
+  local id why moved=0
+  if [[ -z "$baseline_commit" ]]; then
+    echo "moved from pass to fail: not compared (baseline: none)"
+    return 0
+  fi
+  while IFS=$'\t' read -r id why; do
+    [[ -n "$id" ]] || continue
+    if grep -qxF -- "$id" <<<"$baseline_passed"; then
+      echo "moved from pass to fail: $id: $why"
+      moved=1
+    fi
+  done <<<"$failures_rec"
+  ((moved)) || echo "moved from pass to fail: none"
+}
+
 engine_label="$engine"
 [[ -z "${GABO_EVAL_ENGINE_CMD:-}" ]] || engine_label="$engine (fake command: GABO_EVAL_ENGINE_CMD)"
 echo "eval-run: head $head"
+echo "run id: $run_id"
+echo "memory topic: gabo/eval/$head/$run_id"
+echo "changed configuration: $changed_cfg"
 echo "engine: $engine_label"
 echo "runs per task: $runs"
+if [[ -n "$threshold" ]]; then
+  echo "threshold: $threshold"
+else
+  echo "threshold: not set"
+fi
+if [[ -n "$baseline_commit" ]]; then
+  echo "baseline: $baseline at commit $baseline_commit"
+else
+  echo "baseline: none"
+fi
 report_caps
 
 failed_tasks=0
@@ -369,19 +451,25 @@ for f in "${accepted_files[@]}"; do
     echo "task $id: not run: cap $stop_cap$note"
     not_run_tasks=$((not_run_tasks + 1))
   elif ((passed == runs)); then
+    passing_tasks=$((passing_tasks + 1))
     echo "task $id: pass ($passed of $runs runs)"
   else
     echo "task $id: fail ($passed of $runs runs): $first_why"
     failed_tasks=$((failed_tasks + 1))
+    failures_rec+="$id"$'\t'"$first_why"$'\n'
   fi
 done
 
 if [[ -n "$paused" ]]; then
   echo "tasks: $total_tasks, failing: $failed_tasks, not run: $not_run_tasks"
-  echo "status: paused by cap $paused; the tasks marked not run were cut or not started"
-  echo "continue or stop?"
 else
   echo "tasks: $total_tasks, failing: $failed_tasks"
+  echo "pass rate: $(awk -v a="$passing_tasks" -v b="$total_tasks" 'BEGIN { printf "%.2f", a / b }') ($passing_tasks of $total_tasks tasks)"
+fi
+report_moved
+if [[ -n "$paused" ]]; then
+  echo "status: paused by cap $paused; the tasks marked not run were cut or not started"
+  echo "continue or stop?"
 fi
 echo "scratch copies, kept for the parent to remove:"
 for s in "${scratches[@]}"; do

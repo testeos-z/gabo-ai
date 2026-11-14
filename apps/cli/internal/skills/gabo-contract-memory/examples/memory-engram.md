@@ -16,6 +16,7 @@ Notes:
 | wave trace | `gabo/trace/<run id>` |
 | planning record | `gabo/trace/<I####>/planning` |
 | preference | `user/preferences` |
+| eval run report | `gabo/eval/<head sha>/<run id>` |
 
 ## Operations
 

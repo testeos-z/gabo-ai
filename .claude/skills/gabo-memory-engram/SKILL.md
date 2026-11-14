@@ -26,6 +26,7 @@ Use whenever a gabo agent records or reads decisions, the per-wave resource ledg
 | Wave trace | `gabo/trace/<run id>` | project | wave tasks with status, PR, verdict, open questions; enough to resume (D17) |
 | Planning record | `gabo/trace/<I####>/planning` | project | the lines the assistant saves after a planning step: agent, `roles: separate`, `gaps: <n> (<ids>)` or `gaps: none`, `proposals: <n>` with issue or PR and scope each or `proposals: none`, and the UTC time |
 | Preference | `user/preferences` | personal (global) or project | observation, evidence, count; at about 3 repeats propose it for `~/.config/gabo/config.yaml` (D22) |
+| Eval run report | `gabo/eval/<head sha>/<run id>` | project | the report `eval-run.sh run` printed, saved whole: head, run id, changed configuration, engine, runs per task, one line per task, pass rate, threshold, baseline, moved from pass to fail, cap state (intent 0030 D3); one per head and run; the baseline is a file the owner accepts, not a record |
 
 ## Operations
 
