@@ -5,23 +5,29 @@ import (
 	"strings"
 )
 
-// HumanOnlyShellWrites returns the raw words of the paths one shell command
+// humanOnlyShellWrites returns the raw words of the paths one shell command
 // line writes that are human-only (intent 0028 S7, S13, PD6), each once, in
 // command order. Only a coder session is judged. The paths are the targets of
 // the command's redirections and the operands of tee, rm, cp, mv and sed -i,
-// read as bash reads the line (shellCommands); root and fold place relative
-// paths as HumanOnlyPath does.
-func HumanOnlyShellWrites(command string, coder bool, root string, fold bool, list []string) []string {
+// read as bash reads the line (shellCommands), with brace expansion and the
+// command wrappers taken off each command. Each path is judged by HumanOnlyPath.
+func (u *UseCase) humanOnlyShellWrites(command string, coder bool, list []string) []string {
 	if !coder {
 		return nil
 	}
-	hs := humanEntries(list)
+	hs := humanEntries(list, u.s.FoldCase)
 	var out []string
 	seen := map[string]bool{}
 	for _, w := range writeWords(shellCommands(command, true), true) {
-		if !seen[w] && humanOnlyMatch(w, root, fold, hs) {
-			seen[w] = true
-			out = append(out, w)
+		if seen[w] {
+			continue
+		}
+		for _, alt := range expandBraces(w) {
+			if u.humanOnlyTarget(alt, hs) {
+				seen[w] = true
+				out = append(out, w)
+				break
+			}
 		}
 	}
 	return out
@@ -35,7 +41,7 @@ func writeWords(cmds []simpleCommand, unwrap bool) []string {
 	var out []string
 	for _, c := range cmds {
 		out = append(out, c.targets...)
-		argv := skipPrefix(c.words)
+		argv := stripWrappers(skipPrefix(c.words))
 		if len(argv) == 0 {
 			continue
 		}
@@ -54,6 +60,32 @@ func writeWords(cmds []simpleCommand, unwrap bool) []string {
 		}
 	}
 	return out
+}
+
+// commandWrappers run the command that follows them, so a write by that
+// command is the write (env tee, sudo cp, xargs rm, ...).
+var commandWrappers = map[string]bool{
+	"env": true, "command": true, "exec": true, "builtin": true, "nohup": true,
+	"nice": true, "sudo": true, "xargs": true,
+}
+
+// wrapperValueOpts are the options of a wrapper that take the next word as their value.
+var wrapperValueOpts = map[string]bool{"-u": true, "-g": true, "-n": true, "-C": true, "-I": true}
+
+// stripWrappers drops the command wrappers in front of a command, with their
+// options and the VAR=value assignments of env, and returns the command.
+func stripWrappers(argv []string) []string {
+	for len(argv) > 0 && commandWrappers[path.Base(argv[0])] {
+		argv = argv[1:]
+		for len(argv) > 0 && (strings.HasPrefix(argv[0], "-") || isAssignment(argv[0])) {
+			opt := argv[0]
+			argv = argv[1:]
+			if wrapperValueOpts[opt] && len(argv) > 0 {
+				argv = argv[1:]
+			}
+		}
+	}
+	return argv
 }
 
 // operands returns the operands among a command's arguments: the words that
@@ -113,4 +145,55 @@ func inPlace(args []string) bool {
 		}
 	}
 	return false
+}
+
+// expandBraces returns the words a brace expression stands for, as bash expands
+// them: each {a,b} group with a comma gives one word per alternative, the
+// leftmost group first. A brace with no comma is a literal (intent 0028 S7).
+func expandBraces(w string) []string {
+	start := strings.IndexByte(w, '{')
+	if start < 0 {
+		return []string{w}
+	}
+	end, parts := braceGroup(w, start)
+	if end < 0 {
+		var out []string
+		for _, r := range expandBraces(w[start+1:]) {
+			out = append(out, w[:start+1]+r)
+		}
+		return out
+	}
+	var out []string
+	for _, p := range parts {
+		out = append(out, expandBraces(w[:start]+p+w[end+1:])...)
+	}
+	return out
+}
+
+// braceGroup finds the group that opens at w[start] and closes at its matching
+// }, and the comma-separated parts of its top level. end is -1 when the brace
+// has no closing brace or no top-level comma.
+func braceGroup(w string, start int) (int, []string) {
+	depth, from := 0, start+1
+	var parts []string
+	for i := start; i < len(w); i++ {
+		switch w[i] {
+		case '{':
+			depth++
+		case ',':
+			if depth == 1 {
+				parts = append(parts, w[from:i])
+				from = i + 1
+			}
+		case '}':
+			depth--
+			if depth == 0 {
+				if len(parts) == 0 {
+					return -1, nil
+				}
+				return i, append(parts, w[from:i])
+			}
+		}
+	}
+	return -1, nil
 }

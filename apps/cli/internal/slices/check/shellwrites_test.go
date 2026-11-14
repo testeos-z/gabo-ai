@@ -11,12 +11,14 @@ var humanList = []string{".github/", ".claude/", "AGENTS.md", "CLAUDE.md"}
 // humanWrites returns the human-only paths a shell command writes, judged in
 // the coder rules when coder is true, with the project at /proj.
 func humanWrites(command string, coder bool) []string {
-	return HumanOnlyShellWrites(command, coder, "/proj", false, humanList)
+	return humanUseCase(Settings{Root: "/proj"}).humanOnlyShellWrites(command, coder, humanList)
 }
 
 // I0028 S7, S13, PD6: a coder shell call that writes a human-only path or
 // gabo.yaml is judged: the targets of its redirections, and the operands of
-// tee, sed -i, cp, mv and rm. One level of sh -c or bash -c is unwrapped.
+// tee, sed -i, cp, mv and rm. One level of sh -c or bash -c is unwrapped, and
+// a command wrapper (env, sudo, xargs, ...) or a brace group is read as bash
+// reads it.
 func TestHumanOnlyShellWritesBlockedForms(t *testing.T) {
 	t.Parallel()
 	blocked := []string{
@@ -60,6 +62,24 @@ func TestHumanOnlyShellWritesBlockedForms(t *testing.T) {
 		`echo x > .gi"thub"/a`,
 		"echo x > '/proj/.github/a'",
 		"echo x >f&& echo y > CLAUDE.md",
+		"env tee .github/a",
+		"env FOO=1 tee AGENTS.md",
+		"command rm -f gabo.yaml",
+		"nohup cp x .github/y",
+		"exec tee AGENTS.md",
+		"sudo tee .github/a",
+		"sudo -u root rm gabo.yaml",
+		"nice -n 5 cp x .github/y",
+		"time cp x CLAUDE.md",
+		"xargs rm .github/x",
+		"xargs -I{} cp {} .github/",
+		"sudo env rm gabo.yaml",
+		"tee .git{hub,}/a",
+		"rm -f gab{o,x}.yaml",
+		"echo x > {AGENTS,README}.md",
+		"cp x {apps,.github}/y",
+		"cp AGENTS.md /tmp/notes",
+		"bash -c 'env tee .github/a'",
 	}
 	for _, c := range blocked {
 		if got := humanWrites(c, true); len(got) == 0 {
@@ -69,7 +89,8 @@ func TestHumanOnlyShellWritesBlockedForms(t *testing.T) {
 }
 
 // I0028 S13: a write outside the human-only paths is allowed, and so is a read
-// of one, a quoted or evaluated redirection, and an option that is not a path.
+// by a command that does not write (cat, a redirected input), a quoted or
+// evaluated redirection, and an option that is not a path.
 func TestHumanOnlyShellWritesAllowedNeighbours(t *testing.T) {
 	t.Parallel()
 	allowed := []string{
@@ -96,6 +117,11 @@ func TestHumanOnlyShellWritesAllowedNeighbours(t *testing.T) {
 		"echo x >f>g",
 		"echo x 2>&1 >out.txt",
 		"echo x >&2 AGENTS.md",
+		"env echo x > apps/cli/out.txt",
+		"command -v rm",
+		"xargs echo .github",
+		"echo x > {apps,docs}/a.txt",
+		"rm -f a{b}c",
 	}
 	for _, c := range allowed {
 		if got := humanWrites(c, true); len(got) != 0 {
@@ -107,7 +133,7 @@ func TestHumanOnlyShellWritesAllowedNeighbours(t *testing.T) {
 // I0028 S4 and S13: a main session is not judged by the human-only rule.
 func TestHumanOnlyShellWritesMainSessionNotJudged(t *testing.T) {
 	t.Parallel()
-	for _, c := range []string{"echo x > .github/ci.yml", "rm -f AGENTS.md", "cp x gabo.yaml"} {
+	for _, c := range []string{"echo x > .github/ci.yml", "rm -f AGENTS.md", "cp x gabo.yaml", "env tee .github/a"} {
 		if got := humanWrites(c, false); len(got) != 0 {
 			t.Errorf("main session: %q is blocked by %q; want allowed", c, got)
 		}
@@ -122,6 +148,42 @@ func TestHumanOnlyShellWritesNamesPathsAsWritten(t *testing.T) {
 	want := []string{"AGENTS.md", "./.github/y", ".github/y"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("paths = %q, want %q", got, want)
+	}
+}
+
+// I0028 S7: a relative path in a shell call is read from the working
+// directory, as the write hook reads it.
+func TestHumanOnlyShellWritesReadsTheWorkingDirectory(t *testing.T) {
+	t.Parallel()
+	u := humanUseCase(Settings{Root: "/proj", WorkDir: "/proj/apps/cli"})
+	if got := u.humanOnlyShellWrites("echo x > AGENTS.md", true, humanList); len(got) != 0 {
+		t.Fatalf("apps/cli/AGENTS.md is blocked by %q; want allowed", got)
+	}
+	if got := u.humanOnlyShellWrites("echo x > ../../AGENTS.md", true, humanList); len(got) != 1 {
+		t.Fatalf("root AGENTS.md from apps/cli: paths = %q; want one", got)
+	}
+}
+
+// I0028 S7: brace groups expand as bash expands them, the leftmost group first;
+// a brace with no comma stays a literal.
+func TestExpandBraces(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		word string
+		want []string
+	}{
+		{"a{b,c}d", []string{"abd", "acd"}},
+		{"{a,{b,c}}", []string{"a", "b", "c"}},
+		{"{a,b}{c,d}", []string{"ac", "ad", "bc", "bd"}},
+		{"x{}y", []string{"x{}y"}},
+		{"a{b}c", []string{"a{b}c"}},
+		{"{a{b,c}}", []string{"{ab}", "{ac}"}},
+		{"plain", []string{"plain"}},
+	}
+	for _, tt := range tests {
+		if got := expandBraces(tt.word); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("expandBraces(%q) = %q, want %q", tt.word, got, tt.want)
+		}
 	}
 }
 

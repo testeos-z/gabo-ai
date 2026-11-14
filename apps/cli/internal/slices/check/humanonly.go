@@ -2,7 +2,6 @@ package check
 
 import (
 	"path"
-	"path/filepath"
 	"slices"
 	"strings"
 )
@@ -15,16 +14,20 @@ const RouteHumanEdits = "a human edits this path"
 type humanEntry struct {
 	// raw is the entry without its trailing slash, cleaned.
 	raw string
-	// dir is true when the entry ends with a slash: a folder and what lies under it.
+	// dir is true when the entry ends with a slash: a folder and what is under it.
 	dir bool
 	// comps are the components of raw.
 	comps []string
 }
 
-// humanEntries returns the entries of the list, with gabo.yaml added.
-func humanEntries(list []string) []humanEntry {
+// humanEntries returns the entries of the list with gabo.yaml added, lowercased
+// when fold is true (a case-insensitive filesystem).
+func humanEntries(list []string, fold bool) []humanEntry {
 	out := make([]humanEntry, 0, len(list)+1)
 	for _, e := range append(slices.Clone(list), "gabo.yaml") {
+		if fold {
+			e = strings.ToLower(e)
+		}
 		raw := path.Clean(strings.TrimSuffix(e, "/"))
 		if raw == "." {
 			continue
@@ -68,14 +71,9 @@ func globMatch(pattern, name string) bool {
 	return ok || err != nil
 }
 
-// humanOnlyMatch reports whether a write to the path p is a write to a human-only
-// path. An absolute p is read against root (inside it, with case folded when
-// fold is true); a relative p is read from the root.
-func humanOnlyMatch(p, root string, fold bool, hs []humanEntry) bool {
-	rel, ok := projectRel(p, root, fold)
-	if !ok {
-		return false
-	}
+// humanOnlyRel reports whether the clean, project-relative path rel is under an
+// entry of hs, as a literal path or as a glob that can match one.
+func humanOnlyRel(rel string, hs []humanEntry) bool {
 	glob := strings.ContainsAny(rel, "*?[")
 	for _, h := range hs {
 		if (glob && h.glob(rel)) || (!glob && h.literal(rel)) {
@@ -85,26 +83,28 @@ func humanOnlyMatch(p, root string, fold bool, hs []humanEntry) bool {
 	return false
 }
 
-// projectRel returns p as a clean, slash-separated path relative to the project
-// root, and whether it lies inside the root. An empty root is unknown: no
-// absolute path is inside it.
-func projectRel(p, root string, fold bool) (string, bool) {
-	if filepath.IsAbs(p) {
-		if root == "" {
-			return "", false
-		}
-		return relInside(root, p, fold)
-	}
-	rel := path.Clean(filepath.ToSlash(p))
-	if rel == ".." || strings.HasPrefix(rel, "../") {
-		return "", false
-	}
-	return rel, true
-}
-
 // HumanOnlyPath reports whether a write to the path p is a write to a
 // human-only path: under an entry of list, or gabo.yaml (intent 0028 S7, S13).
-// The path is read as HumanOnlyShellWrites reads the paths of a shell command.
-func HumanOnlyPath(p, root string, fold bool, list []string) bool {
-	return humanOnlyMatch(p, root, fold, humanEntries(list))
+// The path is read as PreWrite reads it: relative to the working directory,
+// with its symlinks resolved, so both the path as written and its target are
+// judged. A path that cannot be resolved counts as human-only (fail closed).
+func (u *UseCase) HumanOnlyPath(p string, list []string) bool {
+	return u.humanOnlyTarget(p, humanEntries(list, u.s.FoldCase))
+}
+
+// humanOnlyTarget is HumanOnlyPath with the entries already built.
+func (u *UseCase) humanOnlyTarget(p string, hs []humanEntry) bool {
+	targets, err := u.targetsOf(p)
+	if err != nil {
+		return true
+	}
+	for _, rel := range targets {
+		if u.s.FoldCase {
+			rel = strings.ToLower(rel)
+		}
+		if humanOnlyRel(rel, hs) {
+			return true
+		}
+	}
+	return false
 }

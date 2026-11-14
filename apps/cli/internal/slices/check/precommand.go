@@ -20,7 +20,7 @@ type ShellVerdict struct {
 // JudgeShell judges one shell call under two locks (intent 0028 S2, S4, S6,
 // S7, S10 to S13, S16): shell_guard for the shell rules (ShellViolations) and
 // human_only_paths for a coder's write to a human-only path
-// (HumanOnlyShellWrites). It reads the lock states and the mode of gabo.yaml on
+// (humanOnlyShellWrites). It reads the lock states and the mode of gabo.yaml on
 // every call, finds the violations in the call's session kind (CoderSession),
 // takes each lock's state from Decide, prints one Explain block per violation
 // of a lock that is not allowed, and records each lock's outcome through
@@ -46,7 +46,7 @@ func (u *UseCase) JudgeShell(call ShellCall) (ShellVerdict, error) {
 		groups = append(groups, shellGroup{lock: config.LockShellGuard, violations: vs})
 	}
 	var writes []ShellViolation
-	for _, p := range HumanOnlyShellWrites(call.Command, coder, u.s.Root, u.s.FoldCase, cfg.Review.HumanOnlyPaths) {
+	for _, p := range u.humanOnlyShellWrites(call.Command, coder, cfg.Review.HumanOnlyPaths) {
 		writes = append(writes, ShellViolation{Rule: "a coder shell command writes the human-only path " + oneLine(p), Route: RouteHumanEdits})
 	}
 	if len(writes) > 0 {
