@@ -354,9 +354,9 @@ qa_rows=()
 declare -A qa_seen=() qa_rep_st=() qa_rep_flow=() qa_rep_rest=()
 qa_contract_re='^[[:space:]]*([-*][[:space:]]+)?(S[0-9]+):[[:space:]]*(.*)$'
 qa_cmd_re='^gabo [A-Za-z0-9._/:=,@+ -]*$'
-# Each contract command runs with this bound, and at most ten contract lines are read:
+# Each contract command runs with this bound (ten lines at most: ten minutes in all):
 # the QA stage stays bounded however many lines a task issue carries.
-QA_CMD_TIMEOUT=120
+QA_CMD_TIMEOUT=60
 qa_reply_re='^\[qa\] (S[0-9]+(\.[0-9]+)?|neighbor [12])( \(([^)]*)\))?: (.*)$'
 while IFS= read -r f; do
   case "$f" in
@@ -496,13 +496,14 @@ qa_run_status() {
   local id="${qa_ids[$1]}" code="${qa_codes[$1]:-0}" rest="${qa_rep_rest[${qa_ids[$1]}]:-}" last re
   last="$(tail -n 1 "${qa_logs[$1]}" 2>/dev/null | tr -d '\r' | cut -c1-200)"
   re="(^|[^0-9])exit $code(\$|[^0-9])"
-  if [[ "${qa_rep_st[$id]:-}" == pass ]]; then
+  # The exit code the script saw decides first: a non-zero exit is a fail whatever the reply says.
+  if ((code != 0)); then
+    echo "fail: exit $code: $last"
+  elif [[ "${qa_rep_st[$id]:-}" == pass ]]; then
     if [[ "$rest" != *\`* ]]; then echo "not run: no command recorded"
-    elif [[ "$rest" =~ $re ]]; then echo "$rest"
+    elif [[ "$rest" =~ $re ]]; then echo "pass \`${qa_cmds[$1]}\` exit $code"
     else echo "fail: exit $code, the reply did not say so: $last"
     fi
-  elif ((code != 0)); then
-    echo "fail: exit $code: $last"
   else
     qa_line_status "$id"
   fi
@@ -568,7 +569,6 @@ qa_resolve() {
       qa_rows+=("- $qid${qflow:+ ($qflow)}: $qstatus")
       case "$qstatus" in
         fail:*) qa_failed=true ;;
-        not\ run:*) qnotrun=true ;;
       esac
     done
     if [[ "$qa_failed" == true ]]; then qa_state=fail

@@ -613,6 +613,11 @@ check "a task issue written by someone else builds nothing" bash -c "! grep -q '
 long="$(printf 'x%.0s' {1..300})"
 v="$(SCENARIO_CONTRACT="$(printf '%s\nS1: `gabo version` prints %s' '<!-- gabo-progress -->' "$long")" qa_scenario qalong CLAUDE_MODE=qa_pass)"
 check "a long contract line is cut in the comment" bash -c "! grep -q 'x\{250\}' '$work/qalong/posted_7.md'"
+v="$(qa_scenario qafailexit1 CLAUDE_MODE=qa_exit1 FAIL_CHECK='gabo check')"
+check "a reply of pass with exit 1 for a command that exited 1 is a fail" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1' "$work/qafailexit1/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$v" "a reply that hides a failed contract command is blocking"
+v="$(qa_scenario qawrongcmd CLAUDE_MODE=qa_wrongcmd)"
+check "a pass row names the command the reviewer ran, not the one the reply named" grep -qF -- '- S2 (`gabo version` prints the version): pass `gabo version` exit 0' "$work/qawrongcmd/posted_7.md"
 v="$(SCENARIO_CONTRACT=$'<!-- gabo-progress -->\nS1: `gabo check; touch x`\nS2: `gabo version`' qa_scenario qanotplain CLAUDE_MODE=qa_pass)"
 check "a contract command that is not a plain gabo invocation is never run" grep -qxF -- '- S1 (`gabo check; touch x`): not run: the gabo command is not a plain invocation' "$work/qanotplain/posted_7.md"
 long_contract=$'<!-- gabo-progress -->'
