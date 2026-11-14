@@ -74,6 +74,13 @@ describe("session_start in a gabo project (S4, S7, D2, D9)", () => {
     });
   });
 
+  test("runs gabo with GABO_ENGINE=pi (S16 outcome records name the engine)", async () => {
+    gaboProject();
+    gabo.respond('{"notify":[],"block":null}');
+    await startSession();
+    expect(gabo.file("engine")).toBe("pi");
+  });
+
   test("shows each notification once, with gabo's text and level unchanged", async () => {
     gaboProject();
     const notify = [

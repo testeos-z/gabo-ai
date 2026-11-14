@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Tests for the Codex copy of gabo-pre-write.sh run as
 # `gabo-pre-write.sh codex`, the Codex plugin's PreToolUse apply_patch hook
-# (intent 0002 S8, S13, D5; plan T8). A fake gabo stands on PATH and records
-# its working directory, argv and stdin outside the project; every case runs
-# in a scratch gabo project of its own under one mktemp -d. The inputs follow
-# the Codex PreToolUse shape (https://learn.chatgpt.com/docs/hooks): the patch
-# text is in tool_input.command, with no file-path field. The deny output is
-# the documented example kept in fixtures/pre-tool-use-deny.json, with gabo's
-# lines in place of its reason.
+# (intent 0002 S8, S13, D5; intent 0028 S3, S7, S12, S15; plan T8, T11). A fake
+# gabo stands on PATH and records its working directory, argv, the engine it
+# sees and its stdin outside the project; every case runs in a scratch gabo
+# project of its own under one mktemp -d. The inputs follow the Codex
+# PreToolUse shape (https://learn.chatgpt.com/docs/hooks): the patch text is in
+# tool_input.command, with no file-path field. The deny output is the
+# documented example kept in fixtures/pre-tool-use-deny.json, with gabo's lines
+# in place of its reason.
 # Run: bash plugins/codex/scripts/tests/gabo-pre-write.test.sh
 set -uo pipefail
 
@@ -35,16 +36,18 @@ expect() {
   fi
 }
 
-# Fake gabo: appends "<cwd> <argv>" to $FAKE_GABO_LOG, copies its stdin to
-# $FAKE_GABO_STDIN, prints $FAKE_GABO_OUT to stdout (as the real gabo check
-# --pre-write does) and exits $FAKE_GABO_EXIT.
+# Fake gabo: appends "<cwd> <argv> engine=<GABO_ENGINE>" to $FAKE_GABO_LOG,
+# copies its stdin to $FAKE_GABO_STDIN, prints $FAKE_GABO_OUT to stdout (as the
+# real gabo check --pre-write does), exits $FAKE_GABO_EXIT or, with
+# FAKE_GABO_KILL=1, kills itself with SIGKILL.
 fakebin="$work/bin"
 mkdir -p "$fakebin" "$work/empty"
 cat >"$fakebin/gabo" <<'GABO'
 #!/usr/bin/env bash
-echo "$PWD $*" >>"$FAKE_GABO_LOG"
+echo "$PWD $* engine=${GABO_ENGINE-unset}" >>"$FAKE_GABO_LOG"
 cat >"$FAKE_GABO_STDIN"
 [[ -n "${FAKE_GABO_OUT:-}" ]] && printf '%s\n' "$FAKE_GABO_OUT"
+[[ "${FAKE_GABO_KILL:-}" == 1 ]] && kill -KILL $$
 exit "${FAKE_GABO_EXIT:-0}"
 GABO
 chmod +x "$fakebin/gabo"
@@ -128,14 +131,14 @@ fail_line="✗ $plan_rel: spec.md is not accepted (Acceptance table has no fille
 
 # S13: gabo exit 1 -> Codex PreToolUse deny output with gabo's line as the
 # reason, exit 0; the tool-call JSON reaches gabo check --pre-write unchanged,
-# in the project root.
+# in the project root, with GABO_ENGINE=codex.
 p=$(new_project denied)
 json=$(codex_input "$p" "$(add_patch "$plan_rel")")
 run_hook "$p" "$json" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="$fail_line"
 expect "S13 denied patch exits 0" "$code" 0
 expect "S13 denied patch prints the Codex deny output" "$out" "$(deny_for "$fail_line")"
 expect "S13 denied patch is silent on stderr" "$err" ""
-expect "S13 runs gabo check --pre-write once in the project root" "$calls" "$p check --pre-write"
+expect "S13 runs gabo check --pre-write once in the project root as codex" "$calls" "$p check --pre-write engine=codex"
 expect "S13 pipes the tool-call JSON unchanged" "$stdin_seen" "$json"
 [[ -e "$p/$plan_rel" ]] && expect "S13 denied plan.md does not exist" exists absent || expect "S13 denied plan.md does not exist" absent absent
 
@@ -153,43 +156,69 @@ p=$(new_project accepted)
 json=$(codex_input "$p" "$(add_patch "$plan_rel")")
 run_hook "$p" "$json" FAKE_GABO_EXIT=0
 expect "S13 accepted patch exits 0 silent" "$code:$out:$err" "0::"
-expect "S13 accepted patch asked gabo" "$calls" "$p check --pre-write"
+expect "S13 accepted patch asked gabo as codex" "$calls" "$p check --pre-write engine=codex"
 expect "S13 accepted patch piped the JSON unchanged" "$stdin_seen" "$json"
 
-# An Update File, an absolute gabo path and a gabo path after a non-gabo file
-# reach gabo too.
+# An Update File of an absolute gabo path after a non-gabo file reaches gabo.
 upd=$(printf '*** Begin Patch\n*** Update File: src/main.go\n@@\n-x\n+y\n*** Update File: %s\n@@\n-a\n+b\n*** End Patch\n' "$p/gabo.yaml")
 run_hook "$p" "$(codex_input "$p" "$upd")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
 expect "an Update File of an absolute gabo path asks gabo" "$code:$out" "0:$(deny_for "✗ x")"
 
-# S8: gabo exit 2 -> exit 0, silent, no warning.
-run_hook "$p" "$json" FAKE_GABO_EXIT=2 FAKE_GABO_OUT="usage: gabo check --pre-write"
-expect "S8 gabo exit 2 is silent" "$code:$out:$err" "0::"
-expect "S8 gabo exit 2 still ran gabo check --pre-write" "$calls" "$p check --pre-write"
-
-# S8: the other silent cases, each exit 0 with no output and no gabo call.
+# S7 (intent 0028): every write reaches gabo, gabo path or not. A block on a
+# non-gabo path denies it; an allowed write runs silently.
 p=$(new_project quiet)
 run_hook "$p" "$(codex_input "$p" "$(add_patch src/new.go)")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "S8 non-gabo path is silent and skips gabo" "$code:$out:$err:$calls" "0:::"
-run_hook "$p" "$(codex_input "$p" "$(add_patch "$work/other/$plan_rel")")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "S8 gabo-like path outside the project is silent" "$code:$out:$err:$calls" "0:::"
+expect "S7 a non-gabo path reaches gabo and a block denies it" "$code:$out:$err:$calls" "0:$(deny_for "✗ x")::$p check --pre-write engine=codex"
+run_hook "$p" "$(codex_input "$p" "$(add_patch src/new.go)")" FAKE_GABO_EXIT=0
+expect "S7 an allowed non-gabo path runs silently" "$code:$out:$err:$calls" "0:::$p check --pre-write engine=codex"
+run_hook "$p" "$(codex_input "$p" "$(add_patch "$work/other/$plan_rel")")" FAKE_GABO_EXIT=0
+expect "S7 an absolute path outside the project reaches gabo" "$code:$out:$err:$calls" "0:::$p check --pre-write engine=codex"
 
+# S15: gabo exit 2 (usage or error) -> the patch is denied and the failure
+# named, with gabo's lines after it.
+run_hook "$p" "$json" FAKE_GABO_EXIT=2 FAKE_GABO_OUT="usage: gabo check --pre-write"
+expect "S15 gabo exit 2 denies the patch naming the failure" "$code:$out" "0:$(deny_for $'gabo plugin: gabo check --pre-write failed (exit 2); the call is blocked\nusage: gabo check --pre-write')"
+
+# S15: a killed gabo denies the patch naming the failure.
+run_hook "$p" "$json" FAKE_GABO_KILL=1
+expect "S15 a killed gabo denies the patch" "$code" 0
+[[ "$out" == *"gabo check --pre-write failed (exit 137); the call is blocked"* ]] &&
+  expect "S15 a killed gabo names the failure" ok ok ||
+  expect "S15 a killed gabo names the failure" "$out" "*failed (exit 137)*"
+
+# S12 and S10: exit 3 is an ask codex cannot show (probe item (d) is no), so
+# the patch is denied and the deny says no prompt is shown.
+run_hook "$p" "$json" FAKE_GABO_EXIT=3 FAKE_GABO_OUT="$fail_line"
+expect "S12 exit 3 denies the patch and says no prompt is shown" "$code:$out" "0:$(deny_for "$fail_line"$'\n'"gabo plugin: Codex shows no prompt for an ask, so the call is blocked (intent 0028 S12)")"
+
+# S15: gabo exit 1 with no output is still a deny, with a line that says so.
+run_hook "$p" "$json" FAKE_GABO_EXIT=1 FAKE_GABO_OUT=""
+expect "S15 a block without output still denies" "$code:$out" "0:$(deny_for "gabo plugin: gabo check --pre-write blocked the call without a message")"
+
+# S15: no gabo on PATH -> the patch runs, with one warning line and no deny.
+run_hook "$p" "$(codex_input "$p" "$(add_patch "$plan_rel")")" PATH="$work/empty"
+expect "S15 no gabo on PATH runs the patch silently on stdout" "$code:$out" "0:"
+lines=$(printf '%s\n' "$err" | grep -c .)
+expect "S15 no gabo on PATH prints one warning line" "$lines" 1
+[[ "$err" == *warning* ]] && expect "S15 the no-gabo line is a warning" ok ok || expect "S15 the no-gabo line is a warning" "$err" "*warning*"
+
+# Silent cases: checks option off, no .gabo/VERSION, empty stdin.
+run_hook "$p" "$json" CLAUDE_PLUGIN_OPTION_CHECKS=false FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
+expect "checks option off is silent and skips gabo" "$code:$out:$err:$calls" "0:::"
 nv=$(new_project noversion no-version)
 run_hook "$nv" "$(codex_input "$nv" "$(add_patch "$plan_rel")")" FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "S8 no .gabo/VERSION is silent and skips gabo" "$code:$out:$err:$calls" "0:::"
+expect "no .gabo/VERSION is silent and skips gabo" "$code:$out:$err:$calls" "0:::"
 
-run_hook "$p" "$(codex_input "$p" "$(add_patch "$plan_rel")")" PATH="$work/empty"
-expect "S8 no gabo on PATH is silent" "$code:$out:$err:$calls" "0:::"
-
-# Malformed or empty input never blocks.
-run_hook "$p" '{"tool_name":"apply_patch","tool_input":{}}' FAKE_GABO_EXIT=1 FAKE_GABO_OUT="✗ x"
-expect "input without tool_input.command is silent" "$code:$out:$err:$calls" "0:::"
+# S15: input gabo cannot read as a tool call is a failure of gabo, so the
+# patch is denied and the failure named.
+run_hook "$p" '{"tool_name":"apply_patch","tool_input":{}}' FAKE_GABO_EXIT=2 FAKE_GABO_OUT="usage: gabo check --pre-write"
+expect "S15 input without tool_input.command is denied as a failure" "$code:$out" "0:$(deny_for $'gabo plugin: gabo check --pre-write failed (exit 2); the call is blocked\nusage: gabo check --pre-write')"
 log="$work/gabo.log"; : >"$log"
 out=$(cd "$p" && env -i PATH="$fakebin:/usr/bin:/bin" FAKE_GABO_LOG="$log" \
   FAKE_GABO_STDIN="$work/gabo.stdin" "$bash_bin" "$script" codex </dev/null 2>"$work/stderr"); code=$?
 expect "empty stdin is silent" "$code:$out:$(cat "$work/stderr"):$(cat "$log")" "0:::"
 
-# S13: the script and its shared filter hold no write and no acceptance or
+# S3, S13: the script and its shared filter hold no write and no acceptance or
 # path rule of their own; every rule lives in gabo.
 for f in "$script" "$helper"; do
   name=$(basename "$f")
