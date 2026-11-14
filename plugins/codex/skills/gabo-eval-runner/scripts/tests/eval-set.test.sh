@@ -258,5 +258,42 @@ expect "S4 config runs_per_task reads eval.runs_per_task from gabo.yaml" 0 "3" b
 expect "S4 config runs_per_task of 0 is refused (the loader requires at least 1)" 1 \
   "refused config: eval.runs_per_task must be at least 1" bash "$script" config runs_per_task --config "$runs0"
 
+# --- S8: the caps are read from eval.cap; unset is a state of its own -------
+
+cap_turns="$work/cap-turns.yaml"
+printf 'eval:\n  cap:\n    turns_per_task_run: 4\n' >"$cap_turns"
+cap_runs="$work/cap-runs.yaml"
+printf 'eval:\n  cap:\n    task_runs_per_eval_run: 6\n' >"$cap_runs"
+cap_zero="$work/cap-zero.yaml"
+printf 'eval:\n  cap:\n    turns_per_task_run: 0\n' >"$cap_zero"
+cap_inline="$work/cap-inline.yaml"
+printf 'eval:\n  cap: {turns_per_task_run: 2}\n' >"$cap_inline"
+cap_null="$work/cap-null.yaml"
+printf 'eval:\n  cap:\n    turns_per_task_run: null\n' >"$cap_null"
+
+expect "S8 config turns_per_task_run reads eval.cap.turns_per_task_run" 0 "4" \
+  bash "$script" config turns_per_task_run --config "$cap_turns"
+expect "S8 config task_runs_per_eval_run reads eval.cap.task_runs_per_eval_run" 0 "6" \
+  bash "$script" config task_runs_per_eval_run --config "$cap_runs"
+expect "S8 a cap of 0 is refused (the loader requires at least 1)" 1 \
+  "refused config: eval.cap.turns_per_task_run must be at least 1" bash "$script" config turns_per_task_run --config "$cap_zero"
+expect "S8 an inline eval.cap value is refused (block style only)" 1 \
+  "refused config: eval.cap must be a block (eval.cap then indented keys), not an inline value" bash "$script" check "$(fresh cap-inline)" --config "$cap_inline"
+
+out="$(bash "$script" config turns_per_task_run --config "$min1" 2>&1)"
+code=$?
+if [[ "$code" == 0 && -z "$out" ]]; then
+  ok "S8 an unset cap prints nothing (no number is written by the script)"
+else
+  bad "S8 an unset cap prints nothing (exit $code, got: $out)"
+fi
+out="$(bash "$script" config turns_per_task_run --config "$cap_null" 2>&1)"
+code=$?
+if [[ "$code" == 0 && -z "$out" ]]; then
+  ok "S8 a null cap reads as not set, as config.Load reads it"
+else
+  bad "S8 a null cap reads as not set (exit $code, got: $out)"
+fi
+
 echo "passes: $passes failures: $failures"
 [[ "$failures" == 0 ]]

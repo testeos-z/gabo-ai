@@ -44,8 +44,15 @@ Load when a gabo agent proposes, validates or runs the agent eval set of intent 
 - Then each outcome check runs as a script (`bash -c`) in `tree`. Exit 0 reads `pass`, any other exit `fail`. A check the runner did not execute reads `not run (<reason>)`, never `pass`.
 - A run passes when the engine exits 0 and every check passes. A task passes only when all of its runs pass. With two runs and one failing it reads `fail (1 of 2 runs)`, and both run lines are kept.
 - The report names the engine and `runs per task: <n>`, lists each run with its scratch path, and lists each check. The runner prints every scratch path and never removes one: the parent removes them after use.
-- Command: `bash <skill dir>/scripts/eval-run.sh run evals --head <pr head> --config gabo.yaml [--repo <dir>] [--config-path <path>]...`. Exit 0 when every task passes, 1 on a refusal or a failing task, 2 on bad usage.
+- Command: `bash <skill dir>/scripts/eval-run.sh run evals --head <pr head> --config gabo.yaml [--repo <dir>] [--config-path <path>]...`. Exit 0 when every task passes, 1 on a refusal or a failing task, 2 on bad usage, 3 when a cap paused the run and no task failed.
 - The per-engine command lines are not yet probed against a real engine; that probe is a later task of the same intent. The fixture tests use `GABO_EVAL_ENGINE_CMD`, a fake command that the report labels as such.
+
+## Caps (intent 0030 S8, under the rule of intent 0020)
+
+- Two optional caps, set by the owner by hand in `gabo.yaml` under `eval.cap`: `eval.cap.turns_per_task_run` (the turns one task run may take) and `eval.cap.task_runs_per_eval_run` (the task runs one eval run may start). Each has no default: unset, or `null`, means no cap, and the report reads `cap: none set` when neither is set. A value must be a whole number of at least 1; an inline `eval.cap` value is refused. The runner writes no cap value.
+- Enforcement follows intent 0020 (S7, D2). A turn cap is enforced by the engine where the engine documents one: claude gets `--max-turns`. Other engines get the limit in their prompt (`Turn limit for this run: <n> turns`), an advisory cap. The report says so per engine and says that gabo does not cap spend. `eval.cap.task_runs_per_eval_run` is enforced by the runner: it counts task runs started, and the next one is not started once the count reaches the cap.
+- A cap that fires pauses the run. The task it cut, and every task after it, reads `not run: cap <name>`, never `fail` or `pass`. A task the cap stops before its first run reads only the `not run` line. The report reads `status: paused by cap <name>`, gives no pass rate for the set, and ends with `continue or stop?`. The runner never continues by itself: a continue is a new run that the owner starts.
+- A turn-cap stop is recognized by the engine log's `reached max turns` (the print-mode message of claude). The real engine phrase and the advisory engines' compliance are probed by I0030/T17; no engine runs in the fixture tests.
 
 ## Commands
 

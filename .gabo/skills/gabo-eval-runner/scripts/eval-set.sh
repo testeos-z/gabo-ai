@@ -5,13 +5,16 @@
 #
 #   eval-set.sh check <evals-dir> [--config <gabo.yaml>]
 #   eval-set.sh propose <evals-dir> <candidate.json> [--config <gabo.yaml>]
-#   eval-set.sh config <min_tasks|max_tasks|runs_per_task> [--config <gabo.yaml>]
+#   eval-set.sh config <min_tasks|max_tasks|runs_per_task|turns_per_task_run|task_runs_per_eval_run> [--config <gabo.yaml>]
 #
 # eval.min_tasks (default 2), eval.max_tasks (default 10) and eval.runs_per_task
 # (default 1) are read from the
 # --config file, which must exist when it is given. The eval block must be in
 # block style (eval: then indented keys). A config the script cannot read the
 # way config.Load reads it is refused; it never falls back to the defaults.
+# The caps eval.cap.turns_per_task_run and eval.cap.task_runs_per_eval_run
+# (intent 0030 S8) have no default: unset (or null) prints nothing for them,
+# and a value must be at least 1. The script writes no cap value.
 # Exit 0 when the set may run (or the proposal may be added for review), 1 on
 # any refusal, 2 on bad usage.
 set -uo pipefail
@@ -20,7 +23,7 @@ shopt -s nullglob
 usage() {
   echo "usage: eval-set.sh check <evals-dir> [--config <gabo.yaml>]" >&2
   echo "       eval-set.sh propose <evals-dir> <candidate.json> [--config <gabo.yaml>]" >&2
-  echo "       eval-set.sh config <min_tasks|max_tasks|runs_per_task> [--config <gabo.yaml>]" >&2
+  echo "       eval-set.sh config <min_tasks|max_tasks|runs_per_task|turns_per_task_run|task_runs_per_eval_run> [--config <gabo.yaml>]" >&2
   exit 2
 }
 
@@ -30,7 +33,7 @@ dir=""
 key=""
 if [[ "$mode" == config ]]; then
   key="${1:-}"
-  case "$key" in min_tasks | max_tasks | runs_per_task) ;; *) usage ;; esac
+  case "$key" in min_tasks | max_tasks | runs_per_task | turns_per_task_run | task_runs_per_eval_run) ;; *) usage ;; esac
   shift
 else
   dir="${1:-}"
@@ -89,6 +92,43 @@ cfg_int() {
 min_raw="$(cfg_int min_tasks 2)" || exit 1
 max_raw="$(cfg_int max_tasks 10)" || exit 1
 runs_raw="$(cfg_int runs_per_task 1)" || exit 1
+
+# cfg_cap <key>: eval.cap.<key> from the config file (intent 0030 S8). The caps
+# have no default: an absent or null key prints nothing ("not set"). A set value
+# must be a whole number of at least 1. The cap block is read by indentation
+# under eval:, and an inline eval.cap value is refused.
+cfg_cap() {
+  local v=""
+  if [[ -n "$config" ]]; then
+    v="$(awk -v key="$1" '
+      /^[^[:space:]#]/ { in_eval = ($0 ~ /^eval:[[:space:]]*(#.*)?$/); in_cap = 0; next }
+      in_eval && /^  [^[:space:]#]/ {
+        in_cap = 0
+        if ($0 ~ /^  cap:[[:space:]]*(#.*)?$/) in_cap = 1
+        else if ($0 ~ /^  cap:[[:space:]]*[^[:space:]#]/ && $0 !~ /^  cap:[[:space:]]*(null|~)[[:space:]]*(#.*)?$/) { print "inline"; exit }
+        next
+      }
+      in_eval && in_cap && /^    [^[:space:]#]/ && $1 == key":" { print ($2 == "" ? "empty" : $2); exit }
+    ' "$config")"
+  fi
+  case "$v" in
+    inline)
+      echo "refused config: eval.cap must be a block (eval.cap then indented keys), not an inline value" >&2
+      return 1 ;;
+    "" | null | "~") echo ""; return 0 ;;
+    *[!0-9]* | empty)
+      echo "refused config: eval.cap.$1 is not a whole number" >&2
+      return 1 ;;
+  esac
+  if ((10#$v < 1)); then
+    echo "refused config: eval.cap.$1 must be at least 1" >&2
+    return 1
+  fi
+  echo "$((10#$v))"
+}
+
+cap_turns="$(cfg_cap turns_per_task_run)" || exit 1
+cap_runs="$(cfg_cap task_runs_per_eval_run)" || exit 1
 min=$((10#$min_raw))
 max=$((10#$max_raw))
 runs=$((10#$runs_raw))
@@ -116,6 +156,8 @@ if [[ "$mode" == config ]]; then
     min_tasks) echo "$min" ;;
     max_tasks) echo "$max" ;;
     runs_per_task) echo "$runs" ;;
+    turns_per_task_run) echo "$cap_turns" ;;
+    task_runs_per_eval_run) echo "$cap_runs" ;;
   esac
   exit 0
 fi
