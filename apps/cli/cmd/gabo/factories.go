@@ -20,6 +20,7 @@ import (
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/outcomefile"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/prbase"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/initcmd"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate/adapters"
@@ -103,22 +104,23 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 		// An unknown reviewer dir is reported by the check, not here.
 		reviewerDir, _ := reviewerSkillDir(getenv)
 		return check.NewUseCase(os.DirFS(project), osfs.FS{}, osfs.FS{}, check.Settings{
-			Version:     version,
-			Layers:      config.LayerPaths(getenv, project),
-			UpgradePR:   getenv("GABO_UPGRADE_PR") == "1",
-			Former:      config.FormerNames(getenv, project),
-			Getenv:      getenv,
-			ReviewerDir: reviewerDir,
-			Root:        project,
-			Resolve:     filepath.EvalSymlinks,
-			Readlink:    readlink,
-			WorkDir:     wd,
-			FoldCase:    foldsCase(project),
-			CI:          getenv("CI") != "",
-			OutcomePath: getenv(check.EnvOutcomePath),
-			Outcomes:    outcomefile.File{},
-			Task:        getenv(check.EnvTask),
-			Engine:      getenv(check.EnvEngine),
+			Version:      version,
+			Layers:       config.LayerPaths(getenv, project),
+			UpgradePR:    getenv("GABO_UPGRADE_PR") == "1",
+			Former:       config.FormerNames(getenv, project),
+			Getenv:       getenv,
+			ReviewerDir:  reviewerDir,
+			Root:         project,
+			Resolve:      filepath.EvalSymlinks,
+			Readlink:     readlink,
+			WorkDir:      wd,
+			FoldCase:     foldsCase(project),
+			CI:           getenv("CI") != "",
+			OutcomePath:  getenv(check.EnvOutcomePath),
+			Outcomes:     outcomefile.File{},
+			PullRequests: prbase.GH{Runner: runner, Dir: project},
+			Task:         getenv(check.EnvTask),
+			Engine:       getenv(check.EnvEngine),
 		}), nil
 	}
 }

@@ -89,6 +89,10 @@ type Settings struct {
 	// Outcomes appends the records to OutcomePath; RecordDecision needs it
 	// only when OutcomePath is set.
 	Outcomes OutcomeAppender
+	// PullRequests reads the base of a pull request a merge names (the
+	// release gate, intent 0028 D4); nil reads nothing, so every such merge
+	// counts as unreadable.
+	PullRequests PRBaseReader
 	// Task and Engine name the run's task and engine on every record
 	// (GABO_TASK, GABO_ENGINE).
 	Task   string
