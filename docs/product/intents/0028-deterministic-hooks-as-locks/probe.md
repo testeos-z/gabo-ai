@@ -7,9 +7,18 @@
 | task | I0028/T1, issue #802 |
 | run | 2026-11-14, one machine, every engine headless, default model of each engine except where a run names one |
 
+## Reading
+
+No person has read this record. The assistant (session claude-c9bdd54d, wave I0028-20261114T183645Z) read it under the owner's standing orders of 2026-11-14, quoted verbatim:
+
+- "si doy permiso quiero que cierren todos los issues pronto"
+- "habla con gabo-b para que paralelicen todo lo posible y aprueben solos lo necesario"
+
+The record cites those orders as the basis of that read, because they delegate approval to the agents. Spec S1 and plan 0028 name a human read before the remaining tasks start; this section does not claim that read happened.
+
 ## Record
 
-Caveat on the pi row: its (a) and (b) come from an emulated child process, not from a delegated gentle-agents subagent (see the pi notes below). Codex (d) rests on the bypass run alone (see the codex notes).
+Caveat on the pi row: its (a) and (b) are `not testable`, because the only run was an emulated child process, not a delegated gentle-agents subagent (see the pi notes below). Codex (d) rests on the bypass run alone (see the codex notes).
 
 Items: (a) a pre-command hook fires for a shell call inside a coder subagent and can deny it; (b) the subagent's tool calls reach the hook with an agent or session id; (c) the hand-off event exists and can block; (d) the engine's yes/no permission prompt appears when the session runs with permissions bypassed.
 
@@ -17,10 +26,10 @@ Items: (a) a pre-command hook fires for a shell call inside a coder subagent and
 |---|---|---|---|---|---|
 | claude | 2.1.302 (Claude Code) | yes | yes | yes | no |
 | codex | codex-cli 0.167.2 | yes | yes | yes | no |
-| pi | 1.5.2 | yes | yes | no | no |
+| pi | 1.5.2 | not testable: the delegated gentle-agents runner was not driven; only an emulated child process ran, so no subagent call was observed | not testable: no call inside a delegated subagent was observed; the session id was seen only on the emulated child's call | no | no |
 | opencode | opencode v2.2.6 | no | not testable: no hook was invoked for any call, so no id reached one | not testable: no subagent hand-off hook fired, so blocking cannot be observed | no |
 
-Consequence for the plan: item (a) is `no` for opencode. S14 applies to opencode. Every lock that needs a pre-command hook on opencode shows `not run: <reason>` in the wave report, and no task stops for it. Claude, codex and pi show (a) `yes`, so no S14 fallback is stated for them on this record.
+Consequence for the plan: item (a) is `no` for opencode. S14 applies to opencode. Every lock that needs a pre-command hook on opencode shows `not run: <reason>` in the wave report, and no task stops for it. Claude and codex show (a) `yes` in a delegated run, so no S14 fallback is stated for them. Pi's (a) and (b) are `not testable` on this record, so no S14 statement is made for pi either, and the Pi relay (T12) rests on an unobserved assumption: T12 and T16 must observe a delegated pi run before relying on it.
 
 ## How each cell was observed
 
@@ -42,7 +51,7 @@ Every run used a `mktemp -d` scratch project and hook scripts in a second `mktem
 
 ### pi (1.5.2)
 
-- Child emulation: a `pi` process started with `GENTLE_PI_AGENTS_CHILD=1`, `--no-extensions` and one probe extension, which is the argument shape the gentle-agents runner gives its children. The probe did not drive a delegated gentle-agents run, so the subagent is emulated, not observed.
+- Child emulation: a `pi` process started with `GENTLE_PI_AGENTS_CHILD=1`, `--no-extensions` and one probe extension, which is the argument shape the gentle-agents runner gives its children. The probe did not drive a delegated gentle-agents run, so the subagent is emulated, not observed. Items (a) and (b) are therefore `not testable` in the table; the emulated result is kept here as evidence about the extension API only.
 - Extension: a `tool_call` handler that logs each call with `ctx.sessionManager.getSessionId()` and returns `{ block: true, reason }` for a `bash` call containing `probe-deny`.
 - Model: `--provider opencode-go --model beam-free`; the default `openai` credential reported `invalid` and was not refreshed.
 - Command: `pi --no-extensions -e <probe.ts> --provider opencode-go --model beam-free --mode json -p "<call bash echo probe-deny-1>"`, with `GENTLE_PI_AGENTS_CHILD=1`.
@@ -62,7 +71,8 @@ Every run used a `mktemp -d` scratch project and hook scripts in a second `mktem
 
 ## Open after this record
 
-- The human read of this record that gates T2 is done by the assistant under the owner's order of 2026-11-14 ("aprueben solos lo necesario"), as the PR body says.
-- The native credential-list formats of codex, pi and opencode (plan PD5 and risk 3) are not covered by this record. T9 must establish them.
+- The read that gates T2 is the assistant's, under the standing orders in the Reading section. No person has read this record.
+- The native credential-list formats of codex, pi and opencode (plan PD5 and risk 3) are not covered by this record. T9 must establish them. The plan's T1 row still says T1 verifies them until a plan PR corrects it (D7).
+- Pi (a) and (b) need one delegated gentle-agents run to be observed. T12 and T16 run it.
 - Codex (d) is weaker evidence than the other engines' (d): the bypass run is the only observation. S12's assumption depends on it, so T2 and T9 treat it as provisional.
 - The codex hook trust condition and the opencode hook result are inputs to T9 and T10 and to S14 for opencode.
