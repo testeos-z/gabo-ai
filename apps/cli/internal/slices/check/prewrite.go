@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 )
 
 // ErrPreWriteUsage marks a usage error of the pre-write hook mode.
@@ -239,4 +241,156 @@ func relInside(root, p string, fold bool) (string, bool) {
 // without case.
 func isPlan(rel string) bool {
 	return strings.EqualFold(path.Base(rel), "plan.md") && strings.EqualFold(path.Dir(path.Dir(rel)), IntentsDir)
+}
+
+// humanOnlyRoute is the route a coder reads for a write to a human-only path
+// (intent 0028 S7, S11).
+const humanOnlyRoute = "a human edits this path"
+
+// WriteVerdict is what the file-tool hook mode prints and exits with: Exit
+// is 0 (the write runs), ExitFailed (blocked) or ExitAsk (the engine asks),
+// and Out is the text to print, empty when nothing is printed.
+type WriteVerdict struct {
+	Exit int
+	Out  string
+}
+
+// WriteCall is the part of a file-tool call the human-only lock judges.
+type WriteCall struct {
+	// AgentID is the subagent's id of the call, "" for the main session.
+	AgentID string
+	// Engine is the engine the call came from, "" when the hook does not name it.
+	Engine string
+	// CanAsk reports whether the engine can show its yes/no prompt for an ask.
+	CanAsk bool
+	// Gated reports that the stage gate already blocks the call, so no prompt
+	// is shown for it whatever the lock says.
+	Gated bool
+}
+
+// writeSession reports whether a file-tool call belongs to a coder session
+// (intent 0028 S7, decision 13). A call with an agent id is a subagent's. A
+// call without one whose engine is not named is the main session: no hook
+// names its engine yet, and the human's own edit of gabo.yaml must pass. A
+// named engine is judged as CoderSession judges it: claude and codex give an
+// id to subagents only, so their id-less calls are the main session, and every
+// other engine (pi, opencode) is a coder's.
+func writeSession(agentID, engine string) bool {
+	if agentID != "" {
+		return true
+	}
+	if engine == "" {
+		return false
+	}
+	return CoderSession(agentID, engine)
+}
+
+// JudgeWrites judges the paths one file-tool call writes under the
+// human_only_paths lock (intent 0028 S7, S10 to S12, S16). Only a coder session
+// is judged (writeSession). A path whose target is gabo.yaml or lies under
+// review.human_only_paths is a violation: its state gives Decide's outcome, one
+// record is written per violating path, and each violation prints one Explain
+// block. An ask counts as blocked where no prompt can be shown (CanAsk false)
+// or the stage gate blocks the call anyway (Gated). A config that cannot be read
+// fails the coder's writes closed. It writes no project file. The caller runs
+// PreWrite (the stage gate) on the same paths, which also blocks a path whose
+// symlinks cannot be resolved, so such a path is not judged here.
+func (u *UseCase) JudgeWrites(paths []string, call WriteCall) WriteVerdict {
+	if !writeSession(call.AgentID, call.Engine) {
+		return WriteVerdict{}
+	}
+	cfg, err := u.lockConfig()
+	if err != nil {
+		return WriteVerdict{Exit: ExitFailed, Out: Explain(config.LockHumanOnlyPaths, "the project config cannot be read ("+err.Error()+")", "fix the project, its gabo.yaml or the working directory, then retry", Decision{Exit: ExitFailed, Outcome: OutcomeBlocked}) + "\n"}
+	}
+	var b strings.Builder
+	exit := 0
+	for _, p := range paths {
+		target, ok := u.humanOnlyTarget(p, cfg.Review.HumanOnlyPaths)
+		if !ok {
+			continue
+		}
+		rule := "a coder write to the human-only path " + target + " is blocked"
+		d := Decide(cfg.Lock(config.LockHumanOnlyPaths), cfg.Mode)
+		switch {
+		case d.Exit == ExitAsk && !call.CanAsk:
+			d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the engine cannot show its prompt here; it counts as blocked"}
+		case d.Exit == ExitAsk && call.Gated:
+			d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the stage gate blocks this write too; no prompt is shown"}
+		}
+		if err := u.RecordDecision(config.LockHumanOnlyPaths, rule, d); err != nil {
+			return WriteVerdict{Exit: ExitFailed, Out: Explain(config.LockHumanOnlyPaths, rule, "fix the outcome file named by GABO_OUTCOME_FILE, then retry", Decision{}) + "\n"}
+		}
+		if d.Exit == 0 {
+			continue
+		}
+		b.WriteString(Explain(config.LockHumanOnlyPaths, rule, humanOnlyRoute, d) + "\n")
+		// A block outranks an ask: the strictest outcome of the call wins.
+		if exit == 0 || d.Exit == ExitFailed {
+			exit = d.Exit
+		}
+	}
+	return WriteVerdict{Exit: exit, Out: b.String()}
+}
+
+// lockConfig reads gabo.yaml's layers for the write locks: no config file
+// reads every key as its default (intent 0028 PD2); any other error is
+// returned, and the caller fails closed.
+func (u *UseCase) lockConfig() (config.Config, error) {
+	if u.config == nil {
+		return config.Config{}, nil
+	}
+	res, err := config.LoadLayers(u.config, u.s.Layers)
+	switch {
+	case err == nil:
+		return res.Config, nil
+	case errors.Is(err, config.ErrNoConfig):
+		return config.Config{}, nil
+	default:
+		return config.Config{}, err
+	}
+}
+
+// humanOnlyTarget returns the first project-relative target of a write to p
+// that is human-only, as written or with its symlinks resolved.
+func (u *UseCase) humanOnlyTarget(p string, entries []string) (string, bool) {
+	targets, err := u.targetsOf(p)
+	if err != nil {
+		return "", false
+	}
+	for _, t := range targets {
+		if humanOnlyPath(t, entries, u.s.FoldCase) {
+			return t, true
+		}
+	}
+	return "", false
+}
+
+// humanOnlyPath reports whether rel, a project-relative target, is human-only:
+// gabo.yaml, or a path under an entry of review.human_only_paths. The match is
+// the reviewer's rule (is_human_only in the gabo-reviewer scripts): a
+// directory entry (trailing /) matches by prefix, a file entry by its exact
+// path or as a trailing path element. With fold the comparison ignores case.
+func humanOnlyPath(rel string, entries []string, fold bool) bool {
+	norm := func(s string) string {
+		if fold {
+			return strings.ToLower(s)
+		}
+		return s
+	}
+	r := norm(rel)
+	if r == norm("gabo.yaml") {
+		return true
+	}
+	for _, e := range entries {
+		e = norm(e)
+		if strings.HasSuffix(e, "/") {
+			if strings.HasPrefix(r, e) {
+				return true
+			}
+		} else if r == e || strings.HasSuffix(r, "/"+e) {
+			return true
+		}
+	}
+	return false
 }
