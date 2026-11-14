@@ -164,6 +164,11 @@ func (u *UseCase) JudgeFacts(f Facts) FactsResult {
 			reasons = append(reasons, err.Error())
 		}
 		reasons = append(reasons, rep.Lines...)
+		// Facts carry no agent id: the session is judged as a coder's (the
+		// engine gives none), and no prompt can be shown, so an ask blocks.
+		if v := u.JudgeWrites(f.TargetPaths, "", false); v.Out != "" {
+			reasons = append(reasons, strings.Split(strings.TrimSuffix(v.Out, "\n"), "\n")...)
+		}
 		if len(reasons) > 0 {
 			r.Block = &Block{Reason: strings.Join(reasons, "\n")}
 		}

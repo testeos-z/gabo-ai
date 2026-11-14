@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 )
 
 // ErrPreWriteUsage marks a usage error of the pre-write hook mode.
@@ -239,4 +241,124 @@ func relInside(root, p string, fold bool) (string, bool) {
 // without case.
 func isPlan(rel string) bool {
 	return strings.EqualFold(path.Base(rel), "plan.md") && strings.EqualFold(path.Dir(path.Dir(rel)), IntentsDir)
+}
+
+// humanOnlyRoute is the route a coder reads for a write to a human-only path
+// (intent 0028 S7, S11).
+const humanOnlyRoute = "a human edits this path"
+
+// WriteVerdict is what the file-tool hook mode prints and exits with: Exit
+// is 0 (the write runs), ExitFailed (blocked) or ExitAsk (the engine asks),
+// and Out is the text to print, empty when nothing is printed.
+type WriteVerdict struct {
+	Exit int
+	Out  string
+}
+
+// JudgeWrites judges the paths one file-tool call writes under the
+// human_only_paths lock (intent 0028 S7, S10 to S12, S16). Only a coder
+// session is judged (CoderSession, decision 13). A path whose target is
+// gabo.yaml or lies under review.human_only_paths is a violation: its state
+// gives Decide's outcome, one record is written per violating path, and each
+// violation prints one Explain block. canAsk is false where the engine cannot
+// show a prompt (session facts): an ask then counts as blocked. A config that
+// cannot be read fails the coder's writes closed. It writes no project file;
+// the caller runs PreWrite (the stage gate) on the same paths, which also
+// blocks a path whose symlinks cannot be resolved, so such a path is not
+// judged here.
+func (u *UseCase) JudgeWrites(paths []string, agentID string, canAsk bool) WriteVerdict {
+	if !CoderSession(agentID, u.s.Engine) {
+		return WriteVerdict{}
+	}
+	cfg, err := u.lockConfig()
+	if err != nil {
+		return WriteVerdict{Exit: ExitFailed, Out: Explain(config.LockHumanOnlyPaths, "the project config cannot be read ("+err.Error()+")", "fix the project, its gabo.yaml or the working directory, then retry", Decision{Exit: ExitFailed, Outcome: OutcomeBlocked}) + "\n"}
+	}
+	var b strings.Builder
+	exit := 0
+	for _, p := range paths {
+		target, ok := u.humanOnlyTarget(p, cfg.Review.HumanOnlyPaths)
+		if !ok {
+			continue
+		}
+		rule := "a coder write to the human-only path " + target + " is blocked"
+		d := Decide(cfg.Lock(config.LockHumanOnlyPaths), cfg.Mode)
+		if !canAsk && d.Exit == ExitAsk {
+			d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the engine cannot show its prompt here; it counts as blocked"}
+		}
+		if err := u.RecordDecision(config.LockHumanOnlyPaths, rule, d); err != nil {
+			return WriteVerdict{Exit: ExitFailed, Out: Explain(config.LockHumanOnlyPaths, rule, "fix the outcome file named by GABO_OUTCOME_FILE, then retry", Decision{}) + "\n"}
+		}
+		if d.Exit == 0 {
+			continue
+		}
+		b.WriteString(Explain(config.LockHumanOnlyPaths, rule, humanOnlyRoute, d) + "\n")
+		// A block outranks an ask: the strictest outcome of the call wins.
+		if exit == 0 || d.Exit == ExitFailed {
+			exit = d.Exit
+		}
+	}
+	return WriteVerdict{Exit: exit, Out: b.String()}
+}
+
+// lockConfig reads gabo.yaml's layers for the write locks: no config file
+// reads every key as its default (intent 0028 PD2); any other error is
+// returned, and the caller fails closed.
+func (u *UseCase) lockConfig() (config.Config, error) {
+	if u.config == nil {
+		return config.Config{}, nil
+	}
+	res, err := config.LoadLayers(u.config, u.s.Layers)
+	switch {
+	case err == nil:
+		return res.Config, nil
+	case errors.Is(err, config.ErrNoConfig):
+		return config.Config{}, nil
+	default:
+		return config.Config{}, err
+	}
+}
+
+// humanOnlyTarget returns the first project-relative target of a write to p
+// that is human-only, as written or with its symlinks resolved.
+func (u *UseCase) humanOnlyTarget(p string, entries []string) (string, bool) {
+	targets, err := u.targetsOf(p)
+	if err != nil {
+		return "", false
+	}
+	for _, t := range targets {
+		if humanOnlyPath(t, entries, u.s.FoldCase) {
+			return t, true
+		}
+	}
+	return "", false
+}
+
+// humanOnlyPath reports whether rel, a project-relative target, is human-only:
+// gabo.yaml, or a path under an entry of review.human_only_paths. The match is
+// the reviewer's rule (is_human_only in the gabo-reviewer scripts): a
+// directory entry (trailing /) matches by prefix, a file entry by its exact
+// path or as a trailing path element. With fold the comparison ignores case.
+func humanOnlyPath(rel string, entries []string, fold bool) bool {
+	norm := func(s string) string {
+		if fold {
+			return strings.ToLower(s)
+		}
+		return s
+	}
+	r := norm(rel)
+	if r == norm("gabo.yaml") {
+		return true
+	}
+	for _, e := range entries {
+		e = norm(e)
+		if strings.HasSuffix(e, "/") {
+			if strings.HasPrefix(r, e) {
+				return true
+			}
+		} else if r == e || strings.HasSuffix(r, "/"+e) {
+			return true
+		}
+	}
+	return false
 }

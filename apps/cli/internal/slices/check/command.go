@@ -150,6 +150,12 @@ func NewCommand(factory Factory) *cobra.Command {
 			"\"*** Move to:\" headers of a Codex apply_patch in tool_input.command. A patch\n" +
 			"that writes no file passes; empty stdin or stdin that is not such a JSON\n" +
 			"object exits 2 with one usage line.\n" +
+			"A write by a coder session (the call has an agent_id, or the engine gives none)\n" +
+			"to gabo.yaml or to a path under review.human_only_paths is judged by the\n" +
+			"human_only_paths lock: at block it exits 1 with one \"✗ human_only_paths: <rule>\"\n" +
+			"line and its \"next: a human edits this path\" line; at ask it exits 3; at warn\n" +
+			"it records and passes; off passes. A gabo.yaml that cannot be read blocks such\n" +
+			"a write. The stage gate above still applies to every write.\n" +
 			"Stdin holding a JSON object with the key gabo_facts is an engine extension's\n" +
 			"session facts (intent 0003): {\"gabo_facts\": 1, \"event\": \"session_start\" or\n" +
 			"\"tool_call\", \"engine\": \"pi\", \"tools\": [<registered tool names>],\n" +
@@ -333,10 +339,13 @@ func hasPreWrite(raw []string) bool {
 // that cannot be loaded (the factory fails, e.g. the working directory
 // cannot be read) blocks every path with exit 1: the hook fails closed.
 //
-// With no path the targets come from the engine hook's tool-call JSON on
-// stdin (PreWriteTargets); stdin that cannot be read or is no tool call
-// exits 2, and a tool call that writes no file passes.
+// With no path the targets and the subagent's agent_id come from the engine
+// hook's tool-call JSON on stdin (PreWriteCall); stdin that cannot be read or
+// is no tool call exits 2, and a tool call that writes no file passes. The
+// stage gate and the human-only lock (JudgeWrites) both judge the paths, and
+// the strictest outcome is printed and exits.
 func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
+	var agentID string
 	if len(paths) == 0 {
 		data, err := io.ReadAll(cmd.InOrStdin())
 		if err != nil {
@@ -345,7 +354,7 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 		if IsFacts(data) {
 			return judgeFacts(cmd, factory, data)
 		}
-		if paths, err = PreWriteTargets(data); err != nil {
+		if paths, agentID, err = PreWriteCall(data); err != nil {
 			return &ExitError{Code: ExitUsage, Err: err}
 		}
 		if len(paths) == 0 {
@@ -367,10 +376,29 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 	if err != nil {
 		return &ExitError{Code: ExitUsage, Err: err}
 	}
-	if !rep.Failed {
+	return printWrites(cmd, rep, uc.JudgeWrites(paths, agentID, true))
+}
+
+// printWrites prints the stage gate's blocked lines, then the human-only
+// lock's lines, and exits with the strictest outcome: 1 when the gate blocks
+// or the lock blocks, 3 when the lock asks, 0 with no output otherwise.
+func printWrites(cmd *cobra.Command, rep Report, v WriteVerdict) error {
+	exit := v.Exit
+	var out strings.Builder
+	if rep.Failed {
+		out.WriteString(strings.Join(rep.Lines, "\n") + "\n")
+		exit = ExitFailed
+	}
+	out.WriteString(v.Out)
+	if out.Len() > 0 {
+		if _, err := fmt.Fprint(cmd.OutOrStdout(), out.String()); err != nil {
+			return &ExitError{Code: ExitFailed, Err: err}
+		}
+	}
+	if exit == 0 {
 		return nil
 	}
-	return printBlocked(cmd, rep)
+	return &ExitError{Code: exit}
 }
 
 // judgeFacts runs the session-facts mode (intent 0003 D9): it prints one
