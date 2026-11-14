@@ -222,27 +222,61 @@ func TestPluginPostWriteHookScript(t *testing.T) {
 // scripts/gabo-pre-write.sh from the plugin root (intent 0001 S12, D8).
 func TestPluginHooksWirePreWriteCheck(t *testing.T) {
 	t.Parallel()
+	requirePreToolUse(t, "Write|Edit", "gabo-pre-write.sh")
+}
+
+// hooks.json wires the pre-command hook: PreToolUse on Bash, the shell tool,
+// runs scripts/gabo-pre-command.sh from the plugin root (intent 0028 S3, plan
+// T10).
+func TestPluginHooksWirePreCommandCheck(t *testing.T) {
+	t.Parallel()
+	requirePreToolUse(t, "Bash", "gabo-pre-command.sh")
+}
+
+// requirePreToolUse fails unless hooks.json holds exactly one PreToolUse
+// matcher group per tool, the one with matcher, holding exactly one command
+// bash "${CLAUDE_PLUGIN_ROOT}/scripts/<script>", and the script exists.
+func requirePreToolUse(t *testing.T, matcher, script string) {
+	t.Helper()
 	h := readJSON(t, pluginDir+"/hooks/hooks.json")
 	hooks, _ := h["hooks"].(map[string]any)
 	pre, _ := hooks["PreToolUse"].([]any)
-	if len(pre) != 1 {
-		t.Fatalf("hooks.json PreToolUse %v, want exactly one matcher group", hooks["PreToolUse"])
+	var groups []map[string]any
+	for _, g := range pre {
+		if m, ok := g.(map[string]any); ok && m["matcher"] == matcher {
+			groups = append(groups, m)
+		}
 	}
-	group, _ := pre[0].(map[string]any)
-	if group["matcher"] != "Write|Edit" {
-		t.Fatalf("PreToolUse matcher %v, want Write|Edit", group["matcher"])
+	if len(groups) != 1 {
+		t.Fatalf("hooks.json PreToolUse %v, want exactly one %s matcher group", hooks["PreToolUse"], matcher)
 	}
-	cmds, _ := group["hooks"].([]any)
+	cmds, _ := groups[0]["hooks"].([]any)
 	if len(cmds) != 1 {
-		t.Fatalf("PreToolUse hooks %v, want exactly one command", group["hooks"])
+		t.Fatalf("PreToolUse %s hooks %v, want exactly one command", matcher, groups[0]["hooks"])
 	}
 	cmd, _ := cmds[0].(map[string]any)
-	want := `bash "${CLAUDE_PLUGIN_ROOT}/scripts/gabo-pre-write.sh"`
+	want := `bash "${CLAUDE_PLUGIN_ROOT}/scripts/` + script + `"`
 	if cmd["type"] != "command" || cmd["command"] != want {
-		t.Fatalf("PreToolUse hook %v, want command %s", cmd, want)
+		t.Fatalf("PreToolUse %s hook %v, want command %s", matcher, cmd, want)
 	}
-	if _, err := os.Stat(filepath.Join(repoRoot, pluginDir, "scripts", "gabo-pre-write.sh")); err != nil {
+	if _, err := os.Stat(filepath.Join(repoRoot, pluginDir, "scripts", script)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The pre-command hook script passes its shell tests with a fake gabo on PATH
+// that records its argv, stdin and engine (intent 0028 S3, S15; plan T10).
+func TestPluginPreCommandHookScript(t *testing.T) {
+	if testing.Short() {
+		t.Skip("shell tests skipped in -short mode")
+	}
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skipf("bash not found: %v", err)
+	}
+	test := filepath.Join(repoRoot, pluginDir, "scripts", "tests", "gabo-pre-command.test.sh")
+	out, err := exec.Command("bash", test).CombinedOutput()
+	if err != nil {
+		t.Fatalf("pre-command hook shell tests: %v\n%s", err, out)
 	}
 }
 

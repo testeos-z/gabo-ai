@@ -1,5 +1,5 @@
 {
-  "description": "gabo checks: before Claude writes or edits a gabo file, gabo check --pre-write blocks a write that breaks the stage gate; after it, gabo check runs (both off with the checks option).",
+  "description": "gabo checks: before Claude runs a shell command or writes or edits a file, gabo check --pre-command or --pre-write judges the call and can block it; after a write, gabo check runs (all off with the checks option).",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,15 @@
           {
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/gabo-pre-write.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/gabo-pre-command.sh\""
           }
         ]
       }

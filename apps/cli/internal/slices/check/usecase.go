@@ -97,6 +97,9 @@ type Settings struct {
 	// (GABO_TASK, GABO_ENGINE).
 	Task   string
 	Engine string
+	// Base reads whether a test file is tracked at the worktree's base commit
+	// (intent 0028 D6); nil reads nothing, so no test file is recorded.
+	Base BaseTracker
 }
 
 // Report is the human-readable result. Failed is true when any check failed.

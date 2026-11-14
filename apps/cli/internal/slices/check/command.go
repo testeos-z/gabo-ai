@@ -155,7 +155,10 @@ func NewCommand(factory Factory) *cobra.Command {
 			"human_only_paths lock: at block it exits 1 with one \"✗ human_only_paths: <rule>\"\n" +
 			"line and its \"next: a human edits this path\" line; at ask it exits 3; at warn\n" +
 			"it records and passes; off passes. A gabo.yaml that cannot be read blocks such\n" +
-			"a write. The stage gate above still applies to every write.\n" +
+			"a write. A coder write to an existing test file (*_test.go, *.test.*, *_test.*,\n" +
+			"or a path under test/ or tests/) that the merge base with origin/<integration_branch>\n" +
+			"tracks is judged by the test_files lock: at warn it records one warned line and\n" +
+			"passes, off records nothing; it never blocks. The stage gate above still applies to every write.\n" +
 			"Stdin holding a JSON object with the key gabo_facts is an engine extension's\n" +
 			"session facts (intent 0003): {\"gabo_facts\": 1, \"event\": \"session_start\" or\n" +
 			"\"tool_call\", \"engine\": \"pi\", \"tools\": [<registered tool names>],\n" +
