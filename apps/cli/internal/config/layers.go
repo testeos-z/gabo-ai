@@ -171,6 +171,11 @@ func LoadFile(r Reader, name string) (Resolution, error) {
 	return res, nil
 }
 
+// ErrNoConfig is returned by LoadLayers when no layer file exists. A caller
+// that accepts a missing file (the shell hook mode, intent 0028 PD2) reads
+// every key as its default; any other error still fails.
+var ErrNoConfig = errors.New("no config file found")
+
 // LoadLayers reads every existing layer in order and merges them: a higher
 // layer overrides a lower one field by field (see Merge). Missing files are
 // skipped; unknown keys and an unsupported version fail per file, and
@@ -232,7 +237,7 @@ func LoadLayers(r Reader, layers []Layer) (Resolution, error) {
 				looked = append(looked, l.Path)
 			}
 		}
-		return res, fmt.Errorf("no config file found (looked in %s); create one or pass --config <file>", strings.Join(looked, ", "))
+		return res, fmt.Errorf("%w (looked in %s); create one or pass --config <file>", ErrNoConfig, strings.Join(looked, ", "))
 	}
 	b, err := yaml.Marshal(merged)
 	if err != nil {

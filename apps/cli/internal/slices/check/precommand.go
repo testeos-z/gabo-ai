@@ -1,6 +1,7 @@
 package check
 
 import (
+	"errors"
 	"strings"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
@@ -24,15 +25,22 @@ type ShellVerdict struct {
 // with no output. A config that cannot be read is an error: the mode fails
 // closed. A record that cannot be written fails the call (exit 1).
 func (u *UseCase) JudgeShell(call ShellCall) (ShellVerdict, error) {
+	// A project with no config file reads every key as its default (PD2);
+	// any other load error leaves the state unknown and fails the call.
+	var cfg config.Config
 	res, err := config.LoadLayers(u.config, u.s.Layers)
-	if err != nil {
+	switch {
+	case err == nil:
+		cfg = res.Config
+	case errors.Is(err, config.ErrNoConfig):
+	default:
 		return ShellVerdict{}, err
 	}
 	violations := ShellViolations(call.Command, CoderSession(call.AgentID, u.s.Engine))
 	if len(violations) == 0 {
 		return ShellVerdict{}, nil
 	}
-	d := Decide(res.Config.Lock(config.LockShellGuard), res.Config.Mode)
+	d := Decide(cfg.Lock(config.LockShellGuard), cfg.Mode)
 	if err := u.RecordDecision(config.LockShellGuard, violations[0].Rule, d); err != nil {
 		return ShellVerdict{
 			Exit: ExitFailed,

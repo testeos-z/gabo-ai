@@ -113,6 +113,21 @@ func TestJudgeShellSessionKind(t *testing.T) {
 	}
 }
 
+// I0028 PD2: a project with no gabo.yaml reads every missing key as its
+// default: shell_guard is block, so a violating call is blocked, and a call
+// that breaks no rule still runs.
+func TestJudgeShellWithoutConfigUsesDefaults(t *testing.T) {
+	t.Parallel()
+	v, err := judgeShell(t, configFiles{}, "claude", "a1", "git status", &fakeOutcomes{})
+	if err != nil || v.Exit != 0 || v.Out != "" {
+		t.Fatalf("git status without a config: verdict = %+v, err = %v; want exit 0 and no output", v, err)
+	}
+	v, err = judgeShell(t, configFiles{}, "claude", "a1", "git push origin main", &fakeOutcomes{})
+	if err != nil || v.Exit != ExitFailed || !strings.HasPrefix(v.Out, "✗ shell_guard: "+pushMainRule) {
+		t.Fatalf("push to main without a config: verdict = %+v, err = %v; want exit %d and the block", v, err, ExitFailed)
+	}
+}
+
 // A config that cannot be read or is invalid leaves the lock state unknown:
 // JudgeShell returns the error, and the command fails closed.
 func TestJudgeShellUnknownLockStateIsAnError(t *testing.T) {
