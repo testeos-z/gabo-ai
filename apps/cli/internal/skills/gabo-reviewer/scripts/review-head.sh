@@ -562,10 +562,8 @@ qa_resolve() {
     done
     for qid in "neighbor 1" "neighbor 2"; do
       qflow="${qa_rep_flow[$qid]:-}"
-      if [[ "$qa_build" != passed ]]; then qstatus="not run: the build under test failed"
-      elif [[ -z "${qa_rep_st[$qid]:-}" ]]; then qstatus="not run: reviewer did not name this flow"
-      else qstatus="$(qa_line_status "$qid")"
-      fi
+      # The reviewer runs no neighboring flow: whatever the agent answers, it reads not run.
+      qstatus="not run: the reviewer runs no neighboring flow"
       qa_rows+=("- $qid${qflow:+ ($qflow)}: $qstatus")
       case "$qstatus" in
         fail:*) qa_failed=true ;;

@@ -112,6 +112,9 @@ case "${CLAUDE_MODE:-pass}" in
   nitcont) result "No blocking issues found."$'\n\n'"$(for i in 1 2 3 4 5 6; do printf -- '- [bugs] Nit: apps/cli/main.go:%d naming\n  continuation of nit %d\n' "$i" "$i"; done)" ;;
   imp_clean) result $'No blocking issues found.\n\n- [security] Important: apps/cli/main.go:3 secret in log' ;;
   qa_pass) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] S2: pass `gabo version` exit 0\n[qa] S3: pass\n[qa] neighbor 1 (gabo version): pass `gabo version` exit 0\n[qa] neighbor 2 (gabo check): pass' ;;
+  qa_exit1) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 1' ;;
+  qa_wrongcmd) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] S2: pass `gabo check` exit 0' ;;
+  qa_neighbor_fail) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] neighbor 1 (gabo version): fail: wrong output' ;;
   qa_bare) result $'No blocking issues found.\n\n[qa] S1: pass\n[qa] S2: pass `gabo version` exit 0' ;;
   qa_fail) result $'No blocking issues found.\n\n[qa] S1: fail: exit 1, "unknown flag --json"\n[qa] S2: pass `gabo version` exit 0' ;;
 esac
