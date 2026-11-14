@@ -1,8 +1,9 @@
-# gabo-hook-filter.sh: the S7 filters shared by the gabo plugin's hooks
-# (intent 0001 S7, D9; intent 0002 S8, D5). Sourced by gabo-check.sh
-# (PostToolUse) and gabo-pre-write.sh (PreToolUse); it holds no check rule,
-# only the cases in which a hook stays silent without calling gabo. The Codex
-# plugin ships a byte-identical copy.
+# gabo-hook-filter.sh: the S7 filters and the lock relay shared by the gabo
+# plugin's hooks (intent 0001 S7, D9; intent 0002 S8, D5; intent 0028 S3, S10,
+# S15; plan T10). Sourced by gabo-check.sh (PostToolUse), gabo-pre-write.sh
+# (PreToolUse Write|Edit) and gabo-pre-command.sh (PreToolUse Bash); it holds no
+# check rule, only the cases in which a hook stays silent without calling gabo
+# and the mapping of gabo's exit. The Codex plugin ships a byte-identical copy.
 #
 # gabo_hook_filter [codex] reads the hook JSON from stdin into gabo_input and
 # the project root into gabo_root. It returns 1 (stay silent, exit 0) when the
@@ -88,6 +89,60 @@ gabo_hook_is_gabo_path() {
     gabo.yaml | .gabo/* | .claude/agents/* | .claude/skills/* | docs/product/*) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+# gabo_hook_judge_input reads the hook JSON from stdin into gabo_input and the
+# project root into gabo_root for the lock relay (intent 0028 S3). Unlike
+# gabo_hook_filter it names no path and no command: gabo judges every call. It
+# returns 1 (stay silent, exit 0) when the checks option is off, the project has
+# no .gabo/VERSION or the input is empty. With gabo not on PATH it prints one
+# warning line and returns 1, so the call runs (S15).
+gabo_hook_judge_input() {
+  gabo_input=""
+  [[ "${CLAUDE_PLUGIN_OPTION_CHECKS:-true}" == false ]] && return 1
+
+  gabo_root="${CLAUDE_PROJECT_DIR:-$PWD}"
+  gabo_root="${gabo_root%/}"
+  [[ -f "$gabo_root/.gabo/VERSION" ]] || return 1
+  if [[ -z "$(type -P gabo)" ]]; then
+    echo "gabo plugin warning: gabo is not on PATH; this call runs without gabo's checks" >&2
+    return 1
+  fi
+
+  IFS= read -r -d '' gabo_input || true
+  [[ -n "$gabo_input" ]]
+}
+
+# gabo_hook_judge_relay <kind> pipes gabo_input unchanged to gabo check
+# --pre-<kind> in gabo_root with GABO_ENGINE=claude, so the call is judged by
+# the claude session rules (intent 0028 S3). GABO_TASK and GABO_OUTCOME_FILE
+# pass through when the cycle sets them. The exit maps (S10, S15): 0 runs the
+# call silently; 1 blocks it with gabo's lines; 3 is an ask that claude cannot
+# show (probe item (d) is no), so it blocks as 1 and says so; any other exit, a
+# usage error or a signal, blocks and names the failure. It returns 0 or 2.
+gabo_hook_judge_relay() {
+  local kind="$1" out code
+  out="$(cd "$gabo_root" && printf '%s' "$gabo_input" | GABO_ENGINE=claude gabo check "--pre-$kind" 2>&1)"
+  code=$?
+  case "$code" in
+    0) return 0 ;;
+    1)
+      if [[ -n "$out" ]]; then
+        printf '%s\n' "$out" >&2
+      else
+        printf 'gabo plugin: gabo check --pre-%s blocked the call without a message\n' "$kind" >&2
+      fi
+      ;;
+    3)
+      [[ -n "$out" ]] && printf '%s\n' "$out" >&2
+      echo "gabo plugin: Claude Code shows no prompt for an ask, so the call is blocked (intent 0028 S12)" >&2
+      ;;
+    *)
+      printf 'gabo plugin: gabo check --pre-%s failed (exit %s); the call is blocked\n' "$kind" "$code" >&2
+      [[ -n "$out" ]] && printf '%s\n' "$out" >&2
+      ;;
+  esac
+  return 2
 }
 
 # gabo_json_string <text> prints <text> as a JSON string literal.
