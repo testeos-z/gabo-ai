@@ -15,7 +15,7 @@ import (
 // protectionStep returns the **Branch protection.** step of the setup skill.
 func protectionStep(t *testing.T) string {
 	t.Helper()
-	return setupStep(t, "**Branch protection.**", "\n8. ")
+	return setupStep(t, "**Branch protection.**", "\n9. ")
 }
 
 // S6: the step follows the smoke test that verifies the repository_host slot
@@ -74,6 +74,18 @@ func TestSetupProtectionShowsTheRuleList(t *testing.T) {
 	})
 }
 
+// The start record (R28) is saved right after the memory slot is verified, so
+// the owner's answer to the protection question does not delay it.
+func TestSetupProtectionRunsAfterTheStartRecord(t *testing.T) {
+	t.Parallel()
+	_, steps, _ := strings.Cut(setupDoc(t), "## Steps")
+	start := strings.Index(steps, "**Record the start (R28).**")
+	protect := strings.Index(steps, "**Branch protection.**")
+	if start < 0 || protect < start {
+		t.Fatalf("%s: the **Branch protection.** step must come after **Record the start (R28).**", setupSkill)
+	}
+}
+
 // S7: a decline is saved once, with its date; later runs do not ask and
 // write nothing to the host.
 func TestSetupProtectionRecordsADeclineOnce(t *testing.T) {
@@ -130,7 +142,25 @@ func TestSetupProtectionSavesOneDecisionRecord(t *testing.T) {
 		"the rule list, the choice and one result per rule and branch",
 		"the decline and its date",
 		"`set`", "`missing`", "`not offered`",
+		"the rule list, the choice and one result per rule and branch",
+		"the decline and its date",
+		"`reason:`", "`mode:`", "`wave: none`", "`task: global`", "`resolver: owner`",
+		"unverified",
 	})
+}
+
+// S9 is a tracker write, not a host write: S7's "writes nothing to the host"
+// does not stop the label check on a later run.
+func TestSetupProtectionLabelsAreTrackerWrites(t *testing.T) {
+	t.Parallel()
+	requireAll(t, protectionStep(t), []string{"tracker labels, not a host write"})
+}
+
+// The R28 step keeps its number and its text; the protection step follows it.
+// The memory probe names the record step as step 7.
+func TestSetupMemoryProbeNamesTheStartRecordAsStep7(t *testing.T) {
+	t.Parallel()
+	requireAll(t, setupDoc(t), []string{"the R28 save in step 7, read back"})
 }
 
 // The step leaves the output contract with the branch protection result.
