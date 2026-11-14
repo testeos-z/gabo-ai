@@ -59,6 +59,15 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. L
 4. Delete the branch through `repository_host` (delete branch): the local branch always, and in `mode: auto`, after the merge, the remote branch of the merged task the workflow created. It never deletes any other remote branch nor a branch the workflow did not create. A refused branch goes under `leftovers:`. When the engine asks about deleting the merged remote branch or refuses it, do not retry it by another route (no API call, no force push, no other delete): list it under `leftovers:` as `merged remote branch left (<reason>)` with the exact command `git push origin --delete <branch>` for the owner, and the task still closes (step 2 unchanged). A delete that succeeds leaves no leftover.
 5. Containers stay: the cycle removes them from the ledger.
 
+### Fresh-context verifier
+
+Fixed gabo rule (intent 0027 S28), no configuration. When the change alters behavior, run a fresh-context verifier before you open the PR, after your own checks pass and the head is committed. When the change alters no behavior (documentation or text only), skip it and report `verifier: not applicable: no behavior change`.
+
+- Launch it through your engine's subagent mechanism, or, with no such mechanism, as a separate fresh session; it runs on your engine in a fresh context and gabo pins no model for it (intent 0027 Q34). Start a separate session only in the engine's read-only mode (no write tool), with the worktree as its working directory and a time limit of 10 minutes. When your engine offers neither path (your tool list has no subagent tool and no read-only fresh session can be started), do not run the check in your own conversation: report `verifier: not run: <reason>` and name the missing launch path under open questions. It starts without your conversation: give it only the task issue, the done contract, the worktree path, the diff range and the command forms to run.
+- It exercises the changed behavior and the two nearest neighboring flows (the existing behavior that shares the code you changed), reports the commands it ran and what it saw for the changed behavior and for each of the two flows, and lists each behavior that does not match a linked S# or a done-contract line.
+- It runs in the worktree as is, changes no file and leaves no scratch there (its scratch goes in a `mktemp -d` dir), and never approves or blocks: it reports, you decide. The reviewer stays the only merge gate.
+- A difference it reports that nobody asked for is a regression: fix it and pin it with a test before the PR. Put the report in the outcome as `verifier: <commands and what it saw>`, with one result per flow and each mismatch against the S# or the done contract.
+
 ## Output Contract
 
 The outcome to the cycle (TRD 9.2) holds, in this order:
@@ -73,7 +82,7 @@ The outcome to the cycle (TRD 9.2) holds, in this order:
 
 ### Methodology report block
 
-The outcome carries this methodology report block (intent 0027 S1, S2, S8, S12, S15, S18), one line per item, in this order. A field you did not produce reads `not run: <reason>`, never as a pass; a field is never left out.
+The outcome carries this methodology report block (intent 0027 S1, S2, S8, S12, S15, S18, S28), one line per item, in this order. A field you did not produce reads `not run: <reason>`, never as a pass; a field is never left out.
 
 - Test evidence: `odd: RED <test name and failure>; GREEN <test name and run>`, or, when no relevant deterministic test exists, `odd: exception: <reason>; checks: <proportional checks run>` (no RED or GREEN is claimed).
 - Spec lines: one line for every S# the task links, each `spec S<n>: covered` (with the acceptance criteria you verified) or `spec S<n>: not covered: <reason>`.
@@ -81,6 +90,7 @@ The outcome carries this methodology report block (intent 0027 S1, S2, S8, S12, 
 - Tests: `tests: <test name>: <result>` for the unit test of each changed rule; and, where the task crosses a boundary (a CLI command, a file, a skill that runs a command), `integration: <test name>: <result>` through the public interface, or `integration: not applicable: <reason>`.
 - Checks: for each command of `review.checks` in `gabo.yaml`, the line `check: <command line as listed in review.checks>`, its pasted output, then an `exit: <n>` line. The gate reads shape and command identity; the reviewer's own run stays the proof.
 - Commits: `commits: <sha> <message>` for each work-unit commit.
+- Verifier: `verifier: <commands and what it saw>` (the Fresh-context verifier rule above), or `verifier: not applicable: no behavior change`.
 - Review outcome: `RDD: <granted|declined|passive|off|unavailable>`, with `risk` and `review_due_reason` for each assessed commit.
 
 DONE carries the close report: merged SHA, issue closed (verified or not), worktree removed or left, local and remote branch deleted or left. Then always:
