@@ -22,6 +22,7 @@ import (
 )
 
 //go:embed */SKILL.md */examples/*.md */templates/*.md
+//go:embed gabo-setup/instruction-blocks.md
 //go:embed gabo-agent-templates/agents.yaml gabo-agent-templates/agents/*.md
 //go:embed gabo-runtime-opencode/plugins/*.js
 //go:embed gabo-reviewer-config/scripts/*.sh gabo-reviewer-config/scripts/tests/*.sh
