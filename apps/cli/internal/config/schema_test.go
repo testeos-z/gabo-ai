@@ -130,6 +130,8 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"empty wave after":        with(`wave: {after: ""}`),
 		"wave caps":               with("wave: {max_coder_turns: 30, max_coders: 1, max_fix_rounds: 4}"),
 		"null wave caps":          with("wave: {max_coder_turns: null, max_coders: null, max_fix_rounds: null}"),
+		"approvals per branch":    with("repo: {protection: {required_approvals: {integration: 0, main: 1}}}"),
+		"null approvals":          with("repo: {protection: {required_approvals: {integration: null, main: null}}}"),
 	}
 	reject := map[string]string{
 		"missing runtimes.coder":      string(without(t, "runtimes.coder")),
@@ -208,6 +210,9 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"string max coders":           with("wave: {max_coders: many}"),
 		"bad interaction level":       with("interaction_level: max"),
 		"bad language":                with("language: 'not a tag'"),
+		"negative approvals":          with("repo: {protection: {required_approvals: {main: -1}}}"),
+		"string approvals":            with("repo: {protection: {required_approvals: {main: one}}}"),
+		"unknown approvals branch":    with("repo: {protection: {required_approvals: {dev: 1}}}"),
 		"not a mapping":               "- a\n- b\n",
 	}
 	run := func(name, doc string, want bool) {
@@ -489,5 +494,16 @@ func TestSchemaRejectsFloatWaveCap(t *testing.T) {
 	err := ValidateSchema(SchemaFile, []byte(doc))
 	if err == nil || !strings.Contains(err.Error(), "wave.max_coders") {
 		t.Errorf("ValidateSchema() error = %v, want a float cap rejected", err)
+	}
+}
+
+// yaml.v3 truncates a float into an int field, so the Go loader cannot tell
+// 1.5 from 1; the schema refuses it, and gabo check runs the schema first.
+func TestSchemaRejectsFloatApprovals(t *testing.T) {
+	t.Parallel()
+	doc := "repo: {protection: {required_approvals: {main: 1.5}}}\n"
+	err := ValidateSchema(SchemaFile, []byte(doc))
+	if err == nil || !strings.Contains(err.Error(), "repo.protection.required_approvals.main") {
+		t.Errorf("ValidateSchema() error = %v, want a fractional approval count rejected", err)
 	}
 }

@@ -147,6 +147,22 @@ type Runtimes struct {
 type Repo struct {
 	Name              string `yaml:"name"` // owner/name
 	IntegrationBranch string `yaml:"integration_branch"`
+	// Protection holds the branch protection values the host operation sets
+	// (intent 0029); unset values read as zero.
+	Protection Protection `yaml:"protection,omitempty"`
+}
+
+// Protection is repo.protection: the settings of the branch protection
+// operation (intent 0029).
+type Protection struct {
+	RequiredApprovals RequiredApprovals `yaml:"required_approvals,omitempty"`
+}
+
+// RequiredApprovals is the number of approving reviews each branch requires.
+// Both values are optional; an absent value is zero (intent 0029 S3).
+type RequiredApprovals struct {
+	Integration int `yaml:"integration,omitempty"`
+	Main        int `yaml:"main,omitempty"`
 }
 
 // Owner returns the owner part of Name.
