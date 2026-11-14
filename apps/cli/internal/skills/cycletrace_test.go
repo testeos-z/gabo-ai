@@ -16,6 +16,8 @@ func TestCycleStep6WritesTheTaskTraceLines(t *testing.T) {
 		"`task <id>: RDD: <outcome>; ODD: <RED/GREEN or exception>; gates: done <passed or refused>, report <passed or refused>`",
 		"each value copied from that outcome's own `RDD:` and `odd:` lines and from the two gate results",
 		"a missing value reads `not run: <reason>`",
+		"a resumed wave keeps these lines (PRD R25)",
+		"a BLOCKED outcome runs no gate, so its gates value reads `not run: blocked`",
 	})
 }
 
