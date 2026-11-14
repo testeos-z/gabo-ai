@@ -16,6 +16,9 @@ const (
 	OutcomeWarned  Outcome = "warned"
 	OutcomeAsked   Outcome = "asked"
 	OutcomeBlocked Outcome = "blocked"
+	// OutcomeNotRun records that a lock did not fire on an engine or inside a
+	// coder subagent; its note is the reason (intent 0028 S14, S16).
+	OutcomeNotRun Outcome = "not run"
 )
 
 // Decision is the result of one violating call under one lock.
