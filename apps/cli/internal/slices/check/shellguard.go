@@ -84,6 +84,15 @@ func shellSegments(s string) [][]string {
 	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
+		// A command substitution is judged as its own command line, in
+		// plain or double-quoted text alike; the outer word is kept.
+		if state != single && (c == '`' || (c == '$' && i+1 < len(s) && s[i+1] == '(')) {
+			body, end := substitution(s, i)
+			flushSeg()
+			segs = append(segs, shellSegments(body)...)
+			i = end
+			continue
+		}
 		switch state {
 		case single:
 			if c == '\'' {
@@ -101,11 +110,6 @@ func shellSegments(s string) [][]string {
 				if s[i] != '\n' {
 					word = append(word, s[i])
 				}
-			case c == '$' && i+1 < len(s) && s[i+1] == '(':
-				flushSeg()
-				i++
-			case c == '`':
-				flushSeg()
 			default:
 				word = append(word, c)
 			}
@@ -114,16 +118,11 @@ func shellSegments(s string) [][]string {
 		switch c {
 		case ' ', '\t', '\r':
 			flushWord()
-		case '\n', ';', '|', '&', '(', ')', '`':
+		case '\n', ';', '|', '&', '(', ')':
 			flushSeg()
 		case '$':
-			if i+1 < len(s) && s[i+1] == '(' {
-				flushSeg()
-				i++
-			} else {
-				word = append(word, c)
-				inWord = true
-			}
+			word = append(word, c)
+			inWord = true
 		case '\'':
 			state = single
 			inWord = true
@@ -154,6 +153,37 @@ func shellSegments(s string) [][]string {
 	}
 	flushSeg()
 	return segs
+}
+
+// substitution returns the body of the command substitution that starts at
+// s[i] ("$(" or a backquote) and the index of its closing byte. An unclosed
+// substitution runs to the end of the line.
+func substitution(s string, i int) (string, int) {
+	if s[i] == '`' {
+		for j := i + 1; j < len(s); j++ {
+			if s[j] == '\\' {
+				j++
+				continue
+			}
+			if s[j] == '`' {
+				return s[i+1 : j], j
+			}
+		}
+		return s[i+1:], len(s) - 1
+	}
+	depth := 0
+	for j := i + 1; j < len(s); j++ {
+		switch s[j] {
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth == 0 {
+				return s[i+2 : j], j
+			}
+		}
+	}
+	return s[i+2:], len(s) - 1
 }
 
 // reservedWords start a command without being its name (if, then, ...).
@@ -223,21 +253,31 @@ func isAssignment(w string) bool {
 }
 
 // shellCommandString returns the command line of a shell's -c option: the
-// argument after the first short option cluster that holds c, among the
-// options before the first non-option word (a script name ends them).
+// argument after the first option cluster that holds c, among the options
+// before the first non-option word (a script name ends them). The options
+// -o, +o and -O take the next word as their value, and --rcfile and
+// --init-file do too.
 func shellCommandString(args []string) (string, bool) {
-	for i, a := range args {
-		if a == "--" || a == "-" || !strings.HasPrefix(a, "-") {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if a == "--" || a == "-" || (!strings.HasPrefix(a, "-") && !strings.HasPrefix(a, "+")) {
 			return "", false
 		}
 		if strings.HasPrefix(a, "--") {
+			if a == "--rcfile" || a == "--init-file" {
+				i++
+			}
 			continue
 		}
-		if strings.ContainsRune(a[1:], 'c') {
+		letters := a[1:]
+		if strings.ContainsRune(letters, 'c') {
 			if i+1 < len(args) {
 				return args[i+1], true
 			}
 			return "", false
+		}
+		if letters != "" && strings.ContainsRune("oO", rune(letters[len(letters)-1])) {
+			i++
 		}
 	}
 	return "", false
@@ -282,15 +322,21 @@ func judgeGit(args []string, coder bool) []ShellViolation {
 }
 
 // judgePush judges git push: a target of main is blocked in every session; in
-// a coder session also master and dev, any force form and a + refspec.
+// a coder session also master and dev, any force form and a + refspec. The
+// remote is the first positional word, or the value of --repo when given.
 func judgePush(args []string, coder bool) []ShellViolation {
 	var positional []string
-	force := false
-	endOfOpts := false
-	for _, a := range args {
+	force, repo, endOfOpts := false, false, false
+	for i := 0; i < len(args); i++ {
+		a := args[i]
 		switch {
 		case !endOfOpts && a == "--":
 			endOfOpts = true
+		case !endOfOpts && a == "--repo":
+			repo = true
+			i++
+		case !endOfOpts && strings.HasPrefix(a, "--repo="):
+			repo = true
 		case !endOfOpts && strings.HasPrefix(a, "--"):
 			if a == "--force" || a == "--mirror" || a == "--force-with-lease" || strings.HasPrefix(a, "--force-with-lease=") {
 				force = true
@@ -303,9 +349,13 @@ func judgePush(args []string, coder bool) []ShellViolation {
 			positional = append(positional, a)
 		}
 	}
+	specs := positional
+	if !repo {
+		specs = positional[min(1, len(positional)):]
+	}
 	var out []ShellViolation
-	// positional[0] is the remote; the rest are refspecs (src:dst or dst).
-	for _, spec := range positional[min(1, len(positional)):] {
+	// Each spec is a refspec (src:dst or dst).
+	for _, spec := range specs {
 		plus := strings.HasPrefix(spec, "+")
 		dst := strings.TrimPrefix(spec, "+")
 		if i := strings.LastIndexByte(dst, ':'); i >= 0 {

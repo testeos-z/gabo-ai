@@ -79,6 +79,16 @@ func TestJudgeShellOneViolatingCallPerState(t *testing.T) {
 	}
 }
 
+// TRD 9.4: every argument after --pre-write is a path, also one named
+// --pre-command, so the hook mode is not chosen by a later argument.
+func TestCommandPreWriteTakesPreCommandAsAPath(t *testing.T) {
+	t.Parallel()
+	out, err := runPreWrite(t, intentWith(acceptedMD), "--pre-write", "README.md", "--pre-command")
+	if err != nil || out != "" {
+		t.Fatalf("err = %v, stdout = %q; want the path to pass with no output", err, out)
+	}
+}
+
 // An allowed call exits 0, prints nothing and records nothing.
 func TestJudgeShellAllowedCallRecordsNothing(t *testing.T) {
 	t.Parallel()

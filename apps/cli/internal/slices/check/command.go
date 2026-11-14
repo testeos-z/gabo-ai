@@ -233,9 +233,13 @@ func NewCommand(factory Factory) *cobra.Command {
 }
 
 // hasPreCommand reports whether raw names the shell hook mode flag, bare or
-// with a value, anywhere among the arguments.
+// with a value, before any --pre-write: every argument after --pre-write is a
+// path (TRD 9.4), so a later --pre-command is one.
 func hasPreCommand(raw []string) bool {
 	for _, a := range raw {
+		if a == "--"+preWriteFlag || strings.HasPrefix(a, "--"+preWriteFlag+"=") {
+			return false
+		}
 		if a == "--"+preCommandFlag || strings.HasPrefix(a, "--"+preCommandFlag+"=") {
 			return true
 		}

@@ -67,6 +67,8 @@ func TestShellGuardMainSessionOnlyPushToMain(t *testing.T) {
 		"git push -d origin main",
 		"git push origin HEAD:main",
 		"git push origin feat/x:refs/heads/main",
+		"git push --repo=origin main",
+		"git push --repo origin main",
 	}
 	allowed := []string{
 		"git push --force origin feat/x",
@@ -96,6 +98,9 @@ func TestShellGuardOneLevelUnwrap(t *testing.T) {
 		"bash -c 'git push origin main'",
 		"sh -c 'git push -f origin x'",
 		"bash -lc 'git push origin main'",
+		"bash -o pipefail -c 'git push origin main'",
+		"bash -O extglob -c 'git push origin main'",
+		"bash -eo pipefail -c 'git push -f origin x'",
 		"git -C ../wt push -f",
 		"/usr/bin/git push --force origin x",
 		"bash -c 'git -C ../wt push -f'",
@@ -134,6 +139,8 @@ func TestShellGuardReadsCommandsNotText(t *testing.T) {
 		"echo $(git push origin main)",
 		"git status\ngit push origin main",
 		"(git push origin main)",
+		`echo "$(git push origin main)"`,
+		"echo \"`git push -f origin x`\"",
 	}
 	allowed := []string{
 		`echo "git push origin main"`,
