@@ -38,6 +38,30 @@
               "description": "The only branch auto mode may merge into, never main (D13).",
               "type": ["string", "null"],
               "pattern": "^[A-Za-z0-9._/-]+$"
+            },
+            "protection": {
+              "description": "Branch protection values the repository host operation sets (intent 0029). Both counts are optional; unset reads as zero.",
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "properties": {
+                "required_approvals": {
+                  "description": "Approving reviews each branch requires before a merge, per branch: integration (repo.integration_branch) and main.",
+                  "type": ["object", "null"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "integration": {
+                      "description": "Approving reviews the integration branch requires; zero when unset.",
+                      "type": ["integer", "null"],
+                      "minimum": 0
+                    },
+                    "main": {
+                      "description": "Approving reviews the main branch requires; zero when unset.",
+                      "type": ["integer", "null"],
+                      "minimum": 0
+                    }
+                  }
+                }
+              }
             }
           }
         },
