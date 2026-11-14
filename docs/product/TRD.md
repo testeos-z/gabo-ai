@@ -370,7 +370,7 @@ Each contract is a gabo-ai skill; each operation must be covered by the adapter.
 | `notifications` | notify owner, notify a developer by alias | R16 |
 | `direct_sessions` | open session in a worktree with a brief, send message, read state, close; send message and read state take the handle of any session that agent_host reports, on this machine or a remote host (amended, owner 2026-11-11, intent 0019) | R14, R18 |
 | `methodology` | instructions the coder loads as `gabo-methodology`; declares whether coder-side review (for example GGA, RDD) runs and how. Recommended, not required (owner 2026-10-26): gentle-ai ODD with RDD as the coder-side validation layer | R8, R9 |
-| `repository_host` | open PR, comment on PR, read PR status and checks, merge into `repo.integration_branch`, delete branch | R9, R10, D13 |
+| `repository_host` | open PR, comment on PR, read PR status and checks, merge into `repo.integration_branch`, delete branch; protect branches (amended, owner 2026-11-14, intent 0029): set the branch rules on `repo.integration_branch` and `main`, read them back, report one result per rule and branch (set, missing, or not offered by the host or plan) | R9, R10, R31, D13 |
 | `reviewer_placement` | trigger a review run for a PR head (invoke the script of the user-level `gabo-reviewer` skill, D20), report where it ran and in which mode (single-user or isolated), return the verdict location and `VERDICT` line | R9, R26 |
 | `agent_host` (local or cloud, optional) | start an agent session on the host, stop it, report where agents run; for a cloud host it holds server ids, OS user, bot identity and session prompts. Configured in a separate assistant session | Deployment view |
 
