@@ -82,4 +82,10 @@ expect_match "^PREFLIGHT-FAILED REVIEWER_ENGINE must be claude, codex, pi or ope
   "$(cat "$work/session_engine/out.log")" "an unresolved session engine is refused"
 check "no merge call for an unresolved session engine" bash -c "! grep -q '^gh pr merge' '$work/session_engine/calls.log'"
 
+echo "# the merge gate is unchanged by the comment order (S13)"
+# A deliberate pin: the comment order and the code read line never touch the
+# gate. Changing merge-head.sh means updating this digest on purpose.
+check "merge-head.sh is byte-identical to the pinned gate" \
+  bash -c "echo '55d1ca626de0d7328a33b98e146e11cbf65c7164080a89dca95666cdae5eefab  $src/merge-head.sh' | sha256sum -c --status"
+
 finish

@@ -713,6 +713,11 @@ fi
 
 # --- comment ------------------------------------------------------------------------
 body="$logs/comment.md"
+checks_part="$logs/comment-checks.md"
+code_part="$logs/comment-code-read.md"
+# Comment order (intent 0027 S13): the VERDICT line, the checks section, then the
+# code read section; the marker and footer close it. The product QA section lands
+# between the verdict and the checks.
 {
   if [[ "$tests_state" == success && "$review_state" == success ]]; then
     echo "$VERDICT_CLEAN"
@@ -751,9 +756,14 @@ body="$logs/comment.md"
     fi
     echo
   fi
-  echo "### Review ($REVIEW_CONTEXT: $review_state)"
+} >"$checks_part"
+# The code read section (intent 0027 S14) ends with its `code read:` line (S13).
+{
+  echo "### Code read ($REVIEW_CONTEXT: $review_state)"
   echo
-  if [[ "$review_state" == error ]]; then
+  if [[ -n "$policy_missing" ]]; then
+    :
+  elif [[ "$review_state" == error ]]; then
     echo "The review could not complete ($why) after $attempt attempts. Push a new commit to retry."
   else
     printf '%s\n' "${findings:-No findings.}" | grep -vF "$MARKER_PREFIX"
@@ -762,7 +772,19 @@ body="$logs/comment.md"
     echo
     echo "_Note: the review prompt's diff was truncated to $diff_truncated of $diff_bytes bytes._"
   fi
-} >"$body"
+} >"$code_part"
+# The code read line: pass, the Important finding that blocks, or why the read did not run.
+code_read_line="code read: pass"
+if [[ -n "$policy_missing" ]]; then
+  code_read_line="code read: not run: no policy file on $BASE_BRANCH"
+elif [[ "$review_state" == error ]]; then
+  code_read_line="code read: not run: $why"
+elif [[ "$review_state" == failure ]]; then
+  important="$(grep -E '^[[:space:]]*[-*][[:space:]]+\[(bugs|security|compliance)\][[:space:]]+Important([^[:alnum:]]|$)' <<<"$findings" |
+    sed -E 's/^[[:space:]]*[-*][[:space:]]+//' | awk 'NR > 1 { printf "; " } { printf "%s", $0 }')"
+  important="${important//$MARKER_PREFIX/[marker]}"
+  code_read_line="code read: fail: ${important:-blocking findings, see the list above}"
+fi
 # redact_check_env <log>: the last MiB of <log> with every value passed through
 # review.check_env replaced, literally, by [review.check_env:<name>].
 redact_check_env() {
@@ -775,26 +797,35 @@ redact_check_env() {
   done
   printf '%s' "$text"
 }
-budget=$((60000 - $(wc -c <"$body")))
+# failure_detail <name>: the last lines of a failed check's log, or of the review
+# when it could not complete, in a collapsed block of the section that owns it.
+failure_detail() {
+  local name="$1"
+  echo
+  echo "<details><summary>Failure output: $name (last lines)</summary>"
+  echo
+  echo '```text'
+  redact_check_env "$logs/$name.log" >"$logs/$name.redacted.log"
+  tail_chars "$per" "$logs/$name.redacted.log" | grep -vF "$MARKER_PREFIX"
+  echo '```'
+  echo
+  echo "</details>"
+  echo
+}
+budget=$((60000 - $(wc -c <"$checks_part") - $(wc -c <"$code_part")))
 tails=("${failed[@]}")
 [[ "$review_state" == error ]] && tails+=(review)
+per=12000
 if ((${#tails[@]})); then
   per=$((budget / ${#tails[@]} - 200))
   ((per > 12000)) && per=12000
-  for name in "${tails[@]}"; do
-    {
-      echo
-      echo "<details><summary>Failure output: $name (last lines)</summary>"
-      echo
-      echo '```text'
-      redact_check_env "$logs/$name.log" >"$logs/$name.redacted.log"
-      tail_chars "$per" "$logs/$name.redacted.log" | grep -vF "$MARKER_PREFIX"
-      echo '```'
-      echo
-      echo "</details>"
-    } >>"$body"
-  done
 fi
+cat "$checks_part" >"$body"
+for name in "${failed[@]}"; do failure_detail "$name" >>"$body"; done
+cat "$code_part" >>"$body"
+if [[ "$review_state" == error ]]; then failure_detail review >>"$body"; fi
+echo >>"$body"
+echo "$code_read_line" >>"$body"
 bot_footer "$sha" >>"$body"
 
 if ! post_comment "$body"; then
