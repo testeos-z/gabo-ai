@@ -72,7 +72,7 @@ func TestEngineProbeRecordHoldsSixteenCells(t *testing.T) {
 }
 
 // TestEngineProbeNoOnItemANamesS14 requires every engine whose item (a) is no to
-// name S14 in the record, so the plan knows the fallback applies to that engine.
+// state "S14 applies to <engine>" in the record, so the plan knows the fallback applies to it.
 func TestEngineProbeNoOnItemANamesS14(t *testing.T) {
 	t.Parallel()
 	raw, err := os.ReadFile(filepath.FromSlash(probeRecordPath))
@@ -84,15 +84,10 @@ func TestEngineProbeNoOnItemANamesS14(t *testing.T) {
 		if len(cells) < 3 || cells[2] != "no" {
 			continue
 		}
-		named := false
-		for _, line := range strings.Split(doc, "\n") {
-			if strings.Contains(line, engine) && strings.Contains(line, "S14") {
-				named = true
-				break
-			}
-		}
-		if !named {
-			t.Errorf("%s has item (a) no but the record does not name S14 for it", engine)
+		// A positive statement for this engine, not any line that mentions it.
+		statement := regexp.MustCompile(`S14 applies to ` + regexp.QuoteMeta(engine) + `\b`)
+		if !statement.MatchString(doc) {
+			t.Errorf("%s has item (a) no but the record lacks the statement %q", engine, "S14 applies to "+engine)
 		}
 	}
 }

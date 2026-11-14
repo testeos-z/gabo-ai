@@ -9,6 +9,8 @@
 
 ## Record
 
+Caveat on the pi row: its (a) and (b) come from an emulated child process, not from a delegated gentle-agents subagent (see the pi notes below). Codex (d) rests on the bypass run alone (see the codex notes).
+
 Items: (a) a pre-command hook fires for a shell call inside a coder subagent and can deny it; (b) the subagent's tool calls reach the hook with an agent or session id; (c) the hand-off event exists and can block; (d) the engine's yes/no permission prompt appears when the session runs with permissions bypassed.
 
 | engine | version | (a) | (b) | (c) | (d) |
@@ -18,7 +20,7 @@ Items: (a) a pre-command hook fires for a shell call inside a coder subagent and
 | pi | 1.5.2 | yes | yes | no | no |
 | opencode | opencode v2.2.6 | no | not testable: no hook was invoked for any call, so no id reached one | not testable: no subagent hand-off hook fired, so blocking cannot be observed | no |
 
-Consequence for the plan: item (a) is `no` for opencode, so S14 applies to opencode. Every lock that needs a pre-command hook on opencode shows `not run: <reason>` in the wave report, and no task stops for it. Claude, codex and pi show (a) `yes`, so S14 does not apply to them on this record.
+Consequence for the plan: item (a) is `no` for opencode. S14 applies to opencode. Every lock that needs a pre-command hook on opencode shows `not run: <reason>` in the wave report, and no task stops for it. Claude, codex and pi show (a) `yes`, so no S14 fallback is stated for them on this record.
 
 ## How each cell was observed
 
@@ -60,5 +62,7 @@ Every run used a `mktemp -d` scratch project and hook scripts in a second `mktem
 
 ## Open after this record
 
-- A person reads this record before T2 starts (the PR body says so).
+- The human read of this record that gates T2 is done by the assistant under the owner's order of 2026-11-14 ("aprueben solos lo necesario"), as the PR body says.
+- The native credential-list formats of codex, pi and opencode (plan PD5 and risk 3) are not covered by this record. T9 must establish them.
+- Codex (d) is weaker evidence than the other engines' (d): the bypass run is the only observation. S12's assumption depends on it, so T2 and T9 treat it as provisional.
 - The codex hook trust condition and the opencode hook result are inputs to T9 and T10 and to S14 for opencode.
