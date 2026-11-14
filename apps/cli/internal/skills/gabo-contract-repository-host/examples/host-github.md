@@ -62,6 +62,7 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
 - On both branches: a bypass for the administrator role, which names that role and no user.
 
 1. Approving reviews per branch, from `gabo.yaml` with a YAML reader (for example `yq -r '.repo.protection.required_approvals.integration // 0' gabo.yaml` and the same with `.main`); a missing key reads as `0`.
+   The key is accepted by `gabo check` once intent 0029 T3 lands; until then a value set by hand is rejected, and an absent key reads as `0`.
 2. Find the ruleset of the branch by name; no output means none exists:
 
    ```bash
@@ -91,7 +92,7 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
    {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": false, "required_status_checks": [{"context": "reviewer/tests"}, {"context": "reviewer/review"}]}}
    ```
 
-   `actor_id` 5 is the repository administrator role (`RepositoryRole`); the bypass names that role only. The required statuses carry no `integration_id`, so any login that posts `reviewer/tests` or `reviewer/review` satisfies them; agents use the owner's login (D6), so that gap is accepted.
+   `actor_id` 5 is the repository administrator role (`RepositoryRole`); the bypass names that role only. The required statuses carry no `integration_id`, so any login that posts `reviewer/tests` or `reviewer/review` satisfies them; agents run with the owner's login, so that gap is accepted; the required contexts are D6.
 
 4. Write: no ruleset found, `gh api -X POST repos/$R/rulesets --input <file>`; one found, `gh api -X PUT repos/$R/rulesets/<id> --input <file>` with the same body; more than one found, write nothing and report `missing` with the ids.
 5. Not offered: when the host refuses the write and names one rule type or the bypass, remove that rule from the body, resend, and report that rule `not offered` with the host's reason. Repeat for each rule the host names, at most once per rule in the list. A refusal that names no rule is `missing` with the host's reason, with no retry.
