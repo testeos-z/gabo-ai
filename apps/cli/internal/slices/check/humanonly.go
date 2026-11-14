@@ -2,15 +2,15 @@ package check
 
 import (
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 )
 
-// RouteHumanEdits is the route of a path a coder may not write (intent 0028 S7, S11).
-const RouteHumanEdits = "a human edits this path"
-
-// humanEntry is one human-only entry: an entry of review.human_only_paths, or
-// gabo.yaml, which is protected whatever the list says (intent 0028 S13).
+// humanEntry is one human-only entry for a glob pattern: an entry of
+// review.human_only_paths, or gabo.yaml (intent 0028 S13). A literal path is
+// matched by humanOnlyPath (the reviewer's rule, shared with --pre-write); a
+// glob is matched here against the entries from the root.
 type humanEntry struct {
 	// raw is the entry without its trailing slash, cleaned.
 	raw string
@@ -35,16 +35,6 @@ func humanEntries(list []string, fold bool) []humanEntry {
 		out = append(out, humanEntry{raw: raw, dir: strings.HasSuffix(e, "/"), comps: strings.Split(raw, "/")})
 	}
 	return out
-}
-
-// literal reports whether the clean, project-relative path p is the entry or,
-// for a folder entry, lies under it. A file entry names one file at the root;
-// the same name in a folder is the reviewer's merge check to stop, not this rule.
-func (h humanEntry) literal(p string) bool {
-	if h.dir {
-		return p == h.raw || strings.HasPrefix(p, h.raw+"/")
-	}
-	return p == h.raw
 }
 
 // glob reports whether the glob pattern p can match a path the entry covers:
@@ -88,6 +78,23 @@ func (h humanEntry) ancestorGlob(p string) bool {
 	return true
 }
 
+// globMatch matches one path component; a malformed pattern matches (fail closed).
+func globMatch(pattern, name string) bool {
+	ok, err := path.Match(pattern, name)
+	return ok || err != nil
+}
+
+// humanGlobRel reports whether the clean, project-relative glob pattern rel can
+// match an entry of hs.
+func humanGlobRel(rel string, hs []humanEntry) bool {
+	for _, h := range hs {
+		if h.glob(rel) {
+			return true
+		}
+	}
+	return false
+}
+
 // humanAncestorRel reports whether the clean, project-relative path rel is a
 // folder that contains an entry of hs, literally or as a glob.
 func humanAncestorRel(rel string, hs []humanEntry) bool {
@@ -100,10 +107,36 @@ func humanAncestorRel(rel string, hs []humanEntry) bool {
 	return false
 }
 
-// humanAncestorTarget reports whether a cp, mv or rm of the path p targets a
-// folder that contains a human-only entry (the root, or such a folder), read as
-// humanOnlyTarget reads it. A path that cannot be resolved counts as human-only.
-func (u *UseCase) humanAncestorTarget(p string, hs []humanEntry) bool {
+// shellHumanTarget reports whether a write to the path p, as a shell command
+// spells it, is a write to a human-only path: a target of p (as written, or
+// with its symlinks resolved) is human-only by humanOnlyPath, or is a glob that
+// can match an entry. A path that cannot be resolved counts as human-only
+// (fail closed).
+func (u *UseCase) shellHumanTarget(p string, list []string, hs []humanEntry) bool {
+	targets, err := u.targetsOf(p)
+	if err != nil {
+		return true
+	}
+	for _, rel := range targets {
+		// The folder itself is a target too: rel with a slash matches a folder entry.
+		if humanOnlyPath(rel, list, u.s.FoldCase) || humanOnlyPath(rel+"/", list, u.s.FoldCase) {
+			return true
+		}
+		if strings.ContainsAny(rel, "*?[") && humanGlobRel(rel, hs) {
+			return true
+		}
+	}
+	return false
+}
+
+// shellAncestorTarget reports whether a cp, mv or rm of the path p targets a
+// folder that contains a human-only entry, the project root among them. The
+// root is checked on the path before targets drop the paths outside it, so
+// ".." and "/" count as containing the root (intent 0028 S7, review round 4).
+func (u *UseCase) shellAncestorTarget(p string, hs []humanEntry) bool {
+	if abs := u.absOf(p); filepath.IsAbs(abs) && u.containsRoot(abs) {
+		return true
+	}
 	targets, err := u.targetsOf(p)
 	if err != nil {
 		return true
@@ -119,46 +152,16 @@ func (u *UseCase) humanAncestorTarget(p string, hs []humanEntry) bool {
 	return false
 }
 
-// globMatch matches one path component; a malformed pattern matches (fail closed).
-func globMatch(pattern, name string) bool {
-	ok, err := path.Match(pattern, name)
-	return ok || err != nil
-}
-
-// humanOnlyRel reports whether the clean, project-relative path rel is under an
-// entry of hs, as a literal path or as a glob that can match one.
-func humanOnlyRel(rel string, hs []humanEntry) bool {
-	glob := strings.ContainsAny(rel, "*?[")
-	for _, h := range hs {
-		if (glob && h.glob(rel)) || (!glob && h.literal(rel)) {
-			return true
-		}
+// containsRoot reports whether the absolute path abs is the project root or one
+// of its ancestors, compared without case on a case-insensitive filesystem.
+func (u *UseCase) containsRoot(abs string) bool {
+	if u.s.Root == "" {
+		return false
 	}
-	return false
-}
-
-// HumanOnlyPath reports whether a write to the path p is a write to a
-// human-only path: under an entry of list, or gabo.yaml (intent 0028 S7, S13).
-// The path is read as PreWrite reads it: relative to the working directory,
-// with its symlinks resolved, so both the path as written and its target are
-// judged. A path that cannot be resolved counts as human-only (fail closed).
-func (u *UseCase) HumanOnlyPath(p string, list []string) bool {
-	return u.humanOnlyTarget(p, humanEntries(list, u.s.FoldCase))
-}
-
-// humanOnlyTarget is HumanOnlyPath with the entries already built.
-func (u *UseCase) humanOnlyTarget(p string, hs []humanEntry) bool {
-	targets, err := u.targetsOf(p)
-	if err != nil {
-		return true
+	root := path.Clean(filepath.ToSlash(u.s.Root))
+	a := path.Clean(filepath.ToSlash(abs))
+	if u.s.FoldCase {
+		root, a = strings.ToLower(root), strings.ToLower(a)
 	}
-	for _, rel := range targets {
-		if u.s.FoldCase {
-			rel = strings.ToLower(rel)
-		}
-		if humanOnlyRel(rel, hs) {
-			return true
-		}
-	}
-	return false
+	return strings.HasPrefix(root+"/", strings.TrimSuffix(a, "/")+"/")
 }

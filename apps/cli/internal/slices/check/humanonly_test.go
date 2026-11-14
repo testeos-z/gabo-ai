@@ -9,10 +9,16 @@ func humanUseCase(s Settings) *UseCase {
 	return NewUseCase(project(), nil, nil, s)
 }
 
-// I0028 S7, S13: a path is human-only when it lies under a folder entry of
-// review.human_only_paths, is a file entry at the project root, or is
-// gabo.yaml, which is protected even when the list omits it. A nested file of
-// the same name is not, and a path outside the root is never human-only.
+// humanPath reports whether a shell write to the path p is human-only with the
+// given list, as the shell rule judges it.
+func humanPath(u *UseCase, p string, list []string) bool {
+	return u.shellHumanTarget(p, list, humanEntries(list, u.s.FoldCase))
+}
+
+// I0028 S7, S13: a path is human-only by the reviewer's rule (shared with
+// --pre-write): under a folder entry of review.human_only_paths, a file entry
+// by its exact path or as a trailing path element, gabo.yaml at the root, and a
+// glob that can match one of them.
 func TestHumanOnlyPathMatchesEntries(t *testing.T) {
 	t.Parallel()
 	list := []string{".github/", ".claude/", "AGENTS.md", "CLAUDE.md"}
@@ -27,13 +33,13 @@ func TestHumanOnlyPathMatchesEntries(t *testing.T) {
 		{".claude/settings.json", true},
 		{"AGENTS.md", true},
 		{"./CLAUDE.md", true},
-		{"docs/AGENTS.md", false},
+		{"docs/AGENTS.md", true},
 		{"gabo.yaml", true},
 		{"sub/gabo.yaml", false},
 		{"/proj/.github/ci.yml", true},
 		{"/elsewhere/.github/ci.yml", false},
+		{"../proj/.github/ci.yml", true},
 		{"../other/.github/ci.yml", false},
-		{"../proj/gabo.yaml", true},
 		{"apps/cli/main.go", false},
 		{"AGENTS.mdx", false},
 		{".githubx/a", false},
@@ -44,8 +50,8 @@ func TestHumanOnlyPathMatchesEntries(t *testing.T) {
 		{"build/*", false},
 	}
 	for _, tt := range tests {
-		if got := u.HumanOnlyPath(tt.path, list); got != tt.want {
-			t.Errorf("HumanOnlyPath(%q) = %v, want %v", tt.path, got, tt.want)
+		if got := humanPath(u, tt.path, list); got != tt.want {
+			t.Errorf("humanPath(%q) = %v, want %v", tt.path, got, tt.want)
 		}
 	}
 }
@@ -53,14 +59,14 @@ func TestHumanOnlyPathMatchesEntries(t *testing.T) {
 // I0028 S13: gabo.yaml is human-only even when review.human_only_paths is empty.
 func TestHumanOnlyPathProtectsGaboYamlAlways(t *testing.T) {
 	t.Parallel()
-	if !humanUseCase(Settings{Root: "/proj"}).HumanOnlyPath("gabo.yaml", nil) {
+	if !humanPath(humanUseCase(Settings{Root: "/proj"}), "gabo.yaml", nil) {
 		t.Fatalf("gabo.yaml with an empty list: not human-only; want human-only")
 	}
 }
 
 // I0028 S7: a relative path is read from the working directory, as PreWrite
-// reads it: from apps/cli, ../../gabo.yaml is the root's gabo.yaml and
-// AGENTS.md is apps/cli/AGENTS.md.
+// reads it: from apps/cli, ../../gabo.yaml is the root's gabo.yaml, and
+// AGENTS.md is apps/cli/AGENTS.md, a nested file of a listed name.
 func TestHumanOnlyPathReadsTheWorkingDirectory(t *testing.T) {
 	t.Parallel()
 	list := []string{".github/", "AGENTS.md"}
@@ -72,14 +78,14 @@ func TestHumanOnlyPathReadsTheWorkingDirectory(t *testing.T) {
 		{"../../gabo.yaml", true},
 		{"../../.github/ci.yml", true},
 		{"../../AGENTS.md", true},
-		{"AGENTS.md", false},
+		{"AGENTS.md", true},
 		{"../../apps/cli/main.go", false},
 		{"../../../proj/gabo.yaml", true},
 		{"../../../other/gabo.yaml", false},
 	}
 	for _, tt := range tests {
-		if got := u.HumanOnlyPath(tt.path, list); got != tt.want {
-			t.Errorf("from apps/cli: HumanOnlyPath(%q) = %v, want %v", tt.path, got, tt.want)
+		if got := humanPath(u, tt.path, list); got != tt.want {
+			t.Errorf("from apps/cli: humanPath(%q) = %v, want %v", tt.path, got, tt.want)
 		}
 	}
 }
@@ -101,8 +107,8 @@ func TestHumanOnlyPathFoldsCase(t *testing.T) {
 	}
 	for _, tt := range tests {
 		u := humanUseCase(Settings{Root: "/proj", FoldCase: tt.fold})
-		if got := u.HumanOnlyPath(tt.path, list); got != tt.want {
-			t.Errorf("%s: HumanOnlyPath(%q) = %v, want %v", tt.name, tt.path, got, tt.want)
+		if got := humanPath(u, tt.path, list); got != tt.want {
+			t.Errorf("%s: humanPath(%q) = %v, want %v", tt.name, tt.path, got, tt.want)
 		}
 	}
 }
@@ -116,10 +122,10 @@ func TestHumanOnlyPathFollowsSymlinks(t *testing.T) {
 		Resolve: fakeResolve(map[string]string{"/proj/gh": "/proj/.github"}, "/proj", "/proj/.github", "/proj/.github/ci.yml"),
 	})
 	list := []string{".github/"}
-	if !u.HumanOnlyPath("gh/ci.yml", list) {
+	if !humanPath(u, "gh/ci.yml", list) {
 		t.Fatalf("gh/ci.yml through a link to .github: not human-only; want human-only")
 	}
-	if u.HumanOnlyPath("apps/main.go", list) {
+	if humanPath(u, "apps/main.go", list) {
 		t.Fatalf("apps/main.go: human-only; want allowed")
 	}
 }

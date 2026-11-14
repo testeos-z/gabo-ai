@@ -74,7 +74,6 @@ func TestHumanOnlyShellWritesFollowsCd(t *testing.T) {
 	allowed := []string{
 		"cd apps && tee out.txt",
 		"cd apps && cp x y",
-		"cd apps/cli && echo x > AGENTS.md",
 		"cd .. && echo x > .github/x",
 		"cd apps && echo x > apps/out.txt",
 	}
@@ -121,6 +120,68 @@ func TestHumanOnlyShellWritesSedScript(t *testing.T) {
 	for _, c := range blocked {
 		if got := humanWrites(c, true); len(got) == 0 {
 			t.Errorf("coder: %q is allowed; want blocked", c)
+		}
+	}
+}
+
+// I0028 S7 (review round 4): a target that resolves outside the root but
+// contains it (.., /, a cd up and back to the project) is the root's ancestor,
+// so cp, mv and rm of it are human-only; a path beside the project is not.
+func TestHumanOnlyShellWritesOutsideAncestorOfRoot(t *testing.T) {
+	t.Parallel()
+	blocked := []string{
+		"rm -rf ..",
+		"rm -rf /",
+		"mv .. /tmp/x",
+		"cd .. && rm -rf proj",
+		"cp x ..",
+	}
+	for _, c := range blocked {
+		if got := humanWrites(c, true); len(got) == 0 {
+			t.Errorf("coder: %q is allowed; want blocked", c)
+		}
+	}
+	allowed := []string{"rm -rf /tmp/x", "cd .. && rm -rf other", "rm -rf ../x-worktrees/y/z"}
+	for _, c := range allowed {
+		if got := humanWrites(c, true); len(got) != 0 {
+			t.Errorf("coder: %q is blocked by %v; want allowed", c, got)
+		}
+	}
+}
+
+// I0028 S6, S7 (review round 4): each wrapper has its own value options. sudo -n
+// is a flag; env -C, env --chdir and sudo -D, sudo --chdir change the folder the
+// command runs in, as cd does; timeout -s and -k take a value.
+func TestHumanOnlyShellWritesWrapperOptionsPerWrapper(t *testing.T) {
+	t.Parallel()
+	blocked := []string{
+		"sudo -n tee AGENTS.md",
+		"env -C .github tee ci.yml",
+		"env --chdir=.github tee ci.yml",
+		"env --chdir .github tee ci.yml",
+		"env -C.github tee ci.yml",
+		"sudo -D .github tee ci.yml",
+		"sudo --chdir=.github tee ci.yml",
+		"timeout -s KILL 5 tee .github/a",
+		"timeout --signal=KILL 5 tee .github/a",
+		"timeout -k 1 5 tee .github/a",
+		"timeout --kill-after 1 5 tee .github/a",
+		"env -C $DIR tee x",
+	}
+	for _, c := range blocked {
+		if got := humanWrites(c, true); len(got) == 0 {
+			t.Errorf("coder: %q is allowed; want blocked", c)
+		}
+	}
+	allowed := []string{
+		"sudo -n echo x > apps/out.txt",
+		"timeout -s KILL 5 echo x > apps/x",
+		"env -C apps tee out.txt",
+		"sudo -D apps tee out.txt",
+	}
+	for _, c := range allowed {
+		if got := humanWrites(c, true); len(got) != 0 {
+			t.Errorf("coder: %q is blocked by %v; want allowed", c, got)
 		}
 	}
 }

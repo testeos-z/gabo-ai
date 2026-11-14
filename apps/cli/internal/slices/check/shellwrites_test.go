@@ -160,8 +160,11 @@ func TestHumanOnlyShellWritesNamesPathsAsWritten(t *testing.T) {
 func TestHumanOnlyShellWritesReadsTheWorkingDirectory(t *testing.T) {
 	t.Parallel()
 	u := humanUseCase(Settings{Root: "/proj", WorkDir: "/proj/apps/cli"})
-	if got := u.humanOnlyShellWrites("echo x > AGENTS.md", true, humanList); len(got) != 0 {
-		t.Fatalf("apps/cli/AGENTS.md is blocked by %v; want allowed", got)
+	if got := u.humanOnlyShellWrites("echo x > AGENTS.md", true, humanList); len(got) != 1 {
+		t.Fatalf("apps/cli/AGENTS.md: paths = %v; want the nested listed name blocked", got)
+	}
+	if got := u.humanOnlyShellWrites("echo x > apps/out.txt", true, humanList); len(got) != 0 {
+		t.Fatalf("apps/out.txt is blocked by %v; want allowed", got)
 	}
 	if got := u.humanOnlyShellWrites("echo x > ../../AGENTS.md", true, humanList); len(got) != 1 {
 		t.Fatalf("root AGENTS.md from apps/cli: paths = %v; want one", got)

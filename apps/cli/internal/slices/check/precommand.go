@@ -53,7 +53,7 @@ func humanOnlyViolations(hits []humanHit) []ShellViolation {
 			out = append(out, ShellViolation{Rule: "a coder shell command writes " + oneLine(h.raw) + " after a cd the guard cannot read", Route: "write the literal path, without a cd the guard cannot read"})
 			continue
 		}
-		out = append(out, ShellViolation{Rule: "a coder shell command writes the human-only path " + oneLine(h.raw), Route: RouteHumanEdits})
+		out = append(out, ShellViolation{Rule: "a coder shell command writes the human-only path " + oneLine(h.raw), Route: humanOnlyRoute})
 	}
 	return out
 }
