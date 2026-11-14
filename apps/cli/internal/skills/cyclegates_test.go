@@ -91,6 +91,10 @@ func TestCycleGateFieldsAreInTheCoderReportBlock(t *testing.T) {
 	if !ok {
 		t.Fatal("gabo-coder/SKILL.md: no methodology report block")
 	}
+	// the block ends at the next heading.
+	if i := strings.Index(block, "\n#"); i >= 0 {
+		block = block[:i]
+	}
 	gate := step6(t, readCatalog(t, "gabo-cycle/SKILL.md"))
 	for _, f := range []string{"`odd:", "`spec S<n>:", "`contract:", "`tests:", "`integration:", "`check:", "`commits:", "`RDD:"} {
 		if !strings.Contains(gate, f) {
@@ -105,11 +109,28 @@ func TestCycleGateFieldsAreInTheCoderReportBlock(t *testing.T) {
 	}
 }
 
+// Step 3 (Resume) keeps a task whose DONE was refused out of the DONE skip.
+func TestCycleStep3KeepsARefusedDoneOpen(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	var step3 string
+	for _, line := range strings.Split(doc, "\n") {
+		if strings.HasPrefix(line, "3. Resume") {
+			step3 = line
+		}
+	}
+	for _, want := range []string{"An open issue carrying a report gate refusal comment", "launch a coder only to complete the report and close again", "never to run the whole Task Close on a report the gates refused"} {
+		if !strings.Contains(step3, want) {
+			t.Errorf("gabo-cycle step 3: lacks %q", want)
+		}
+	}
+}
+
 // A refused DONE reaches a coder that may be gone: the rule says how.
 func TestCycleStep6RefusedDoneSaysHowToReachTheCoder(t *testing.T) {
 	t.Parallel()
 	s := step6(t, readCatalog(t, "gabo-cycle/SKILL.md"))
-	for _, want := range []string{"resumed by its handle", "a new `gabo-coder` launched from the main checkout", "never as live code work and never as DONE"} {
+	for _, want := range []string{"resumed by its handle", "a new `gabo-coder` launched from the main checkout", "never as live code work and never as DONE", "read the completed outcome through both gates again", "the coder closes the issue again with DONE via PR", "on a second refusal, mark the task BLOCKED with the refusal string"} {
 		if !strings.Contains(s, want) {
 			t.Errorf("gabo-cycle step 6: refused DONE lacks %q", want)
 		}
