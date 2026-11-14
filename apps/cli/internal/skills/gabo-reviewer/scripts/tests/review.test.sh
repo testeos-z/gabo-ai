@@ -45,8 +45,10 @@ scenario() {
   mkdir -p "$fx"
   echo "owner" >"$fx/user_login"
   jq -n --arg sha "${SCENARIO_HEAD:-$HEAD_SHA}" --arg m "${SCENARIO_MERGEABLE:-MERGEABLE}" --arg b "${SCENARIO_BASE:-dev}" \
-    '{number:7, state:"OPEN", headRefOid:$sha, baseRefName:$b, isDraft:false, isCrossRepository:false, mergeable:$m}' >"$fx/pr_7.json"
+    --arg body "${SCENARIO_PR_BODY-}" \
+    '{number:7, state:"OPEN", headRefOid:$sha, baseRefName:$b, isDraft:false, isCrossRepository:false, mergeable:$m, body:$body}' >"$fx/pr_7.json"
   pr_files_json "$ORIGIN" >"$fx/files_7"
+  jq -n --arg c "${SCENARIO_CONTRACT-$default_contract}" '{body: "Task body.", comments: [{body: $c}]}' >"$fx/issue_789.json"
   echo "${SCENARIO_COMMENTS:-[]}" >"$fx/comments_7.json"
   echo '{"commit":{"committer":{"date":"2026-10-20T11:00:00Z"}}}' >"$fx/commit_$HEAD_SHA.json"
   (
@@ -63,6 +65,8 @@ scenario() {
     tail -n 2 "$fx/out.log" | head -n 1
   )
 }
+# The done contract of the fixture task issue (#789): one line per S#.
+default_contract=$'<!-- gabo-progress --> Done contract\nS1: `gabo check` exits 0\nS2: `gabo version` prints the version\nS3: no observable check on this line'
 status_line() { grep "^STATUS $HEAD_SHA $2 " "$work/$1/calls.log" | tail -1 | cut -d' ' -f3-; }
 first_line() { grep -m1 -v '^[[:space:]]*$' "$work/$1/posted_7.md"; }
 footer() { grep -v '^$' "$work/$1/posted_7.md" | tail -n 2 | paste -sd'|'; }
@@ -545,5 +549,66 @@ expect_eq "code read: not run: no policy file on dev" "$(last_before_marker nopo
   "a missing policy file reads code read: not run"
 expect_eq "code read: not run: the review agent modified the checkout" "$(last_before_marker modify)" \
   "an agent that edits the checkout reads code read: not run"
+
+# qa_scenario <name> [VAR=value...]: a scenario whose PR body links the task issue #789.
+qa_scenario() {
+  local name="$1"
+  shift
+  SCENARIO_PR_BODY='Refs #789' scenario "$name" "$@"
+}
+# qa_build_dir <name>: the scratch directory of the QA build of fixture <name>.
+qa_build_dir() { grep -oE 'build -o [^ ]+' "$work/$1/calls.log" | head -n 1 | awk '{print $3}' | xargs -r dirname; }
+
+echo "# product QA (intent 0027 S11, S12, S13)"
+origin qa
+v="$(qa_scenario qapass CLAUDE_MODE=qa_pass)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$v" \
+  "a product QA line the reviewer did not run never blocks a clean head"
+expect_eq "No blocking issues found." "$(first_line qapass)" "the comment still opens with the VERDICT line"
+check "the QA section sits between the VERDICT line and the checks" in_order qapass '### Product QA' '### Checks ('
+check "the QA section sits before the code read section" in_order qapass '### Product QA' '### Code read ('
+check "S1 names its contract line and passes" grep -qF -- '- S1 (`gabo check` exits 0): pass' "$work/qapass/posted_7.md"
+check "S2 names its contract line and passes" grep -qF -- '- S2 (`gabo version` prints the version): pass' "$work/qapass/posted_7.md"
+check "S3 with no gabo command reads not run, never pass" grep -qxF -- '- S3 (no observable check on this line): not run: no runnable gabo command on the line' "$work/qapass/posted_7.md"
+check "a neighboring flow that names no command reads not run" grep -qxF -- '- neighbor 2 (gabo check): not run: no command recorded' "$work/qapass/posted_7.md"
+check "a neighboring flow with its command passes" grep -qF -- '- neighbor 1 (gabo version): pass `gabo version` exit 0' "$work/qapass/posted_7.md"
+check "the QA lines are not repeated in the code read section" bash -c "! grep -q '^\[qa\] ' '$work/qapass/posted_7.md'"
+check "the contract command runs in the scratch project, not the checkout" grep -qE '^gabo-call version .*cwd=.*gabo-reviewer-qa\.' "$work/qapass/calls.log"
+check "the build under test is built in a mktemp scratch project" grep -qE 'go-argc=.* args=go -C .*gabo-reviewer-qa\.[^ ]*/apps/cli build -o ' "$work/qapass/calls.log"
+check "the scratch project is removed when the run ends" bash -c 'd="$1"; [[ -n "$d" && ! -e "$d" ]]' _ "$(qa_build_dir qapass)"
+check "the review agent may run the build through its wrapper only" grep -qE -- 'allowedTools .*Bash\([^)]*gabo-qa-run \*\)' "$work/qapass/calls.log"
+check "the agent prompt names each contract line with its reviewer run" grep -qF -- '- S1: `gabo check` exits 0' "$work/qapass/prompt_seen.txt"
+check "the agent prompt says a line with no gabo command was not run" grep -qF 'reviewer run: none (no runnable gabo command on the line)' "$work/qapass/prompt_seen.txt"
+check "the agent prompt asks for the two neighboring flows" grep -qF 'neighbor 2 (' "$work/qapass/prompt_seen.txt"
+
+v="$(qa_scenario qafail CLAUDE_MODE=qa_fail)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$v" "a product QA fail is blocking while the checks pass"
+check "the QA section names the failed line with what was observed" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1, "unknown flag --json"' "$work/qafail/posted_7.md"
+check "the checks section still reads pass" grep -qF '### Checks (reviewer/tests: success)' "$work/qafail/posted_7.md"
+check "the QA fail sits above the checks section" in_order qafail '- S1 (' '### Checks ('
+expect_eq "code read: pass" "$(last_before_marker qafail)" "a product QA fail does not change the code read line"
+expect_match '^reviewer/review failure' "$(status_line qafail reviewer/review)" "a product QA fail is not reported as a passing review status"
+
+v="$(qa_scenario qaomit)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$v" "a QA section the reviewer left out does not block"
+check "a contract line the reviewer did not report reads not run" grep -qxF -- '- S1 (`gabo check` exits 0): not run: reviewer did not report this line' "$work/qaomit/posted_7.md"
+
+v="$(SCENARIO_CONTRACT=$'S1: `gabo version` prints the version\nS4: not provable: the wording is a judgment' qa_scenario qanot)"
+check "a requirement no check can prove reads not run with its reason" grep -qxF -- '- S4 (not provable: the wording is a judgment): not run: the wording is a judgment' "$work/qanot/posted_7.md"
+
+origin qadocs O_PR=docs
+v="$(qa_scenario qadocs)"
+check "a docs-only head reads not applicable: no product behavior change" grep -qxF 'not applicable: no product behavior change' "$work/qadocs/posted_7.md"
+check "a docs-only head builds nothing" bash -c "! grep -q 'build -o' '$work/qadocs/calls.log'"
+
+origin qabuild
+v="$(qa_scenario qabuild FAIL_CHECK='build -o')"
+check "a build under test that fails names every line not run" grep -qF -- '- S1 (`gabo check` exits 0): not run: the build under test failed' "$work/qabuild/posted_7.md"
+check "a failed build under test is named in the QA section" grep -qxF 'build under test: failed' "$work/qabuild/posted_7.md"
+
+origin qanoref
+v="$(scenario qanoref CLAUDE_MODE=qa_pass)"
+check "a PR that links no task issue reads QA not run" grep -qxF 'not run: no task issue linked (no Refs #<n> in the PR body)' "$work/qanoref/posted_7.md"
+check "a PR that links no task issue builds nothing" bash -c "! grep -q 'build -o' '$work/qanoref/calls.log'"
 
 finish
