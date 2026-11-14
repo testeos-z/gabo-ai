@@ -19,6 +19,7 @@ import (
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/basecommit"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/outcomefile"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/prbase"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/initcmd"
@@ -119,6 +120,7 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 			OutcomePath:  getenv(check.EnvOutcomePath),
 			Outcomes:     outcomefile.File{},
 			PullRequests: prbase.GH{Runner: runner, Dir: project},
+			Base:         basecommit.Git{Runner: runner, Dir: project},
 			Task:         getenv(check.EnvTask),
 			Engine:       getenv(check.EnvEngine),
 		}), nil

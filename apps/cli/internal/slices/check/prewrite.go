@@ -294,7 +294,8 @@ func writeSession(agentID, engine string) bool {
 // or the stage gate blocks the call anyway (Gated). A config that cannot be read
 // fails the coder's writes closed. It writes no project file. The caller runs
 // PreWrite (the stage gate) on the same paths, which also blocks a path whose
-// symlinks cannot be resolved, so such a path is not judged here.
+// symlinks cannot be resolved, so such a path is not judged here. The test_files
+// lock judges the same paths after this one (judgeTestFiles).
 func (u *UseCase) JudgeWrites(paths []string, call WriteCall) WriteVerdict {
 	if !writeSession(call.AgentID, call.Engine) {
 		return WriteVerdict{}
@@ -311,13 +312,7 @@ func (u *UseCase) JudgeWrites(paths []string, call WriteCall) WriteVerdict {
 			continue
 		}
 		rule := "a coder write to the human-only path " + target + " is blocked"
-		d := Decide(cfg.Lock(config.LockHumanOnlyPaths), cfg.Mode)
-		switch {
-		case d.Exit == ExitAsk && !call.CanAsk:
-			d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the engine cannot show its prompt here; it counts as blocked"}
-		case d.Exit == ExitAsk && call.Gated:
-			d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the stage gate blocks this write too; no prompt is shown"}
-		}
+		d := decideFor(cfg, config.LockHumanOnlyPaths, call)
 		if err := u.RecordDecision(config.LockHumanOnlyPaths, rule, d); err != nil {
 			return WriteVerdict{Exit: ExitFailed, Out: Explain(config.LockHumanOnlyPaths, rule, "fix the outcome file named by GABO_OUTCOME_FILE, then retry", Decision{}) + "\n"}
 		}
@@ -330,7 +325,21 @@ func (u *UseCase) JudgeWrites(paths []string, call WriteCall) WriteVerdict {
 			exit = d.Exit
 		}
 	}
-	return WriteVerdict{Exit: exit, Out: b.String()}
+	return WriteVerdict{Exit: exit, Out: b.String() + u.judgeTestFiles(paths, cfg, call)}
+}
+
+// decideFor judges one violating write under lock at its state in cfg, with the
+// engine's prompt limits applied: an ask the engine cannot show, or one the stage
+// gate blocks anyway (call.Gated), counts as blocked.
+func decideFor(cfg config.Config, lock config.LockName, call WriteCall) Decision {
+	d := Decide(cfg.Lock(lock), cfg.Mode)
+	switch {
+	case d.Exit == ExitAsk && !call.CanAsk:
+		d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the engine cannot show its prompt here; it counts as blocked"}
+	case d.Exit == ExitAsk && call.Gated:
+		d = Decision{Exit: ExitFailed, Outcome: OutcomeBlocked, Note: "the stage gate blocks this write too; no prompt is shown"}
+	}
+	return d
 }
 
 // lockConfig reads gabo.yaml's layers for the write locks: no config file
