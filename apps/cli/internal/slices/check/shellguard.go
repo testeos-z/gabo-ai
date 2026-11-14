@@ -39,14 +39,19 @@ const (
 // one level of sh -c or bash -c is unwrapped (never eval, xargs or an alias).
 // git's own -C and -c options are read where git runs.
 func ShellViolations(command string, coder bool) []ShellViolation {
+	return uniqueRules(judgeLine(command, func(argv []string) []ShellViolation {
+		return judgeCommand(argv, coder)
+	}))
+}
+
+// uniqueRules keeps the first violation of each rule, in order.
+func uniqueRules(vs []ShellViolation) []ShellViolation {
 	var out []ShellViolation
 	seen := map[string]bool{}
-	for _, argv := range shellSegments(command) {
-		for _, v := range judgeSegment(argv, coder, true) {
-			if !seen[v.Rule] {
-				seen[v.Rule] = true
-				out = append(out, v)
-			}
+	for _, v := range vs {
+		if !seen[v.Rule] {
+			seen[v.Rule] = true
+			out = append(out, v)
 		}
 	}
 	return out
@@ -195,27 +200,42 @@ var reservedWords = map[string]bool{
 // shellNames are the shells whose -c argument is one command line.
 var shellNames = map[string]bool{"sh": true, "bash": true, "zsh": true, "dash": true, "ksh": true}
 
-// judgeSegment judges one simple command. unwrap is true for a command of the
-// line itself: the one level of sh -c is read as its own command line, which
-// is judged without unwrapping again.
-func judgeSegment(argv []string, coder, unwrap bool) []ShellViolation {
+// judgeLine runs visit on each simple command of a line, in command order,
+// and collects its violations. One level of sh -c or bash -c is read as its
+// own command line (S6): its commands are visited, never unwrapped again.
+func judgeLine(command string, visit func(argv []string) []ShellViolation) []ShellViolation {
+	var out []ShellViolation
+	for _, argv := range shellSegments(command) {
+		out = append(out, judgeArgv(argv, visit, true)...)
+	}
+	return out
+}
+
+// judgeArgv visits one simple command, or with unwrap the commands of its
+// one level of shell -c.
+func judgeArgv(argv []string, visit func(argv []string) []ShellViolation, unwrap bool) []ShellViolation {
 	argv = skipPrefix(argv)
 	if len(argv) == 0 {
 		return nil
 	}
-	name := path.Base(argv[0])
-	if unwrap && shellNames[name] {
+	if unwrap && shellNames[path.Base(argv[0])] {
 		inner, ok := shellCommandString(argv[1:])
 		if !ok {
 			return nil
 		}
 		var out []ShellViolation
 		for _, seg := range shellSegments(inner) {
-			out = append(out, judgeSegment(seg, coder, false)...)
+			out = append(out, judgeArgv(seg, visit, false)...)
 		}
 		return out
 	}
-	switch name {
+	return visit(argv)
+}
+
+// judgeCommand judges one shell-guard command by its name: git, and rm in a
+// coder session.
+func judgeCommand(argv []string, coder bool) []ShellViolation {
+	switch path.Base(argv[0]) {
 	case "git":
 		return judgeGit(argv[1:], coder)
 	case "rm":
