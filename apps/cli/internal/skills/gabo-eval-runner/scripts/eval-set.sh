@@ -5,7 +5,7 @@
 #
 #   eval-set.sh check <evals-dir> [--config <gabo.yaml>]
 #   eval-set.sh propose <evals-dir> <candidate.json> [--config <gabo.yaml>]
-#   eval-set.sh config <min_tasks|max_tasks|runs_per_task|turns_per_task_run|task_runs_per_eval_run> [--config <gabo.yaml>]
+#   eval-set.sh config <min_tasks|max_tasks|runs_per_task|pass_threshold|turns_per_task_run|task_runs_per_eval_run> [--config <gabo.yaml>]
 #
 # eval.min_tasks (default 2), eval.max_tasks (default 10) and eval.runs_per_task
 # (default 1) are read from the
@@ -15,6 +15,8 @@
 # The caps eval.cap.turns_per_task_run and eval.cap.task_runs_per_eval_run
 # (intent 0030 S8) have no default: unset (or null) prints nothing for them,
 # and a value must be at least 1. The script writes no cap value.
+# eval.pass_threshold (intent 0030 S7, S9) has no default either: unset (or null)
+# prints nothing; a value must be a number from 0 to 1. The script sets none.
 # Exit 0 when the set may run (or the proposal may be added for review), 1 on
 # any refusal, 2 on bad usage.
 set -uo pipefail
@@ -23,7 +25,7 @@ shopt -s nullglob
 usage() {
   echo "usage: eval-set.sh check <evals-dir> [--config <gabo.yaml>]" >&2
   echo "       eval-set.sh propose <evals-dir> <candidate.json> [--config <gabo.yaml>]" >&2
-  echo "       eval-set.sh config <min_tasks|max_tasks|runs_per_task|turns_per_task_run|task_runs_per_eval_run> [--config <gabo.yaml>]" >&2
+  echo "       eval-set.sh config <min_tasks|max_tasks|runs_per_task|pass_threshold|turns_per_task_run|task_runs_per_eval_run> [--config <gabo.yaml>]" >&2
   exit 2
 }
 
@@ -33,7 +35,7 @@ dir=""
 key=""
 if [[ "$mode" == config ]]; then
   key="${1:-}"
-  case "$key" in min_tasks | max_tasks | runs_per_task | turns_per_task_run | task_runs_per_eval_run) ;; *) usage ;; esac
+  case "$key" in min_tasks | max_tasks | runs_per_task | pass_threshold | turns_per_task_run | task_runs_per_eval_run) ;; *) usage ;; esac
   shift
 else
   dir="${1:-}"
@@ -137,6 +139,29 @@ cfg_cap() {
 
 cap_turns="$(cfg_cap turns_per_task_run)" || exit 1
 cap_runs="$(cfg_cap task_runs_per_eval_run)" || exit 1
+
+# cfg_threshold: eval.pass_threshold from the config file (intent 0030 S7, S9),
+# block style like the counts. Unset or null prints nothing. A value must be a
+# number from 0 to 1, as config.Load reads it; anything else is refused.
+cfg_threshold() {
+  local v=""
+  if [[ -n "$config" ]]; then
+    v="$(awk '
+      /^[^[:space:]#]/ { in_eval = ($0 ~ /^eval:[[:space:]]*(#.*)?$/); next }
+      in_eval && $1 == "pass_threshold:" { print ($2 == "" ? "empty" : $2); exit }
+    ' "$config" | tr -d "\"'")"
+  fi
+  case "$v" in
+    "" | null | "~") return 0 ;;
+  esac
+  if [[ "$v" == empty ]] || ! [[ "$v" =~ ^(0|1)(\.[0-9]+)?$|^\.[0-9]+$ ]] || ! awk -v v="$v" 'BEGIN { exit !(v + 0 <= 1) }'; then
+    echo "refused config: eval.pass_threshold must be from 0 to 1" >&2
+    return 1
+  fi
+  echo "$v"
+}
+
+threshold="$(cfg_threshold)" || exit 1
 min=$((10#$min_raw))
 max=$((10#$max_raw))
 runs=$((10#$runs_raw))
@@ -166,6 +191,7 @@ if [[ "$mode" == config ]]; then
     runs_per_task) echo "$runs" ;;
     turns_per_task_run) [[ -z "$cap_turns" ]] || echo "$cap_turns" ;;
     task_runs_per_eval_run) [[ -z "$cap_runs" ]] || echo "$cap_runs" ;;
+    pass_threshold) [[ -z "$threshold" ]] || echo "$threshold" ;;
   esac
   exit 0
 fi

@@ -484,6 +484,176 @@ fi
 has "S8 the report names the intent 0020 rule" "$code" 0 "intent 0020" "$out"
 has "S8 the report says gabo does not cap spend" "$code" 0 "spend is not capped by gabo" "$out"
 
+# --- S6, S7: the run report and the baseline comparison ----------------------
+
+# line_of <output> <prefix>: the first output line that starts with the prefix.
+line_of() { awk -v p="$2" 'index($0, p) == 1 { print; exit }' <<<"$1"; }
+
+# baseline_file <evals-dir> <commit> <tasks-json>: the baseline the owner accepted,
+# at evals/baseline/baseline.json, outside the task set (evals/*.json).
+baseline_file() {
+  mkdir -p "$1/baseline"
+  jq -n --arg c "$2" --argjson t "$3" '{commit: $c, run_id: "eval-fixture", accepted_by: "owner", accepted_on: "2026-11-14", tasks: $t}' >"$1/baseline/baseline.json"
+}
+
+# S7 one passing task: every field of the run report is present.
+e="$work/report/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(run_eval report "$e" "$cfg_coder")"
+code=$?
+rid="$(line_of "$out" "run id: " | sed 's/^run id: //')"
+has "S7 the report names the head commit it measured" "$code" 0 "eval-run: head $head" "$out"
+if [[ "$(line_of "$out" "changed configuration: ")" == "changed configuration: AGENTS.md" ]]; then
+  ok "S7 the report names the changed configuration files it measured, and no source path"
+else
+  bad "S7 the report names the changed configuration files it measured (got: $(line_of "$out" "changed configuration: "))"
+fi
+has "S7 the report names the engine" "$code" 0 "engine: claude" "$out"
+has "S7 the report names the runs per task" "$code" 0 "runs per task: 1" "$out"
+has "S7 the report gives one line per task" "$code" 0 "task eval-001: pass (1 of 1 runs)" "$out"
+has "S7 the report gives the pass rate of the set" "$code" 0 "pass rate: 1.00 (1 of 1 tasks)" "$out"
+has "S7 with no threshold set the report reads threshold: not set" "$code" 0 "threshold: not set" "$out"
+has "S7 with no baseline the report reads baseline: none" "$code" 0 "baseline: none" "$out"
+has "S7 with no baseline nothing is compared, and the report says so" "$code" 0 \
+  "moved from pass to fail: not compared (baseline: none)" "$out"
+if grep -Eq '^run id: eval-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{6}$' <<<"$out"; then
+  ok "S7 the report names its run id"
+else
+  bad "S7 the report names its run id (got: $rid)"
+fi
+has "S7 the report names the memory topic gabo/eval/<head sha>/<run id> (PD3)" "$code" 0 \
+  "memory topic: gabo/eval/$head/$rid" "$out"
+if grep -qi notice <<<"$out"; then
+  bad "S6 with no baseline the run posts no notice and says nothing of one"
+else
+  ok "S6 with no baseline the run posts no notice and says nothing of one"
+fi
+if [[ -e "$e/baseline" ]]; then
+  bad "S6 the runner creates no baseline file"
+else
+  ok "S6 the runner creates no baseline file"
+fi
+
+# S7 the threshold the owner set is in effect; a value outside 0 to 1 is refused.
+cfg_thr="$work/threshold.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  pass_threshold: 0.8\n' >"$cfg_thr"
+out="$(run_eval thr "$e" "$cfg_thr")"
+code=$?
+has "S7 the threshold in effect is named in the report" "$code" 0 "threshold: 0.8" "$out"
+cfg_thr_high="$work/threshold-high.yaml"
+printf 'runtimes:\n  coder: claude\neval:\n  min_tasks: 1\n  pass_threshold: 1.5\n' >"$cfg_thr_high"
+out="$(run_eval thr-high "$e" "$cfg_thr_high")"
+code=$?
+has "S7 a threshold above one is refused before any engine runs" "$code" 1 \
+  "refused config: eval.pass_threshold must be from 0 to 1" "$out"
+if [[ -e "$work/thr-high.count" ]]; then
+  bad "S7 a refused threshold starts no engine (count file exists)"
+else
+  ok "S7 a refused threshold starts no engine"
+fi
+
+# S6 a baseline is named with its commit; a task that passed on it and fails now
+# is listed under the tasks that moved from pass to fail, with the failed check.
+e="$work/base-moved/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+baseline_file "$e" "$start" '{"eval-001": "pass"}'
+out="$(run_eval base-moved "$e" "$cfg_coder" 1)"
+code=$?
+has "S6 an accepted baseline is named with its path and its commit" "$code" 1 \
+  "baseline: $e/baseline/baseline.json at commit $start" "$out"
+has "S7 a task that passed on the baseline and fails now is listed with the failed check and its exit" "$code" 1 \
+  "moved from pass to fail: eval-001: check grep -qx done out.txt failed (exit 1)" "$out"
+if [[ "$(cat "$work/base-moved.count" 2>/dev/null)" == 1 ]]; then
+  ok "S6 the baseline comparison reads the file and starts the one run it needs"
+else
+  bad "S6 the baseline comparison starts one run (count $(cat "$work/base-moved.count" 2>/dev/null))"
+fi
+
+e="$work/base-same/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+baseline_file "$e" "$start" '{"eval-001": "pass"}'
+out="$(run_eval base-same "$e" "$cfg_coder")"
+code=$?
+has "S7 a task that still passes on the baseline is not listed as moved" "$code" 0 \
+  "moved from pass to fail: none" "$out"
+
+e="$work/base-failed/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+baseline_file "$e" "$start" '{"eval-001": "fail"}'
+out="$(run_eval base-failed "$e" "$cfg_coder" 1)"
+code=$?
+has "S7 a task that failed on the baseline is not moved from pass to fail" "$code" 1 \
+  "moved from pass to fail: none" "$out"
+
+# S6 a malformed baseline is refused before any engine runs.
+e="$work/base-commit/evals"
+mkdir -p "$e/baseline"
+task "$start" >"$e/eval-001.json"
+jq -n '{commit: "nothex", tasks: {}}' >"$e/baseline/baseline.json"
+out="$(run_eval base-commit "$e" "$cfg_coder")"
+code=$?
+has "S6 a baseline whose commit is not 40 hex is refused" "$code" 1 \
+  "refused baseline: commit is not a 40-hex commit" "$out"
+e="$work/base-tasks/evals"
+mkdir -p "$e/baseline"
+task "$start" >"$e/eval-001.json"
+jq -n --arg c "$start" '{commit: $c, tasks: []}' >"$e/baseline/baseline.json"
+out="$(run_eval base-tasks "$e" "$cfg_coder")"
+code=$?
+has "S6 a baseline whose tasks are not an object is refused" "$code" 1 \
+  "refused baseline: tasks must be an object" "$out"
+if [[ -e "$work/base-commit.count" || -e "$work/base-tasks.count" ]]; then
+  bad "S6 a refused baseline starts no engine"
+else
+  ok "S6 a refused baseline starts no engine"
+fi
+
+# S6 the runner never writes the baseline: its bytes are the same after a run.
+e="$work/base-readonly/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+baseline_file "$e" "$start" '{"eval-001": "pass"}'
+before="$(cksum <"$e/baseline/baseline.json")"
+out="$(run_eval base-readonly "$e" "$cfg_coder" 1)"
+after="$(cksum <"$e/baseline/baseline.json")"
+if [[ "$before" == "$after" ]]; then
+  ok "S6 the runner never writes the baseline file, even when a run fails against it"
+else
+  bad "S6 the runner never writes the baseline file"
+fi
+if [[ "$(find "$e" -newer "$e/baseline/baseline.json" -type f | wc -l)" == 0 ]]; then
+  ok "S6 nothing in the evals folder is written after the baseline"
+else
+  bad "S6 nothing in the evals folder is written after the baseline"
+fi
+
+# S7 the pass rate of the set counts the tasks that pass (a task passes when all its runs pass).
+e="$work/rate/evals"
+three_tasks "$e"
+out="$(run_eval rate-fail "$e" "$cfg_coder" 2)"
+code=$?
+has "S7 the pass rate counts the tasks that pass: two of three" "$code" 1 "pass rate: 0.67 (2 of 3 tasks)" "$out"
+has "S7 the failing task keeps its failed check and its exit code" "$code" 1 \
+  "task eval-002: fail (0 of 1 runs): check grep -qx done out.txt failed (exit 1)" "$out"
+
+# S7 two saved reports are read back and their pass rates compared (the fixture
+# read-back; the engram round trip is the assistant's, outside this worktree).
+out1="$(run_eval rate-all "$e" "$cfg_coder")"
+out2="$(run_eval rate-fail-2 "$e" "$cfg_coder" 2)"
+r1="$(awk 'index($0, "pass rate: ") == 1 { print $3; exit }' <<<"$out1")"
+r2="$(awk 'index($0, "pass rate: ") == 1 { print $3; exit }' <<<"$out2")"
+rid1="$(line_of "$out1" "run id: " | sed 's/^run id: //')"
+rid2="$(line_of "$out2" "run id: " | sed 's/^run id: //')"
+if [[ "$r1" == 1.00 && "$r2" == 0.67 && "$rid1" != "$rid2" ]]; then
+  ok "S7 two reports read back: pass rates 1.00 and 0.67 compare, under two run ids"
+else
+  bad "S7 two reports read back (rates '$r1' and '$r2', run ids '$rid1' and '$rid2')"
+fi
+
 # --- refusals: no engine runs -------------------------------------------------
 
 e="$work/refuse/evals"

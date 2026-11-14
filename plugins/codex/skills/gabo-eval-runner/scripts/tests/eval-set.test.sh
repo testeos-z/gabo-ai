@@ -306,5 +306,41 @@ expect "S8 an inline cap under a four-space eval block is refused" 1 \
   "refused config: eval.cap must be a block (eval.cap then indented keys), not an inline value" \
   bash "$script" config turns_per_task_run --config "$wideinline"
 
+# --- S9 config: the pass threshold is read from eval.pass_threshold (S7) -----
+
+thr="$work/threshold.yaml"
+printf 'eval:\n  pass_threshold: 0.8\n' >"$thr"
+thr_none="$work/threshold-none.yaml"
+printf 'eval:\n  min_tasks: 1\n' >"$thr_none"
+thr_null="$work/threshold-null.yaml"
+printf 'eval:\n  pass_threshold: null\n' >"$thr_null"
+thr_high="$work/threshold-high.yaml"
+printf 'eval:\n  pass_threshold: 1.5\n' >"$thr_high"
+thr_neg="$work/threshold-neg.yaml"
+printf 'eval:\n  pass_threshold: -0.1\n' >"$thr_neg"
+thr_word="$work/threshold-word.yaml"
+printf 'eval:\n  pass_threshold: high\n' >"$thr_word"
+
+expect "S7 config pass_threshold reads eval.pass_threshold" 0 "0.8" \
+  bash "$script" config pass_threshold --config "$thr"
+thr_one="$work/threshold-one.yaml"
+printf 'eval:\n  pass_threshold: 1\n' >"$thr_one"
+expect "S7 config pass_threshold of 1 is accepted (the upper bound)" 0 "1" \
+  bash "$script" config pass_threshold --config "$thr_one"
+for t in thr_none thr_null; do
+  bash "$script" config pass_threshold --config "${!t}" >"$work/$t.out" 2>&1
+  if [[ $? == 0 && ! -s "$work/$t.out" ]]; then
+    ok "S7 an unset pass_threshold prints nothing ($t)"
+  else
+    bad "S7 an unset pass_threshold prints nothing ($t)"
+  fi
+done
+for t in thr_high thr_neg thr_word; do
+  expect "S7 a pass_threshold outside 0 to 1 or not a number is refused ($t)" 1 \
+    "refused config: eval.pass_threshold must be from 0 to 1" bash "$script" config pass_threshold --config "${!t}"
+done
+expect "S7 check refuses the same bad pass_threshold before any count" 1 \
+  "refused config: eval.pass_threshold must be from 0 to 1" bash "$script" check "$(fresh threshold-check)" --config "$thr_high"
+
 echo "passes: $passes failures: $failures"
 [[ "$failures" == 0 ]]

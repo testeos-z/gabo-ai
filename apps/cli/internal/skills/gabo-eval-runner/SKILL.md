@@ -61,13 +61,22 @@ Load when a gabo agent proposes, validates or runs the agent eval set of intent 
 - A failing outcome check with complete evidence reads `fail: check <cmd> failed (exit <n>)` with the observed exit code. The checks are judged before the report, so a failing check gives its own reason.
 - A line counts with or without a list marker and backticks, as a coder writes it. The field list is pinned to the gate text by a Go test (`evalreport_test.go`), so the runner and the gate cannot drift.
 
+## Run report (intent 0030 S6, S7, D3)
+
+- `eval-run.sh run` prints one run report, in this order: `eval-run: head <sha>`, `run id: <id>`, `memory topic: gabo/eval/<head sha>/<run id>`, `changed configuration: <paths>` (the configuration paths the head changes against the starting commits, or `none`), `engine: <engine>`, `runs per task: <n>`, `threshold: <value>` or `threshold: not set` (`eval.pass_threshold`, set by the owner), `baseline: none` or `baseline: <path> at commit <sha>`, the cap lines, one `task <id>: pass|fail|not run` line per task, `tasks: <n>, failing: <n>`, `pass rate: <rate> (<k> of <n> tasks)` and the `moved from pass to fail:` lines. A paused run prints no pass rate.
+- The baseline is `evals/baseline/baseline.json`, beside the task set and outside it (`evals/*.json` holds tasks only). It holds `commit` (the 40-hex commit it was taken on), `tasks` (each task id with `pass` or `fail`) and the owner's acceptance. The first run on the current configuration is offered to the owner as the baseline; it becomes the baseline only when the owner accepts it. A baseline that is not valid JSON, whose commit is not 40 hex or whose `tasks` is not an object is refused before any engine runs (`refused baseline: <reason>`).
+- With no baseline the report reads `baseline: none` and `moved from pass to fail: not compared (baseline: none)`, and it posts no notice. With a baseline, each task that passed on it and fails now is listed as `moved from pass to fail: <id>: <failed check and its exit code, or the missing field>`.
+- The runner never writes the baseline: a run that an agent wants as the new baseline changes nothing until the owner accepts it, and only the owner's acceptance replaces the file.
+- The report is printed, not written. The assistant saves it with the existing memory save operation under `gabo/eval/<head sha>/<run id>` at project scope (a `gabo-memory` Records row) and reads it back. Two saved reports are compared by their `pass rate:` lines.
+- The pass rate is the tasks that pass over the tasks in the set; a task passes only when all of its runs pass.
+
 ## Commands
 
 Both validation commands print one line per file and exit 0 when the set may run or the proposal may be added, 1 on any refusal, 2 on bad usage. They write nothing.
 
 - `bash <skill dir>/scripts/eval-set.sh check evals --config gabo.yaml`: validates the whole set. The last line is `set: <accepted> accepted of <tasks> tasks, minimum <min>, maximum <max>` when the set may run.
 - `bash <skill dir>/scripts/eval-set.sh propose evals <candidate.json> --config gabo.yaml`: validates one proposed task before it is added to the set for review. A proposal needs no acceptance record yet.
-- `bash <skill dir>/scripts/eval-set.sh config <min_tasks|max_tasks|runs_per_task> --config gabo.yaml`: prints one validated count (the runner reads its runs per task this way).
+- `bash <skill dir>/scripts/eval-set.sh config <min_tasks|max_tasks|runs_per_task|pass_threshold> --config gabo.yaml`: prints one validated count, or the pass threshold (a number from 0 to 1; nothing when unset). The runner reads its runs per task and its threshold this way.
 
 ## Hard Rules
 
