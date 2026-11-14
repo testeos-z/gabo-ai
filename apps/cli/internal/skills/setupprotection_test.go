@@ -15,7 +15,7 @@ import (
 // protectionStep returns the **Branch protection.** step of the setup skill.
 func protectionStep(t *testing.T) string {
 	t.Helper()
-	return setupStep(t, "**Branch protection.**", "\n9. ")
+	return setupStep(t, "**Branch protection.**", "**Product model.**")
 }
 
 // S6: the step follows the smoke test that verifies the repository_host slot
@@ -92,7 +92,7 @@ func TestSetupProtectionRecordsADeclineOnce(t *testing.T) {
 	t.Parallel()
 	requireAll(t, protectionStep(t), []string{
 		"decline",
-		"`gabo/decision/global/branch-protection`",
+		"`list decisions`", "`wave: none`", "`task: global`", "whose `what` starts with `branch protection`",
 		"with its date",
 		"does not ask again",
 		"writes nothing to the host",
@@ -131,19 +131,16 @@ func TestSetupProtectionMakesSureTheStatusLabelsExist(t *testing.T) {
 	})
 }
 
-// S10: one decision record under the topic key holds the rule list, the
-// choice and one result per rule and branch, or the decline with its date.
+// S10: one decision record holds the rule list, the choice and one result per
+// rule and branch, or the decline with its date; the lookup uses the same fields.
 func TestSetupProtectionSavesOneDecisionRecord(t *testing.T) {
 	t.Parallel()
 	requireAll(t, protectionStep(t), []string{
 		"`save decision`",
 		"`memory`",
-		"`gabo/decision/global/branch-protection`",
 		"the rule list, the choice and one result per rule and branch",
 		"the decline and its date",
 		"`set`", "`missing`", "`not offered`",
-		"the rule list, the choice and one result per rule and branch",
-		"the decline and its date",
 		"`reason:`", "`mode:`", "`wave: none`", "`task: global`", "`resolver: owner`",
 		"unverified",
 	})
