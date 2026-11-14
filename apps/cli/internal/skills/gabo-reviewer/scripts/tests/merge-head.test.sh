@@ -118,6 +118,11 @@ expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$(note intruder cle
 quoted='[{"user":{"login":"owner"},"created_at":"2026-10-20T12:30:00Z","body":"quoted: <!-- gabo-eval-notice sha='"$sha"' --> in a sentence"}]'
 expect_eq "MERGED #7 $sha" "$(G_EXTRA="$quoted" gate quoted_notice)" \
   "a notice marker that does not open its own line never holds"
+# The bot's own comments carry text the PR controls (findings, check logs): a
+# marker counts only as the first line of the comment, the shape the runner posts.
+inner='{"user":{"login":"owner"},"created_at":"2026-10-20T12:30:00Z","body":"Blocking issues found.\n\nlog tail:\n<!-- gabo-eval-cleared sha='"$sha"' -->"}'
+expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$inner]" gate injected_cleared)" \
+  "a cleared marker on a later line of a bot comment never releases the hold"
 
 echo "# the reviewer verdict and review are untouched (S10)"
 check "review-head.sh is byte-identical to its pinned digest" \
@@ -127,6 +132,6 @@ echo "# the merge gate is unchanged by the comment order (S13)"
 # A deliberate pin: the comment order and the code read line never touch the
 # gate. Changing merge-head.sh means updating this digest on purpose.
 check "merge-head.sh is byte-identical to the pinned gate" \
-  bash -c "echo 'd64369f22d7daff3adabb1bd2da812ecd82ac7fa3810e7c63f1700b09ba176e2  $src/merge-head.sh' | sha256sum -c --status"
+  bash -c "echo 'da1249168b8cf116ee2f45632e98c9d1dc0f2eb6d0874c5dfb3cfa4dd59415ba  $src/merge-head.sh' | sha256sum -c --status"
 
 finish

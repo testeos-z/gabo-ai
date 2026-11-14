@@ -11,8 +11,9 @@
 # commit opens with the clean verdict and signs that SHA, and no changed path
 # is human-only: review.human_only_paths plus the built-in .gabo/VERSION and
 # .gabo/skills/, and no eval notice holds the head (intent 0030 S10): a head
-# is held while a notice by the bot login names it, and released only when a
-# cleared marker by that login names it and no notice names it. A held or
+# is held while a notice by the bot login names it (the marker opening the
+# comment), and released only when a cleared marker by that login names it and
+# no notice names it. A held or
 # human-only PR gets a "needs human merge" comment and no merge (a person may
 # still merge it). The merge is exactly
 #   gh pr merge <pr> --repo <repo> --merge --match-head-commit <sha>
@@ -43,11 +44,12 @@ fail() {
 }
 
 # eval_marker_heads <comments json> <notice|cleared>: the heads that the bot
-# login names with an eval marker line of its own (the eval runner's markers,
-# intent 0030 S9), one per line.
+# login names with an eval marker, one per line. Only the first line of a
+# comment counts, the shape the eval runner posts: the bot's own comments carry
+# text the PR controls (findings, check logs), so a marker further down never counts.
 eval_marker_heads() {
   jq -r --arg l "$BOT_LOGIN" --arg k "$2" '
-    [.[] | select(.user.login == $l) | (.body // "") | split("\n")[]
+    [.[] | select(.user.login == $l) | ((.body // "") | split("\n")[0])
      | sub("\r$"; "") | gsub("^\\s+|\\s+$"; "")
      | select(test("^<!-- gabo-eval-" + $k + " sha=[0-9a-f]{40} -->$"))
      | capture("sha=(?<s>[0-9a-f]{40})").s] | unique[]' <<<"$1"
