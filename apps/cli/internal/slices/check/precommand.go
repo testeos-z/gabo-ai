@@ -44,11 +44,16 @@ func (u *UseCase) JudgeShell(call ShellCall) (ShellVerdict, error) {
 }
 
 // humanOnlyViolations turns the human-only paths a call writes into one
-// violation each, with the route a human edits the path (intent 0028 S7, S11).
-func humanOnlyViolations(paths []string) []ShellViolation {
+// violation each (intent 0028 S7, S11): a path to a human, and a write after a
+// cd the guard cannot read to the literal path, without the cd.
+func humanOnlyViolations(hits []humanHit) []ShellViolation {
 	var out []ShellViolation
-	for _, p := range paths {
-		out = append(out, ShellViolation{Rule: "a coder shell command writes the human-only path " + oneLine(p), Route: RouteHumanEdits})
+	for _, h := range hits {
+		if h.unresolved {
+			out = append(out, ShellViolation{Rule: "a coder shell command writes " + oneLine(h.raw) + " after a cd the guard cannot read", Route: "write the literal path, without a cd the guard cannot read"})
+			continue
+		}
+		out = append(out, ShellViolation{Rule: "a coder shell command writes the human-only path " + oneLine(h.raw), Route: RouteHumanEdits})
 	}
 	return out
 }

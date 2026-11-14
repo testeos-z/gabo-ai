@@ -65,6 +65,60 @@ func (h humanEntry) glob(p string) bool {
 	return true
 }
 
+// ancestor reports whether the clean, project-relative path p is a folder that
+// contains the entry: the root contains every entry. Removing or moving such a
+// folder takes the entry with it (intent 0028 S7, review round 3).
+func (h humanEntry) ancestor(p string) bool {
+	return p == "." || strings.HasPrefix(h.raw, p+"/")
+}
+
+// ancestorGlob reports whether the glob pattern p can match a folder that
+// contains the entry: the pattern is no deeper than the entry, and its
+// components match the entry's from the root.
+func (h humanEntry) ancestorGlob(p string) bool {
+	pc := strings.Split(p, "/")
+	if len(pc) > len(h.comps) {
+		return false
+	}
+	for i := range pc {
+		if !globMatch(pc[i], h.comps[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+// humanAncestorRel reports whether the clean, project-relative path rel is a
+// folder that contains an entry of hs, literally or as a glob.
+func humanAncestorRel(rel string, hs []humanEntry) bool {
+	glob := strings.ContainsAny(rel, "*?[")
+	for _, h := range hs {
+		if (glob && h.ancestorGlob(rel)) || (!glob && h.ancestor(rel)) {
+			return true
+		}
+	}
+	return false
+}
+
+// humanAncestorTarget reports whether a cp, mv or rm of the path p targets a
+// folder that contains a human-only entry (the root, or such a folder), read as
+// humanOnlyTarget reads it. A path that cannot be resolved counts as human-only.
+func (u *UseCase) humanAncestorTarget(p string, hs []humanEntry) bool {
+	targets, err := u.targetsOf(p)
+	if err != nil {
+		return true
+	}
+	for _, rel := range targets {
+		if u.s.FoldCase {
+			rel = strings.ToLower(rel)
+		}
+		if humanAncestorRel(rel, hs) {
+			return true
+		}
+	}
+	return false
+}
+
 // globMatch matches one path component; a malformed pattern matches (fail closed).
 func globMatch(pattern, name string) bool {
 	ok, err := path.Match(pattern, name)

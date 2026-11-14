@@ -11,7 +11,11 @@ var humanList = []string{".github/", ".claude/", "AGENTS.md", "CLAUDE.md"}
 // humanWrites returns the human-only paths a shell command writes, judged in
 // the coder rules when coder is true, with the project at /proj.
 func humanWrites(command string, coder bool) []string {
-	return humanUseCase(Settings{Root: "/proj"}).humanOnlyShellWrites(command, coder, humanList)
+	var out []string
+	for _, h := range humanUseCase(Settings{Root: "/proj"}).humanOnlyShellWrites(command, coder, humanList) {
+		out = append(out, h.raw)
+	}
+	return out
 }
 
 // I0028 S7, S13, PD6: a coder shell call that writes a human-only path or
@@ -157,10 +161,10 @@ func TestHumanOnlyShellWritesReadsTheWorkingDirectory(t *testing.T) {
 	t.Parallel()
 	u := humanUseCase(Settings{Root: "/proj", WorkDir: "/proj/apps/cli"})
 	if got := u.humanOnlyShellWrites("echo x > AGENTS.md", true, humanList); len(got) != 0 {
-		t.Fatalf("apps/cli/AGENTS.md is blocked by %q; want allowed", got)
+		t.Fatalf("apps/cli/AGENTS.md is blocked by %v; want allowed", got)
 	}
 	if got := u.humanOnlyShellWrites("echo x > ../../AGENTS.md", true, humanList); len(got) != 1 {
-		t.Fatalf("root AGENTS.md from apps/cli: paths = %q; want one", got)
+		t.Fatalf("root AGENTS.md from apps/cli: paths = %v; want one", got)
 	}
 }
 
