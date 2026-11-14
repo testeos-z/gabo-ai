@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0028-deterministic-hooks-as-locks |
-| status | Draft. Open questions closed 2026-11-13; the spec has not started (the owner ordered the intents first, then the specs). The owner accepts the spec, not this intent (owner decision D-6, 2026-11-13) |
+| status | The owner accepted the spec on 2026-11-14 (spec section 7; decision 6: the spec only, not this intent and not the plan). The plan may now be written by `gabo-dev-lead`. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) (closed; intent issue linked under it, as [#758](https://github.com/testeos-z/gabo-ai/issues/758) was) |
 | intent issue | [#765 I0028: Deterministic hooks as locks](https://github.com/testeos-z/gabo-ai/issues/765) |

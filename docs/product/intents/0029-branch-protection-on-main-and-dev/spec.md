@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent | [0029-branch-protection-on-main-and-dev](intent.md) |
-| status | Draft |
+| status | Accepted by the owner on 2026-11-14 (section 7; decision 6): the spec as on `dev` at 0917fec. It does not accept the intent or the plan. The plan may be written by `gabo-dev-lead`. |
 | owner | gabo-pm |
 | contributors | — (no screen and no stored data: sections 3 and 4 are not applicable) |
 | date | 2026-11-13 |
@@ -106,4 +106,8 @@ Filled by a human only.
 
 | accepted by | date | notes |
 |---|---|---|
-| | | |
+| leomerida15 (owner, alias Leo) | 2026-11-14 | Acceptance of the spec as on `dev` at 0917fec (last change to this spec.md: 9f1785e). Owner, verbatim, typed by the owner in the main session on 2026-11-14 (Spanish, English gloss in brackets): "si ya acepte los 4 spec 27 ao 30" [yes, I already accepted the 4 specs, 27 to 30]. Context: the assistant asked "¿Aceptas los specs de 0028, 0029 y 0030 tal como quedaron en dev?" [Do you accept the specs of 0028, 0029 and 0030 as they are on dev?], and this was the reply. Not covered by this row: the intent and the plan (decision 6). |
+
+## Log
+
+- 2026-11-14, owner, typed directly in the main session (verbatim, Spanish, English gloss in brackets): "si ya acepte los 4 spec 27 ao 30" [yes, I already accepted the 4 specs, 27 to 30]. Context: the assistant asked "¿Aceptas los specs de 0028, 0029 y 0030 tal como quedaron en dev?" [Do you accept the specs of 0028, 0029 and 0030 as they are on dev?]. Effect: section 7 holds the human acceptance row and the status is Accepted, for the spec as on `dev` at 0917fec. The intent and the plan are not accepted (decision 6). No requirement, decision or open question changes.
