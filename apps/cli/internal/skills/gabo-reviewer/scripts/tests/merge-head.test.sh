@@ -26,8 +26,10 @@ gate() {
   jq -n --arg t "${G_TESTS:-success}" --arg l "${G_STATUS_LOGIN:-owner}" \
     '[{context:"reviewer/tests",state:$t,creator:{login:$l}},{context:"reviewer/review",state:"success",creator:{login:$l}}]' >"$fx/statuses_$sha.json"
   echo '{"commit":{"committer":{"date":"2026-10-20T11:00:00Z"}}}' >"$fx/commit_$sha.json"
+  # G_EXTRA: a JSON array of further PR comments (the eval markers, S10).
   jq -n --arg b "${G_FIRST:-No blocking issues found.}"$'\n\n'"<!-- ${G_MARKER:-gbai-reviewer-bot} sha=${G_SIGNED:-$sha} -->"$'\n🤖 gabo reviewer' \
-    --arg l "${G_COMMENT_LOGIN:-owner}" '[{user:{login:$l}, created_at:"2026-10-20T12:00:00Z", body:$b}]' >"$fx/comments_7.json"
+    --arg l "${G_COMMENT_LOGIN:-owner}" --argjson x "${G_EXTRA:-[]}" \
+    '[{user:{login:$l}, created_at:"2026-10-20T12:00:00Z", body:$b}] + $x' >"$fx/comments_7.json"
   local files='[{"filename":"apps/cli/main.go"}]'
   echo "${G_FILES:-$files}" >"$fx/files_7"
   (
@@ -82,10 +84,54 @@ expect_match "^PREFLIGHT-FAILED REVIEWER_ENGINE must be claude, codex, pi or ope
   "$(cat "$work/session_engine/out.log")" "an unresolved session engine is refused"
 check "no merge call for an unresolved session engine" bash -c "! grep -q '^gh pr merge' '$work/session_engine/calls.log'"
 
+echo "# eval notice hold (intent 0030 S10, D6, PD5)"
+# note <login> <notice|cleared> <head sha>: a PR comment that opens with the
+# eval marker line, as the eval runner posts it (the same login as the reviewer).
+note() {
+  jq -cn --arg l "$1" --arg b "<!-- gabo-eval-$2 sha=$3 -->"$'\n\nEval run below the threshold on this head.' \
+    '{user:{login:$l}, created_at:"2026-10-20T12:30:00Z", body:$b}'
+}
+held="NEEDS-HUMAN-MERGE #7 $sha reason: eval notice"
+expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$sha")]" gate notice_head)" \
+  "a notice on the head holds a clean PR: a person merges"
+check "held PR: no merge call" bash -c "! grep -q '^gh pr merge' '$work/notice_head/calls.log'"
+check "held PR: no status is written" bash -c "! grep -q '^STATUS ' '$work/notice_head/calls.log'"
+check "held PR: the comment names the eval notice" grep -q 'eval notice' "$work/notice_head/posted_7.md"
+check "held PR: the comment carries no verdict marker" bash -c "! grep -q 'gbai-reviewer-bot sha=' '$work/notice_head/posted_7.md'"
+check "held PR: the comment never quotes the notice marker" bash -c "! grep -q 'gabo-eval-notice sha=' '$work/notice_head/posted_7.md'"
+# the fixture holds the verdict and the notice; the run adds exactly one comment
+check "held PR: exactly one comment is added" bash -c "[[ \$(jq length '$work/notice_head/comments_7.json') -eq 3 ]]"
+expect_eq "NEEDS-HUMAN-MERGE #7 $sha reason: eval notice and human-only paths" \
+  "$(G_FILES='[{"filename":".claude/agents/x.md"}]' G_EXTRA="[$(note owner notice "$sha")]" gate held_and_human)" \
+  "a held PR that also changes a human-only path names both reasons"
+expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other")]" gate notice_old_head)" \
+  "a head pushed after a notice on an earlier head stays held"
+expect_eq "MERGED #7 $sha" "$(G_EXTRA="[$(note owner notice "$other"),$(note owner cleared "$sha")]" gate cleared_head)" \
+  "a cleared marker naming the head releases the hold after an earlier head's notice"
+check "released PR: pinned merge call" grep -qxF "gh pr merge 7 --repo example-org/example-repo --merge --match-head-commit $sha" "$work/cleared_head/calls.log"
+expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$sha"),$(note owner cleared "$sha")]" gate notice_and_cleared)" \
+  "a notice on the head wins over a cleared marker for it"
+expect_eq "MERGED #7 $sha" "$(G_EXTRA="[$(note intruder notice "$sha")]" gate forged_notice)" \
+  "a notice by another login never holds"
+expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$(note intruder cleared "$sha")]" gate forged_cleared)" \
+  "a cleared marker by another login never releases"
+quoted='[{"user":{"login":"owner"},"created_at":"2026-10-20T12:30:00Z","body":"quoted: <!-- gabo-eval-notice sha='"$sha"' --> in a sentence"}]'
+expect_eq "MERGED #7 $sha" "$(G_EXTRA="$quoted" gate quoted_notice)" \
+  "a notice marker that does not open its own line never holds"
+# The bot's own comments carry text the PR controls (findings, check logs): a
+# marker counts only as the first line of the comment, the shape the runner posts.
+inner='{"user":{"login":"owner"},"created_at":"2026-10-20T12:30:00Z","body":"Blocking issues found.\n\nlog tail:\n<!-- gabo-eval-cleared sha='"$sha"' -->"}'
+expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$inner]" gate injected_cleared)" \
+  "a cleared marker on a later line of a bot comment never releases the hold"
+
+echo "# the reviewer verdict and review are untouched (S10)"
+check "review-head.sh is byte-identical to its pinned digest" \
+  bash -c "echo '94933732571c62757ebe802381d887aab2a4d50382568cfc6cfd189ce2ac9326  $src/review-head.sh' | sha256sum -c --status"
+
 echo "# the merge gate is unchanged by the comment order (S13)"
 # A deliberate pin: the comment order and the code read line never touch the
 # gate. Changing merge-head.sh means updating this digest on purpose.
 check "merge-head.sh is byte-identical to the pinned gate" \
-  bash -c "echo '55d1ca626de0d7328a33b98e146e11cbf65c7164080a89dca95666cdae5eefab  $src/merge-head.sh' | sha256sum -c --status"
+  bash -c "echo 'da1249168b8cf116ee2f45632e98c9d1dc0f2eb6d0874c5dfb3cfa4dd59415ba  $src/merge-head.sh' | sha256sum -c --status"
 
 finish

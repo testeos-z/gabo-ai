@@ -10,8 +10,12 @@
 # success, the newest marker comment by the bot login newer than the head
 # commit opens with the clean verdict and signs that SHA, and no changed path
 # is human-only: review.human_only_paths plus the built-in .gabo/VERSION and
-# .gabo/skills/ (then it comments "needs human merge" and merges nothing).
-# The merge is exactly
+# .gabo/skills/, and no eval notice holds the head (intent 0030 S10): a head
+# is held while a notice by the bot login names it (the marker opening the
+# comment), and released only when a cleared marker by that login names it and
+# no notice names it. A held or
+# human-only PR gets a "needs human merge" comment and no merge (a person may
+# still merge it). The merge is exactly
 #   gh pr merge <pr> --repo <repo> --merge --match-head-commit <sha>
 # (never --admin, --auto, --squash, --rebase, or branch deletion).
 # Prints one line: MERGED, MERGE-SKIPPED <reason>, NEEDS-HUMAN-MERGE (exit 0)
@@ -37,6 +41,35 @@ skip() {
 fail() {
   log_event "MERGE-FAILED" "#$pr $sha $1"
   exit 1
+}
+
+# eval_marker_heads <comments json> <notice|cleared>: the heads that the bot
+# login names with an eval marker, one per line. Only the first line of a
+# comment counts, the shape the eval runner posts: the bot's own comments carry
+# text the PR controls (findings, check logs), so a marker further down never counts.
+eval_marker_heads() {
+  jq -r --arg l "$BOT_LOGIN" --arg k "$2" '
+    [.[] | select(.user.login == $l) | ((.body // "") | split("\n")[0])
+     | sub("\r$"; "") | gsub("^\\s+|\\s+$"; "")
+     | select(test("^<!-- gabo-eval-" + $k + " sha=[0-9a-f]{40} -->$"))
+     | capture("sha=(?<s>[0-9a-f]{40})").s] | unique[]' <<<"$1"
+}
+
+# eval_notice_hold <comments json> <head sha>: prints "eval notice" when a
+# notice holds the head, nothing otherwise. No notice on the PR holds nothing;
+# a notice naming the head holds it; a head without its own notice is released
+# only by a cleared marker that names it.
+eval_notice_hold() {
+  local notices cleared
+  notices="$(eval_marker_heads "$1" notice)" || return 1
+  [[ -n "$notices" ]] || return 0
+  grep -qxF "$2" <<<"$notices" && {
+    echo "eval notice"
+    return 0
+  }
+  cleared="$(eval_marker_heads "$1" cleared)" || return 1
+  grep -qxF "$2" <<<"$cleared" || echo "eval notice"
+  return 0
 }
 
 [[ "$AUTO_MERGE" == true ]] || skip "REVIEWER_AUTO_MERGE is not true; a human merges"
@@ -76,18 +109,30 @@ protected=""
 while IFS= read -r f; do
   is_human_only "$f" && protected+="$f"$'\n'
 done <<<"$files"
-if [[ -n "$protected" ]]; then
+hold="$(eval_notice_hold "$comments" "$sha")" || skip "could not read the eval markers"
+if [[ -n "$protected" || -n "$hold" ]]; then
   body="$(
-    echo "Needs human merge: the review of \`$sha\` is clean, but this PR changes human-only paths, so gabo-reviewer does not merge it:"
-    echo
-    head -n 20 <<<"${protected%$'\n'}" | sed 's/^/- `/; s/$/`/'
-    echo
+    if [[ -n "$hold" ]]; then
+      echo "Needs human merge: the review of \`$sha\` is clean, but an eval notice holds this head (intent 0030 S10), so gabo-reviewer does not merge it. A head is released only by a cleared marker from an eval run on that head at or above the threshold, and never while a notice names it."
+      echo
+    fi
+    if [[ -n "$protected" ]]; then
+      echo "Needs human merge: the review of \`$sha\` is clean, but this PR changes human-only paths, so gabo-reviewer does not merge it:"
+      echo
+      head -n 20 <<<"${protected%$'\n'}" | sed 's/^/- `/; s/$/`/'
+      echo
+    fi
     echo "$NEEDS_HUMAN_MARKER"
     echo "$FOOTER"
   )"
   jq -n --arg b "$body" '{body: $b}' | "$GH" api -X POST "repos/$REPO/issues/$pr/comments" --input - >/dev/null ||
     fail "could not post the needs-human-merge comment"
-  log_event "NEEDS-HUMAN-MERGE" "#$pr $sha"
+  suffix=""
+  if [[ -n "$hold" ]]; then
+    suffix=" reason: eval notice"
+    [[ -z "$protected" ]] || suffix+=" and human-only paths"
+  fi
+  log_event "NEEDS-HUMAN-MERGE" "#$pr $sha$suffix"
   exit 0
 fi
 
