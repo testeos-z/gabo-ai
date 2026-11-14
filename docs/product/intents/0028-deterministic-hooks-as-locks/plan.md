@@ -1,0 +1,144 @@
+# Plan 0028 Deterministic hooks as locks
+
+| field | value |
+|---|---|
+| intent | [0028-deterministic-hooks-as-locks](intent.md) |
+| spec | [spec](spec.md) (accepted by the owner on 2026-11-14, section 7: "si ya acepte los 4 spec 27 ao 30") |
+| status | Draft. Not started: no wave runs until the owner orders it. Tasks are in the tracker under [#765](https://github.com/testeos-z/gabo-ai/issues/765). |
+| owner | gabo-dev-lead |
+| date | 2026-11-14 |
+
+Mode is `auto` (owner's standing order, 2026-11-13: apply the recommended option to every doubt and record it; merges to `main`, versions, publishing, secrets and the owner's own values stay with the owner). Every fixed question below is answered by `gabo-dev-lead` and marked **Proposed (auto)** with a one-line reason. No agent accepts this plan: it changes nothing until a human reviews the plan PR.
+
+The spec is not edited. Its six open questions (section 6) take their **Proposed (auto)** option, recorded as plan decisions PD1 to PD6.
+
+**Task T1 is the engine probe (S1) and runs first.** A human reads its record before any other task starts. Every task reaches T1 through `depends_on`, directly or through T2 or T9.
+
+**Cross-intent edges.** `0027/T12` (the test-edit rule) waits for T8 (the test-file warning record). Intent 0029 relies on the local shell guard, which is **T4** (`gabo check --pre-command` with the S4 rules); the relays T10 to T13 make it fire on each engine. 0029's plan, still being written, will reference it as `0028/T4`.
+
+Human merge: T14 edits `.gabo/skills/` and T9 writes engine config files that are human-only in a project (`.claude/`, `.codex/`, `.agents/`); a person merges those PRs. Each such row says so.
+
+## Fixed questions
+
+| id | answer |
+|---|---|
+| Q1 | **Proposed (auto)**: see Steps. The probe (T1), then the shared core (T2 decision and config, T3 outcome record), then the shell rules (T4, then T5 and T6), then the write rules (T7 after T4, then T8), then the credential list (T9 after T7), then the four relays (T10 to T13 after T4 and T7), the cycle and report lines (T14) and the probe wave (T16). Reason: T4 and T7 edit the same `check` slice wiring, so they run one at a time; the rest follow their shared files. |
+| Q2 | **Proposed (auto)**: fifteen tasks (T15 removed, S18 landed with this plan change), each one reviewable PR of about 400 changed lines or less, test-first where a runnable test exists. Reason: one behavior per task, split at the shared file that forces an order. |
+| Q3 | **Proposed (auto)**: see the `spec refs` column and the Spec map. Reason: each row names the S# and D# its acceptance proves. |
+| Q4 | **Proposed (auto)**: see `depends_on` and `unblocks`, acyclic and mirrored. One edge leaves the intent: T8 unblocks `0027/T12`. Reason: the owner ordered 0027's test-edit rule to wait for 0028's test-file lock (S9). |
+| Q5 | **Proposed (auto)**: see `acceptance`. Each acceptance starts with its failing test. Rules are pinned by Go table and golden tests in `apps/cli/internal/slices/check` (the spec's verification column); relays by the existing relay and build tests plus a stub `gabo`; skill text by Go text tests in `apps/cli/internal/skills`. Size is `S` (about 100 changed lines), `M` (about 200 to 400) or `L` (more than 400, to split at unblock). Reason: the spec's own verification column names these forms. |
+| Q6 | **Proposed (auto)**: yes. Every requirement S1 to S18 has at least one task, except S18, whose amendment is applied in this plan PR (see the Spec map). Reason: checked against the spec table. |
+| Q7 | **Proposed (auto)**: see Risks to the plan. |
+| Q8 | **Proposed (auto)**: see Open questions. |
+| Q9 | **Proposed (auto)**: yes, in T2: `gabo check` validates the new `locks.*` keys (S13) and the `--pre-command` mode is a flag of the same command, so the CLI keeps four commands (spec decision 10, PRD R31 and TRD 9.4 amended in this plan PR). The schema for `gabo.yaml` gains the optional `locks` object in T2. Reason: TRD 8.5; S13 and S2. |
+
+## Steps
+
+1. **Probe first.** T1 runs the four engines and records sixteen results (S1). A person reads the record. Where item (a) is `no` for an engine, S14 applies to it and T14 and T16 show `not run: <reason>` for that engine.
+2. **Core.** T2 adds the lock states, the `gabo.yaml` keys and their validation, and the decision function (`off`, `warn`, `ask`, `block`; auto mode turns `ask` into `block`; exit code 3). T3 adds the outcome record (one JSON line to the file the cycle names). Both live in the `check` slice.
+3. **Shell rules.** T4 adds `gabo check --pre-command` with the shell guard (S2, S4, S6). T5 adds the release gate (S5, D4). T6 adds the shell forms that write a human-only path (question 6), so `gabo.yaml` is protected from the shell too (S13).
+4. **Write rules.** T7 sends every write through `--pre-write` and judges human-only paths (S7). T8 adds the test-file warning (S9, D6); it unblocks `0027/T12`.
+5. **Credentials.** T9 writes the base deny list per engine at project level in `gabo init` and adds the Pi and OpenCode project config paths to the human-only lists (S8, question 5).
+6. **Relays.** T10 (Claude Code), T11 (Codex), T12 (Pi, with S17) and T13 (OpenCode) each become a thin relay for the two modes with the failure rule (S3, S15). They run in parallel once T4 and T7 are merged.
+7. **Cycle and report.** T14 teaches the cycle and the wave report to carry the records and the `not run:` lines (S14, S16). PRD R31 and TRD 9.4 are amended in this plan PR (S18); no task is needed.
+8. **Probe wave.** T16 runs one wave on the probe repository: one manual `ask` run per engine, the Pi dual-guard run, and a credential read attempt per engine and the report lines (S8, S10, S14, S16, S17).
+9. **Order of switches.** T2 defines the switches, but they are binding only once T4 and T7 exist (S13); no task that relies on them starts before those two.
+
+## Tasks
+
+Task ids are local to the intent. A dependency in another intent is written `<NNNN>/T<n>`. `depends_on` and `unblocks` mirror each other; `—` means none. The tracker titles are `I0028/T<n>: <title>`. Tracker issues (verified by re-read, parent #765, blocked-by links match `depends_on`): T1 #802, T2 #803, T3 #804, T4 #805, T5 #806, T6 #807, T7 #808, T8 #809, T9 #810, T10 #811, T11 #812, T12 #813, T13 #814, T14 #815, T15 #816, T16 #817; #790 (`0027/T12`) is also blocked by T8 (#809). Labels: `m1-local-core`, the size label, `flow-improvements`.
+
+| id | title | spec refs | depends_on | unblocks | acceptance | size |
+|---|---|---|---|---|---|---|
+| T1 | Engine probe: hooks in coder subagents on claude, codex, pi and opencode | S1; D3, D4 (session kind) | — | T2, T9 | Docs and manual runs; no deterministic RED exists, so the exception is stated in the PR. Test first (structure only): a Go doc test in `apps/cli/internal/slices/check` reads `docs/product/intents/0028-deterministic-hooks-as-locks/probe.md` and fails until it holds one table with the four engines by items (a), (b), (c) and (d), sixteen cells, each `yes`, `no` or `not testable: <reason>`, plus the engine version per row. Each result comes from a run in a `mktemp -d` scratch project, with the command used and what was seen. A result `no` on (a) names S14 for that engine. A person reads the record before T2 starts; the PR body says so. | M |
+| T2 | Lock states, `locks.*` keys in `gabo.yaml`, the decision function and the block message | S10, S11, S12, S13 (keys and validation); D2, D3; Q1, Q2 (spec section 6) | T1 | T3, T4, T7 | Test first: Go tests in `apps/cli/internal/slices/check` fail until: the decision function, given one violating call, returns for `off` allow and nothing to record, for `warn` allow and a `warned` outcome, for `ask` exit 3, for `block` exit 1 (S10); with `mode: auto` it turns `ask` into `block`, returns the outcome `blocked` and the note that the state was `ask` (S12); T2 tests only the returned value and writes no record; the all-off switch `locks.enabled: false` turns every lock off and a per-lock key turns only that one off (S13); a missing key gives `block` for four locks and `warn` for `test_files` (question 2); `test_files: ask` or `block` is a failure (question 1); an unknown lock name or state is one `✗` line of `gabo check` (S13, golden test); the message has the lock, the rule and one `next:` line (S11, golden). A hook mode exits 2 on a usage error or a stdin that cannot be read, and 1 when the project cannot be read, as `--pre-write` does today (fail closed). `gabo check` without a flag keeps its output and exit codes (golden). The JSON Schema of `gabo.yaml` gains the optional `locks` object. | M |
+| T3 | Outcome record: one JSON line per `blocked`, `warned`, `asked` | S16 (file side), S10 (records); Q3 (spec section 6) | T2 | T4, T7, T14 | Test first: Go tests fail until, for the outcomes T2's decision function returns (`warn` gives one `warned` line, `ask` gives one `asked` line, `block` gives one `blocked` line, and `ask` in auto mode gives `blocked` with the note that the state was `ask`; `off` gives none), a hook mode appends one JSON line with lock, task, engine and rule to the file named by the environment variable the cycle sets, and writes nothing when none is named; `allowed` is never recorded; `asked` is written by gabo at exit 3 with the answer field `pending`, and the relay appends the human's answer line when its engine reports it (PD11); `not run` is a record kind. Records go to the cycle's `mktemp -d` scratch, never into the project tree. TRD 9.4's read-only wording gets the exception in this plan PR (S18). | S |
+| T4 | Shell guard: `gabo check --pre-command` with the S4 rules and one-level unwrap (the local lock that 0029 relies on) | S2, S4, S6, S11 (shell messages); D1 | T2, T3 | T5, T6, T7, T10, T11, T12, T13 | Test first: Go table tests in `apps/cli/internal/slices/check` fail until: `git push origin main` exits 1 with one `✗` line and its `next:` line; `git status` exits 0 with no output; no stdin exits 2; a coder session blocks one case per S4 form: `git push origin main`, `git push origin master`, `git push origin dev`; `git push --force origin feat/x`, `git push -f origin feat/x`, `git push --force-with-lease origin feat/x`, `git push --mirror`, `git push origin +feat/x`; `git branch -D x`, `git branch --delete --force x`; `git worktree remove --force p`, `git worktree remove -f p`; `rm -rf build/*`, `rm -rf a?`, `rm -rf a[0-9]`, `rm -rf ../x-worktrees/y`; and allows one neighbour each: `git push origin feat/x`, `git branch -d feat/x`, `git worktree remove p`, `rm -rf /tmp/tmp.Ab12/out` (a literal `mktemp -d` path), `rm -f one.txt` (S4); a non-coder session blocks only the push to `main` and the reviewer's merge into `dev` is exempt (S4, decision 13); `bash -c 'git push origin main'` and `git -C ../wt push -f` are blocked, `eval "git push -f"` is allowed (S6). Session kind comes from the id the probe (T1) found; where an engine gives none, the coder rules apply to every session (spec section 2). `gabo check` without a flag is unchanged (golden). The CLI keeps four commands. | M |
+| T5 | Release gate: tags, publish, release and merge into `main` | S5, S11; D4 | T4 | T16 | Test first: Go table tests fail until, in every agent session, `git tag v1.2.0`, `git push --tags`, `npm publish`, `claude plugin tag`, `gh release create v1` and a merge of a PR whose base is `main` are blocked with the route "the owner runs this outside agent sessions", and `git tag` with no argument (list) is allowed (S5). The exact publish and release command list is read from the manifests the repository ships (`plugins/claude-code`, `plugins/codex`, `packages/pi`, `apps/cli` and the root `package.json`) and named in the PR. The merge rule reads the PR base once through a port with a hand-written fake; when the read fails the call is blocked, and in a coder session every merge command is blocked (D4). | M |
+| T6 | Shell commands that write a human-only path | S13 (protection of `gabo.yaml` from the shell); Q6 (spec section 6) | T4 | T16 | Test first: Go table tests fail until, under the `human_only_paths` lock, a coder shell command is blocked when a redirect target, or an argument of `tee`, `sed -i`, `cp`, `mv` or `rm`, is under an entry of `review.human_only_paths` or is `gabo.yaml`, with the route "a human edits this path", and `echo x > apps/cli/out.txt` is allowed. The PR states that a script or interpreter can still write the file and that the text rule and the reviewer's merge check cover it (question 6). | S |
+| T7 | Every write goes through `--pre-write`; human-only paths are judged | S7, S11 (write messages); D3 | T2, T3, T4 | T8, T9, T10, T11, T12, T13 | Test first: Go tests on `--pre-write` fail until a coder write to `.github/workflows/x.yml` or `gabo.yaml` exits 1 with the route "a human edits this path", a write to `apps/cli/main.go` exits 0 with no output, and a write to a `plan.md` whose spec is not accepted keeps today's message and exit (S7, stage gate of intent 0001 S7 unchanged, regression test). The path filter of the Claude Code script and the other relays is not changed here; T10 to T13 do that. T4 is a dependency because both edit the `check` slice's command wiring, one at a time. | S |
+| T8 | Test-file warning: an edit to an existing tracked test file records one warning | S9, S10 (`warn` record); D6 | T7 | 0027/T12, T16 | Test first: Go tests with a fixture repository fail until an edit to an existing tracked `foo_test.go`, `a.test.ts`, `b_test.rb` or a file under `test/` or `tests/` runs and one `warned` line with the path is recorded; a new `bar_test.go` records nothing; the lock at `off` records nothing; `ask` and `block` are refused by `gabo check` (T2). "Existing" means tracked at the worktree's base commit (D6). The record is the one that spec 0027 S29 reads. | S |
+| T9 | Base credential deny list written by `gabo init` per engine | S8; D5; Q5 (spec section 6) | T1, T7 | T16 | Human merge: the engine files written are human-only in a project. Test first: Go tests of `gabo init` for each engine format that T1 found fail until the project-level engine config holds one deny entry per base path (`.env`, `.env.*`, `*.pem`, `*.key`, `secrets/`, `~/.ssh`, `~/.aws/credentials`, `~/.config/gh/hosts.yml`, the macOS keychain folder, `~/.credentials`) for read and for edit, and a second run keeps the project's own entries; `gabo check` reads those deny keys in its engine integration check (S8 verification); the user's global engine config is never read or written (PRD R32). An engine with no native deny format reports `not run: <reason>` (S14). The file that holds each engine's list is under `review.human_only_paths`, so a coder write to it is blocked by S7 (a test over the fixture config). The runtime proof, a coder file-tool read of `.env` blocked, is in T16. The Pi and OpenCode project config paths join `review.human_only_paths` and the reviewer's list (question 5). `gabo.yaml` is edited in this PR only to add those paths, which a person merges. Size `L` if the per-engine formats exceed about 400 changed lines: then split by engine at unblock. | L |
+| T10 | Claude Code relay: shell and file calls to gabo, failure rule | S3, S15, S10 (`ask` mapping), S16 (answer line) | T4, T7 | T14, T16 | Test first: relay tests under `plugins/claude-code/tests` with a stub `gabo` fail until the relay appends the human's `asked` answer to the outcome file when Claude Code reports it, and `hooks.json` also matches the shell tool, `gabo-hook-filter.sh` passes every file path and every shell command to `gabo check --pre-write` or `--pre-command` unchanged, exit 1 denies with gabo's lines, exit 3 maps to the engine's ask answer, a `gabo` not on PATH lets the call run with one warning line, and a `gabo` that is installed but exits with anything other than 0, 1 or 3, is killed or gives unreadable output blocks the call and shows the failure (S15, PD4, spec question 4). Where T1 found item (d) `no` for Claude Code, exit 3 is treated as 1 and recorded (S12 assumption). A write to a path outside the gabo paths, such as `apps/cli/main.go`, reaches `gabo check --pre-write` (S7). The script holds no command name, path pattern or lock state (S3, a test greps for them). | M |
+| T11 | Codex relay: shell and `apply_patch` calls to gabo, failure rule | S3, S15, S16 (answer line) | T4, T7 | T14, T16 | Test first: relay tests under `plugins/codex/tests` with a stub `gabo` fail for the same cases as T10 on `hooks.codex.json` and its script; where T1 found no ask answer on Codex, exit 3 is treated as 1 and recorded (S12 assumption). The relay holds no rule (S3). | M |
+| T12 | Pi relay: shell and file calls to gabo; gentle-pi's guardrails stay | S3, S15, S16 (answer line), S17 | T4, T7 | T14, T16 | Test first: the Pi build test and an extension test with a stub `gabo` fail until `packages/pi/extensions/gabo.ts` relays the shell tool and every `write` and `edit`, with the T10 failure cases; the relay never edits or reads gentle-pi's `runtime-guardrails.json` (S17); a call gentle-pi guards but gabo allows is still blocked by gentle-pi, and the reverse is blocked by gabo (checked in T16 by one manual run). Where T1 found item (d) `no` for Pi, exit 3 is treated as 1 and recorded (S12 assumption). The relay holds no rule (S3). | M |
+| T13 | OpenCode relay: shell and file calls to gabo, failure rule | S3, S15, S16 (answer line) | T4, T7 | T14, T16 | Test first: the OpenCode build and plugin tests with a stub `gabo` fail until `gabo-stage-gate.js` relays the shell tool and every `edit`, `write` and `patch` with the T10 failure cases, and its header no longer says a shell call is not gated. Where T1 found item (d) `no` for OpenCode, exit 3 is treated as 1 and recorded (S12 assumption). The plugin holds no rule (S3). | M |
+| T14 | Cycle and wave report carry the lock records and `not run:` lines | S14, S16 (trace and report side) | T3, T10, T11, T12, T13 | T16 | Human merge: `.gabo/skills/gabo-cycle/` and `.gabo/skills/gabo-wave-report/` are human-only; the catalog copies stay byte-identical. Test first: Go text tests in `apps/cli/internal/skills` fail until step 6 of `gabo-cycle` names the scratch file the hooks write, copies its lines into `gabo/trace/<run id>` (`blocked`, `warned`, `asked`, `not run`, four fields each) and `gabo-wave-report` shows them; a lock on an engine whose probe item (a) is `no` shows `not run: <reason>` and stops no task (S14). `gabo check` passes. | M |
+| T15 | (removed 2026-11-14: amendment landed with the plan change, S18) PRD R31 and TRD 9.4 name the second additive hook mode | — | — | — | Removed: S18 is an accepted requirement and its amendment is applied in this plan PR (PRD R31 with the text of spec section 5; TRD 9.4 from the S2 and D3 facts). Tracker task #816 closed with this reason. | — |
+| T16 | Probe wave: one manual `ask` run per engine, the Pi dual-guard run, the report lines | S8, S10, S14, S16, S17 | T5, T6, T8, T9, T10, T11, T12, T13, T14 | — | Not human-only. Once all leaves are merged: one wave on the probe repository runs a blocked push, a test-file warning and an engine without the event; the trace holds the three lines with the four fields and the wave report shows them (S16); each engine shows its `ask` prompt answered by a person, or `not run: <reason>` (S10); a coder file-tool read of `.env` is blocked on each engine that has a native deny format, or reads `not run: <reason>` (S8); Pi blocks a call gentle-pi guards and gabo allows, and the reverse (S17); a lock on an engine without the event reads `not run: <reason>` (S14). Results are posted on #765, read back. | M |
+
+## Spec map
+
+| spec | what changes | task |
+|---|---|---|
+| S1 | probe record, sixteen results | T1 |
+| S2 | `--pre-command` mode, exits 0, 1, 2, 3, four commands | T4 (mode), T2 (exit 3, golden) |
+| S3 | relays hold no rule | T10, T11, T12, T13 |
+| S4 | shell guard rules | T4 |
+| S5 | release gate | T5 |
+| S6 | one-level unwrap | T4 |
+| S7 | human-only paths at write time | T7 (rule), T10 to T13 (every write reaches gabo) |
+| S8 | base credential list per engine | T9 (config, write to the list file), T16 (read attempt per engine) |
+| S9 | test-file warning | T8 |
+| S10 | four states | T2 (decision), T16 (manual `ask`) |
+| S11 | the block message | T2 (shape), T4, T5, T7 (rules) |
+| S12 | auto mode turns `ask` into `block` | T2, T11 (engine without ask) |
+| S13 | switches and validation | T2 (keys), T6 (shell protection of `gabo.yaml`), T7 (write protection) |
+| S14 | `not run: <reason>` | T14, T16 |
+| S15 | failure rule | T10, T11, T12, T13 |
+| S16 | outcome records and report | T3 (file, `asked` pending), T10 to T13 (answer line), T14 (trace and report), T16 |
+| S17 | Pi keeps gentle-pi's guardrails | T12, T16 |
+| S18 | PRD R31 and TRD 9.4 amended | this plan PR (no task) |
+
+## Plan decisions
+
+All are **decided by the owner's standing rule** (resolver: agent, owner's rule of 2026-11-13: apply the recommended option to every doubt and record it). The spec's six open questions take their **Proposed (auto)** option.
+
+| id | what | question | choice | reason | task |
+|---|---|---|---|---|---|
+| PD1 | `test_files` states (spec question 1) | May it be `ask` or `block`? | `off` and `warn` only; `gabo check` fails on the others. | Honours D-4 ("never blocks") literally, but one lock has two states instead of four. | T2, T8 |
+| PD2 | State of a missing key (question 2) | `off` or the default states? | The states of decision 1: `block` for four locks, `warn` for `test_files`. | Existing projects get the locks on upgrade without editing the file; the alternative (`off` until set) is quieter but leaves the locks unused by default. | T2 |
+| PD3 | Who writes the outcome line (question 3) | The hook mode, a relay or the cycle? | The hook modes append one JSON line to a file the cycle names in its scratch; no file named, nothing written; the cycle copies it to the trace (decision 15). | A deterministic record; TRD 9.4's read-only wording gains one exception, written in this plan PR (S18); how the file name reaches a coder subagent's hook depends on T1. | T3, T14 |
+| PD4 | gabo installed but failing (spec question 4, S15) | Block or pass? | The spec's Proposed (auto) option exactly: "both relays block the call and show the failure" (question 4). Gabo not on PATH: the call passes with one warning (S15). | Spec tradeoff, as stated there: it follows decision 8, but a broken gabo stops every write and shell call, including the stage gate's formerly passing case, until a human repairs it. The relay cannot read lock states (S3), so it cannot tell which locks are at `block`. | T10 to T13 |
+| PD5 | Credential list per engine (question 5) | Pi and OpenCode paths; engines without a native format | Add the two engines' project config paths to `review.human_only_paths` and to the reviewer's list; where no native format exists, `not run: <reason>` (S14). | Coders can no longer change those engine files; that engine has no credential lock where no native format exists. Which formats `codex`, `pi` and `opencode` offer is verified by T1. | T9 |
+| PD6 | Shell commands that write a path (question 6) | Which forms? | Redirect targets and the arguments of `tee`, `sed -i`, `cp`, `mv`, `rm`. | Closes the plain forms; a script can still write, and the reviewer's merge check covers it. | T6 |
+| PD7 | Tracker | Where do the tasks live? | Intent item #765 (already under #492); task sub-issues `I0028/T<n>: <title>`, labels `m1-local-core`, size and `flow-improvements`; blocked-by links match `depends_on`, and #790 (`0027/T12`) is blocked by T8. Issue numbers are in the Tasks section. | The 0027 convention. | all |
+| PD8 | The relays' common wiring | Four relays touch four different files. | One task per engine, in parallel, each with its own tests. | Disjoint edit surfaces; an engine without the event (probe) can drop out without stopping the others. | T10 to T13 |
+| PD9 | The doc amendment (S18) | S18 is an accepted requirement and lands with the plan change. | Applied in this PR: PRD R31 takes the opening words of spec section 5 and keeps the rest of the row; TRD 9.4 gains the `--pre-command` mode from S2 and D3 (spec section 5 gives no TRD text, so the wording is the dev lead's, from those facts). T15 is removed. | The spec says the amendment lands with the plan change; the owner permitted it (decision 10). | none |
+| PD10 | The task 0029 depends on | 0029 relies on "the local shell guard". | T4. The relays (T10 to T13) make it fire; on an engine without the event S14 applies, as 0029's spec states. | T4 is the rule set and the mode; 0029's own spec already names the no-hook case. | T4 |
+| PD11 | How the human's answer reaches an `asked` record | `gabo check` exits 3 before the engine shows its prompt, so it never sees the answer. | Gabo writes `asked` with the answer `pending`; each relay (T10 to T13) appends the answer line to the same outcome file when its engine reports it; where it does not, the answer reads `not reported` and T16 lists it as a gap. | The relay is the only part that sees the engine's answer, and appending a record line is not a rule (S3). | T3, T10 to T13 |
+
+## Parallel groups
+
+Edit surfaces are disjoint between groups except in the `check` slice, which G1, G2 and G3 all edit: T2, T3 and T4 run one after another because they share the config, decision and command wiring; after T4, T5, T6 and T7 edit separate files (separate rule files and `prewrite.go`) and may run together, and T8 follows T7 on `prewrite.go`. Inside a group the order is the `depends_on` column.
+
+| group | tasks | files |
+|---|---|---|
+| G0 probe | T1 | `docs/product/intents/0028-deterministic-hooks-as-locks/probe.md`, one doc test |
+| G1 core | T2, then T3 | `apps/cli/internal/slices/check` (config, decision, record), the `gabo.yaml` schema |
+| G2 shell | T4, then T5 and T6 | `apps/cli/internal/slices/check` (a new shell file and its tests; T5 and T6 edit separate rule files) |
+| G3 write | T7, then T8 | `apps/cli/internal/slices/check/prewrite.go` and tests |
+| G4 credentials | T9 | `apps/cli/internal/slices/initcmd`, `apps/cli/internal/engineconfig`, `gabo.yaml` (paths only) |
+| G5 relays | T10, T11, T12, T13 | `plugins/claude-code`, `plugins/codex`, `packages/pi/extensions/gabo.ts`, `apps/cli/internal/skills/gabo-runtime-opencode` |
+| G6 flow | T14 | `.gabo/skills/gabo-cycle`, `gabo-wave-report` and catalog copies |
+
+Runnable at once: T1 only. After T2 and T3: T4. After T4: T5, T6, T7 (T7 edits `check` wiring, so it waits for T4). After T7: T8, T9. After T4 and T7: T10 to T13 together. T14 after the relays. T16 last.
+
+## Risks to the plan
+
+| risk | impact | mitigation |
+|---|---|---|
+| The probe finds no pre-command hook inside a coder subagent on an engine | that engine's locks do not act; 0029 relies on T4 | S14: `not run: <reason>` in the wave report; the relay task for that engine shrinks to the file relay; text rules stay |
+| A broken `gabo` blocks every write and shell call on an engine | work stops until a human repairs it, even where every lock is off | PD4 is the spec's question 4 option and tradeoff; T10 to T13 test the absent, exit 2 and killed cases |
+| Locks default to `block` on upgrade | existing projects see new blocks | PD2 is the owner's decision 1; the message names the switch (S11) |
+| Session kind (coder or other) is not given by an engine | the stricter coder rules apply to every session there | T1 item (b); the spec states this reading |
+| T4 and T7 both edit the `check` slice wiring | merge conflicts | order T4 then T7 (G2, G3) |
+| 0027/T12 waits for T8 | the reviewer's test-edit rule is late | T8 is early in the chain (after T7), small |
+| Four human-merged or engine-specific PRs queue | T9, T14 wait for a person | T9 and T14 are late; T10 to T13 are not human-only |
+
+## Open questions
+
+1. **Intent 0029's edge.** 0029's plan (not yet written) will list `0028/T4` in `depends_on`; the mirror `0029/T<n>` in T4's `unblocks` is added by whichever plan PR merges second, because a cross-intent id must exist before it is written. (gabo-dev-lead, through the assistant)
+2. **PRD R31 and TRD 9.4 wording.** The PRD is gabo-pm's document; spec section 5 gives only the opening words of R31 and no TRD text, so the rest of R31 is unchanged and the TRD 9.4 text is derived from S2 and D3. gabo-pm and the owner read it in this PR. (gabo-pm)
+3. **Per-engine credential formats (T9).** Which native formats `codex`, `pi` and `opencode` offer is unverified until T1; T9 splits by engine if it exceeds about 400 changed lines. (T1, then gabo-dev-lead)
+4. **Engine versions in the probe (T1).** The record names the versions it ran on; a later engine upgrade may change a result and needs a re-probe. (owner, when upgrading an engine)
