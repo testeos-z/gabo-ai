@@ -125,7 +125,7 @@ describe("tool_call on write or edit in a gabo project (S5, S6, D3, D4, D9)", ()
   });
 });
 
-describe("tool_call without a usable gabo (S6, intent 0001 S7)", () => {
+describe("tool_call without a usable gabo (S15, intent 0001 S7)", () => {
   test("gabo missing from PATH: no block and one warning", async () => {
     gaboProject();
     process.env.PATH = join(caseDir, "empty");
@@ -135,31 +135,156 @@ describe("tool_call without a usable gabo (S6, intent 0001 S7)", () => {
     expect(notified[0].type).toBe("warning");
   });
 
-  test("gabo exiting 2: no block and one warning", async () => {
+  test("gabo exiting 2 blocks the write and names the failure (S15)", async () => {
     gaboProject();
     gabo.respond('{"notify":[],"block":{"reason":"ignored"}}', 2);
     const { result, notified } = await callTool(write(".pi/agents/gabo-coder.md"));
     expect(gabo.file("calls")).toBe("1\n");
-    expect(isBlocked(result)).toBe(false);
-    expect(notified.length).toBe(1);
-    expect(notified[0].type).toBe("warning");
-    expect(notified[0].message).not.toContain("ignored");
+    expect(isBlocked(result)).toBe(true);
+    expect((result as { reason: string }).reason).toContain("exit 2");
+    expect(notified).toEqual([]);
   });
 
-  test("gabo exit 1 without a block reason: no block and one warning", async () => {
+  test("gabo killed by a signal blocks the write and names the failure (S15)", async () => {
+    gaboProject();
+    gabo.respondKilled();
+    const { result } = await callTool(write("src/main.go"));
+    expect(isBlocked(result)).toBe(true);
+    expect((result as { reason: string }).reason).toContain("killed by SIGKILL");
+  });
+
+  test("gabo exit 1 without a block reason blocks with a generic reason (S15)", async () => {
     gaboProject();
     gabo.respond('{"notify":[],"block":null}', 1);
     const { result, notified } = await callTool(write("src/main.go"));
-    expect(isBlocked(result)).toBe(false);
-    expect(notified.length).toBe(1);
-    expect(notified[0].type).toBe("warning");
+    expect(isBlocked(result)).toBe(true);
+    expect((result as { reason: string }).reason).toContain("blocked the call without a message");
+    expect(notified).toEqual([]);
+  });
+
+  test("gabo exit 3 on a write is blocked as exit 1, with the no-prompt line (S12)", async () => {
+    gaboProject();
+    gabo.respond(JSON.stringify({ notify: [], block: { reason: "ask: plan" } }), 3);
+    const { result } = await callTool(write("src/main.go"));
+    expect(isBlocked(result)).toBe(true);
+    expect((result as { reason: string }).reason).toContain("ask: plan");
+    expect((result as { reason: string }).reason).toContain("Pi shows no prompt for an ask");
   });
 });
 
-describe("tool_call where gabo is not run (S5, S6)", () => {
+describe("tool_call on bash in a gabo project (S3, S15, S16, S12)", () => {
+  const shell = (command: string) => call("bash", { command });
+  const bashLine = "✗ shell_guard: a force push is blocked (S4) next: use git push origin feat/x";
+
+  test("runs gabo check --pre-command once in the project root, with the tool-call JSON unchanged", async () => {
+    gaboProject();
+    gabo.respond("");
+    const { result } = await callTool(shell("git push origin main"));
+    expect(result).toBeUndefined();
+    expect(gabo.file("calls")).toBe("1\n");
+    expect(gabo.file("argv")).toBe("check\n--pre-command\n");
+    expect(gabo.file("cwd")?.trim()).toBe(project);
+    expect(JSON.parse(gabo.file("stdin") ?? "null")).toEqual({
+      tool_name: "bash",
+      tool_input: { command: "git push origin main" },
+    });
+  });
+
+  test("runs gabo with GABO_ENGINE=pi, and GABO_TASK and GABO_OUTCOME_FILE pass through (S16)", async () => {
+    gaboProject();
+    gabo.respond("");
+    process.env.GABO_TASK = "I0028/T12";
+    process.env.GABO_OUTCOME_FILE = join(caseDir, "outcome.jsonl");
+    try {
+      await callTool(shell("git status"));
+    } finally {
+      delete process.env.GABO_TASK;
+      delete process.env.GABO_OUTCOME_FILE;
+    }
+    expect(gabo.file("engine")).toBe("pi");
+    expect(gabo.file("task")).toBe("I0028/T12");
+    expect(gabo.file("outcome")).toBe(join(caseDir, "outcome.jsonl"));
+  });
+
+  test("gabo exit 0 allows the call: no result, nothing shown", async () => {
+    gaboProject();
+    gabo.respond("");
+    const { result, notified } = await callTool(shell("git status"));
+    expect(result).toBeUndefined();
+    expect(notified).toEqual([]);
+  });
+
+  test("gabo exit 1 blocks the call with gabo's line unchanged (S3)", async () => {
+    gaboProject();
+    gabo.respond(bashLine, 1);
+    const { result, notified } = await callTool(shell("git push --force origin feat/x"));
+    expect(result).toEqual({ block: true, reason: bashLine });
+    expect(notified).toEqual([]);
+  });
+
+  test("gabo exit 3 blocks the call with gabo's line and the no-prompt line (S12, S16)", async () => {
+    gaboProject();
+    gabo.respond(bashLine, 3);
+    const { result } = await callTool(shell("git push --force origin feat/x"));
+    expect(isBlocked(result)).toBe(true);
+    expect((result as { reason: string }).reason.split("\n")[0]).toBe(bashLine);
+    expect((result as { reason: string }).reason).toContain("Pi shows no prompt for an ask");
+  });
+
+  test("gabo exit 2 blocks the call and names the failure (S15)", async () => {
+    gaboProject();
+    gabo.respond("usage: gabo check --pre-command", 2);
+    const { result, notified } = await callTool(shell("git status"));
+    expect(isBlocked(result)).toBe(true);
+    expect((result as { reason: string }).reason).toContain("exit 2");
+    expect(notified).toEqual([]);
+  });
+
+  test("gabo killed by a signal blocks the call and names the failure (S15)", async () => {
+    gaboProject();
+    gabo.respondKilled();
+    const { result } = await callTool(shell("git status"));
+    expect(isBlocked(result)).toBe(true);
+    expect((result as { reason: string }).reason).toContain("killed by SIGKILL");
+  });
+
+  test("gabo missing from PATH runs the call with one warning (S15)", async () => {
+    gaboProject();
+    process.env.PATH = join(caseDir, "empty");
+    const { result, notified } = await callTool(shell("git push --force origin feat/x"));
+    expect(result).toBeUndefined();
+    expect(notified.length).toBe(1);
+    expect(notified[0].type).toBe("warning");
+  });
+
+  test("bash outside a gabo project does not run gabo", async () => {
+    gabo.respond(bashLine, 1);
+    const { result, notified } = await callTool(shell("git push --force origin feat/x"));
+    expect(gabo.file("calls")).toBeUndefined();
+    expect(result).toBeUndefined();
+    expect(notified).toEqual([]);
+  });
+});
+
+describe("tool_call and gentle-pi's guardrails (S17)", () => {
+  test("an allowed write or bash call returns no result, so gentle-pi's own handler still decides", async () => {
+    gaboProject();
+    gabo.respond('{"notify":[],"block":null}');
+    expect((await callTool(write("src/main.go"))).result).toBeUndefined();
+    gabo.respond("");
+    expect((await callTool(call("bash", { command: "git status" }))).result).toBeUndefined();
+  });
+
+  test("the source never names runtime-guardrails.json", async () => {
+    const text = readFileSync(extension, "utf8");
+    expect(text).not.toMatch(/runtime-guardrails|guardrails\.json/);
+  });
+});
+
+describe("tool_call where gabo is not run (S3, S5)", () => {
   for (const event of [
     call("read", { path: ".pi/agents/gabo-coder.md" }),
-    call("bash", { command: "echo x > .pi/agents/gabo-coder.md" }),
+    call("grep", { pattern: "x", path: "src" }),
     call("my_write", { path: ".pi/agents/gabo-coder.md" }),
   ]) {
     test(`${event.toolName} in a gabo project does not run gabo`, async () => {

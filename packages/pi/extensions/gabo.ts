@@ -1,22 +1,35 @@
-// gabo extension for Pi (intent 0003). A thin connection layer (TRD 2, D9):
-// it collects the session facts, pipes them to `gabo check --pre-write` and
-// shows or applies what gabo returns. Every rule, comparison and message
-// text lives in Go; this file decides nothing about tools, paths or
-// versions. It writes no file (S8).
+// gabo extension for Pi (intent 0003, intent 0028). A thin connection layer
+// (TRD 2, D9): it collects the session facts or one tool call, pipes it to
+// gabo unchanged and applies what gabo returns. Every rule, comparison and
+// message text lives in Go; this file decides nothing about tools, paths or
+// commands. It writes no file (S8), and it reads no list of gentle-pi's: Pi's
+// own handlers keep their guards, and a call is blocked when either blocks it.
 //
 //   session_start (T6): in a gabo project (gabo.yaml in the working
 //   directory) run gabo once with the session facts and show each returned
 //   notification unchanged; gabo missing or failing -> one warning.
-//   tool_call (T7): for Pi's write and edit tools in a gabo project, run
-//   gabo once with the session facts plus the call's input.path, unchanged,
-//   as the one target path; gabo's block becomes { block: true, reason }
-//   with gabo's reason; gabo missing or failing -> no block, one warning.
+//   tool_call write and edit (T7): run `gabo check --pre-write` once with the
+//   session facts plus the call's input.path, unchanged, as the one target
+//   path; gabo's block becomes { block: true, reason } with gabo's reason.
+//   tool_call bash (T12, intent 0028 S3): run `gabo check --pre-command` once
+//   with the tool-call JSON, unchanged; gabo's text becomes the block reason.
+//
+// Every run carries GABO_ENGINE=pi (S16). The exit mapping of a judged call
+// is the one of the Claude Code relay (intent 0028 S10, S12, S15): 0 runs the
+// call; 1 blocks it with gabo's text; 3 is an ask Pi cannot show (probe item
+// (d) is no), so it blocks as 1 and says so; any other exit, a signal or a
+// failed spawn blocks the call and names the failure. gabo not on PATH runs
+// the call with one warning.
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext, ToolCallEvent, ToolCallEventResult } from "@earendil-works/pi-coding-agent";
 
 export type GaboEvent = "session_start" | "tool_call";
+
+// The two hook modes this relay calls: the file tool (session facts on stdin)
+// and the shell tool (the tool-call JSON on stdin).
+export type GaboMode = "pre-write" | "pre-command";
 
 export interface GaboFacts {
   gabo_facts: 1;
@@ -37,9 +50,17 @@ export interface GaboResult {
   block: { reason: string } | null;
 }
 
-export type GaboRun = { ok: true; code: number; result: GaboResult } | { ok: false; problem: string };
+// What one gabo run came to: absent (not on PATH), failed (an exit other than
+// 0, 1 or 3, a signal, the timeout or a spawn error, each named in problem),
+// or ran, with its exit code and stdout.
+export type GaboRun =
+  | { kind: "absent"; problem: string }
+  | { kind: "failed"; problem: string }
+  | { kind: "ran"; code: number; out: string };
 
 const GABO_TIMEOUT_MS = 30_000;
+const GABO_ENGINE = "pi";
+const NO_PROMPT = "gabo extension: Pi shows no prompt for an ask, so the call is blocked (intent 0028 S12)";
 
 let packageVersionCache: string | undefined;
 
@@ -66,10 +87,10 @@ export function sessionFacts(pi: ExtensionAPI, event: GaboEvent): GaboFacts {
   };
 }
 
-// Runs `gabo check --pre-write` in cwd with the facts on stdin. Exit 0 or 1
-// with gabo's JSON is a result; anything else (not on PATH, exit 2, a
-// signal, unreadable output) is a problem the caller reports as a warning.
-export function runGabo(cwd: string, facts: GaboFacts): Promise<GaboRun> {
+// Runs `gabo check --<mode>` in cwd with stdin, GABO_ENGINE=pi and the rest of
+// the environment (GABO_TASK and GABO_OUTCOME_FILE pass through, S16). Exit 0,
+// 1 or 3 is a run with its stdout; any other outcome is a failed run.
+export function runGabo(cwd: string, mode: GaboMode, stdin: string): Promise<GaboRun> {
   return new Promise((resolve) => {
     let stdout = "";
     let settled = false;
@@ -81,36 +102,38 @@ export function runGabo(cwd: string, facts: GaboFacts): Promise<GaboRun> {
     };
     let child;
     try {
-      child = spawn("gabo", ["check", "--pre-write"], {
+      child = spawn("gabo", ["check", `--${mode}`], {
         cwd,
+        env: { ...process.env, GABO_ENGINE },
         stdio: ["pipe", "pipe", "ignore"],
         timeout: GABO_TIMEOUT_MS,
       });
     } catch (err) {
-      done({ ok: false, problem: describeSpawnError(err) });
+      done(spawnProblem(err));
       return;
     }
-    child.on("error", (err) => done({ ok: false, problem: describeSpawnError(err) }));
+    child.on("error", (err) => done(spawnProblem(err)));
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", (chunk: string) => {
       stdout += chunk;
     });
     child.stdin?.on("error", () => undefined);
     child.on("close", (code, signal) => {
-      if (code !== 0 && code !== 1) {
-        done({ ok: false, problem: code === null ? `killed by ${signal}` : `exit ${code}` });
-        return;
+      if (code === 0 || code === 1 || code === 3) {
+        done({ kind: "ran", code, out: stdout });
+      } else {
+        done({ kind: "failed", problem: code === null ? `killed by ${signal}` : `exit ${code}` });
       }
-      const result = parseResult(stdout);
-      done(result ? { ok: true, code, result } : { ok: false, problem: "unreadable output" });
     });
-    child.stdin?.end(JSON.stringify(facts));
+    child.stdin?.end(stdin);
   });
 }
 
-function describeSpawnError(err: unknown): string {
+function spawnProblem(err: unknown): GaboRun {
   const code = (err as { code?: string })?.code;
-  return code === "ENOENT" ? "gabo not found on PATH" : String((err as Error)?.message ?? err);
+  return code === "ENOENT"
+    ? { kind: "absent", problem: "gabo not found on PATH" }
+    : { kind: "failed", problem: String((err as Error)?.message ?? err) };
 }
 
 function parseResult(stdout: string): GaboResult | undefined {
@@ -123,9 +146,10 @@ function parseResult(stdout: string): GaboResult | undefined {
   }
 }
 
-// The one warning shown when gabo could not decide (intent 0001 S7).
-export function warnGaboUnavailable(ctx: ExtensionContext, problem: string): void {
-  ctx.ui.notify(`gabo extension warning: gabo check --pre-write could not run (${problem}); gabo's checks skipped`, "warning");
+// The one warning shown when gabo could not decide a call that runs anyway
+// (intent 0001 S7).
+export function warnGaboUnavailable(ctx: ExtensionContext, mode: GaboMode, problem: string): void {
+  ctx.ui.notify(`gabo extension warning: gabo check --${mode} could not run (${problem}); gabo's checks skipped`, "warning");
 }
 
 // Shows each notification gabo returned, text and level unchanged.
@@ -133,40 +157,85 @@ export function showNotifications(ctx: ExtensionContext, result: GaboResult): vo
   for (const n of result.notify) ctx.ui.notify(n.text, n.level as "info" | "warning" | "error");
 }
 
+// The reason of a blocked call when gabo exits 1 or 3 (S3, S12): gabo's text
+// unchanged, or one generic line when it gave none; exit 3 adds the no-prompt
+// line.
+function blockReason(mode: GaboMode, code: number, text: string): string {
+  const lines = [text || `gabo extension: gabo check --${mode} blocked the call without a message`];
+  if (code === 3) lines.push(NO_PROMPT);
+  return lines.join("\n");
+}
+
+// The reason of a blocked call when gabo fails (S15): the failure, named.
+function failureReason(mode: GaboMode, problem: string): string {
+  return `gabo extension: gabo check --${mode} failed (${problem}); the call is blocked`;
+}
+
 // Pi's file-writing tools whose target gabo judges (S5, S6).
 const WRITE_TOOLS = new Set(["write", "edit"]);
 
-// Relays one write or edit call to gabo and applies gabo's answer: exit 1
-// with a block reason blocks the call with that reason unchanged; any other
-// outcome lets it run. Which paths block is gabo's decision, not this one.
+// Pi's shell tool, whose command gabo judges (intent 0028 S3).
+const SHELL_TOOL = "bash";
+
+// The verdict on one write or edit: exit 0 runs it, a block is gabo's reason,
+// a failure blocks it and names the failure, a missing gabo runs it with one
+// warning.
+function judgeWrite(ctx: ExtensionContext, run: GaboRun): ToolCallEventResult | undefined {
+  if (run.kind === "absent") {
+    warnGaboUnavailable(ctx, "pre-write", run.problem);
+    return undefined;
+  }
+  if (run.kind === "failed") return { block: true, reason: failureReason("pre-write", run.problem) };
+  const result = parseResult(run.out);
+  if (run.code === 0) {
+    if (result) showNotifications(ctx, result);
+    else warnGaboUnavailable(ctx, "pre-write", "unreadable output");
+    return undefined;
+  }
+  if (result) showNotifications(ctx, result);
+  const reason = typeof result?.block?.reason === "string" ? result.block.reason : "";
+  return { block: true, reason: blockReason("pre-write", run.code, reason) };
+}
+
+// The verdict on one shell call: exit 0 runs it, gabo's text blocks it, a
+// failure blocks it and names the failure, a missing gabo runs it with one
+// warning.
+function judgeShell(ctx: ExtensionContext, run: GaboRun): ToolCallEventResult | undefined {
+  if (run.kind === "absent") {
+    warnGaboUnavailable(ctx, "pre-command", run.problem);
+    return undefined;
+  }
+  if (run.kind === "failed") return { block: true, reason: failureReason("pre-command", run.problem) };
+  if (run.code === 0) return undefined;
+  return { block: true, reason: blockReason("pre-command", run.code, run.out.replace(/\n+$/, "")) };
+}
+
+// Relays one write, edit or bash call to gabo and applies gabo's answer. Which
+// calls block is gabo's decision, not this one; a call this relay allows
+// returns no result, so Pi's other handlers, gentle-pi's among them, still
+// decide it.
 export async function onToolCall(
   pi: ExtensionAPI,
   event: ToolCallEvent,
   ctx: ExtensionContext,
 ): Promise<ToolCallEventResult | undefined> {
-  if (!WRITE_TOOLS.has(event.toolName) || !isGaboProject(ctx.cwd)) return undefined;
+  if (!isGaboProject(ctx.cwd)) return undefined;
+  if (event.toolName === SHELL_TOOL) {
+    const call = JSON.stringify({ tool_name: event.toolName, tool_input: event.input });
+    return judgeShell(ctx, await runGabo(ctx.cwd, "pre-command", call));
+  }
+  if (!WRITE_TOOLS.has(event.toolName)) return undefined;
   const facts = { ...sessionFacts(pi, "tool_call"), target_paths: [event.input.path as string] };
-  const run = await runGabo(ctx.cwd, facts);
-  if (!run.ok) {
-    warnGaboUnavailable(ctx, run.problem);
-    return undefined;
-  }
-  showNotifications(ctx, run.result);
-  if (run.code !== 1) return undefined;
-  const reason = run.result.block?.reason;
-  if (typeof reason !== "string") {
-    warnGaboUnavailable(ctx, "exit 1 without a block reason");
-    return undefined;
-  }
-  return { block: true, reason };
+  return judgeWrite(ctx, await runGabo(ctx.cwd, "pre-write", JSON.stringify(facts)));
 }
 
 export default function gabo(pi: ExtensionAPI): void {
   pi.on("session_start", async (_event, ctx) => {
     if (!isGaboProject(ctx.cwd)) return;
-    const run = await runGabo(ctx.cwd, sessionFacts(pi, "session_start"));
-    if (run.ok) showNotifications(ctx, run.result);
-    else warnGaboUnavailable(ctx, run.problem);
+    const run = await runGabo(ctx.cwd, "pre-write", JSON.stringify(sessionFacts(pi, "session_start")));
+    const result = run.kind === "ran" ? parseResult(run.out) : undefined;
+    if (result) showNotifications(ctx, result);
+    else warnGaboUnavailable(ctx, "pre-write", run.kind === "ran" ? "unreadable output" : run.problem);
   });
   pi.on("tool_call", (event, ctx) => onToolCall(pi, event, ctx));
 }

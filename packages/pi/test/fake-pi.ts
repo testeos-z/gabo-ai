@@ -84,8 +84,9 @@ export function fakePi(tools: FakeToolInfo[]) {
 }
 
 // A fake `gabo` executable in its own bin dir. Each run records its argv,
-// stdin and working directory in the bin dir (never in the project), prints
-// the configured stdout and exits with the configured code.
+// stdin, working directory and GABO_ENGINE in the bin dir (never in the
+// project), prints the configured stdout and exits with the configured code,
+// or kills itself with SIGKILL after respondKilled().
 export function fakeGabo(binDir: string) {
   mkdirSync(binDir, { recursive: true });
   const script = join(binDir, "gabo");
@@ -100,6 +101,10 @@ export function fakeGabo(binDir: string) {
       'printf "%s\\n" "$@" > "$d/argv"',
       'cat > "$d/stdin"',
       'pwd > "$d/cwd"',
+      'printf "%s" "${GABO_ENGINE-unset}" > "$d/engine"',
+      'printf "%s" "${GABO_TASK-unset}" > "$d/task"',
+      'printf "%s" "${GABO_OUTCOME_FILE-unset}" > "$d/outcome"',
+      '[ -f "$d/killed" ] && kill -KILL $$',
       'cat "$d/out" 2>/dev/null',
       'exit "$(cat "$d/code" 2>/dev/null || echo 0)"',
       "",
@@ -111,7 +116,10 @@ export function fakeGabo(binDir: string) {
       writeFileSync(join(binDir, "out"), stdout);
       writeFileSync(join(binDir, "code"), String(code));
     },
-    file(name: "calls" | "argv" | "stdin" | "cwd"): string | undefined {
+    respondKilled() {
+      writeFileSync(join(binDir, "killed"), "");
+    },
+    file(name: "calls" | "argv" | "stdin" | "cwd" | "engine" | "task" | "outcome"): string | undefined {
       try {
         return readFileSync(join(binDir, name), "utf8");
       } catch {

@@ -1,9 +1,10 @@
 # gabo-hook-filter.sh: the S7 filters and the lock relay shared by the gabo
 # plugin's hooks (intent 0001 S7, D9; intent 0002 S8, D5; intent 0028 S3, S10,
-# S15; plan T10). Sourced by gabo-check.sh (PostToolUse), gabo-pre-write.sh
-# (PreToolUse Write|Edit) and gabo-pre-command.sh (PreToolUse Bash); it holds no
-# check rule, only the cases in which a hook stays silent without calling gabo
-# and the mapping of gabo's exit. The Codex plugin ships a byte-identical copy.
+# S15; plan T10, T11). Sourced by gabo-check.sh (PostToolUse), gabo-pre-write.sh
+# (PreToolUse Write|Edit, and apply_patch in Codex) and gabo-pre-command.sh
+# (PreToolUse Bash); it holds no check rule, only the cases in which a hook
+# stays silent without calling gabo, the mapping of gabo's exit and the answer
+# each runtime reads. The Codex plugin ships a byte-identical copy.
 #
 # gabo_hook_filter [codex] reads the hook JSON from stdin into gabo_input and
 # the project root into gabo_root. It returns 1 (stay silent, exit 0) when the
@@ -113,36 +114,56 @@ gabo_hook_judge_input() {
   [[ -n "$gabo_input" ]]
 }
 
-# gabo_hook_judge_relay <kind> pipes gabo_input unchanged to gabo check
-# --pre-<kind> in gabo_root with GABO_ENGINE=claude, so the call is judged by
-# the claude session rules (intent 0028 S3). GABO_TASK and GABO_OUTCOME_FILE
-# pass through when the cycle sets them. The exit maps (S10, S15): 0 runs the
-# call silently; 1 blocks it with gabo's lines; 3 is an ask that claude cannot
-# show (probe item (d) is no), so it blocks as 1 and says so; any other exit, a
-# usage error or a signal, blocks and names the failure. It returns 0 or 2.
+# gabo_hook_judge_relay <kind> <engine> <label> pipes gabo_input unchanged to
+# gabo check --pre-<kind> in gabo_root with GABO_ENGINE=<engine>, so the call is
+# judged by that engine's session rules (intent 0028 S3). GABO_TASK and
+# GABO_OUTCOME_FILE pass through when the cycle sets them. The exit maps (S10,
+# S15): 0 runs the call (returns 0); 1 blocks it with gabo's lines; 3 is an ask
+# that <label> cannot show (probe item (d) is no for claude and codex), so it
+# blocks as 1 and says so; any other exit, a usage error or a signal, blocks and
+# names the failure. A block returns 2 and leaves its text in gabo_block_text.
 gabo_hook_judge_relay() {
-  local kind="$1" out code
-  out="$(cd "$gabo_root" && printf '%s' "$gabo_input" | GABO_ENGINE=claude gabo check "--pre-$kind" 2>&1)"
+  local kind="$1" engine="$2" label="$3" out code note nl=$'\n'
+  out="$(cd "$gabo_root" && printf '%s' "$gabo_input" | GABO_ENGINE="$engine" gabo check "--pre-$kind" 2>&1)"
   code=$?
   case "$code" in
     0) return 0 ;;
     1)
-      if [[ -n "$out" ]]; then
-        printf '%s\n' "$out" >&2
-      else
-        printf 'gabo plugin: gabo check --pre-%s blocked the call without a message\n' "$kind" >&2
-      fi
+      note="gabo plugin: gabo check --pre-$kind blocked the call without a message"
+      gabo_block_text="${out:-$note}"
       ;;
     3)
-      [[ -n "$out" ]] && printf '%s\n' "$out" >&2
-      echo "gabo plugin: Claude Code shows no prompt for an ask, so the call is blocked (intent 0028 S12)" >&2
+      gabo_block_text="gabo plugin: $label shows no prompt for an ask, so the call is blocked (intent 0028 S12)"
+      [[ -n "$out" ]] && gabo_block_text="$out$nl$gabo_block_text"
       ;;
     *)
-      printf 'gabo plugin: gabo check --pre-%s failed (exit %s); the call is blocked\n' "$kind" "$code" >&2
-      [[ -n "$out" ]] && printf '%s\n' "$out" >&2
+      gabo_block_text="gabo plugin: gabo check --pre-$kind failed (exit $code); the call is blocked"
+      [[ -n "$out" ]] && gabo_block_text="$gabo_block_text$nl$out"
       ;;
   esac
   return 2
+}
+
+# gabo_hook_run <kind> [runtime] judges the hook's tool call with gabo (intent
+# 0028 S3, S15) and writes the answer in the runtime's format. A call gabo
+# allows, and every silent case, returns 0 with nothing on stdout. Without a
+# runtime (Claude Code) a block prints gabo's text on stderr and returns 2.
+# With `codex` a block is Codex's PreToolUse deny output on stdout, with gabo's
+# text as its reason, and returns 0, since Codex denies the call from that JSON.
+gabo_hook_run() {
+  local kind="$1" runtime="${2:-}" engine=claude label="Claude Code"
+  if [[ "$runtime" == codex ]]; then
+    engine=codex
+    label=Codex
+  fi
+  gabo_hook_judge_input || return 0
+  gabo_hook_judge_relay "$kind" "$engine" "$label" && return 0
+  if [[ "$runtime" != codex ]]; then
+    printf '%s\n' "$gabo_block_text" >&2
+    return 2
+  fi
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' "$(gabo_json_string "$gabo_block_text")"
+  return 0
 }
 
 # gabo_json_string <text> prints <text> as a JSON string literal.
