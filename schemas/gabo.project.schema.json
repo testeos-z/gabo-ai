@@ -9,7 +9,7 @@
     { "$ref": "#/$defs/complete" }
   ],
   "$comment": "The names below close the object; their rules live in $defs/projectKeys.",
-  "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true },
+  "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "eval": true },
   "additionalProperties": false,
   "$defs": {
     "projectKeys": {
@@ -236,6 +236,51 @@
               "maximum": 4
             }
           }
+        },
+        "eval": {
+          "description": "The agent eval set (intent 0030). Counts default to a minimum of 2 and a maximum of 10 tasks and 1 run per task. The pass threshold and the cap have no default: unset means no threshold and no cap, and the owner sets them. The loader also checks that the effective minimum is at most the effective maximum.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "min_tasks": {
+              "description": "Fewest accepted tasks a run accepts. Unset means 2.",
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "max_tasks": {
+              "description": "Most accepted tasks in the set. Unset means 10; a project may raise it.",
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "runs_per_task": {
+              "description": "Runs per task; a task passes when it passes every run. Unset means 1.",
+              "type": ["integer", "null"],
+              "minimum": 1
+            },
+            "pass_threshold": {
+              "description": "Pass rate, from 0 to 1, below which a complete run on a pull request head posts a notice. No default; unset means no threshold.",
+              "type": ["number", "null"],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "cap": {
+              "description": "Caps of one eval run under the cap rule of intent 0020. No default; unset means no cap.",
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "properties": {
+                "turns_per_task_run": {
+                  "description": "Most turns one task run may use before the run pauses. Unset means no cap.",
+                  "type": ["integer", "null"],
+                  "minimum": 1
+                },
+                "task_runs_per_eval_run": {
+                  "description": "Most task runs one eval run may start before it pauses. Unset means no cap.",
+                  "type": ["integer", "null"],
+                  "minimum": 1
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -278,7 +323,7 @@
         { "$ref": "#/$defs/projectKeys" },
         { "$ref": "gabo.user.schema.json#/$defs/personalKeys" }
       ],
-      "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
+      "properties": { "version": true, "mode": true, "repo": true, "runtimes": true, "coder": true, "review": true, "worktree": true, "parallelism": true, "slots": true, "reviewer": true, "developers": true, "plan_change": true, "wave": true, "eval": true, "alias": true, "interaction_level": true, "tone": true, "language": true },
       "additionalProperties": false
     },
     "file": {
