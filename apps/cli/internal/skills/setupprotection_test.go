@@ -92,7 +92,7 @@ func TestSetupProtectionRecordsADeclineOnce(t *testing.T) {
 	t.Parallel()
 	requireAll(t, protectionStep(t), []string{
 		"decline",
-		"`list decisions`", "`wave: none`", "`task: global`", "whose `what` starts with `branch protection`",
+		"`list decisions`", "`wave: none`", "`task: global`", "whose `what` starts with `branch protection`", "the most recent",
 		"with its date",
 		"does not ask again",
 		"writes nothing to the host",
@@ -150,7 +150,11 @@ func TestSetupProtectionSavesOneDecisionRecord(t *testing.T) {
 // does not stop the label check on a later run.
 func TestSetupProtectionLabelsAreTrackerWrites(t *testing.T) {
 	t.Parallel()
-	requireAll(t, protectionStep(t), []string{"tracker labels, not a host write"})
+	requireAll(t, protectionStep(t), []string{
+		"tracker labels, not a host write",
+		"report `branch protection: not offered (<reason>)`, still run the labels check below, and go on",
+		"report the labels as not run and go on",
+	})
 }
 
 // The R28 step keeps its number and its text; the protection step follows it.
