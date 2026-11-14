@@ -46,7 +46,7 @@ scenario() {
   echo "owner" >"$fx/user_login"
   jq -n --arg sha "${SCENARIO_HEAD:-$HEAD_SHA}" --arg m "${SCENARIO_MERGEABLE:-MERGEABLE}" --arg b "${SCENARIO_BASE:-dev}" \
     --arg body "${SCENARIO_PR_BODY-}" \
-    '{number:7, state:"OPEN", headRefOid:$sha, baseRefName:$b, isDraft:false, isCrossRepository:false, mergeable:$m, body:$body}' >"$fx/pr_7.json"
+    '{number:7, state:"OPEN", headRefOid:$sha, baseRefName:$b, isDraft:false, isCrossRepository:false, mergeable:$m, body:$body, author:{login:"owner"}}' >"$fx/pr_7.json"
   pr_files_json "$ORIGIN" >"$fx/files_7"
   if [[ -n "${SCENARIO_ISSUE:-}" ]]; then
     printf '%s\n' "$SCENARIO_ISSUE" >"$fx/issue_789.json"
@@ -602,6 +602,17 @@ v="$(SCENARIO_ISSUE='{"author":{"login":"owner"},"body":"Task body.","comments":
 check "a contract line from a third party is never read as a contract line" bash -c "! grep -q -- '- S2 ' '$work/qanot/posted_7.md' && ! grep -q -- '--bogus' '$work/qanot/prompt_seen.txt'"
 check "the contract line of the issue author is read" grep -qF -- '- S1 (`gabo version` prints the version): pass' "$work/qanot/posted_7.md"
 check "the contract text sits between data markers in the prompt" grep -qF 'BEGIN DONE CONTRACT' "$work/qanot/prompt_seen.txt"
+v="$(qa_scenario qafailrun CLAUDE_MODE=qa_pass FAIL_CHECK='gabo check')"
+check "a contract command that exits 1 is a fail even when the reply says pass" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1' "$work/qafailrun/posted_7.md"
+check "the failed contract command makes the verdict blocking" grep -qF 'Blocking issues found.' "$work/qafailrun/posted_7.md"
+v="$(qa_scenario qafailomit FAIL_CHECK='gabo check')"
+check "a contract command that exits 1 is a fail when the reply leaves the line out" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1' "$work/qafailomit/posted_7.md"
+v="$(SCENARIO_ISSUE='{"author":{"login":"stranger"},"body":"Task body.","comments":[{"author":{"login":"stranger"},"body":"<!-- gabo-progress -->\nS1: `gabo version` prints the version"}]}' qa_scenario qastranger CLAUDE_MODE=qa_pass)"
+check "a task issue written by someone else than the PR author is not read" grep -qxF 'not run: task issue #789 was not written by the PR author' "$work/qastranger/posted_7.md"
+check "a task issue written by someone else builds nothing" bash -c "! grep -q 'build -o' '$work/qastranger/calls.log'"
+long="$(printf 'x%.0s' {1..300})"
+v="$(SCENARIO_CONTRACT="$(printf '%s\nS1: `gabo version` prints %s' '<!-- gabo-progress -->' "$long")" qa_scenario qalong CLAUDE_MODE=qa_pass)"
+check "a long contract line is cut in the comment" bash -c "! grep -q 'x\{250\}' '$work/qalong/posted_7.md'"
 v="$(qa_scenario qabare CLAUDE_MODE=qa_bare)"
 check "a pass without its command reads not run, for a contract line too" grep -qxF -- '- S1 (`gabo check` exits 0): not run: no command recorded' "$work/qabare/posted_7.md"
 v="$(SCENARIO_CONTRACT=$'S1: `gabo version` prints the version\nS4: not provable: the wording is a judgment' qa_scenario qanot2)"
