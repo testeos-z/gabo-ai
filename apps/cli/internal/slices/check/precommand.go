@@ -50,7 +50,7 @@ func humanOnlyViolations(hits []humanHit) []ShellViolation {
 	var out []ShellViolation
 	for _, h := range hits {
 		if h.unresolved {
-			out = append(out, ShellViolation{Rule: "a coder shell command writes " + oneLine(h.raw) + " after a cd the guard cannot read", Route: "write the literal path, without a cd the guard cannot read"})
+			out = append(out, ShellViolation{Rule: "a coder shell command writes " + oneLine(h.raw) + " through a path the guard cannot read (a cd, a variable, ~ or a command substitution)", Route: "write the literal path, without a cd, a variable, ~ or a command substitution the guard cannot read"})
 			continue
 		}
 		out = append(out, ShellViolation{Rule: "a coder shell command writes the human-only path " + oneLine(h.raw), Route: humanOnlyRoute})

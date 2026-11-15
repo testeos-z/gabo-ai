@@ -33,16 +33,25 @@ type cdState struct {
 	unresolved bool
 }
 
-// word returns the write of raw made in this folder.
+// word returns the write of raw made in this folder. A raw path the guard
+// cannot read (unreadableWord) is unresolved, as a write after a cd it cannot read.
 func (st cdState) word(raw string, ancestor bool) writeWord {
-	w := writeWord{raw: raw, path: raw, ancestor: ancestor, unresolved: st.unresolved}
+	w := writeWord{raw: raw, path: raw, ancestor: ancestor, unresolved: st.unresolved || unreadableWord(raw)}
 	switch {
-	case st.unresolved:
+	case w.unresolved:
 		w.path = ""
 	case st.dir != "" && !filepath.IsAbs(raw):
 		w.path = path.Join(st.dir, raw)
 	}
 	return w
+}
+
+// unreadableWord reports whether a write target names a path the guard cannot
+// read: it holds a variable ($), a tilde (~), a backquote, or the $ marker that
+// shellCommands keeps for a command substitution, whose output only the shell
+// knows (I0028 S7, S13, review round 5).
+func unreadableWord(raw string) bool {
+	return strings.ContainsAny(raw, "$`~")
 }
 
 // enter returns the state after a cd or pushd with args. An operand the guard

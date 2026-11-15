@@ -136,6 +136,14 @@ func shellCommands(s string, bash bool) []simpleCommand {
 		// plain or double-quoted text alike; the outer word is kept.
 		if state != single && (c == '`' || (c == '$' && i+1 < len(s) && s[i+1] == '(')) {
 			body, end := substitution(s, i)
+			if bash {
+				// The write rule keeps the substitution's own text in the outer word,
+				// so a write target that holds it is unreadable (unreadableWord), and a
+				// pending redirection target is not lost with the split (I0028 S7,
+				// review round 5).
+				word = append(word, s[i:end+1]...)
+				inWord = true
+			}
 			flushSeg()
 			cmds = append(cmds, shellCommands(body, bash)...)
 			i = end
