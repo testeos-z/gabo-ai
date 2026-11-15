@@ -2,7 +2,13 @@
 # wave-record.sh [--wave <id>] stamp <event> <args...> [--at <UTC time>] | measures
 #   | saves add <topic key> <observation id> | saves read <topic key> | saves unverified
 #   | caps --engine <engine> [--paused]
+#   | outcome <kind> [--answer <answer>] <lock> <task> <engine> <rule...>
+#   | outcomes <file>
 # Records the steps of one wave and reports their measures (intent 0024).
+# outcome and outcomes print the lock records of the wave's trace (intent
+# 0028 S16): outcome checks and prints one line, outcomes turns the JSON
+# records the hooks append to the outcome file into such lines. Neither writes
+# a file.
 # The wave id is --wave or GABO_WAVE_ID (not needed by caps). Files live only
 # under ${XDG_STATE_HOME:-$HOME/.local/state}/gabo/waves/<id>/ (stamps, saves).
 # caps reads wave.* of ./gabo.yaml read-only.
@@ -149,8 +155,81 @@ case $cmd in
     echo "spend is not capped by gabo"
     [ -z "$paused" ] || echo "continue or stop"
     ;;
+  outcome)
+    kind=${1:-}
+    [ $# -eq 0 ] || shift
+    answer=
+    has_answer=
+    if [ "${1:-}" = --answer ]; then
+      [ $# -ge 2 ] || { echo "wave-record: outcome: --answer needs a value" >&2; exit 2; }
+      answer=$2
+      has_answer=1
+      shift 2
+    fi
+    lock=${1:-}
+    task=${2:-}
+    engine=${3:-}
+    if [ $# -ge 3 ]; then shift 3; else set --; fi
+    rule="$*"
+    case $kind in
+      blocked | warned | asked | not-run) ;;
+      *) echo "wave-record: outcome: the kind is blocked, warned, asked or not-run" >&2; exit 2 ;;
+    esac
+    if [ "$kind" = asked ]; then
+      [ -n "$has_answer" ] || { echo "wave-record: outcome: asked needs --answer" >&2; exit 2; }
+    elif [ -n "$has_answer" ]; then
+      echo "wave-record: outcome: --answer is for asked only" >&2; exit 2
+    fi
+    case $lock in
+      shell_guard | release_gate | human_only_paths | credentials | test_files) ;;
+      *) echo "wave-record: outcome: unknown lock" >&2; exit 2 ;;
+    esac
+    case $task in '' | *[[:space:]]*) echo "wave-record: outcome: the task is one word" >&2; exit 2 ;; esac
+    case $engine in '' | *[[:space:]]*) echo "wave-record: outcome: the engine is one word" >&2; exit 2 ;; esac
+    nl='
+'
+    case $rule in '' | *"$nl"*) echo "wave-record: outcome: the rule is one non-empty line" >&2; exit 2 ;; esac
+    if [ "$kind" = asked ]; then
+      printf '%s\n' "asked: $lock $task $engine $rule; answer: $answer"
+    else
+      label=$kind
+      [ "$kind" = not-run ] && label='not run'
+      printf '%s\n' "$label: $lock $task $engine $rule"
+    fi
+    ;;
+  outcomes)
+    file=${1:-}
+    [ $# -eq 0 ] || shift
+    [ -n "$file" ] && [ $# -eq 0 ] || { echo "wave-record: usage: outcomes <file>" >&2; exit 2; }
+    # No file means no hook wrote a record yet: nothing to print.
+    [ -f "$file" ] || exit 0
+    awk '
+      function field(key,   re, s) {
+        re = "\"" key "\":\"([^\"\\\\]|\\\\.)*\""
+        if (!match($0, re)) return ""
+        s = substr($0, RSTART + length(key) + 4, RLENGTH - length(key) - 5)
+        gsub(/\\"/, "\"", s)
+        return s
+      }
+      {
+        kind = field("outcome"); lock = field("lock"); task = field("task")
+        engine = field("engine"); rule = field("rule")
+        if (kind == "" || lock == "" || task == "" || engine == "") {
+          printf "wave-record: outcomes: unreadable record on line %d\n", NR > "/dev/stderr"
+          exit 1
+        }
+        if (kind == "asked") {
+          printf "asked: %s %s %s %s; answer: %s\n", lock, task, engine, rule, field("answer")
+        } else {
+          line = kind ": " lock " " task " " engine " " rule
+          note = field("note")
+          if (note != "") line = line "; note: " note
+          print line
+        }
+      }' "$file"
+    ;;
   *)
-    echo "wave-record: usage: [--wave <id>] stamp <event> <args...> | measures | saves ... | caps --engine <engine> [--paused]" >&2
+    echo "wave-record: usage: [--wave <id>] stamp <event> <args...> | measures | saves ... | caps --engine <engine> [--paused] | outcome ... | outcomes <file>" >&2
     exit 2
     ;;
 esac
