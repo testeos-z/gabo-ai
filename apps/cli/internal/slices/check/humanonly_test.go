@@ -47,7 +47,8 @@ func TestHumanOnlyPathMatchesEntries(t *testing.T) {
 		{"*.md", true},
 		{"AGENTS.*", true},
 		{"apps/cli/*.go", false},
-		{"build/*", false},
+		// build/* can match build/AGENTS.md, which the literal rule covers (round 5).
+		{"build/*", true},
 	}
 	for _, tt := range tests {
 		if got := humanPath(u, tt.path, list); got != tt.want {
