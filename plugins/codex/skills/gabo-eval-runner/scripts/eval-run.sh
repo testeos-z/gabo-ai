@@ -275,6 +275,16 @@ one_line() {
   awk 'NR > 1 { printf " ; " } { printf "%s", $0 } END { print "" }' <<<"${1%$'\n'}"
 }
 
+# report_format <tree>: the coder's methodology report block, read from the tree
+# under test (its gabo-coder skill, after the head configuration is applied), so
+# the engine writes the report the catalog under test asks for (intent 0030 S5,
+# T18). Nothing when the tree has no such block: the report gate then fails.
+report_format() {
+  local f="$1/.gabo/skills/gabo-coder/SKILL.md"
+  [[ -f "$f" ]] || return 0
+  awk '/^### Methodology report block/ { p = 1 } /^DONE carries/ { p = 0 } p' "$f"
+}
+
 # run_one <task-file> <id> <starting-commit> <run-no> <task-input>: one run in a
 # fresh scratch copy. Prints the run line and one line per outcome check, and
 # returns 0 only when the run passes. A check that did not run is `not run`.
@@ -282,7 +292,7 @@ one_line() {
 # or cut (a turn cap stopped the engine: the run is not run and no check runs).
 run_one() {
   local file="$1" id="$2" start="$3" n="$4" input="$5"
-  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" check_why="" gap="" c rc detail="" nr turn_cut=0
+  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" check_why="" gap="" c rc detail="" nr turn_cut=0 fmt
   local -a checks
   # Each outcome check is one script, possibly several lines: read the
   # NUL-delimited scripts whole, never line by line (the first baseline failed
@@ -306,6 +316,8 @@ run_one() {
 
   if [[ -z "$reason" ]]; then
     printf '%s\n' "$input" >"$scratch/prompt.txt"
+    fmt="$(report_format "$tree")"
+    if [[ -n "$fmt" ]]; then printf '\n%s\n' "$fmt" >>"$scratch/prompt.txt"; fi
     if [[ -n "$cap_turns" && "$engine" != claude ]]; then
       printf 'Turn limit for this run: %s turns. Stop and report at this limit.\n' "$cap_turns" >>"$scratch/prompt.txt"
     fi

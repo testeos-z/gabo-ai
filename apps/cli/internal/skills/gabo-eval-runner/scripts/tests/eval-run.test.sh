@@ -228,6 +228,48 @@ code=$?
 has "T18 a multi-line outcome check that fails on a later line fails the run" "$code" 1 \
   "task eval-001: fail (0 of 1 runs)" "$out"
 
+# --- T18: the engine prompt carries the report format of the tree under test --
+
+# The coder's report format is read from the tree being evaluated (the gabo-coder
+# skill of the head configuration), never hard-coded: evals measure the catalog.
+mkdir -p "$repo/.gabo/skills/gabo-coder"
+cat >"$repo/.gabo/skills/gabo-coder/SKILL.md" <<'MD'
+# Coder fixture
+
+### Methodology report block
+
+- Test evidence: `odd: RED FIXTURE-FORMAT-7 <test name>; GREEN <test name>`.
+- Spec lines: `spec S<n>: covered`.
+- Verifier: `verifier: <commands and what it saw>`.
+
+DONE carries the close report: merged SHA.
+MD
+gitc "$repo" add -A
+gitc "$repo" commit -q -m "docs: head carries the coder report block"
+fmt_head="$(gitc "$repo" rev-parse HEAD)"
+e="$work/fmt/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_STDIN="$work/fmt.prompt" run_eval fmt "$e" "$cfg_coder" 0 "$fmt_head")"
+code=$?
+has "T18 the engine prompt carries the report block of the tree under test" "$code" 0 \
+  "odd: RED FIXTURE-FORMAT-7" "$(cat "$work/fmt.prompt" 2>/dev/null)"
+has "T18 the engine prompt keeps the task input first" "$code" 0 \
+  "Change the rule to new." "$(head -1 "$work/fmt.prompt" 2>/dev/null)"
+has "T18 the report block stops before the close report line" "$code" 0 "- Verifier:" "$(cat "$work/fmt.prompt" 2>/dev/null)"
+if grep -q "DONE carries" "$work/fmt.prompt" 2>/dev/null; then
+  bad "T18 the report block stops before the close report line"
+fi
+e="$work/nofmt/evals"
+mkdir -p "$e"
+task "$start" >"$e/eval-001.json"
+out="$(FAKE_STDIN="$work/nofmt.prompt" run_eval nofmt "$e" "$cfg_coder" 0 "$head")"
+if grep -q "FIXTURE-FORMAT-7\|Methodology report block" "$work/nofmt.prompt" 2>/dev/null; then
+  bad "T18 a tree without a report block adds none to the engine prompt"
+else
+  ok "T18 a tree without a report block adds none to the engine prompt"
+fi
+
 # --- S4: runs per task, a failing run reads fail and both are kept -----------
 
 e="$work/two/evals"
