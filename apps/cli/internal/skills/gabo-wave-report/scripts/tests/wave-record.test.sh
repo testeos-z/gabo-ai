@@ -65,6 +65,19 @@ expect_eq "$out" "$(cat "$waves/w2/stamps")" "GABO_WAVE_ID writes its own folder
 run --wave w1 stamp bogus-event >/dev/null
 expect_eq "2" "$?" "an unknown event exits 2"
 expect_eq "5" "$(wc -l <"$waves/w1/stamps" | tr -d ' ')" "an unknown event writes nothing"
+
+echo "# stamp incident (intent 0030 S13)"
+out="$(run --wave w3 stamp incident T14 838 reviewer)"
+expect_match "^incident T14 838 reviewer $RFC\$" "$out" "incident prints <task> <pr> <who> <time>"
+expect_eq "$out" "$(cat "$waves/w3/stamps")" "incident appends the printed line"
+expect_eq "incident T15 839 assistant 2026-11-14T10:00:00Z" "$(run --wave w3 stamp incident T15 839 assistant --at 2026-11-14T10:00:00Z)" "incident keeps its own --at time"
+run --wave w3 stamp incident T14 838 nobody >/dev/null
+expect_eq "2" "$?" "incident with an unknown finder exits 2"
+run --wave w3 stamp incident T14 PR838 owner >/dev/null
+expect_eq "2" "$?" "incident with a non-numeric PR exits 2"
+run --wave w3 stamp incident T14 owner >/dev/null
+expect_eq "2" "$?" "incident without a PR exits 2"
+expect_eq "2" "$(wc -l <"$waves/w3/stamps" | tr -d ' ')" "a refused incident writes nothing"
 sh "$script" stamp wave-started >/dev/null 2>&1
 expect_eq "2" "$?" "no wave id exits 2"
 expect_eq "wave-record: no wave id" "$(sh "$script" stamp wave-started 2>&1)" "no wave id message"
