@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0014-agent-name-and-duplicate-skill-checks |
-| status | Accepted |
+| status | Done on 2026-11-07. Intent issue [#444](https://github.com/testeos-z/gabo-ai/issues/444) is closed as completed; all 2 task issues are closed: "Both tasks merged into dev with a clean review: #467 (PR #470, merge 64c2971) and #468 (PR #471, merge 498f015).". |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-07 |

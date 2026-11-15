@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0023-unattended-pi-waves-and-flow-hygiene](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-13. All 26 task issues are closed (26 completed); see the intent status row. Tasks are in the tracker under [#575](https://github.com/testeos-z/gabo-ai/issues/575). |
 | owner | gabo-dev-lead |
 | date | 2026-11-12 |
 

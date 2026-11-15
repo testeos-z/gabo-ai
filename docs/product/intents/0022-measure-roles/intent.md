@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0022-measure-roles |
-| status | Specified |
+| status | Done on 2026-11-12. Intent issue [#497](https://github.com/testeos-z/gabo-ai/issues/497) is closed as completed; all 8 task issues are closed: all 8 tasks (T1-T8) closed as completed; the wave report is in the #497 comments. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |

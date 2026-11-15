@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0019-talk-to-cloud-agent-sessions |
-| status | Specified |
+| status | Done on 2026-11-12. Intent issue [#494](https://github.com/testeos-z/gabo-ai/issues/494) is closed as completed; all 8 task issues are closed: all 8 tasks closed as completed; the wave report is in the #494 comments. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |

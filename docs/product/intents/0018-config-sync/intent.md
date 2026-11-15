@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0018-config-sync |
-| status | Specified |
+| status | Done on 2026-11-11. Intent issue [#493](https://github.com/testeos-z/gabo-ai/issues/493) is closed as completed; all 4 task issues are closed: "T1 #499 (PR #511), T2 #500 (PR #518), T3 #501 (PR #521, fix PR #523), T4 #502 closed, and the _env follow-up (PR #527) merged into dev." A later finding from the I0015/T13 review was posted on #493 on 2026-11-12. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |

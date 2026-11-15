@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0021-delegate-by-reason-not-by-default |
-| status | Specified |
+| status | Done on 2026-11-12. Intent issue [#496](https://github.com/testeos-z/gabo-ai/issues/496) is closed as completed; all 7 task issues are closed: all 7 tasks (T1-T7) closed as completed; the wave report is in the #496 comments. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-11 |

@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0016-gabo-init-pi-subagent-package-check-and-reviewer-content-check](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-12. All 5 task issues are closed (5 completed); see the intent status row. Tasks are in the tracker under [#489](https://github.com/testeos-z/gabo-ai/issues/489). |
 | owner | gabo-dev-lead |
 | date | 2026-11-11 |
 

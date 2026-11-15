@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0002-codex-plugin |
-| status | Draft |
+| status | Done on 2026-11-11. Intent issue [#173](https://github.com/testeos-z/gabo-ai/issues/173) is closed as completed; all 11 task issues are closed: 10 tasks closed as completed with merged PRs; the owner-machine verification T10 #216 was closed as not planned on the owner's decision of 2026-11-11 ("closed unverified"; code merged in `main` and shipped in gabo 0.2.10). |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-03 |

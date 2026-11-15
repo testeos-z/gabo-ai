@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0012-design-norms-template |
-| status | Accepted |
+| status | Done on 2026-11-07. Intent issue [#374](https://github.com/testeos-z/gabo-ai/issues/374) is closed as completed; all 5 task issues are closed: "All I0012 tasks closed (T1 #395, T2 #396, T3 #397, T4 #398, T5 #438 via PR #442, merge 3b1417d).". |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-06 |

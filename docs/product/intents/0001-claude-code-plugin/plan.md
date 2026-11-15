@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0001-claude-code-plugin](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-11. All 10 task issues are closed (9 completed); see the intent status row. Tasks are in the tracker under [#172](https://github.com/testeos-z/gabo-ai/issues/172). |
 | owner | gabo-dev-lead |
 | date | 2026-11-03 |
 

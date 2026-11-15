@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0013-several-engines-in-parallel-in-one-project |
-| status | Accepted |
+| status | Done on 2026-11-07. Intent issue [#393](https://github.com/testeos-z/gabo-ai/issues/393) is closed as completed; all 22 task issues are closed: "All tasks closed (T1-T22). Known limits for 0.2.10 documented in docs/compatibility.md (PR #465); code follow-ups in #463.". |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-06 |

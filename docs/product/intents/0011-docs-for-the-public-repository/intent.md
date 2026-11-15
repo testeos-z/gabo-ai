@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0011-docs-for-the-public-repository |
-| status | Accepted |
+| status | Done on 2026-11-06. Intent issue [#355](https://github.com/testeos-z/gabo-ai/issues/355) is closed as completed; all 4 task issues are closed: "All four tasks (#369-#372) are merged into dev (PRs #376, #377, #378, #380).". |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-06 |
