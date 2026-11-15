@@ -125,6 +125,10 @@ func (u *UseCase) humanOnlyShellWrites(command string, coder bool, list []string
 func writeWords(cmds []simpleCommand, unwrap bool, st cdState) ([]writeWord, cdState) {
 	var out []writeWord
 	for _, c := range cmds {
+		// A substitution runs first, in a subshell: its commands are judged from the
+		// folder this command runs in, and a cd in them does not leave it.
+		subWords, _ := writeWords(c.subs, unwrap, st)
+		out = append(out, subWords...)
 		for _, t := range c.targets {
 			out = append(out, st.word(t, false))
 		}

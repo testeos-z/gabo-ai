@@ -77,6 +77,9 @@ func shellSegments(s string) [][]string {
 type simpleCommand struct {
 	words   []string
 	targets []string
+	// subs are the commands of the substitutions in this command, which run
+	// first, in a subshell (write view only).
+	subs []simpleCommand
 }
 
 // shellCommands splits a command line into its simple commands, as
@@ -94,6 +97,7 @@ func shellCommands(s string, bash bool) []simpleCommand {
 	)
 	var cmds []simpleCommand
 	var cur, targets []string
+	var subs []simpleCommand
 	var word []byte
 	inWord := false
 	state := plain
@@ -124,10 +128,10 @@ func shellCommands(s string, bash bool) []simpleCommand {
 	}
 	flushSeg := func() {
 		flushWord()
-		if len(cur) > 0 {
-			cmds = append(cmds, simpleCommand{words: cur, targets: targets})
+		if len(cur) > 0 || len(subs) > 0 {
+			cmds = append(cmds, simpleCommand{words: cur, targets: targets, subs: subs})
 		}
-		cur, targets = nil, nil
+		cur, targets, subs = nil, nil, nil
 		pending, targetAt, redirOp = false, -1, ""
 	}
 	for i := 0; i < len(s); i++ {
@@ -137,15 +141,16 @@ func shellCommands(s string, bash bool) []simpleCommand {
 		if state != single && (c == '`' || (c == '$' && i+1 < len(s) && s[i+1] == '(')) {
 			body, end := substitution(s, i)
 			if bash {
-				// The write rule keeps the substitution's own text in the outer word,
-				// so a write target that holds it is unreadable (unreadableWord), and a
-				// pending redirection target is not lost with the split (I0028 S7,
-				// review round 5).
+				// The write rule keeps the substitution in its command: its text joins the
+				// outer word, and its commands run first, in a subshell (subs), so an operand
+				// after it is still judged. The rule view (bash false) ends the command.
 				word = append(word, s[i:end+1]...)
 				inWord = true
+				subs = append(subs, shellCommands(body, bash)...)
+			} else {
+				flushSeg()
+				cmds = append(cmds, shellCommands(body, bash)...)
 			}
-			flushSeg()
-			cmds = append(cmds, shellCommands(body, bash)...)
 			i = end
 			continue
 		}

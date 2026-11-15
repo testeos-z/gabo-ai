@@ -65,3 +65,32 @@ func TestHumanOnlyShellWritesUnreadableNeighbours(t *testing.T) {
 		}
 	}
 }
+
+// I0028 S7, S13 (review round 6): a command substitution does not end the
+// command that holds it, so the operands after it are still judged, and a cd
+// inside a substitution runs in a subshell and does not leave the folder of
+// the line.
+func TestHumanOnlyShellWritesSubstitutionKeepsCommand(t *testing.T) {
+	t.Parallel()
+	blocked := []string{
+		`sed -i "s/v/$(cat VERSION)/" gabo.yaml`,
+		"cp --preserve=$(echo all) x AGENTS.md",
+		"echo $(cd apps) >/dev/null; echo x > gabo.yaml",
+		"echo $(cd apps) >/dev/null; rm -f gabo.yaml",
+	}
+	for _, c := range blocked {
+		if got := humanWrites(c, true); len(got) == 0 {
+			t.Errorf("coder: %q is allowed; want blocked", c)
+		}
+	}
+	allowed := []string{
+		`echo "$(date)" > apps/out.txt`,
+		`sed -i "s/$(cat VERSION)/y/" apps/a.txt`,
+		"echo $(cd apps) >/dev/null; echo x > apps/y",
+	}
+	for _, c := range allowed {
+		if got := humanWrites(c, true); len(got) != 0 {
+			t.Errorf("coder: %q is blocked by %q; want allowed", c, got)
+		}
+	}
+}
