@@ -269,6 +269,22 @@ report_gap() {
   done
 }
 
+# one_line <script>: an outcome check as one report line, its lines joined by
+# ` ; `. A check is a script of several lines, run whole (intent 0030 S1, T18).
+one_line() {
+  awk 'NR > 1 { printf " ; " } { printf "%s", $0 } END { print "" }' <<<"${1%$'\n'}"
+}
+
+# report_format <tree>: the coder's methodology report block, read from the tree
+# under test (its gabo-coder skill, after the head configuration is applied), so
+# the engine writes the report the catalog under test asks for (intent 0030 S5,
+# T18). Nothing when the tree has no such block: the report gate then fails.
+report_format() {
+  local f="$1/.gabo/skills/gabo-coder/SKILL.md"
+  [[ -f "$f" ]] || return 0
+  awk '/^### Methodology report block/ { p = 1 } /^DONE carries/ { p = 0 } p' "$f"
+}
+
 # run_one <task-file> <id> <starting-commit> <run-no> <task-input>: one run in a
 # fresh scratch copy. Prints the run line and one line per outcome check, and
 # returns 0 only when the run passes. A check that did not run is `not run`.
@@ -276,9 +292,13 @@ report_gap() {
 # or cut (a turn cap stopped the engine: the run is not run and no check runs).
 run_one() {
   local file="$1" id="$2" start="$3" n="$4" input="$5"
-  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" check_why="" gap="" c rc detail="" nr turn_cut=0
+  local scratch tree reason="" ecode=0 checks_ok=1 verdict why="" check_why="" gap="" c rc detail="" nr turn_cut=0 fmt
   local -a checks
-  mapfile -t checks < <(jq -r '.outcome_checks[]' "$file")
+  # Each outcome check is one script, possibly several lines: read the
+  # NUL-delimited scripts whole, never line by line (the first baseline failed
+  # because every line of a script ran alone, with its variables unset).
+  checks=()
+  while IFS= read -r -d '' c; do checks+=("$c"); done < <(jq -j '.outcome_checks[] | ., "\u0000"' "$file")
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/gabo-eval-run.XXXXXX")"
   scratches+=("$scratch")
   tree="$scratch/tree"
@@ -296,6 +316,8 @@ run_one() {
 
   if [[ -z "$reason" ]]; then
     printf '%s\n' "$input" >"$scratch/prompt.txt"
+    fmt="$(report_format "$tree")"
+    if [[ -n "$fmt" ]]; then printf '\n%s\n' "$fmt" >>"$scratch/prompt.txt"; fi
     if [[ -n "$cap_turns" && "$engine" != claude ]]; then
       printf 'Turn limit for this run: %s turns. Stop and report at this limit.\n' "$cap_turns" >>"$scratch/prompt.txt"
     fi
@@ -308,18 +330,18 @@ run_one() {
         rc=0
         (cd "$tree" && run_bounded bash -c "$c") >>"$scratch/checks.log" 2>&1 || rc=$?
         if ((rc == 0)); then
-          detail+="    check: $c: pass (exit 0)"$'\n'
+          detail+="    check: $(one_line "$c"): pass (exit 0)"$'\n'
         else
-          detail+="    check: $c: fail (exit $rc)"$'\n'
+          detail+="    check: $(one_line "$c"): fail (exit $rc)"$'\n'
           checks_ok=0
-          [[ -n "$check_why" ]] || check_why="check $c failed (exit $rc)"
+          [[ -n "$check_why" ]] || check_why="check $(one_line "$c") failed (exit $rc)"
         fi
       done
     fi
   else
     nr="$reason"
     for c in "${checks[@]}"; do
-      detail+="    check: $c: not run ($nr)"$'\n'
+      detail+="    check: $(one_line "$c"): not run ($nr)"$'\n'
     done
   fi
 
@@ -327,7 +349,7 @@ run_one() {
     run_verdict=cut
     run_why="cap eval.cap.turns_per_task_run"
     for c in "${checks[@]}"; do
-      detail+="    check: $c: not run (cap eval.cap.turns_per_task_run)"$'\n'
+      detail+="    check: $(one_line "$c"): not run (cap eval.cap.turns_per_task_run)"$'\n'
     done
     printf '%s\n' cut >"$scratch/result"
     printf '  run %s: not run: cap eval.cap.turns_per_task_run (scratch %s)\n' "$n" "$scratch"

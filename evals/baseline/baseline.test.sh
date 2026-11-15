@@ -46,7 +46,7 @@ fi
 
 # 4. The owner's acceptance is recorded: the date and the text relayed to the assistant.
 if [[ "$(jq -r '.accepted_on // ""' "$baseline")" == "2026-11-15" ]] &&
-  [[ "$(jq -r '.acceptance // ""' "$baseline")" == "accepted by the owner 2026-11-15, relayed by the gabo-b assistant" ]]; then
+  [[ "$(jq -r '.acceptance // ""' "$baseline")" == "accepted under the owner's order of 2026-11-15 to proceed with the recommended option, relayed by the gabo-b assistant" ]]; then
   ok "S6 the baseline records the owner's acceptance of 2026-11-15"
 else
   bad "S6 the baseline records the owner's acceptance of 2026-11-15"
