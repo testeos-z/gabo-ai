@@ -199,6 +199,35 @@ else
   bad "S4 the scratch path is printed and kept for the parent to remove (got: ${scratch:-none})"
 fi
 
+# --- S4: a multi-line outcome check runs as one script (intent 0030 S1, S6, T18)
+
+# The accepted tasks hold each outcome check as a script of several lines (a
+# variable set on one line and used on the next). The runner runs the whole
+# script in one bash, so a later line sees what an earlier line set. The first
+# baseline failed this way: each line ran alone and `$bin` was empty.
+e="$work/multi/evals"
+mkdir -p "$e"
+task "$start" | jq '.outcome_checks = ["x=7\n[ \"$x\" = 7 ]\necho \"$x\" >/dev/null", "set -u\ny=ok\n[ \"$y\" = ok ]"]' >"$e/eval-001.json"
+out="$(run_eval multi "$e" "$cfg_coder")"
+code=$?
+has "T18 a multi-line outcome check passes when its whole script passes" "$code" 0 \
+  "task eval-001: pass (1 of 1 runs)" "$out"
+has "T18 the multi-line check is reported once, as one line, and passes" "$code" 0 \
+  "check: x=7 ; [ \"\$x\" = 7 ] ; echo \"\$x\" >/dev/null: pass (exit 0)" "$out"
+if [[ "$(grep -c '^    check: ' <<<"$out")" == 2 ]]; then
+  ok "T18 each outcome check is one report line (two checks, two lines)"
+else
+  bad "T18 each outcome check is one report line (two checks, two lines)"
+  sed 's/^/      | /' <<<"$out"
+fi
+e2="$work/multifail/evals"
+mkdir -p "$e2"
+task "$start" | jq '.outcome_checks = ["x=7\n[ \"$x\" = 8 ]"]' >"$e2/eval-001.json"
+out="$(run_eval multifail "$e2" "$cfg_coder")"
+code=$?
+has "T18 a multi-line outcome check that fails on a later line fails the run" "$code" 1 \
+  "task eval-001: fail (0 of 1 runs)" "$out"
+
 # --- S4: runs per task, a failing run reads fail and both are kept -----------
 
 e="$work/two/evals"
