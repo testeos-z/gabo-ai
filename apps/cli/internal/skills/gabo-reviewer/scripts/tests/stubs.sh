@@ -347,6 +347,7 @@ make_origin() {
     # Existing test files at the base: a Go test, a .test.js file and a file under tests/.
     printf 'package main\n\nimport "testing"\n\nfunc TestMain(t *testing.T) {\n\tif 1 != 1 {\n\t\tt.Fatal("bad")\n\t}\n\tif 2 != 2 {\n\t\tt.Fatal("bad")\n\t}\n}\n' >"$src/apps/cli/main_test.go"
     echo "// fixture" >"$src/apps/cli/fixture.test.js"
+    echo "// fixture with a space" >"$src/apps/cli/has space_test.go"
     mkdir -p "$src/tests" && echo "echo run" >"$src/tests/run.sh"
   fi
   write_yaml "$src/gabo.yaml"
@@ -401,11 +402,12 @@ make_origin() {
       printf 'package main\n\nimport "testing"\n\nfunc TestMain(t *testing.T) {\n\tif 1 != 1 {\n\t\tt.Fatal("bad")\n\t}\n}\n' >"$src/apps/cli/main_test.go"
       echo "// fixture, changed" >"$src/apps/cli/fixture.test.js"
       echo "echo run again" >"$src/tests/run.sh"
+      echo "// fixture with a space, changed" >"$src/apps/cli/has space_test.go"
       printf 'package main\n\nimport "testing"\n\nfunc TestNew(t *testing.T) {}\n' >"$src/apps/cli/new_test.go"
       ;;
   esac
   "${g[@]}" -C "$src" add -A
-  "${g[@]}" -C "$src" commit -qm head
+  "${g[@]}" -C "$src" commit -qm "${O_HEAD_MSG:-head}"
   HEAD_SHA="$(git -C "$src" rev-parse HEAD)"
   "${g[@]}" -C "$src" checkout -qb merged "$BASE_SHA"
   echo "# Dev moved on" >"$src/dev.md"

@@ -180,6 +180,8 @@ check "the Important finding is posted with its pass tag" grep -qF '[security] I
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario high_only CLAUDE_MODE=high_only)" "a High finding without a tagged Important never blocks and never merges"
 
 echo "# test-edit rule (S29)"
+# The fixtures of this section replace the origin of the sections below; they are restored after it.
+kept_origin=("$ORIGIN" "$CALLER" "$BASE_SHA" "$DEV_SHA" "$HEAD_SHA" "$MERGE_SHA")
 origin testedit O_PR=testedit
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario testedit CLAUDE_MODE=loosened)" "a loosened existing test without a reason is blocking"
 expect_eq "Blocking issues found." "$(first_line testedit)" "the loosened-test comment opens with the blocking verdict"
@@ -189,8 +191,14 @@ check "the prompt names a modified .test.js file and a modified file under tests
 check "the prompt does not name a test file the PR adds" bash -c "! grep -qxF -- '- apps/cli/new_test.go' '$work/testedit/prompt_seen.txt'"
 check "the prompt does not name a modified file that is not a test" bash -c "! grep -qxF -- '- apps/cli/main.go' '$work/testedit/prompt_seen.txt'"
 check "the prompt states the loosened-test rule with its reason exception" grep -qF 'loosens an existing test without a stated reason' "$work/testedit/prompt_seen.txt"
-check "a PR that modifies no existing test file lists none" bash -c "grep -A1 -F 'Existing test files this pull request modifies' '$work/clean/prompt_seen.txt' | tail -n 1 | grep -qxF none"
-expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario testedit_ok CLAUDE_MODE=nothing)" "an edit the review does not flag, with no finding, stays clean"
+check "a test file with a space in its name is listed as one path" grep -qxF -- '- apps/cli/has space_test.go' "$work/testedit/prompt_seen.txt"
+check "the commit messages of the PR are in the prompt between markers" bash -c "sed -n '/^----- BEGIN PR COMMITS /,/^----- END PR COMMITS /p' '$work/testedit/prompt_seen.txt' | grep -qxF 'head'"
+check "a PR that modifies no existing test file lists none" bash -c "sed -n '/^----- BEGIN TEST FILES /,/^----- END TEST FILES /p' '$work/clean/prompt_seen.txt' | sed -n 2p | grep -qxF none"
+# A loosened test with a reason stated in a commit message: the reason reaches the prompt, so the agent can judge it.
+origin testedit_reason O_PR=testedit O_HEAD_MSG=$'test: drop the second assertion\n\nThe second case is covered by new_test.go.'
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario testedit_reason CLAUDE_MODE=nothing)" "a loosened test with a stated reason raises no finding"
+check "the stated reason is in the prompt between the commit markers" bash -c "sed -n '/^----- BEGIN PR COMMITS /,/^----- END PR COMMITS /p' '$work/testedit_reason/prompt_seen.txt' | grep -qF 'covered by new_test.go.'"
+ORIGIN="${kept_origin[0]}" CALLER="${kept_origin[1]}" BASE_SHA="${kept_origin[2]}" DEV_SHA="${kept_origin[3]}" HEAD_SHA="${kept_origin[4]}" MERGE_SHA="${kept_origin[5]}"
 
 echo "# review errors"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario garbage CLAUDE_MODE=garbage)" "no verdict line is an error"
