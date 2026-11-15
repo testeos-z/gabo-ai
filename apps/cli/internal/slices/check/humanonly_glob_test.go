@@ -35,3 +35,20 @@ func TestHumanOnlyShellWritesGlobNestedFileEntry(t *testing.T) {
 		}
 	}
 }
+
+// I0028 S13 (review round 6): on a case-insensitive filesystem a glob is
+// matched without case, as a literal path is: rm -f AGENTS.* removes AGENTS.md,
+// so it is blocked; the fold fails closed.
+func TestHumanOnlyShellWritesGlobFoldsCase(t *testing.T) {
+	t.Parallel()
+	u := humanUseCase(Settings{Root: "/proj", FoldCase: true})
+	blocked := []string{"rm -f AGENTS.*", "sed -i s/a/b/ CLAUDE.*", "rm -f GAB*.YAML"}
+	for _, c := range blocked {
+		if got := u.humanOnlyShellWrites(c, true, humanList); len(got) == 0 {
+			t.Errorf("fold: %q is allowed; want blocked", c)
+		}
+	}
+	if got := u.humanOnlyShellWrites("rm -f APPS/*.GO", true, humanList); len(got) != 0 {
+		t.Errorf("fold: APPS/*.GO is blocked by %v; want allowed", got)
+	}
+}

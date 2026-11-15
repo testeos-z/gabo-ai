@@ -140,7 +140,13 @@ func (u *UseCase) shellHumanTarget(p string, list []string, hs []humanEntry) boo
 		if humanOnlyPath(rel, list, u.s.FoldCase) || humanOnlyPath(rel+"/", list, u.s.FoldCase) {
 			return true
 		}
-		if strings.ContainsAny(rel, "*?[") && humanGlobRel(rel, hs) {
+		// The glob is folded like the entries on a case-insensitive filesystem
+		// (I0028 S13, review round 6), as shellAncestorTarget folds it.
+		glob := rel
+		if u.s.FoldCase {
+			glob = strings.ToLower(rel)
+		}
+		if strings.ContainsAny(glob, "*?[") && humanGlobRel(glob, hs) {
 			return true
 		}
 	}
