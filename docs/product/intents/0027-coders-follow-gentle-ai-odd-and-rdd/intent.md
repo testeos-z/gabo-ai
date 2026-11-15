@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0027-coders-follow-gentle-ai-odd-and-rdd |
-| status | Scope A. The owner accepted the spec on 2026-11-13 (spec section 7; decision 6: the spec only, not this intent and not the plan). The plan may now be written by `gabo-dev-lead`; no wave starts until the owner orders it. The narrowing and the playbook changes of the same day are in the spec (section 0 and the Log). |
+| status | Done on 2026-11-15. All 14 tasks of #758 are closed and merged on `dev`: T1 #795, T2 #796, T3 #799, T4 #800, T5 #851, T6 #853, T7 #797, T8 #798, T9 #819, T10 #854, T11 #856, T12 #884, T13 #855; T14 (#792) was the acceptance probe on `testeos-z/gabo-repo` (task #239, PR #240, verdict `clean`, merged), with no gabo-ai PR. Plan changes: #794, #848, #883. Acceptance evidence is the #758 comments of 2026-11-15; S4, S5, S11 and S29 were not observed in the probe and are covered by their task tests (see the plan Log). |
 | owner | gabo-pm |
 | scope | scope A of the four-intent cut of 2026-11-13: what done means and who checks it |
 | sister intents | 0028 deterministic hooks (locks), 0029 branch protection, 0030 agent evals (written by a sister agent in parallel; cited by number, their folders land on dev separately) |
