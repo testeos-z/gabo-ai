@@ -4,7 +4,7 @@ description: "Trigger: eval runner, eval set, evals/*.json, agent eval task, run
 license: Apache-2.0
 metadata:
   author: gabo-ai
-  version: "1.1"
+  version: "1.2"
 ---
 ## Activation Contract
 
@@ -44,7 +44,7 @@ Load when a gabo agent proposes, validates or runs the agent eval set of intent 
 - Then each outcome check runs as a script (`bash -c`) in `tree`. Exit 0 reads `pass`, any other exit `fail`. A check the runner did not execute reads `not run (<reason>)`, never `pass`.
 - A run passes when the engine exits 0, every check passes and the coder's report holds the method evidence (see Method evidence). A task passes only when all of its runs pass. With two runs and one failing it reads `fail (1 of 2 runs)`, both run lines are kept, and the task line names the reason of the first failing run.
 - The report names the engine and `runs per task: <n>`, lists each run with its scratch path, and lists each check. The runner prints every scratch path and never removes one: the parent removes them after use.
-- Command: `bash <skill dir>/scripts/eval-run.sh run evals --head <pr head> --config gabo.yaml [--repo <dir>] [--config-path <path>]...`. Exit 0 when every task passes, 1 on a refusal or a failing task, 2 on bad usage, 3 when a cap paused the run and no task failed.
+- Command: `bash <skill dir>/scripts/eval-run.sh run evals --head <pr head> --config gabo.yaml [--repo <dir>] [--config-path <path>]... [--pr <n>]`. Exit 0 when every task passes, 1 on a refusal, a failing task or a notice that was not posted, 2 on bad usage, 3 when a cap paused the run and no task failed.
 - The per-engine command lines are not yet probed against a real engine; that probe is a later task of the same intent. The fixture tests use `GABO_EVAL_ENGINE_CMD`, a fake command that the report labels as such.
 
 ## Caps (intent 0030 S8, under the rule of intent 0020)
@@ -70,6 +70,19 @@ Load when a gabo agent proposes, validates or runs the agent eval set of intent 
 - The report is printed, not written. The assistant saves it with the existing memory save operation under `gabo/eval/<head sha>/<run id>` at project scope (a `gabo-memory` Records row) and reads it back. Two saved reports are compared by their `pass rate:` lines.
 - The pass rate is the tasks that pass over the tasks in the set; a task passes only when all of its runs pass.
 
+## Notice on the PR (intent 0030 S9, D6, PD4, PD5)
+
+- Only `--pr <n>` (the PR number) lets the run call `gh`. Without it the run posts nothing and prints nothing of a notice.
+- Rule for a run with no accepted baseline: no notice (S6). With no `evals/baseline/baseline.json` the run reads `notice: none (baseline: none; no notice before the owner accepts a baseline, S6)` and posts nothing, even with `--pr`.
+- Author rule: only comments by the authenticated login count. The run reads that login once per run with `gh api user`; if it cannot, it reads `notice: not posted: could not read the authenticated login` and posts nothing. A marker pasted by another commenter never blocks a notice, never earns a cleared marker and is never read back.
+- The notice is never on a paused run: a paused run posts nothing, and the report reads `notice: none (paused run: a notice is posted only for a complete run)`.
+- A complete run below `eval.pass_threshold`, or with no threshold set (`threshold: not set`), posts one PR comment that opens with the marker line `<!-- gabo-eval-notice sha=<head> -->`. It names the head, the run id, the memory topic, the engine, the pass rate, the threshold and each failed task with its reason. A second run on the same head reads `notice: already posted for head` with the head and posts none.
+- A complete run at or above the threshold posts no notice; the report reads `notice: none (at or above the threshold; no notice on PR #<n>)`. On a PR that carries a notice of an earlier head, the run posts once the cleared marker `<!-- gabo-eval-cleared sha=<head> -->`. A repeat on the same head reads `notice: cleared marker already posted for head`.
+- Conservative rule (for the merge hold of T8): a cleared marker only clears an earlier head's notice. It is never posted on a head that carries its own notice; that run reads `notice: none (head <head> already carries a notice; no cleared marker for it)`. A notice for a head is posted whatever a cleared marker for that head says, so the merge step holds a head while any notice names it, and releases a head only when a cleared marker names it and no notice names it.
+- Before it posts, the run reads the PR head (`gh pr view`) and posts nothing when the head is not `--head`: `notice: not posted: PR #<n> head is <sha>, the run measured <head>`. It reads the PR comments with `gh api`, posts with `gh pr comment <n> --body-file`, and reads the comments back. The report prints `notice: posted` with the kind and the head when the read back shows the marker. A failed post reads `notice: not posted: gh could not post the comment`; a post the read back does not show reads `but the read back does not show it`. Each of these exits 1.
+- The notice body is written under a `gabo-eval-notice.<id>` scratch that the report lists for the parent to remove.
+- The markers are the input of the merge hold (intent 0030 S10, a later task). A notice or cleared marker never carries the reviewer's marker, and it is the only write a run makes to the repository host.
+
 ## Commands
 
 Both validation commands print one line per file and exit 0 when the set may run or the proposal may be added, 1 on any refusal, 2 on bad usage. They write nothing.
@@ -82,5 +95,5 @@ Both validation commands print one line per file and exit 0 when the set may run
 
 - Never write a token, key or credential into a task file, a proposal, a baseline or a report. When a source PR printed a secret, the task is not proposed with that text.
 - Never accept a task on the owner's behalf. The owner's acceptance is a human decision.
-- The runner never pushes, opens a PR, comments, calls `gh` or writes to the tracker. It writes only inside its scratch directories, and it never runs an engine in the repository.
+- The runner never pushes, opens a PR, writes to the tracker, or calls `gh` without `--pr`. Its one write to the repository host is the notice of the section Notice on the PR, on that PR only. Otherwise it writes only inside its scratch directories, and it never runs an engine in the repository.
 - Values the owner sets (the pass threshold and the cap) are never written by this skill.

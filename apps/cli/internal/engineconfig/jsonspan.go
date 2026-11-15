@@ -37,6 +37,9 @@ type jsonKV struct {
 // renderJSON renders v. Multiline puts each member on its own line at
 // indent+unit and the closing brace at indent; inline uses ": " and ", ".
 func renderJSON(v any, indent, unit string, multiline bool) string {
+	if list, ok := v.([]any); ok {
+		return renderArray(list, indent, unit, multiline)
+	}
 	obj, ok := v.(jsonObj)
 	if !ok {
 		b, _ := json.Marshal(v)
@@ -440,4 +443,20 @@ func splice(src []byte, from, to int, text string) []byte {
 	out = append(out, src[:from]...)
 	out = append(out, text...)
 	return append(out, src[to:]...)
+}
+
+// renderArray renders a JSON array of values. Multi-line puts one element per
+// line at indent+unit; single-line joins them with ", ".
+func renderArray(items []any, indent, unit string, multiline bool) string {
+	if len(items) == 0 {
+		return "[]"
+	}
+	parts := make([]string, len(items))
+	for i, item := range items {
+		parts[i] = renderJSON(item, indent+unit, unit, multiline)
+	}
+	if !multiline {
+		return "[" + strings.Join(parts, ", ") + "]"
+	}
+	return "[\n" + indent + unit + strings.Join(parts, ",\n"+indent+unit) + "\n" + indent + "]"
 }

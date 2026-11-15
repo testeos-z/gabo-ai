@@ -24,15 +24,59 @@ const (
   },
   "enabledPlugins": {
     "gabo@gabo-ai": true
+  },
+  "permissions": {
+    "deny": [
+      "Read(**/.env)",
+      "Edit(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.env.*)",
+      "Read(**/*.pem)",
+      "Edit(**/*.pem)",
+      "Read(**/*.key)",
+      "Edit(**/*.key)",
+      "Read(**/secrets/**)",
+      "Edit(**/secrets/**)",
+      "Read(~/.ssh/**)",
+      "Edit(~/.ssh/**)",
+      "Read(~/.aws/credentials)",
+      "Edit(~/.aws/credentials)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Edit(~/.config/gh/hosts.yml)",
+      "Read(~/Library/Keychains/**)",
+      "Edit(~/Library/Keychains/**)",
+      "Read(~/.credentials/**)",
+      "Edit(~/.credentials/**)"
+    ]
   }
 }
 `
-	codexKeysTOML = `[marketplaces.gabo-ai]
+	codexKeysTOML = `default_permissions = "gabo-credentials"
+
+[marketplaces.gabo-ai]
 source_type = "git"
 source = "https://github.com/testeos-z/gabo-ai.git"
 
 [plugins."gabo@gabo-ai"]
 enabled = true
+
+[permissions.gabo-credentials]
+extends = ":workspace"
+
+[permissions.gabo-credentials.filesystem]
+"~/.ssh" = "deny"
+"~/.aws/credentials" = "deny"
+"~/.config/gh/hosts.yml" = "deny"
+"~/Library/Keychains" = "deny"
+"~/.credentials" = "deny"
+glob_scan_max_depth = 5
+
+[permissions.gabo-credentials.filesystem.":workspace_roots"]
+"**/.env" = "deny"
+"**/.env.*" = "deny"
+"**/*.pem" = "deny"
+"**/*.key" = "deny"
+"**/secrets/**" = "deny"
 `
 	piKeysJSON = `{"packages": ["npm:@gabo-ai/pi@0.2.6"]}
 `
@@ -42,6 +86,7 @@ enabled = true
 const (
 	claudeMissingPlugin = `✗ .claude/settings.json: enabledPlugins."gabo@gabo-ai" missing; run gabo init`
 	claudeMissingMarket = `✗ .claude/settings.json: extraKnownMarketplaces."gabo-ai" missing; run gabo init`
+	claudeMissingDeny   = `✗ .claude/settings.json: permissions.deny missing; run gabo init`
 	piMissing           = `✗ .pi/settings.json: packages entry npm:@gabo-ai/pi missing; run gabo init (a release build) or add "npm:@gabo-ai/pi@<version>" to packages`
 )
 
@@ -84,18 +129,14 @@ func wantEngineLines(t *testing.T, r Report, want ...string) {
 // another value (false) passes (D6); a complete file passes.
 func TestEngineKeysClaude(t *testing.T) {
 	t.Parallel()
-	noPlugin := `{
-  "extraKnownMarketplaces": {"gabo-ai": {"source": {"source": "github", "repo": "testeos-z/gabo-ai"}}},
-  "permissions": {"allow": ["Bash(ls)"]}
-}
-`
+	noPlugin := strings.Replace(claudeKeysJSON, "  \"enabledPlugins\": {\n    \"gabo@gabo-ai\": true\n  },\n", "", 1)
 	r := run(t, with(project(), map[string]string{".claude/settings.json": noPlugin}), configFiles{projectFile: validConfig}, Settings{})
 	wantFailed(t, r, claudeMissingPlugin)
 	wantEngineLines(t, r, claudeMissingPlugin)
 
 	r = run(t, with(project(), map[string]string{".claude/settings.json": ""}), configFiles{projectFile: validConfig}, Settings{})
-	wantFailed(t, r, claudeMissingMarket, claudeMissingPlugin)
-	wantEngineLines(t, r, claudeMissingMarket, claudeMissingPlugin)
+	wantFailed(t, r, claudeMissingMarket, claudeMissingPlugin, claudeMissingDeny)
+	wantEngineLines(t, r, claudeMissingMarket, claudeMissingPlugin, claudeMissingDeny)
 
 	off := strings.Replace(claudeKeysJSON, `"gabo@gabo-ai": true`, `"gabo@gabo-ai": false`, 1)
 	r = run(t, with(project(), map[string]string{".claude/settings.json": off}), configFiles{projectFile: validConfig}, Settings{})
@@ -133,16 +174,18 @@ func TestEngineKeysCodex(t *testing.T) {
 		codexMissing("marketplaces.gabo-ai.source_type"),
 		codexMissing("marketplaces.gabo-ai.source"),
 		codexMissing(`plugins."gabo@gabo-ai".enabled`),
+		codexMissing("default_permissions"),
+		codexMissing("permissions.gabo-credentials"),
 	}
 	wantFailed(t, r, all...)
 	wantEngineLines(t, r, all...)
 
-	noPlugin := "model = \"o3\"\n\n[marketplaces.gabo-ai]\nsource_type = \"git\"\nsource = \"https://github.com/testeos-z/gabo-ai.git\"\n"
+	noPlugin := strings.Replace(codexKeysTOML, "[plugins.\"gabo@gabo-ai\"]\nenabled = true\n", "", 1)
 	r = run(t, with(proj, map[string]string{".codex/config.toml": noPlugin}), cfg, Settings{})
 	wantFailed(t, r, codexMissing(`plugins."gabo@gabo-ai".enabled`))
 	wantEngineLines(t, r, codexMissing(`plugins."gabo@gabo-ai".enabled`))
 
-	noMarket := "[plugins.\"gabo@gabo-ai\"]\nenabled = true\n"
+	noMarket := strings.Replace(codexKeysTOML, "[marketplaces.gabo-ai]\nsource_type = \"git\"\nsource = \"https://github.com/testeos-z/gabo-ai.git\"\n", "", 1)
 	r = run(t, with(proj, map[string]string{".codex/config.toml": noMarket}), cfg, Settings{})
 	wantFailed(t, r, all[0], all[1])
 	wantEngineLines(t, r, all[0], all[1])

@@ -21,13 +21,14 @@ The plugin does not replace `gabo init`. Per-project config (`gabo.yaml`), slots
 |---|---|
 | `.claude-plugin/plugin.json` | Manifest: name `gabo`, `version`, and the `checks` option (boolean, default `true`). |
 | `skills/` | One relative symlink per catalog skill into `apps/cli/internal/skills/`, every catalog skill except those that run reviews (`gabo-reviewer`, `gabo-reviewer-placement-local`). Claude Code copies them into its plugin cache on install. |
-| `hooks/hooks.json` | `PreToolUse` and `PostToolUse` on `Write\|Edit`. |
-| `scripts/gabo-pre-write.sh` | Pre-write hook: pipes the tool call to `gabo check --pre-write`; a write that breaks the stage gate is blocked with gabo's reason. |
+| `hooks/hooks.json` | `PreToolUse` on `Write\|Edit` and on `Bash`, and `PostToolUse` on `Write\|Edit`. |
+| `scripts/gabo-pre-command.sh` | Pre-command hook: pipes every shell call, unchanged, to `gabo check --pre-command` with `GABO_ENGINE=claude`; gabo's block stops the call with its lines. |
+| `scripts/gabo-pre-write.sh` | Pre-write hook: pipes every file call, unchanged, to `gabo check --pre-write`; gabo's block stops the write with its lines. |
 | `scripts/gabo-check.sh` | Post-write hook: runs `gabo check` and reports its failures to Claude. |
-| `scripts/gabo-hook-filter.sh` | Shared filter: both hooks stay silent when `checks` is off, the project has no `.gabo/VERSION`, `gabo` is not on `PATH`, or the file is not a gabo path (`gabo.yaml`, `.gabo/`, `.claude/agents/`, `.claude/skills/`, `docs/product/`). |
-| `scripts/tests/` | Shell tests for both hooks, run by the Go tests in `apps/cli/internal/skills`. |
+| `scripts/gabo-hook-filter.sh` | Shared helpers: the lock relay (silent when `checks` is off or the project has no `.gabo/VERSION`; one warning when `gabo` is not on `PATH`; the exit mapping: 0 runs, 1 and 3 block, any other exit blocks and names the failure) and the gabo-path filter of the post-write check (`gabo.yaml`, `.gabo/`, `.claude/agents/`, `.claude/skills/`, `docs/product/`). |
+| `scripts/tests/` | Shell tests for the hooks, run by the Go tests in `apps/cli/internal/skills`. |
 
-The hooks hold no check rule; every rule lives in `gabo check`. Turn both off with the plugin's `checks` row in `/config`.
+The hooks hold no check rule; every rule lives in `gabo check`. Turn the hooks off with the plugin's `checks` row in `/config`. Claude Code shows no prompt for an `ask` lock in this relay (probe item (d) is `no`), so an ask blocks the call (intent 0028 S12).
 
 ## Open owner decisions
 

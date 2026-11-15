@@ -1,0 +1,26 @@
+default_permissions = "gabo-credentials"
+
+[marketplaces.gabo-ai]
+source_type = "git"
+source = "https://github.com/testeos-z/gabo-ai.git"
+
+[plugins."gabo@gabo-ai"]
+enabled = true
+
+[permissions.gabo-credentials]
+extends = ":workspace"
+
+[permissions.gabo-credentials.filesystem]
+"~/.ssh" = "deny"
+"~/.aws/credentials" = "deny"
+"~/.config/gh/hosts.yml" = "deny"
+"~/Library/Keychains" = "deny"
+"~/.credentials" = "deny"
+glob_scan_max_depth = 5
+
+[permissions.gabo-credentials.filesystem.":workspace_roots"]
+"**/.env" = "deny"
+"**/.env.*" = "deny"
+"**/*.pem" = "deny"
+"**/*.key" = "deny"
+"**/secrets/**" = "deny"

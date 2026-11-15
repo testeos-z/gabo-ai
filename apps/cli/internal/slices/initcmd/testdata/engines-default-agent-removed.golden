@@ -1,6 +1,6 @@
 engine integration:
   claude:
-    wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai", agent
+    wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai", agent, permissions.deny
   opencode:
     removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)
     removed opencode.jsonc default_agent: "gabo-assistant" (runtimes.assistant is claude)

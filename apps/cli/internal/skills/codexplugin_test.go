@@ -266,9 +266,9 @@ func dirNames(t *testing.T, dir string) []string {
 // codexHookScripts are the shared hook scripts of the Claude Code plugin the
 // Codex plugin ships as real copies under scripts/ (intent 0002 S7, S13, D5,
 // spec open question 5 option c): codex-cli leaves symlinked files out of its
-// plugin cache. gabo-hook-filter.sh is sourced by gabo-check.sh and
-// gabo-pre-write.sh.
-var codexHookScripts = []string{"gabo-check.sh", "gabo-hook-filter.sh", "gabo-pre-write.sh"}
+// plugin cache. gabo-hook-filter.sh is sourced by every hook script; the two
+// relays (intent 0028 T11) run as `codex`.
+var codexHookScripts = []string{"gabo-check.sh", "gabo-hook-filter.sh", "gabo-pre-command.sh", "gabo-pre-write.sh"}
 
 // The Codex plugin's scripts/ holds exactly the shared hook scripts (plus
 // their tests), each a regular file byte-identical, with the same mode, to its
@@ -296,7 +296,7 @@ func TestCodexPluginScriptsCopyTheSharedHookScripts(t *testing.T) {
 // the plugin root with the argument codex (intent 0002 S1, S7, D5).
 func TestCodexPluginHooksWirePostWriteCheck(t *testing.T) {
 	t.Parallel()
-	requireCodexHook(t, "PostToolUse", "gabo-check.sh")
+	requireCodexHook(t, "PostToolUse", "apply_patch", "gabo-check.sh")
 }
 
 // hooks.codex.json wires the pre-write hook: PreToolUse on apply_patch runs
@@ -304,14 +304,22 @@ func TestCodexPluginHooksWirePostWriteCheck(t *testing.T) {
 // (intent 0002 S13, D5).
 func TestCodexPluginHooksWirePreWriteCheck(t *testing.T) {
 	t.Parallel()
-	requireCodexHook(t, "PreToolUse", "gabo-pre-write.sh")
+	requireCodexHook(t, "PreToolUse", "apply_patch", "gabo-pre-write.sh")
+}
+
+// hooks.codex.json wires the pre-command hook: PreToolUse on Bash, the Codex
+// shell tool, runs scripts/gabo-pre-command.sh from the plugin root with the
+// argument codex (intent 0028 S3, plan T11).
+func TestCodexPluginHooksWirePreCommandCheck(t *testing.T) {
+	t.Parallel()
+	requireCodexHook(t, "PreToolUse", "Bash", "gabo-pre-command.sh")
 }
 
 // requireCodexHook fails unless the Codex manifest names hooks.codex.json
-// inside the plugin root and that file wires event to exactly one apply_patch
-// matcher group running `bash "${PLUGIN_ROOT}/scripts/<script>" codex`, a
+// inside the plugin root and that file wires event to exactly one matcher
+// group for matcher, running `bash "${PLUGIN_ROOT}/scripts/<script>" codex`, a
 // script present in the plugin.
-func requireCodexHook(t *testing.T, event, script string) {
+func requireCodexHook(t *testing.T, event, matcher, script string) {
 	t.Helper()
 	p := readJSON(t, codexPluginDir+"/.codex-plugin/plugin.json")
 	if p["hooks"] != "./hooks/hooks.codex.json" {
@@ -324,25 +332,44 @@ func requireCodexHook(t *testing.T, event, script string) {
 	}
 	h := readJSON(t, codexPluginDir+"/hooks/hooks.codex.json")
 	hooks, _ := h["hooks"].(map[string]any)
-	groups, _ := hooks[event].([]any)
+	all, _ := hooks[event].([]any)
+	var groups []map[string]any
+	for _, g := range all {
+		if m, ok := g.(map[string]any); ok && m["matcher"] == matcher {
+			groups = append(groups, m)
+		}
+	}
 	if len(groups) != 1 {
-		t.Fatalf("hooks.codex.json %s %v, want exactly one matcher group", event, hooks[event])
+		t.Fatalf("hooks.codex.json %s %v, want exactly one %s matcher group", event, hooks[event], matcher)
 	}
-	group, _ := groups[0].(map[string]any)
-	if group["matcher"] != "apply_patch" {
-		t.Fatalf("%s matcher %v, want apply_patch", event, group["matcher"])
-	}
-	cmds, _ := group["hooks"].([]any)
+	cmds, _ := groups[0]["hooks"].([]any)
 	if len(cmds) != 1 {
-		t.Fatalf("%s hooks %v, want exactly one command", event, group["hooks"])
+		t.Fatalf("%s %s hooks %v, want exactly one command", event, matcher, groups[0]["hooks"])
 	}
 	cmd, _ := cmds[0].(map[string]any)
 	want := `bash "${PLUGIN_ROOT}/scripts/` + script + `" codex`
 	if cmd["type"] != "command" || cmd["command"] != want {
-		t.Fatalf("%s hook %v, want command %s", event, cmd, want)
+		t.Fatalf("%s %s hook %v, want command %s", event, matcher, cmd, want)
 	}
 	if _, err := os.Stat(filepath.Join(root, "scripts", script)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// The Codex copy of the pre-command hook script passes its shell tests with a
+// fake gabo on PATH and Codex PreToolUse Bash inputs (intent 0028 S3, S10,
+// S12, S15, S16; plan T11).
+func TestCodexPluginPreCommandHookScript(t *testing.T) {
+	if testing.Short() {
+		t.Skip("shell tests skipped in -short mode")
+	}
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skipf("bash not found: %v", err)
+	}
+	test := filepath.Join(repoRoot, codexPluginDir, "scripts", "tests", "gabo-pre-command.test.sh")
+	out, err := exec.Command("bash", test).CombinedOutput()
+	if err != nil {
+		t.Fatalf("Codex pre-command hook shell tests: %v\n%s", err, out)
 	}
 }
 

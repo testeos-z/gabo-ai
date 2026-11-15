@@ -45,6 +45,8 @@ func TestCommandHelpNamesTheEngineFiles(t *testing.T) {
 	for _, s := range []string{
 		".claude/settings.json, .codex/config.toml, .pi/settings.json and the OpenCode configs named below are the only engine files it writes",
 		"it never writes user-level engine config",
+		"It also writes the base credential deny list into each engine's own deny format",
+		"Pi has no native deny format and reports not run",
 		"It writes the main-session key of every engine listed in runtimes.assistant (one engine or a list), and removes gabo's value only from an engine that is not listed",
 		`With claude listed it also sets the top-level "agent": "gabo-assistant" key of .claude/settings.json`,
 		`another value of "agent" is yours and kept`,

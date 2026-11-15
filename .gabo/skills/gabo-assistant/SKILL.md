@@ -111,7 +111,7 @@ Before step 1, if the print-mode check in the Hard Rules applies to this session
 
 ## Agent Eval Trigger (intent 0030 S3)
 
-- **Path list:** a change to any of these paths changes the agent configuration: a `gabo-*` skill (its catalog copy under `apps/cli/internal/skills/` and its project and plugin copies), an agent definition (`.claude/agents/gabo-*.md`), the methodology adapter (`slots.methodology.adapter` in `gabo.yaml`), or the instruction file (`AGENTS.md` or `CLAUDE.md`).
+- **Path list:** a change to any of these paths changes the agent configuration: a `gabo-*` skill (its catalog copy under `apps/cli/internal/skills/` and its project and plugin copies), an agent definition (`.claude/agents/gabo-*.md`), the methodology adapter (`slots.methodology.adapter` in `gabo.yaml`), the instruction file (`AGENTS.md` or `CLAUDE.md`), or a hook of intent 0028: the engine relays `plugins/claude-code/hooks/` and `plugins/codex/hooks/` with their scripts under `plugins/claude-code/scripts/` and `plugins/codex/scripts/`, `packages/pi/extensions/`, and the OpenCode plugin under `apps/cli/internal/skills/gabo-runtime-opencode/plugins/`.
 - **Run:** when a PR changes the agent configuration, a run of the eval set through the `gabo-eval-runner` skill happens on the owner's machine before the owner accepts the change, started by the owner or by you. Your answer for that PR names the run report for its head, or says `eval: not run: <reason>`. This rule re-implements no runner; it only names the skill.
 - **Product code only:** a PR that touches only product code needs no run; say nothing about evals for it.
 - **Never in CI:** a run is never in CI; no workflow under `.github/` starts it.
