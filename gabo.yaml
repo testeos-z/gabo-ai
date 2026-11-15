@@ -52,6 +52,14 @@ review:
   auto_merge: true
   human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/, .codex/, .agents/, .pi/, .opencode/, opencode.json, opencode.jsonc]
 
+# Agent evals (intent 0030, owner-set 2026-11-15, see #841): a complete run below
+# pass_threshold posts a notice on the PR and holds the automatic merge (S9, S10).
+eval:
+  pass_threshold: 1.0
+  cap:
+    turns_per_task_run: 300
+    task_runs_per_eval_run: 10
+
 # Git email -> alias (TRD D10). OWNER: change "Leo" if you prefer another alias.
 # The local git user.email is dimasmerida15@gmail.com; both emails map to the owner.
 developers:
