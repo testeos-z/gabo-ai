@@ -2,6 +2,7 @@ package check
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
@@ -16,14 +17,13 @@ type ShellVerdict struct {
 	Out string
 }
 
-// JudgeShell judges one shell call under the shell_guard lock (intent 0028
-// S2, S4, S6, S10 to S12, S16). It reads the lock state and the mode of
-// gabo.yaml on every call, finds the violations (ShellViolations) in the call's
-// session kind (CoderSession), takes the state from Decide, prints one
-// Explain block per violation and records the call's outcome through
-// RecordDecision. A lock at off or warn, or a call that breaks no rule, exits 0
-// with no output. A config that cannot be read is an error: the mode fails
-// closed. A record that cannot be written fails the call (exit 1).
+// JudgeShell judges one shell call under three locks (intent 0028 S2, S4, S6,
+// S7, S10 to S13, S16): shell_guard and release_gate for the shell rules, and
+// human_only_paths for a coder's write to a human-only path
+// (humanOnlyShellWrites). Each lock's violations are judged in its state
+// (judgeLock), and the verdicts are joined (joinVerdicts). A call that breaks no
+// rule exits 0 with no output. A config that cannot be read is an error: the
+// mode fails closed.
 func (u *UseCase) JudgeShell(call ShellCall) (ShellVerdict, error) {
 	// A project with no config file reads every key as its default (PD2);
 	// any other load error leaves the state unknown and fails the call.
@@ -39,7 +39,32 @@ func (u *UseCase) JudgeShell(call ShellCall) (ShellVerdict, error) {
 	coder := CoderSession(call.AgentID, u.s.Engine)
 	shell := u.judgeLock(cfg, config.LockShellGuard, ShellViolations(call.Command, coder))
 	release := u.judgeReleaseGate(cfg, call.Command, coder)
-	return joinVerdicts(shell, release), nil
+	human := u.judgeLock(cfg, config.LockHumanOnlyPaths, humanOnlyViolations(u.humanOnlyShellWrites(call.Command, coder, cfg.Review.HumanOnlyPaths)))
+	return joinVerdicts(joinVerdicts(shell, release), human), nil
+}
+
+// humanOnlyViolations turns the human-only paths a call writes into one
+// violation each (intent 0028 S7, S11): a path to a human, and a write after a
+// cd the guard cannot read to the literal path, without the cd.
+func humanOnlyViolations(hits []humanHit) []ShellViolation {
+	var out []ShellViolation
+	for _, h := range hits {
+		if h.unresolved {
+			out = append(out, ShellViolation{Rule: "a coder shell command writes " + oneLine(h.raw) + " through a path the guard cannot read (a cd, a variable, ~ or a command substitution)", Route: "write the literal path, without a cd, a variable, ~ or a command substitution the guard cannot read"})
+			continue
+		}
+		out = append(out, ShellViolation{Rule: "a coder shell command writes the human-only path " + oneLine(h.raw), Route: humanOnlyRoute})
+	}
+	return out
+}
+
+// oneLine quotes a path that holds a line break, so one message stays one
+// line (intent 0028 S11).
+func oneLine(p string) string {
+	if strings.ContainsAny(p, "\r\n") {
+		return strconv.Quote(p)
+	}
+	return p
 }
 
 // judgeLock judges the violations of one lock in its state: the first

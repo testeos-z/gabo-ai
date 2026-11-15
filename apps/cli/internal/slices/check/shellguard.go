@@ -61,31 +61,78 @@ func uniqueRules(vs []ShellViolation) []ShellViolation {
 // Operators (;, &, |, &&, ||, newline, parentheses, backquotes and $( ) end
 // a command; quotes and backslashes make a word literal; a # at the start of
 // a word comments out the rest of the line. Redirection operators stay
-// inside their words, which are harmless to the rules.
+// inside their words, which are harmless to the rules. This is the rule view:
+// every & ends a command, as the shell guard has always read it.
 func shellSegments(s string) [][]string {
+	cmds := shellCommands(s, false)
+	segs := make([][]string, 0, len(cmds))
+	for _, c := range cmds {
+		segs = append(segs, c.words)
+	}
+	return segs
+}
+
+// simpleCommand is one simple command of a command line: its words, and the
+// targets of its unquoted write redirections (intent 0028 S7, PD6).
+type simpleCommand struct {
+	words   []string
+	targets []string
+	// subs are the commands of the substitutions in this command, which run
+	// first, in a subshell (write view only).
+	subs []simpleCommand
+}
+
+// shellCommands splits a command line into its simple commands, as
+// shellSegments describes. The words are the same in both views, except where
+// bash is true: a & that joins a redirection (&> or >&) does not end the
+// command, and | or & right after > is part of the operator, so the word after
+// it is that redirection's target, as bash reads it. The rules read bash false
+// and the write rule reads bash true. Each target is recorded once, from the
+// unquoted operator that precedes it.
+func shellCommands(s string, bash bool) []simpleCommand {
 	const (
 		plain = iota
 		single
 		double
 	)
-	var segs [][]string
-	var cur []string
+	var cmds []simpleCommand
+	var cur, targets []string
+	var subs []simpleCommand
 	var word []byte
 	inWord := false
 	state := plain
+	// pending: the next word is the target of the operator just read.
+	// targetAt: where in word an attached target starts, -1 when none.
+	// redirOp: the operator of that target.
+	pending, targetAt, redirOp := false, -1, ""
+	recordTarget := func(t string) {
+		if t == "" || (redirOp == ">&" && isFdOrClose(t)) {
+			return
+		}
+		targets = append(targets, t)
+	}
 	flushWord := func() {
-		if inWord {
-			cur = append(cur, string(word))
+		if !inWord {
+			return
+		}
+		cur = append(cur, string(word))
+		switch {
+		case targetAt >= 0:
+			recordTarget(string(word[targetAt:]))
+		case pending:
+			recordTarget(string(word))
 		}
 		word = word[:0]
 		inWord = false
+		pending, targetAt, redirOp = false, -1, ""
 	}
 	flushSeg := func() {
 		flushWord()
-		if len(cur) > 0 {
-			segs = append(segs, cur)
+		if len(cur) > 0 || len(subs) > 0 {
+			cmds = append(cmds, simpleCommand{words: cur, targets: targets, subs: subs})
 		}
-		cur = nil
+		cur, targets, subs = nil, nil, nil
+		pending, targetAt, redirOp = false, -1, ""
 	}
 	for i := 0; i < len(s); i++ {
 		c := s[i]
@@ -93,8 +140,17 @@ func shellSegments(s string) [][]string {
 		// plain or double-quoted text alike; the outer word is kept.
 		if state != single && (c == '`' || (c == '$' && i+1 < len(s) && s[i+1] == '(')) {
 			body, end := substitution(s, i)
-			flushSeg()
-			segs = append(segs, shellSegments(body)...)
+			if bash {
+				// The write rule keeps the substitution in its command: its text joins the
+				// outer word, and its commands run first, in a subshell (subs), so an operand
+				// after it is still judged. The rule view (bash false) ends the command.
+				word = append(word, s[i:end+1]...)
+				inWord = true
+				subs = append(subs, shellCommands(body, bash)...)
+			} else {
+				flushSeg()
+				cmds = append(cmds, shellCommands(body, bash)...)
+			}
 			i = end
 			continue
 		}
@@ -123,8 +179,45 @@ func shellSegments(s string) [][]string {
 		switch c {
 		case ' ', '\t', '\r':
 			flushWord()
-		case '\n', ';', '|', '&', '(', ')':
+		case '\n', ';', '|', '(', ')':
 			flushSeg()
+		case '&':
+			if bash && i+1 < len(s) && s[i+1] == '>' {
+				// &> redirects both streams: the & joins the > that follows.
+				word = append(word, c)
+				inWord = true
+			} else {
+				flushSeg()
+			}
+		case '>', '<':
+			// An input redirection and a here-document are plain words here.
+			if c == '<' && (i+1 >= len(s) || s[i+1] != '>') {
+				word = append(word, c)
+				inWord = true
+				break
+			}
+			start, j := i, i+1
+			if c == '<' || (j < len(s) && s[j] == '>') {
+				j++ // <> and >>
+			}
+			if bash && c == '>' && j < len(s) && (s[j] == '|' || s[j] == '&') {
+				j++ // >| and >&
+			}
+			op := string(s[start:j])
+			if targetAt >= 0 {
+				recordTarget(string(word[targetAt:]))
+				targetAt = -1
+			}
+			word = append(word, op...)
+			inWord = true
+			i = j - 1
+			if j >= len(s) || strings.IndexByte(" \t\r\n;|&()<>", s[j]) >= 0 {
+				// No target follows the operator in this word: the next word is it.
+				flushWord()
+				redirOp, pending = op, true
+			} else {
+				redirOp, targetAt = op, len(word)
+			}
 		case '$':
 			word = append(word, c)
 			inWord = true
@@ -157,7 +250,21 @@ func shellSegments(s string) [][]string {
 		}
 	}
 	flushSeg()
-	return segs
+	return cmds
+}
+
+// isFdOrClose reports whether the word after >& is a file descriptor (digits)
+// or the close form (-), so that it is no file target.
+func isFdOrClose(t string) bool {
+	if t == "-" {
+		return true
+	}
+	for _, r := range t {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return t != ""
 }
 
 // substitution returns the body of the command substitution that starts at

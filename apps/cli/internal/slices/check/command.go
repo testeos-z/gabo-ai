@@ -183,6 +183,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"The release_gate lock judges a tag, a publish, a release and a merge into main in\n" +
 			"every agent session, and every merge in a coder session (it reads the base of a\n" +
 			"merge's pull request through gh; an unreadable base blocks the merge).\n" +
+			"The human_only_paths lock judges a coder session's write to a human-only path (a\n" +
+			"redirect target, or an operand of tee, sed -i, cp, mv or rm) and to gabo.yaml.\n" +
 			"Exit 0 with no output when the call passes; 1 with one \"✗ shell_guard: <rule>\"\n" +
 			"line and its \"next: <route>\" line per violation when it is blocked; 3 when the\n" +
 			"lock asks (the engine shows its prompt; with mode auto a block instead, exit 1);\n" +
