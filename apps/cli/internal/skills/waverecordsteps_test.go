@@ -135,7 +135,8 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	re := regexp.MustCompile("`sh \\.gabo/skills/gabo-wave-report/scripts/wave-record\\.sh ([^`]*)`")
-	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<createdAt>", "2026-11-13T09:00:00Z", "<mergedAt>", "2026-11-13T09:30:00Z", "<who>", "owner", "'<topic key>#<entry>'", "k#start", "'<topic key>#start'", "k#start", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures")
+	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<createdAt>", "2026-11-13T09:00:00Z", "<mergedAt>", "2026-11-13T09:30:00Z", "<who>", "owner", "'<topic key>#<entry>'", "'k#start'", "'<topic key>#start'", "'k#start'", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures", "<lock>", "shell_guard", "<session engine>", "claude", "<reason>", "probe item (a) is no on claude", "<outcome file>", "/nonexistent/outcomes.jsonl")
+
 	seen := 0
 	for _, name := range []string{"gabo-cycle", "gabo-wave-report", "gabo-assistant"} {
 		for _, m := range re.FindAllStringSubmatch(readCatalog(t, name+"/SKILL.md"), -1) {
@@ -157,7 +158,10 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 					t.Fatalf("seed: %v: %s", err, out)
 				}
 			}
-			cmd := exec.Command("sh", append([]string{script}, args...)...)
+			// Run the documented text through a shell, so that quoting and
+			// parentheses in it are judged as the agent would paste them.
+			line := "sh " + "'" + strings.ReplaceAll(script, "'", `'\''`) + "' " + strings.TrimSpace(repl.Replace(m[1]))
+			cmd := exec.Command("sh", "-c", line)
 			cmd.Env = env
 			if out, err := cmd.CombinedOutput(); err != nil {
 				t.Errorf("%s: %q fails: %v: %s", name, m[1], err, out)

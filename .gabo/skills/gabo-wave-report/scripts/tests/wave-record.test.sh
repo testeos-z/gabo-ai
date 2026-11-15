@@ -251,6 +251,53 @@ expect_eq "$h1" "$(cksum <"$proj/gabo.yaml")" "gabo.yaml is unchanged"
 expect_eq "gabo.yaml" "$(ls "$proj")" "nothing new in the project dir"
 expect_eq "" "$(find "$work" -type f -not -path "$waves/*" -not -path "$proj/*" -not -path "$cproj/*")" "no file outside the wave folders"
 
+echo "# outcome (intent 0028 S16: one trace line per lock record)"
+expect_eq "blocked: shell_guard I0028/T4 claude git push --force" \
+  "$(run --wave o1 outcome blocked shell_guard I0028/T4 claude git push --force)" "outcome prints a blocked line with the four fields"
+expect_eq "warned: test_files I0028/T8 claude edit of a test file" \
+  "$(run --wave o1 outcome warned test_files I0028/T8 claude edit of a test file)" "outcome prints a warned line"
+expect_eq "asked: human_only_paths I0028/T7 codex write to gabo.yaml; answer: pending" \
+  "$(run --wave o1 outcome asked --answer pending human_only_paths I0028/T7 codex write to gabo.yaml)" "outcome prints an asked line with its answer"
+expect_eq 'not run: release_gate I0028/T5 pi probe item (a) is not testable' \
+  "$(run --wave o1 outcome not-run release_gate I0028/T5 pi probe item \(a\) is not testable)" "outcome prints a not run line"
+run --wave o1 outcome asked human_only_paths I0028/T7 codex write >/dev/null
+expect_eq "2" "$?" "asked without --answer exits 2"
+run --wave o1 outcome blocked --answer pending shell_guard I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "--answer on a blocked line exits 2"
+run --wave o1 outcome bogus shell_guard I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "an unknown kind exits 2"
+run --wave o1 outcome blocked not_a_lock I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "an unknown lock exits 2"
+run --wave o1 outcome blocked shell_guard "I0028 T4" claude x >/dev/null
+expect_eq "2" "$?" "a task with a space exits 2"
+run --wave o1 outcome blocked shell_guard I0028/T4 claude >/dev/null
+expect_eq "2" "$?" "a line without a rule exits 2"
+run --wave o1 outcome "not run" shell_guard I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "the quoted kind not run exits 2; the CLI kind is not-run"
+expect_eq "" "$(find "$waves/o1" -type f 2>/dev/null)" "outcome writes no file"
+
+echo "# outcomes (the scratch file the hooks append to)"
+ofile="$work/outcomes.jsonl"
+cat >"$ofile" <<'EOF'
+{"outcome":"blocked","lock":"shell_guard","task":"I0028/T4","engine":"claude","rule":"git push --force","note":"the state was ask; mode auto blocks instead of prompting"}
+{"outcome":"asked","lock":"human_only_paths","task":"I0028/T7","engine":"codex","rule":"write to \"gabo.yaml\"","answer":"pending"}
+{"outcome":"warned","lock":"test_files","task":"I0028/T8","engine":"opencode","rule":"edit of a test file"}
+{"outcome":"warned","lock":"shell_guard","task":"I0028/T9","engine":"claude","rule":"grep 'a\\b' \\ x"}
+EOF
+expect_eq "blocked: shell_guard I0028/T4 claude git push --force; note: the state was ask; mode auto blocks instead of prompting
+asked: human_only_paths I0028/T7 codex write to \"gabo.yaml\"; answer: pending
+warned: test_files I0028/T8 opencode edit of a test file
+warned: shell_guard I0028/T9 claude grep 'a\b' \ x" "$(run --wave o1 outcomes "$ofile")" "outcomes prints one line per record, in file order, unescaping quotes"
+expect_eq "" "$(run --wave o1 outcomes "$work/absent.jsonl")" "a missing file prints nothing"
+sh "$script" --wave o1 outcomes "$work/absent.jsonl" >/dev/null 2>&1
+expect_eq "0" "$?" "a missing file exits 0"
+printf 'not a record\n' >"$work/bad.jsonl"
+run --wave o1 outcomes "$work/bad.jsonl" >/dev/null
+expect_eq "1" "$?" "an unreadable record exits 1"
+run --wave o1 outcomes >/dev/null
+expect_eq "2" "$?" "outcomes without a file exits 2"
+expect_eq "" "$(find "$waves/o1" -type f 2>/dev/null)" "outcomes writes no file"
+
 echo
 echo "$passes passed, $failures failed"
 if ((failures)); then
