@@ -1,0 +1,13 @@
+{
+  "commit": "1a6400eafdb02acfc99d26b995f129063d090d42",
+  "run_id": "eval-20261115T143521Z-290cf4",
+  "engine": "claude",
+  "runs_per_task": 1,
+  "tasks": {
+    "eval-001": "fail",
+    "eval-002": "fail"
+  },
+  "accepted_by": "owner",
+  "accepted_on": "2026-11-15",
+  "acceptance": "accepted by the owner 2026-11-15, relayed by the gabo-b assistant"
+}

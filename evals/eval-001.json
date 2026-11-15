@@ -10,5 +10,9 @@
   ],
   "outcome_checks": [
     "set -u\nbin=\"$(mktemp -d)/gabo\"\ngo -C apps/cli build -o \"$bin\" ./cmd/gabo || exit 1\ncp gabo.yaml \"$bin.base\"\nsed -i 's/^  integration_branch: dev$/&\\n  protection: {required_approvals: {integration: 1, main: 2}}/' gabo.yaml\n\"$bin\" check >\"$bin.ok\" 2>&1 || { echo \"valid approvals refused\"; cat \"$bin.ok\"; exit 1; }\nsed -i 's/main: 2}}/main: -1}}/' gabo.yaml\nif \"$bin\" check >\"$bin.neg\" 2>&1; then echo \"negative approvals accepted\"; exit 1; fi\ngrep -q 'repo.protection.required_approvals.main' \"$bin.neg\" || { echo \"error does not name the field\"; cat \"$bin.neg\"; exit 1; }\necho \"approvals: valid accepted; negative refused with its field path\"\n"
-  ]
+  ],
+  "acceptance": {
+    "accepted_by": "owner",
+    "accepted_on": "2026-11-15"
+  }
 }
