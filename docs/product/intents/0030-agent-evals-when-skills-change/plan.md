@@ -68,7 +68,7 @@ Task ids are local to the intent. A dependency in another intent is written `<NN
 
 ## Tracker
 
-Intent item: [#767](https://github.com/testeos-z/gabo-ai/issues/767) (`I0030`), under the product card. Task issues, parent #767, blocked-by links matching `depends_on`: T1 #820, T2 #821, T3 #822, T4 #823, T5 #825, T6 #826, T7 #828, T8 #830, T9 #832, T10 #834, T11 #835, T12 #836, T13 #837, T14 #838, T15 #839, T16 #840, T17 #841, T18 (issue number below). Verified by re-read: parent, blocked-by and unblocks match the table. Cross-intent edges: 0027/T2 #780, 0027/T4 #782, 0027/T5 #783, 0027/T10 #788, 0028/T10 to T13 #811 to #814.
+Intent item: [#767](https://github.com/testeos-z/gabo-ai/issues/767) (`I0030`), under the product card. Task issues, parent #767, blocked-by links matching `depends_on`: T1 #820, T2 #821, T3 #822, T4 #823, T5 #825, T6 #826, T7 #828, T8 #830, T9 #832, T10 #834, T11 #835, T12 #836, T13 #837, T14 #838, T15 #839, T16 #840, T17 #841, T18 #891. Verified by re-read: parent, blocked-by and unblocks match the table. Cross-intent edges: 0027/T2 #780, 0027/T4 #782, 0027/T5 #783, 0027/T10 #788, 0028/T10 to T13 #811 to #814.
 
 ## Traceability notes
 
