@@ -204,13 +204,6 @@ func (u *UseCase) piPackage() bool {
 // or writes experimental.subagent_depth. It returns the files that may be
 // written, in lookup order, or the refused or unreadable file and why.
 func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistants []string) ([]string, string, string) {
-	if len(assistants) == 0 || engineconfig.Unlisted(assistants, engineconfig.Opencode) {
-		var read []string
-		if engineconfig.Unlisted(assistants, engineconfig.Opencode) {
-			read = u.readRemovable(in, engineconfig.OpencodeConfigs)
-		}
-		return slices.DeleteFunc(slices.Clone(engineconfig.OpencodeConfigs), func(p string) bool { return !slices.Contains(read, p) }), "", ""
-	}
 	target := engineconfig.OpencodeNewConfig
 	for _, p := range engineconfig.OpencodeConfigs {
 		if _, err := u.store.Lstat(u.path(p)); err == nil || u.refuseEngineFile(p) != "" {
@@ -228,7 +221,18 @@ func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistants []strin
 	case !errors.Is(err, fs.ErrNotExist):
 		return nil, target, fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err)
 	}
-	return []string{target}, "", ""
+	// The target holds the credential deny rules in every case (intent 0028
+	// S8); with OpenCode not listed, the other configs also lose gabo's
+	// default_agent value (intent 0013 D7).
+	writable := []string{target}
+	if engineconfig.Unlisted(assistants, engineconfig.Opencode) {
+		for _, p := range u.readRemovable(in, engineconfig.OpencodeConfigs) {
+			if p != target {
+				writable = append(writable, p)
+			}
+		}
+	}
+	return writable, "", ""
 }
 
 // readRemovable reads each of files that is not refused into in and returns
