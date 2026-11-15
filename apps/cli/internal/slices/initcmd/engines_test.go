@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
@@ -849,4 +850,17 @@ func TestEngineStepPiListRunsOnlyForAPiSet(t *testing.T) {
 			t.Errorf("unexpected write %s", w)
 		}
 	}
+}
+
+// depthMember is the experimental.subagent_depth member of an OpenCode config
+// in the test fixtures; the depth tests pin its bytes, not the whole file.
+var depthMember = regexp.MustCompile(`"experimental": (\{[^}]*\}|[^,}\n]+)`)
+
+// defaultAgentMember is the default_agent member of an OpenCode config fixture.
+var defaultAgentMember = regexp.MustCompile(`"default_agent": "[^"]*"`)
+
+// noDefaultAgent reports whether an OpenCode config holds no default_agent and
+// keeps the model and depth members of the fixture (intent 0013 D7 removal).
+func noDefaultAgent(got string) bool {
+	return !strings.Contains(got, "default_agent") && strings.Contains(got, `"model": "x"`)
 }

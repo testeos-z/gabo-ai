@@ -38,7 +38,10 @@ func TestClaudeRule(t *testing.T) {
 		lines []string
 	}{
 		{name: "missing", write: true, lines: []string{claudeWrote}},
-		{name: "merge", in: "merge.in.json", write: true, lines: []string{claudeWrote}},
+		{name: "merge", in: "merge.in.json", write: true, lines: []string{
+			`wrote .claude/settings.json: added extraKnownMarketplaces."gabo-ai", enabledPlugins."gabo@gabo-ai"`,
+			"kept .claude/settings.json permissions.deny (your setting; gabo leaves it)",
+		}},
 		{name: "empty-object", in: "empty-object.in.json", write: true, lines: []string{claudeWrote}},
 		{name: "tabs", in: "tabs.in.json", write: true, lines: []string{claudeWrote}},
 		{name: "compact", in: "compact.in.json", write: true, lines: []string{claudeWrote}},

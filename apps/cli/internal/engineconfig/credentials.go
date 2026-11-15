@@ -29,47 +29,46 @@ func claudeDenyEntries() []any {
 	return out
 }
 
-// claudeDenyMerge adds the missing Claude Code deny entries to the settings
-// bytes src, keeping every existing entry and byte (D5). It reports whether
-// it added any, or the reason it cannot merge (a permissions or deny value of
-// another shape), in which case src is returned unchanged.
-func claudeDenyMerge(src []byte) ([]byte, bool, string) {
+// claudeDenyMerge writes the base Claude Code deny list into the settings
+// bytes src when the project has no deny list yet (intent 0028 S8: a project
+// adds or removes entries, and only a human changes them). A permissions.deny
+// array that exists is the project's own and is kept as it is, so a removed
+// entry stays removed; kept reports it only when the array lacks a base entry,
+// so a second run on gabo's own output is silent. It reports whether it added
+// the list, or the reason it cannot merge (a value of another shape), in which
+// case src is returned unchanged.
+func claudeDenyMerge(src []byte) (out []byte, added, kept bool, reason string) {
 	top := scanObject(src, skipWS(src, 0))
 	unit := indentUnit(src, top)
 	list := claudeDenyEntries()
 	perm, ok := top.member(src, "permissions")
 	if !ok {
-		return insertMember(src, top, jsonKV{"permissions", jsonObj{{"deny", list}}}, unit), true, ""
+		return insertMember(src, top, jsonKV{"permissions", jsonObj{{"deny", list}}}, unit), true, false, ""
 	}
 	if src[perm.valStart] != '{' {
-		return src, false, "permissions is not a JSON object"
+		return src, false, false, "permissions is not a JSON object"
 	}
 	obj := scanObject(src, perm.valStart)
 	deny, ok := obj.member(src, "deny")
 	if !ok {
-		return insertMember(src, obj, jsonKV{"deny", list}, unit), true, ""
+		return insertMember(src, obj, jsonKV{"deny", list}, unit), true, false, ""
 	}
 	if src[deny.valStart] != '[' {
-		return src, false, "permissions.deny is not an array"
+		return src, false, false, "permissions.deny is not an array"
 	}
-	arr := scanSpanArray(src, deny.valStart)
 	have := map[string]bool{}
-	for _, e := range arr.elems {
+	for _, e := range arrayElems(src, deny.valStart) {
 		var s string
 		if json.Unmarshal(src[e.start:e.end], &s) == nil {
 			have[s] = true
 		}
 	}
-	var missing []any
 	for _, e := range list {
 		if !have[e.(string)] {
-			missing = append(missing, e)
+			return src, false, true, ""
 		}
 	}
-	if len(missing) == 0 {
-		return src, false, ""
-	}
-	return appendElems(src, arr, missing, unit), true, ""
+	return src, false, false, ""
 }
 
 // opencodeNoConfigNotRun is the report line of the OpenCode credential list
@@ -101,45 +100,44 @@ func opencodeDenyRules() []any {
 	return out
 }
 
-// opencodeDenyMerge adds the missing OpenCode deny rules to the config bytes
-// src, keeping every existing rule and byte (D5, comments included). When the
-// file does not exist, it returns a new config holding only the rules. It
-// reports whether it added any, or the reason it cannot merge.
-func opencodeDenyMerge(src []byte, exists bool) ([]byte, bool, string) {
+// opencodeDenyMerge writes the base OpenCode deny rules into the config bytes
+// src when the project has no permissions array yet, keeping every existing
+// byte (D5, comments included). A permissions array that exists is the
+// project's own and is kept (intent 0028 S8); kept reports it only when the
+// array lacks a base rule. When the file does not exist, it returns a new
+// config holding only the rules. It reports whether it added the rules, or the
+// reason it cannot merge.
+func opencodeDenyMerge(src []byte, exists bool) (out []byte, added, kept bool, reason string) {
 	rules := opencodeDenyRules()
 	if !exists {
-		return []byte(renderJSON(jsonObj{{"permissions", rules}}, "", "  ", true) + "\n"), true, ""
+		return []byte(renderJSON(jsonObj{{"permissions", rules}}, "", "  ", true) + "\n"), true, false, ""
 	}
 	top, reason := opencodeTop(src)
 	if reason != "" {
-		return src, false, reason
+		return src, false, false, reason
 	}
 	unit := indentUnit(src, top)
 	perm, ok := top.member(src, "permissions")
 	if !ok {
-		return insertMember(src, top, jsonKV{"permissions", rules}, unit), true, ""
+		return insertMember(src, top, jsonKV{"permissions", rules}, unit), true, false, ""
 	}
 	if src[perm.valStart] != '[' {
-		return src, false, "permissions is not an array"
+		return src, false, false, "permissions is not an array"
 	}
-	arr := scanSpanArray(src, perm.valStart)
-	var missing []any
+	arr := arrayElems(src, perm.valStart)
 	for _, r := range rules {
 		found := false
-		for _, e := range arr.elems {
+		for _, e := range arr {
 			if sameJSON(src[e.start:e.end], r) {
 				found = true
 				break
 			}
 		}
 		if !found {
-			missing = append(missing, r)
+			return src, false, true, ""
 		}
 	}
-	if len(missing) == 0 {
-		return src, false, ""
-	}
-	return appendElems(src, arr, missing, unit), true, ""
+	return src, false, false, ""
 }
 
 // codexHomeDeny are the base paths under the user's home that the profile
@@ -153,3 +151,26 @@ var codexWorkspaceDeny = []string{"**/.env", "**/.env.*", "**/*.pem", "**/*.key"
 // piCredentialNotRun is the report line of the credential list for Pi: it has
 // no native deny format, so no file is written (intent 0028 S8, S14).
 const piCredentialNotRun = "not run: credential deny list: Pi has no native deny format (" + PiSettings + " holds no permission or deny key)"
+
+// spanElem is the byte range of one array element.
+type spanElem struct {
+	start, end int
+}
+
+// arrayElems returns the byte ranges of the elements of the array whose
+// opening bracket is at src[open]. src must be valid JSON or JSONC (checked by
+// the caller).
+func arrayElems(src []byte, open int) []spanElem {
+	var out []spanElem
+	i := skipWS(src, open+1)
+	for src[i] != ']' {
+		if src[i] == ',' {
+			i = skipWS(src, i+1)
+			continue
+		}
+		end := skipValue(src, i)
+		out = append(out, spanElem{start: i, end: end})
+		i = skipWS(src, end)
+	}
+	return out
+}

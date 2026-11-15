@@ -170,8 +170,33 @@ func codexTablesFor(doc map[string]any, profile bool) ([]codexTable, string) {
 	if dp, ok := doc["default_permissions"]; ok && dp != any(codexProfile) {
 		return codexTables, fmt.Sprintf("not applied: credential deny list: default_permissions is %s (your choice); set it to %q to apply the list", codexLiteral(dp), codexProfile)
 	}
+	// A profile the project already has is its own (intent 0028 S8): gabo
+	// adds nothing to it. The note comes only when it lacks a base entry.
+	if _, ok := codexLookup(doc, []string{"permissions", codexProfile}); ok {
+		if codexProfileComplete(doc) {
+			return codexTables, ""
+		}
+		return codexTables, "kept permissions." + codexProfile + " (your setting; gabo leaves it)"
+	}
 	tables := append(slices.Clone(codexTables), codexDefaultTable)
 	return append(tables, codexCredentialTables...), ""
+}
+
+// codexProfileComplete reports whether the credential profile of doc holds
+// every base key of codexCredentialTables.
+func codexProfileComplete(doc map[string]any) bool {
+	for _, t := range codexCredentialTables {
+		table, ok := codexLookup(doc, t.path)
+		if !ok {
+			return false
+		}
+		for _, k := range t.keys {
+			if _, has := table[k.key]; !has {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // codexRule makes .codex/config.toml hold the gabo marketplace and plugin

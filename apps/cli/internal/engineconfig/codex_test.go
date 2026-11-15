@@ -161,9 +161,8 @@ func TestIntegrateRunsTheCodexRule(t *testing.T) {
 	if len(report.Sections) != 1 || report.Sections[0].Engine != Codex {
 		t.Fatalf("Sections = %+v, want one codex section", report.Sections)
 	}
-	got := writes[CodexConfigPath]
-	if len(writes) != 1 || !bytes.Contains(got, []byte(`default_permissions = "gabo-credentials"`)) || !bytes.Contains(got, []byte(`[marketplaces.gabo-ai]`)) {
-		t.Errorf("writes = %q, want only %s with the marketplace and the credential profile", writes, CodexConfigPath)
+	if want := codexGolden(t, "profile", "want.toml"); !bytes.Equal(writes[CodexConfigPath], want) || len(writes) != 1 {
+		t.Errorf("writes = %q, want only %s, the marketplace, the plugin and the credential profile", writes, CodexConfigPath)
 	}
 }
 

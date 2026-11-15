@@ -70,20 +70,39 @@ func TestCredentialDenyClaudeWritesEveryBasePath(t *testing.T) {
 	}
 }
 
-// A project's own entries and other permissions are kept in order; the
-// missing base entries are appended after them.
+// A project's own deny list is kept as it is: no base entry is added to it, so
+// an entry the project removed stays removed (intent 0028 S8).
 func TestCredentialDenyClaudeKeepsTheProjectsOwnEntries(t *testing.T) {
 	src := []byte("{\n  \"permissions\": {\n    \"allow\": [\"Bash(go test *)\"],\n    \"deny\": [\"Bash(curl *)\", \"Read(./custom.txt)\"]\n  }\n}\n")
 	res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: src}, Version: "0.2.6"})
 	got := res.Writes[ClaudeSettings]
-	deny := claudeDenyOf(t, got)
-	want := append([]string{"Bash(curl *)", "Read(./custom.txt)"}, wantClaudeDeny...)
-	if !slices.Equal(deny, want) {
-		t.Errorf("permissions.deny =\n%q\nwant\n%q", deny, want)
+	if deny := claudeDenyOf(t, got); !slices.Equal(deny, []string{"Bash(curl *)", "Read(./custom.txt)"}) {
+		t.Errorf("permissions.deny = %q, want the project's own list only", deny)
 	}
-	allow := decodeJSONMap(t, got)["permissions"].(map[string]any)["allow"] // the rule fails the test first when permissions is not an object
-	if !slices.Equal(anyStrings(allow), []string{"Bash(go test *)"}) {
-		t.Errorf("permissions.allow changed: %v", allow)
+	if allow := anyStrings(decodeJSONMap(t, got)["permissions"].(map[string]any)["allow"]); !slices.Equal(allow, []string{"Bash(go test *)"}) {
+		t.Errorf("permissions.allow changed: %q", allow)
+	}
+	if !slices.Contains(res.Section.Lines, "kept .claude/settings.json permissions.deny (your setting; gabo leaves it)") {
+		t.Errorf("lines = %q, want the kept line", res.Section.Lines)
+	}
+}
+
+// An entry the project removed from the base list stays removed on the next
+// run (intent 0028 S8: a project adds or removes entries).
+func TestCredentialDenyClaudeKeepsARemovedEntryRemoved(t *testing.T) {
+	var list []string
+	for _, e := range wantClaudeDeny {
+		if e != "Read(**/.env)" && e != "Edit(**/.env)" {
+			list = append(list, e)
+		}
+	}
+	src, err := json.Marshal(map[string]any{"permissions": map[string]any{"deny": list}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := claudeRule(Input{Files: map[string][]byte{ClaudeSettings: src}, Version: "0.2.6"})
+	if deny := claudeDenyOf(t, res.Writes[ClaudeSettings]); slices.Contains(deny, "Read(**/.env)") || !slices.Equal(deny, list) {
+		t.Errorf("permissions.deny = %q, want the reduced list without the removed entries", deny)
 	}
 }
 
@@ -174,22 +193,16 @@ func TestCredentialDenyOpencodeWritesReadAndEditDenyRules(t *testing.T) {
 	}
 }
 
-// OpenCode: the project's own permissions rules stay and come first; a
-// second run writes nothing.
-func TestCredentialDenyOpencodeKeepsTheProjectsRulesAndIsIdempotent(t *testing.T) {
-	src := []byte("{\n  // project\n  \"permissions\": [\n    { \"action\": \"read\", \"resource\": \"*.env.example\", \"effect\": \"allow\" }\n  ]\n}\n")
-	res := opencodeRule(Input{Files: map[string][]byte{"opencode.json": src}, Version: "0.2.6"})
-	out := res.Writes["opencode.json"]
-	if !strings.Contains(string(out), "// project") {
-		t.Errorf("comment dropped:\n%s", out)
+// OpenCode: a permissions array the project has is its own and is kept; no
+// base rule is added to it, and its comments stay.
+func TestCredentialDenyOpencodeKeepsTheProjectsRules(t *testing.T) {
+	src := "{\n  // project\n  \"permissions\": [\n    { \"action\": \"read\", \"resource\": \"*.env.example\", \"effect\": \"allow\" }\n  ]\n}\n"
+	res := opencodeRule(Input{Files: map[string][]byte{"opencode.json": []byte(src)}, Version: "0.2.6"})
+	if len(res.Writes) != 0 {
+		t.Errorf("writes = %q, want none", res.Writes)
 	}
-	rules := opencodeRulesOf(t, out)
-	if rules[0] != (opencodePerm{"read", "*.env.example", "allow"}) {
-		t.Errorf("first rule = %+v, want the project's own", rules[0])
-	}
-	again := opencodeRule(Input{Files: map[string][]byte{"opencode.json": out}, Version: "0.2.6"})
-	if len(again.Writes) != 0 {
-		t.Errorf("second run writes %q, want none", again.Writes)
+	if !slices.Contains(res.Section.Lines, "kept opencode.json permissions (your setting; gabo leaves it)") {
+		t.Errorf("lines = %q, want the kept line", res.Section.Lines)
 	}
 }
 
@@ -237,6 +250,9 @@ func TestCredentialDenyCodexKeepsTheProjectsOwnEntries(t *testing.T) {
 	ws := tomlTable(t, tomlTable(t, tomlTable(t, tomlTable(t, doc, "permissions"), "gabo-credentials"), "filesystem"), ":workspace_roots")
 	if ws["secrets.local"] != "deny" {
 		t.Errorf("the project's own entry was lost: %v", ws)
+	}
+	if _, added := ws["**/.env"]; added {
+		t.Errorf("base entries were added to the project's own profile: %v", ws)
 	}
 	again := codexRule(Input{Files: map[string][]byte{CodexConfigPath: out}, Version: "0.2.6"})
 	if len(again.Writes) != 0 {

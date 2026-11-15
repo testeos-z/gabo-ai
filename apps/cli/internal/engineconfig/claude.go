@@ -159,14 +159,17 @@ func claudeSettingsRule(in Input, deny bool) Result {
 		added = append(added, k.name())
 	}
 	if deny {
-		var denied bool
+		var denied, keptList bool
 		var reason string
-		out, denied, reason = claudeDenyMerge(out)
+		out, denied, keptList, reason = claudeDenyMerge(out)
 		if reason != "" {
 			return fail(reason)
 		}
 		if denied {
 			added = append(added, claudeDenyKey)
+		}
+		if keptList {
+			kept = append(kept, "kept "+ClaudeSettings+" "+claudeDenyKey+" (your setting; gabo leaves it)")
 		}
 	}
 	var lines []string

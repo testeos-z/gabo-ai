@@ -1,7 +1,6 @@
 package initcmd
 
 import (
-	"regexp"
 	"strings"
 	"testing"
 
@@ -69,15 +68,15 @@ func TestCredentialDenyInitWritesEachEngineList(t *testing.T) {
 	}
 }
 
-// A project's own deny entry survives a run, and a second run writes nothing.
-func TestCredentialDenyInitKeepsTheProjectsEntriesOnRerun(t *testing.T) {
+// A project's own deny list is kept as it is, and a second run writes nothing
+// (intent 0028 S8).
+func TestCredentialDenyInitKeepsAProjectsOwnList(t *testing.T) {
 	t.Parallel()
-	s := newStore(map[string]string{
-		claudeFile: "{\n  \"permissions\": {\n    \"deny\": [\"Read(./mine.txt)\"]\n  }\n}\n",
-	})
+	src := "{\n  \"permissions\": {\n    \"deny\": [\"Read(./mine.txt)\"]\n  }\n}\n"
+	s := newStore(map[string]string{claudeFile: src})
 	credentialStep(t, s, nil, "claude")
-	if !strings.Contains(s.Files[claudeFile], `"Read(./mine.txt)"`) || !strings.Contains(s.Files[claudeFile], `"Read(**/.env)"`) {
-		t.Fatalf("first run lost an entry:\n%s", s.Files[claudeFile])
+	if got := s.Files[claudeFile]; !strings.Contains(got, `"Read(./mine.txt)"`) || strings.Contains(got, `"Read(**/.env)"`) {
+		t.Fatalf("first run changed the project's own list:\n%s", got)
 	}
 	s.Writes = nil
 	before := s.Files[claudeFile]
@@ -106,17 +105,4 @@ func TestCredentialDenyInitOpencodeAssistantAndDenyTogether(t *testing.T) {
 	if _, ok := s.Files[credOpencodeFile]; ok {
 		t.Errorf("created %s next to the existing opencode.json", credOpencodeFile)
 	}
-}
-
-// depthMember is the experimental.subagent_depth member of an OpenCode config
-// in the test fixtures; the depth tests pin its bytes, not the whole file.
-var depthMember = regexp.MustCompile(`"experimental": (\{[^}]*\}|[^,}\n]+)`)
-
-// defaultAgentMember is the default_agent member of an OpenCode config fixture.
-var defaultAgentMember = regexp.MustCompile(`"default_agent": "[^"]*"`)
-
-// noDefaultAgent reports whether an OpenCode config holds no default_agent and
-// keeps the model and depth members of the fixture (intent 0013 D7 removal).
-func noDefaultAgent(got string) bool {
-	return !strings.Contains(got, "default_agent") && strings.Contains(got, `"model": "x"`)
 }

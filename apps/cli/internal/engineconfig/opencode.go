@@ -128,14 +128,17 @@ func opencodeKeys(in Input, deny bool) (Result, bool) {
 		// that is not a listed assistant, so there is no file to hold the list.
 		notRun = opencodeNoConfigNotRun
 	default:
-		var denied bool
+		var denied, keptList bool
 		var reason string
-		src, denied, reason = opencodeDenyMerge(src, exists)
+		src, denied, keptList, reason = opencodeDenyMerge(src, exists)
 		if reason != "" {
 			return fail(reason)
 		}
 		if denied {
 			parts = append(parts, "added permissions deny rules")
+		}
+		if keptList {
+			kept = append(kept, "kept "+file+" permissions (your setting; gabo leaves it)")
 		}
 	}
 

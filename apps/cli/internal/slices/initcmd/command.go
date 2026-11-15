@@ -38,7 +38,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"It also writes the base credential deny list into each engine's own deny format: reads and\n" +
 			"edits of .env, *.pem, *.key, secrets/, ~/.ssh and other credential paths (Claude Code\n" +
 			"permissions.deny, OpenCode permissions rules, the gabo-credentials Codex profile). Pi has no\n" +
-			"native deny format and reports not run; a project's own entries are kept.\n" +
+			"native deny format and reports not run. A deny list or profile the project already has is\n" +
+			"its own and is kept; the Codex workspace globs reach five directory levels deep.\n" +
 			"It writes the main-session key of every engine listed in runtimes.assistant (one engine\n" +
 			"or a list), and removes gabo's value only from an engine that is not listed.\n" +
 			"With claude listed it also sets the top-level \"agent\": \"gabo-assistant\" key of\n" +
