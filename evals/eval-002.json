@@ -13,5 +13,9 @@
   ],
   "outcome_checks": [
     "set -u\nbin=\"$(mktemp -d)/gabo\"\ngo -C apps/cli build -o \"$bin\" ./cmd/gabo || exit 1\ncp gabo.yaml \"$bin.base\"\nprintf '\\nlocks: {shell_guard: warn}\\n' >>gabo.yaml\n\"$bin\" check >\"$bin.ok\" 2>&1 || { echo \"valid lock state refused\"; cat \"$bin.ok\"; exit 1; }\ncp \"$bin.base\" gabo.yaml; printf '\\nlocks: {nosuch: block}\\n' >>gabo.yaml\nif \"$bin\" check >\"$bin.unk\" 2>&1; then echo \"unknown lock accepted\"; exit 1; fi\n[ \"$(grep -c '✗' \"$bin.unk\")\" = 1 ] && grep -q '✗.*nosuch' \"$bin.unk\" || { echo \"unknown lock not named\"; cat \"$bin.unk\"; exit 1; }\ncp \"$bin.base\" gabo.yaml; printf '\\nlocks: {test_files: ask}\\n' >>gabo.yaml\nif \"$bin\" check >\"$bin.ask\" 2>&1; then echo \"test_files ask accepted\"; exit 1; fi\necho \"locks: valid state accepted; unknown lock and test_files ask refused\"\n"
-  ]
+  ],
+  "acceptance": {
+    "accepted_by": "owner",
+    "accepted_on": "2026-11-15"
+  }
 }
