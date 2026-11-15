@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0029-branch-protection-on-main-and-dev](intent.md) |
 | spec | [spec](spec.md) (accepted by the owner on 2026-11-14, section 7) |
-| status | Draft. Not started: no wave runs until the owner orders it. Tasks are in the tracker under [#766](https://github.com/testeos-z/gabo-ai/issues/766). |
+| status | Done. All 5 tasks are closed; see the closing Log line of 2026-11-15. Tasks are in the tracker under [#766](https://github.com/testeos-z/gabo-ai/issues/766). |
 | owner | gabo-dev-lead |
 | date | 2026-11-14 |
 
@@ -114,3 +114,7 @@ Runnable at once (pairwise disjoint): T1 (after the owner's go-ahead) and T3. T2
 1. **Go-ahead for the probe (T1).** The probe writes and deletes a ruleset on `testeos-z/gabo-ai`; the owner decides when. (owner)
 2. **Timing of the live run (T5).** It waits for the 0028 shell guard (PD1). The owner may release it earlier, accepting that the bypass is open to agents until then (spec question 2 allows it). (owner)
 3. **Spec table update (PD5).** The probe answers belong in the spec's section 2 table; the plan does not edit the spec. (gabo-pm)
+
+## Log
+
+- 2026-11-15, gabo-pm, intent done (#766): all 5 tasks are closed (T1 #824, T2 #829, T3 #827, T4 #831, T5 #833). T5 results are in the #766 comments of 2026-11-15: rulesets `gabo-protect-main` (27316519: pull request, no force-push, no deletion) and `gabo-protect-dev` (27316520: the same plus required statuses `reviewer/tests` and `reviewer/review`), both with the administrator-role bypass; a second run left the read-back identical. Probe PRs: #885 (docs-only, reviewer `verdict=clean merge=merged`) merged; #886 (no statuses) was blocked by the host and closed. Not observed: the `main` = 1 approvals step (S3; the `gabo.yaml` approvals key is an owner step and is not set) and the owner-login bypass path (S12). Leftover note `docs/i0029-t5-s12-check.md` stays on `dev`. Owner acceptance, relayed by the gabo-b assistant (not the owner's words): on 2026-11-15 the owner confirmed directly that owner-pending items proceed with the assistant's recommended option; the not-observed items are accepted under that order.
