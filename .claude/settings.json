@@ -10,5 +10,29 @@
   "enabledPlugins": {
     "gabo@gabo-ai": true
   },
-  "agent": "gabo-assistant"
+  "agent": "gabo-assistant",
+  "permissions": {
+    "deny": [
+      "Read(**/.env)",
+      "Edit(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.env.*)",
+      "Read(**/*.pem)",
+      "Edit(**/*.pem)",
+      "Read(**/*.key)",
+      "Edit(**/*.key)",
+      "Read(**/secrets/**)",
+      "Edit(**/secrets/**)",
+      "Read(~/.ssh/**)",
+      "Edit(~/.ssh/**)",
+      "Read(~/.aws/credentials)",
+      "Edit(~/.aws/credentials)",
+      "Read(~/.config/gh/hosts.yml)",
+      "Edit(~/.config/gh/hosts.yml)",
+      "Read(~/Library/Keychains/**)",
+      "Edit(~/Library/Keychains/**)",
+      "Read(~/.credentials/**)",
+      "Edit(~/.credentials/**)"
+    ]
+  }
 }

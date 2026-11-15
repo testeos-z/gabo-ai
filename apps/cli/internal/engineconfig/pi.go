@@ -30,6 +30,7 @@ func piSource(version string) string { return "npm:" + PiPackage + "@" + version
 // only when the package check found none (intent 0016 S1, S2, D1).
 func piRule(in Input) Result {
 	res := pi(in)
+	res.Section.Lines = append(res.Section.Lines, piCredentialNotRun)
 	res.Section.Steps = append(res.Section.Steps, "trust the project in Pi so it installs and loads "+PiPackage+" from "+PiSettings)
 	if in.PiPackage {
 		return res

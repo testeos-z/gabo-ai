@@ -101,7 +101,7 @@ func TestPiRule(t *testing.T) {
 			if c.in != "" && string(files[".pi/settings.json"]) != string(before) {
 				t.Error("the input bytes were modified")
 			}
-			if wantLines := append([]string{c.line}, piTail...); !slices.Equal(res.Section.Lines, wantLines) {
+			if wantLines := append([]string{c.line, piCredentialNotRun}, piTail...); !slices.Equal(res.Section.Lines, wantLines) {
 				t.Errorf("lines =\n%q\nwant\n%q", res.Section.Lines, wantLines)
 			}
 			if wantSteps := append(slices.Clone(c.steps), piSteps...); !slices.Equal(res.Section.Steps, wantSteps) {
