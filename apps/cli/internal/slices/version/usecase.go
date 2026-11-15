@@ -15,6 +15,7 @@ type UseCase struct {
 }
 
 // NewUseCase returns a use case reporting the given version, or DefaultVersion when empty.
+// NewUseCase builds the version use case (probe C: product code only, #841).
 func NewUseCase(version string) *UseCase {
 	if version == "" {
 		version = DefaultVersion
