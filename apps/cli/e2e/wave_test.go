@@ -221,12 +221,12 @@ func TestSkillsCarryTheRulesTheWaveFollows(t *testing.T) {
 	for skill, rules := range map[string][]string{
 		"gabo-cycle": {
 			"skips DONE tasks",
-			"Never delete anything outside the ledger; a resource you find that is not in it is reported, never removed.",
+			"Never delete anything outside this wave's ledger.", "is reported as found, never removed",
 			"never `--force`",
 			"Every write is re-read (R24)",
 			"the cycle never writes DONE",
-			"`gabo/ledger/<wave>`",
-			"`gabo/trace/<wave>`",
+			"`gabo/ledger/<run id>`",
+			"`gabo/trace/<run id>`",
 			"the wave id is the intent id (`I####`)",
 			"`read unblocked` with the `intent` filter",
 		},

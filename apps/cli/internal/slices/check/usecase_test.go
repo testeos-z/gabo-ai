@@ -614,3 +614,135 @@ func TestMethodologyAdapterAsSkillName(t *testing.T) {
 	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
 	wantFailed(t, r, "✗ adapter "+CatalogDir+"/gabo-methodology-tdd/SKILL.md does not cover: report per task")
 }
+
+// engineSkill is a runtime skill a runtime builder writes for engine (intent
+// 0017 D1 (a)): frontmatter that parses and declares metadata.agent_dir.
+func engineSkill(engine string) string {
+	return "---\nname: gabo-runtime-" + engine + "\nmetadata:\n  agent_dir: ." + engine + "/agents\n  agent_skills: frontmatter:skills\n---\nbody\n"
+}
+
+// roleConfig is the validConfig with one runtime role set to engine.
+func roleConfig(role, engine string) string {
+	if role == "coder" {
+		return strings.Replace(validConfig, "coder: claude", "coder: "+engine, 1)
+	}
+	return strings.Replace(validConfig, "assistant: claude", "assistant: "+engine, 1)
+}
+
+// builderEdit adds the builder engine foo: its runtime skill in dir and its
+// two agent files built for foo.
+func builderEdit(dir string) map[string]string {
+	return map[string]string{
+		dir + "/gabo-runtime-foo/SKILL.md": engineSkill("foo"),
+		".foo/agents/alpha.md":             "---\nname: alpha\ngabo-version: 1.2.3\n---\nbody\n",
+		".foo/agents/beta.md":              "---\nname: beta\ngabo-version: 1.2.3\n---\nbody\n",
+	}
+}
+
+// S1 (intent 0017): a builder engine with a valid runtime skill passes the
+// config in runtimes.coder or runtimes.assistant, in either skill folder,
+// and its per-agent rules run: a missing agent file gives the existing line.
+func TestBuilderEngineRuntimeSkillRunsTheAgentRules(t *testing.T) {
+	t.Parallel()
+	for _, role := range []string{"coder", "assistant"} {
+		for _, dir := range []string{CatalogDir, RuntimesDir} {
+			t.Run(role+" in "+dir, func(t *testing.T) {
+				t.Parallel()
+				full := with(project(), builderEdit(dir))
+				r := run(t, full, configFiles{projectFile: roleConfig(role, "foo")}, Settings{})
+				wantPassed(t, r, PassedLine)
+				noLineWith(t, r, "runtime foo")
+
+				partial := with(full, map[string]string{".foo/agents/beta.md": ""})
+				r = run(t, partial, configFiles{projectFile: roleConfig(role, "foo")}, Settings{})
+				wantFailed(t, r, "✗ agent beta missing", "why: no file named beta in .foo/agents (runtime foo)", NextBuildAgent)
+			})
+		}
+	}
+}
+
+// S2 (intent 0017): a name with no valid runtime skill fails with today's
+// line and the builder next step, and nothing else is printed for it.
+func TestBuilderEngineWithoutSkillNamesTheBuilder(t *testing.T) {
+	t.Parallel()
+	for _, role := range []string{"coder", "assistant"} {
+		t.Run(role, func(t *testing.T) {
+			t.Parallel()
+			r := run(t, project(), configFiles{projectFile: roleConfig(role, "bar")}, Settings{})
+			want := []string{"✗ runtime bar has no runtime skill gabo-runtime-bar", NextRuntimeBuilder}
+			if !r.Failed || !slices.Equal(r.Lines, want) {
+				t.Fatalf("Failed = %v, lines = %q; want exactly %q", r.Failed, r.Lines, want)
+			}
+		})
+	}
+}
+
+// S2 (intent 0017): a builder skill whose frontmatter does not parse or
+// declares no metadata.agent_dir keeps its existing line.
+func TestBuilderEngineBadSkillKeepsItsLine(t *testing.T) {
+	t.Parallel()
+	cases := map[string]struct{ skill, line string }{
+		"frontmatter does not parse": {"---\nname: gabo-runtime-foo\nmetadata:\n  agent_dir: [\n---\n", "✗ runtime foo: gabo-runtime-foo frontmatter: "},
+		"no agent_dir":               {"---\nname: gabo-runtime-foo\n---\n", "✗ runtime foo: gabo-runtime-foo declares no metadata.agent_dir"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			proj := with(project(), map[string]string{".gabo/runtimes/gabo-runtime-foo/SKILL.md": c.skill})
+			r := run(t, proj, configFiles{projectFile: roleConfig("coder", "foo")}, Settings{})
+			wantLines(t, r, NextRuntimeBuilder)
+			if !r.Failed || !slices.ContainsFunc(r.Lines, func(l string) bool { return strings.HasPrefix(l, c.line) }) {
+				t.Fatalf("output lacks %q:\n%s", c.line, joined(r))
+			}
+		})
+	}
+}
+
+// S3 (intent 0017): runtimes.reviewer accepts only the four engines the
+// reviewer scripts run, even with a valid runtime skill for bar; the
+// refusal names them and the gabo-reviewer-config step.
+func TestBuilderEngineCannotBeTheReviewer(t *testing.T) {
+	t.Parallel()
+	proj := with(project(), map[string]string{".gabo/runtimes/gabo-runtime-bar/SKILL.md": engineSkill("bar")})
+	cfg := strings.Replace(validConfig, "reviewer: claude", "reviewer: bar", 1)
+	r := run(t, proj, configFiles{projectFile: cfg}, Settings{})
+	wantFailed(t, r, NextFixConfig)
+	if !strings.Contains(joined(r), `runtimes.reviewer: must be one of "claude", "codex", "pi", "opencode", got "bar"`) || !strings.Contains(joined(r), "gabo-reviewer-config") {
+		t.Fatalf("output:\n%s", joined(r))
+	}
+}
+
+// S3 (intent 0017) and the four named engines: each one is accepted as the
+// reviewer and as a coder, with no reviewer line.
+func TestNamedEnginesKeepTheirRuntimeRules(t *testing.T) {
+	t.Parallel()
+	for _, engine := range []string{"claude", "codex", "pi", "opencode"} {
+		t.Run(engine, func(t *testing.T) {
+			t.Parallel()
+			r := run(t, project(), configFiles{projectFile: strings.Replace(validConfig, "reviewer: claude", "reviewer: "+engine, 1)}, Settings{})
+			noLineWith(t, r, "runtimes.reviewer")
+
+			noSkill := with(project(), map[string]string{".gabo/skills/gabo-runtime-" + engine + "/SKILL.md": ""})
+			r = run(t, noSkill, configFiles{projectFile: roleConfig("coder", engine)}, Settings{})
+			wantFailed(t, r, "✗ runtime "+engine+" has no runtime skill gabo-runtime-"+engine, NextRuntimeBuilder)
+			noLineWith(t, r, "runtimes.coder")
+		})
+	}
+}
+
+// S4 (intent 0017): gabo check reads no engine file for a builder engine:
+// the reads for foo are its runtime skill, its agent directory and the
+// catalog, nothing else.
+func TestBuilderEngineReadsNoEngineFile(t *testing.T) {
+	t.Parallel()
+	var read []string
+	proj := recordingFS{MapFS: with(project(), builderEdit(RuntimesDir)), read: &read}
+	r := run(t, proj, configFiles{projectFile: roleConfig("coder", "foo")}, Settings{})
+	wantPassed(t, r, PassedLine)
+	noLineWith(t, r, "foo")
+	for _, p := range read {
+		if strings.Contains(p, "foo") && !strings.HasPrefix(p, ".gabo/") && !strings.HasPrefix(p, ".foo/agents/") {
+			t.Fatalf("read %s, an engine file of foo", p)
+		}
+	}
+}

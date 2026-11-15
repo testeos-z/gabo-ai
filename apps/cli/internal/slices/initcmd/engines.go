@@ -1,12 +1,14 @@
 package initcmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -30,6 +32,9 @@ var engineFiles = map[string]string{
 	engineconfig.Codex:  engineconfig.CodexConfigPath,
 	engineconfig.Pi:     engineconfig.PiSettings,
 }
+
+// piListDeadline bounds `pi list` (intent 0016 PD3).
+var piListDeadline = 5 * time.Second
 
 // engineSet reads the engine set and the assistant engines from the
 // runtimes mapping of gabo.yaml (S1; intent 0010 D1): the set is
@@ -63,23 +68,34 @@ func engineSet(b []byte) ([]string, []string, error) {
 	return engineconfig.Set(engineconfig.Engines(rt.Coder, rt.Reviewer, assistants)...), assistants, nil
 }
 
+// configMode returns the mode key of gabo.yaml (intent 0023 S5, D4); empty
+// when the key is absent or not a string, which writes no guardrails file.
+// engineSet has already read the YAML.
+func configMode(b []byte) string {
+	var doc struct {
+		Mode string `yaml:"mode"`
+	}
+	_ = yaml.Unmarshal(b, &doc)
+	return strings.TrimSpace(doc.Mode)
+}
+
 // engineStep runs each engine's rule in set order and writes each changed
 // engine file. A refused or failed engine gets its ✗ line and the next
 // engine still runs (S5, D10). Then it removes the gabo main-session value
 // from the file of each engine outside the set (intent 0010 S4, D2); a
 // listed assistant engine is always in the set, so its value stays (intent
 // 0013 D7). It reads and writes only project files.
-func (u *UseCase) engineStep(set, assistants []string, version string) engineconfig.Report {
+func (u *UseCase) engineStep(set, assistants []string, mode, version string) engineconfig.Report {
 	var report engineconfig.Report
 	for _, engine := range set {
-		report.Sections = append(report.Sections, u.integrateEngine(engine, assistants, version))
+		report.Sections = append(report.Sections, u.integrateEngine(engine, assistants, mode, version))
 	}
 	report.Sections = append(report.Sections, u.removeMainSession(set, assistants, version)...)
 	return report
 }
 
-func (u *UseCase) integrateEngine(engine string, assistants []string, version string) engineconfig.Section {
-	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistants: assistants}
+func (u *UseCase) integrateEngine(engine string, assistants []string, mode, version string) engineconfig.Section {
+	in := engineconfig.Input{Files: map[string][]byte{}, Version: version, Assistants: assistants, Mode: mode}
 	file, owns := engineFiles[engine]
 	fail := func(reason string) engineconfig.Section {
 		return engineconfig.Section{Engine: engine, Lines: []string{engineconfig.FailurePrefix + " " + file + ": " + reason}}
@@ -95,6 +111,9 @@ func (u *UseCase) integrateEngine(engine string, assistants []string, version st
 		case !errors.Is(err, fs.ErrNotExist):
 			return fail(fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err))
 		}
+	}
+	if engine == engineconfig.Pi {
+		in.PiPackage = u.piPackage()
 	}
 	if engine == engineconfig.Claude {
 		// The rule only needs to know whether the main session's agent is built (S8).
@@ -118,21 +137,72 @@ func (u *UseCase) integrateEngine(engine string, assistants []string, version st
 			return fail(reason)
 		}
 	}
+	var guard engineconfig.Result
+	var guardWritable []string
+	if engine == engineconfig.Pi {
+		guard, guardWritable = u.guardrailsStep(&in)
+	}
 	report, writes := engineconfig.Integrate([]string{engine}, in)
 	section := report.Sections[0]
+	section.Lines = append(section.Lines, guard.Section.Lines...)
+	for path, b := range guard.Writes {
+		writes[path] = b
+	}
+	writable = append(writable, guardWritable...)
 	section.Lines = append(section.Lines, u.writeEngineFiles(writes, writable)...)
 	return section
 }
 
+// guardrailsStep runs the S5 rule of intent 0023 for pi in gabo.yaml mode
+// auto (D4): it reads the guardrails file into in, unless its directory or
+// the file is refused, and returns the rule's result with the files it may
+// write. Any other mode reads and refuses nothing, so it writes nothing and
+// prints nothing.
+func (u *UseCase) guardrailsStep(in *engineconfig.Input) (engineconfig.Result, []string) {
+	if in.Mode != engineconfig.ModeAuto {
+		return engineconfig.Result{}, nil
+	}
+	file := engineconfig.GuardrailsFile
+	if reason := u.refuseEngineFile(file); reason != "" {
+		return engineconfig.Result{Section: engineconfig.Section{Lines: []string{engineconfig.FailurePrefix + " " + file + ": " + reason}}}, nil
+	}
+	b, err := u.store.ReadFile(u.path(file))
+	switch {
+	case err == nil:
+		in.Files[file] = b
+	case !errors.Is(err, fs.ErrNotExist):
+		line := fmt.Sprintf("%s %s: cannot read it (%v); fix it and run gabo init again", engineconfig.FailurePrefix, file, err)
+		return engineconfig.Result{Section: engineconfig.Section{Lines: []string{line}}}, nil
+	}
+	return engineconfig.Guardrails(*in), []string{file}
+}
+
+// piPackage runs the subagent-package check of intent 0016 S1 and D1: `pi
+// list` under piListDeadline, then gentle-shell on PATH, which counts only
+// when `pi list` ran and exited 0 (S1). A `pi list` that is missing, fails or
+// outlives the deadline counts as no package, gentle-shell or not (S2); a
+// missing probe is no package too.
+func (u *UseCase) piPackage() bool {
+	if u.s.Pi == nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), piListDeadline)
+	defer cancel()
+	out, ok := u.s.Pi.PiList(ctx)
+	if !ok {
+		return false
+	}
+	return engineconfig.PiListNamesPackage(out) || u.s.Pi.GentleShellOnPath()
+}
+
 // loadOpencodeConfigs reads the OpenCode configs the rule may change
-// (intent 0010 S2, S3, S4): always the first existing one (else the new
-// .opencode/opencode.json), which must not be refused, since it gets
-// experimental.subagent_depth and, with OpenCode a listed assistant engine,
-// default_agent; with OpenCode not listed in a non-empty
-// runtimes.assistant also every other existing one that is not refused,
-// for the default_agent removal (intent 0013 D7). It returns the files that
-// may be written, in lookup order, or the refused or unreadable file and
-// why.
+// (intent 0010 S2, S4; intent 0015 S8): with OpenCode a listed assistant
+// engine, the first existing one (else the new .opencode/opencode.json),
+// which must not be refused, since it gets default_agent; with OpenCode not
+// listed in a non-empty runtimes.assistant, every existing one that is not
+// refused, for the default_agent removal (intent 0013 D7). gabo never reads
+// or writes experimental.subagent_depth. It returns the files that may be
+// written, in lookup order, or the refused or unreadable file and why.
 func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistants []string) ([]string, string, string) {
 	target := engineconfig.OpencodeNewConfig
 	for _, p := range engineconfig.OpencodeConfigs {
@@ -151,14 +221,15 @@ func (u *UseCase) loadOpencodeConfigs(in *engineconfig.Input, assistants []strin
 	case !errors.Is(err, fs.ErrNotExist):
 		return nil, target, fmt.Sprintf("cannot read it (%v); fix it and run gabo init again", err)
 	}
-	var read []string
+	// The target holds the credential deny rules in every case (intent 0028
+	// S8); with OpenCode not listed, the other configs also lose gabo's
+	// default_agent value (intent 0013 D7).
+	writable := []string{target}
 	if engineconfig.Unlisted(assistants, engineconfig.Opencode) {
-		read = u.readRemovable(in, engineconfig.OpencodeConfigs)
-	}
-	var writable []string
-	for _, p := range engineconfig.OpencodeConfigs {
-		if p == target || slices.Contains(read, p) {
-			writable = append(writable, p)
+		for _, p := range u.readRemovable(in, engineconfig.OpencodeConfigs) {
+			if p != target {
+				writable = append(writable, p)
+			}
 		}
 	}
 	return writable, "", ""

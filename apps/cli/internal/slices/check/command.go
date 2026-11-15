@@ -10,6 +10,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
 )
 
 // Exit codes (TRD 9.4): 0 nothing failed, 1 a check failed, 2 a usage or
@@ -44,12 +46,16 @@ type Factory func(ctx context.Context) (*UseCase, error)
 // preWriteFlag is the hook mode flag (intent 0001 S11).
 const preWriteFlag = "pre-write"
 
-// NewCommand builds the `check` driving adapter. Without --pre-write it takes
-// no arguments and no flags; with it, the paths of the pending writes.
+// preCommandFlag is the shell hook mode flag (intent 0028 S2).
+const preCommandFlag = "pre-command"
+
+// NewCommand builds the `check` driving adapter. Without a hook mode it takes
+// no arguments and no flags; --pre-write takes the paths of the pending
+// writes, and --pre-command takes no arguments and reads a shell call on stdin.
 func NewCommand(factory Factory) *cobra.Command {
-	var preWrite bool
+	var preWrite, preCommand bool
 	cmd := &cobra.Command{
-		Use:   "check [--pre-write [<path>...]]",
+		Use:   "check [--pre-write [<path>...] | --pre-command]",
 		Short: "Validate the config, the agents, slot coverage and the catalog version, read-only",
 		Long: "Validate the project read-only, engine-neutral except for the keys below (PRD R33):\n" +
 			"  - the global user file and gabo.yaml, each layer and the merged result,\n" +
@@ -83,6 +89,11 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for a runtime skill declaring metadata.skill_dir, a link <skill_dir>/<name>\n" +
 			"    to " + CatalogDir + "/<name> for each skill a spec agent lists, and a link\n" +
 			"    <skill_dir>/gabo-<slot> to each slot adapter that is a skill folder;\n" +
+			"  - no agent file left by an older build for an agent the spec no longer lists\n" +
+			"    (gabo-cycle, gabo-reviewer): a file with a gabo-version line fails as\n" +
+			"    \"<file>: agent <id> is no longer in the agent spec\" and names asking your\n" +
+			"    agent to rebuild the agents; a file without that line is yours; a catalog\n" +
+			"    copy that still lists the agent is not checked for it;\n" +
 			"  - no gabo-reviewer in the project: no <skill_dir>/gabo-reviewer entry and no\n" +
 			"    agent file listing it among its skills;\n" +
 			"  - for a runtime skill declaring metadata.former_skill_dir, no gabo-* link left\n" +
@@ -90,12 +101,6 @@ func NewCommand(factory Factory) *cobra.Command {
 			"  - for the reviewer runtime's metadata.reviewer_link, a user-level link to\n" +
 			"    ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer holding\n" +
 			"    scripts/reviewer.sh (not checked with CI set);\n" +
-			"  - when a role runs on opencode, experimental.subagent_depth at 3 or more in\n" +
-			"    the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json\n" +
-			"    and .opencode/opencode.jsonc (never ~/.config/opencode);\n" +
-			"    a missing or lower whole value names \"run gabo init (it sets\n" +
-			"    experimental.subagent_depth to 3 in <file>)\", any other value names setting\n" +
-			"    it by hand; a file gabo init refuses names \"fix <file> (<its reason>)\";\n" +
 			"  - for each of claude, codex and pi a role runs on, the keys gabo init writes:\n" +
 			"    .claude/settings.json extraKnownMarketplaces.\"gabo-ai\" and\n" +
 			"    enabledPlugins.\"gabo@gabo-ai\", the .codex/config.toml tables\n" +
@@ -104,7 +109,8 @@ func NewCommand(factory Factory) *cobra.Command {
 			"    value passes, and other engines' files are never read;\n" +
 			"  - the main-session entry of every engine listed in runtimes.assistant, from\n" +
 			"    each runtime skill's metadata.main_session: each listed engine's\n" +
-			"    gabo-assistant link and its agent file plus key, or exactly one scoped\n" +
+			"    link of every main-session skill (gabo-assistant, gabo-cycle and\n" +
+			"    gabo-wave-report) and its agent file plus key, or exactly one scoped\n" +
 			"    block; no entry of a full-tier engine that is not listed, named as \"<file>:\n" +
 			"    gabo assistant entry for <engine>, but runtimes.assistant is <the listed\n" +
 			"    engines, joined with \", \">\"\n" +
@@ -144,6 +150,15 @@ func NewCommand(factory Factory) *cobra.Command {
 			"\"*** Move to:\" headers of a Codex apply_patch in tool_input.command. A patch\n" +
 			"that writes no file passes; empty stdin or stdin that is not such a JSON\n" +
 			"object exits 2 with one usage line.\n" +
+			"A write by a coder session (the call has an agent_id, or the engine gives none)\n" +
+			"to gabo.yaml or to a path under review.human_only_paths is judged by the\n" +
+			"human_only_paths lock: at block it exits 1 with one \"✗ human_only_paths: <rule>\"\n" +
+			"line and its \"next: a human edits this path\" line; at ask it exits 3; at warn\n" +
+			"it records and passes; off passes. A gabo.yaml that cannot be read blocks such\n" +
+			"a write. A coder write to an existing test file (*_test.go, *.test.*, *_test.*,\n" +
+			"or a path under test/ or tests/) that the merge base with origin/<integration_branch>\n" +
+			"tracks is judged by the test_files lock: at warn it records one warned line and\n" +
+			"passes, off records nothing; it never blocks. The stage gate above still applies to every write.\n" +
 			"Stdin holding a JSON object with the key gabo_facts is an engine extension's\n" +
 			"session facts (intent 0003): {\"gabo_facts\": 1, \"event\": \"session_start\" or\n" +
 			"\"tool_call\", \"engine\": \"pi\", \"tools\": [<registered tool names>],\n" +
@@ -157,11 +172,36 @@ func NewCommand(factory Factory) *cobra.Command {
 			"\"warning\" or \"info\", \"text\": ...}], \"block\": null or {\"reason\": ...}},\n" +
 			"and exits 0 without a block, 1 with one, 2 with one usage line on a bad\n" +
 			"object (malformed, unknown schema version, engine or event, or a tool_call\n" +
-			"without target_paths).",
+			"without target_paths).\n" +
+			"\n" +
+			"Hook mode, gabo check --pre-command < tool-call.json, judges one shell call before\n" +
+			"it runs, for the engines' shell-call hooks. It takes no arguments and reads the\n" +
+			"hook's tool-call JSON from stdin: the command of tool_input.command (a string, or\n" +
+			"an argv read as one command line) and the agent_id of a subagent call. The\n" +
+			"shell_guard lock judges every command of the line (a list, a pipe, a substitution\n" +
+			"or a group), unwraps one level of sh -c or bash -c, and writes no project file.\n" +
+			"The release_gate lock judges a tag, a publish, a release and a merge into main in\n" +
+			"every agent session, and every merge in a coder session (it reads the base of a\n" +
+			"merge's pull request through gh; an unreadable base blocks the merge).\n" +
+			"The human_only_paths lock judges a coder session's write to a human-only path (a\n" +
+			"redirect target, or an operand of tee, sed -i, cp, mv or rm) and to gabo.yaml.\n" +
+			"Exit 0 with no output when the call passes; 1 with one \"✗ shell_guard: <rule>\"\n" +
+			"line and its \"next: <route>\" line per violation when it is blocked; 3 when the\n" +
+			"lock asks (the engine shows its prompt; with mode auto a block instead, exit 1);\n" +
+			"2 on a usage error or stdin that is no tool call; 1 when the project or gabo.yaml\n" +
+			"cannot be read, so the hook fails closed.",
 		// The command parses its own flags, so a flag error knows the mode
 		// wherever --pre-write stands among the arguments.
 		DisableFlagParsing: true,
 		RunE: func(cmd *cobra.Command, raw []string) error {
+			// The shell hook mode takes no arguments: anything beside its own
+			// bare flag is a usage error, before the project is read.
+			if hasPreCommand(raw) {
+				if len(raw) != 1 || raw[0] != "--"+preCommandFlag {
+					return &ExitError{Code: ExitUsage, Err: ErrPreCommandUsage}
+				}
+				return judgePreCommand(cmd, factory)
+			}
 			flags, paths := splitPreWrite(raw)
 			if err := cmd.Flags().Parse(flags); err != nil {
 				if hasPreWrite(raw) {
@@ -202,7 +242,65 @@ func NewCommand(factory Factory) *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&preWrite, preWriteFlag, false, "judge the pending writes to the given paths, or to the paths of the tool-call JSON on stdin, with the intent stage gate (hook mode)")
+	cmd.Flags().BoolVar(&preCommand, preCommandFlag, false, "judge the shell call of the tool-call JSON on stdin with the shell guard (hook mode)")
 	return cmd
+}
+
+// hasPreCommand reports whether raw names the shell hook mode flag, bare or
+// with a value, before any --pre-write: every argument after --pre-write is a
+// path (TRD 9.4), so a later --pre-command is one.
+func hasPreCommand(raw []string) bool {
+	for _, a := range raw {
+		if a == "--"+preWriteFlag || strings.HasPrefix(a, "--"+preWriteFlag+"=") {
+			return false
+		}
+		if a == "--"+preCommandFlag || strings.HasPrefix(a, "--"+preCommandFlag+"=") {
+			return true
+		}
+	}
+	return false
+}
+
+// judgePreCommand runs the shell hook mode: silent exit 0 when the call
+// passes, the message and exit 3 or 1 otherwise, exit 2 on a usage error. A
+// project or config that cannot be read blocks the call with exit 1 (fail
+// closed); the factory is not called before stdin has passed its usage check.
+func judgePreCommand(cmd *cobra.Command, factory Factory) error {
+	data, err := io.ReadAll(cmd.InOrStdin())
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: fmt.Errorf("%w: stdin cannot be read (%v)", ErrPreCommandUsage, err)}
+	}
+	call, err := ParseShellCall(data)
+	if err != nil {
+		return &ExitError{Code: ExitUsage, Err: err}
+	}
+	uc, err := factory(cmd.Context())
+	if err != nil {
+		return printShellBlock(cmd, "the project cannot be read ("+err.Error()+"); the call counts as blocked")
+	}
+	v, err := uc.JudgeShell(call)
+	if err != nil {
+		return printShellBlock(cmd, "the project config cannot be read ("+err.Error()+"); the call counts as blocked")
+	}
+	if v.Out != "" {
+		if _, err := fmt.Fprint(cmd.OutOrStdout(), v.Out); err != nil {
+			return &ExitError{Code: ExitFailed, Err: err}
+		}
+	}
+	if v.Exit == 0 {
+		return nil
+	}
+	return &ExitError{Code: v.Exit}
+}
+
+// printShellBlock prints one blocked shell call with its lock and route and
+// exits 1: the hook fails closed.
+func printShellBlock(cmd *cobra.Command, reason string) error {
+	out := Explain(config.LockShellGuard, reason, "fix the project, its gabo.yaml or the working directory, then retry", Decision{Exit: ExitFailed, Outcome: OutcomeBlocked})
+	if _, err := fmt.Fprintln(cmd.OutOrStdout(), out); err != nil {
+		return &ExitError{Code: ExitFailed, Err: err}
+	}
+	return &ExitError{Code: ExitFailed}
 }
 
 // splitPreWrite splits raw after the first --pre-write in any form (bare or
@@ -249,10 +347,13 @@ func hasPreWrite(raw []string) bool {
 // that cannot be loaded (the factory fails, e.g. the working directory
 // cannot be read) blocks every path with exit 1: the hook fails closed.
 //
-// With no path the targets come from the engine hook's tool-call JSON on
-// stdin (PreWriteTargets); stdin that cannot be read or is no tool call
-// exits 2, and a tool call that writes no file passes.
+// With no path the targets and the subagent's agent_id come from the engine
+// hook's tool-call JSON on stdin (PreWriteCall); stdin that cannot be read or
+// is no tool call exits 2, and a tool call that writes no file passes. The
+// stage gate and the human-only lock (JudgeWrites) both judge the paths, and
+// the strictest outcome is printed and exits.
 func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
+	var agentID string
 	if len(paths) == 0 {
 		data, err := io.ReadAll(cmd.InOrStdin())
 		if err != nil {
@@ -261,7 +362,7 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 		if IsFacts(data) {
 			return judgeFacts(cmd, factory, data)
 		}
-		if paths, err = PreWriteTargets(data); err != nil {
+		if paths, agentID, err = PreWriteCall(data); err != nil {
 			return &ExitError{Code: ExitUsage, Err: err}
 		}
 		if len(paths) == 0 {
@@ -283,10 +384,29 @@ func judgePreWrite(cmd *cobra.Command, factory Factory, paths []string) error {
 	if err != nil {
 		return &ExitError{Code: ExitUsage, Err: err}
 	}
-	if !rep.Failed {
+	return printWrites(cmd, rep, uc.JudgeWrites(paths, WriteCall{AgentID: agentID, Engine: uc.s.Engine, CanAsk: true, Gated: rep.Failed}))
+}
+
+// printWrites prints the stage gate's blocked lines, then the human-only
+// lock's lines, and exits with the strictest outcome: 1 when the gate blocks
+// or the lock blocks, 3 when the lock asks, 0 with no output otherwise.
+func printWrites(cmd *cobra.Command, rep Report, v WriteVerdict) error {
+	exit := v.Exit
+	var out strings.Builder
+	if rep.Failed {
+		out.WriteString(strings.Join(rep.Lines, "\n") + "\n")
+		exit = ExitFailed
+	}
+	out.WriteString(v.Out)
+	if out.Len() > 0 {
+		if _, err := fmt.Fprint(cmd.OutOrStdout(), out.String()); err != nil {
+			return &ExitError{Code: ExitFailed, Err: err}
+		}
+	}
+	if exit == 0 {
 		return nil
 	}
-	return printBlocked(cmd, rep)
+	return &ExitError{Code: exit}
 }
 
 // judgeFacts runs the session-facts mode (intent 0003 D9): it prints one

@@ -1,6 +1,6 @@
 engine integration:
   codex:
-    wrote .codex/config.toml: added marketplaces.gabo-ai.source_type, marketplaces.gabo-ai.source, plugins."gabo@gabo-ai".enabled
+    wrote .codex/config.toml: added marketplaces.gabo-ai.source_type, marketplaces.gabo-ai.source, plugins."gabo@gabo-ai".enabled, default_permissions, permissions.gabo-credentials
   claude:
     removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is codex)
 you still need to:

@@ -5,3 +5,7 @@ dist/
 .env
 .env.*
 .archify/
+# bun is the only package manager: a stray npm, yarn or pnpm run must not commit a lockfile.
+package-lock.json
+yarn.lock
+pnpm-lock.yaml

@@ -20,7 +20,8 @@ func NewCommand(factory Factory) *cobra.Command {
 		Short: "Install the reviewer skill and copy the gabo skill catalog into this project",
 		Long: "Install the embedded gabo-reviewer skill and its scripts at user level, in\n" +
 			"${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer/, never in the repository;\n" +
-			"on every run it replaces a copy whose " + ReviewerStamp + " differs from the binary version.\n" +
+			"on every run it replaces a copy whose " + ReviewerStamp + " differs from the binary version, and a copy of\n" +
+			"the same version whose content differs from the embedded reviewer (" + ReviewerHashFile + ").\n" +
 			"Copy the embedded gabo skill catalog (without gabo-reviewer) into " + CatalogDir + "/\n" +
 			"and write the catalog version to " + StampFile + "; commit both.\n" +
 			"An older or missing stamp refreshes the catalog; a matching stamp changes nothing;\n" +
@@ -34,6 +35,11 @@ func NewCommand(factory Factory) *cobra.Command {
 			"engine in runtimes, merged with the existing project config (unrelated keys kept):\n" +
 			engineconfig.ClaudeSettings + ", " + engineconfig.CodexConfigPath + ", " + engineconfig.PiSettings + " and the OpenCode configs\n" +
 			"named below are the only engine files it writes; it never writes user-level engine config.\n" +
+			"It also writes the base credential deny list into each engine's own deny format: reads and\n" +
+			"edits of .env, *.pem, *.key, secrets/, ~/.ssh and other credential paths (Claude Code\n" +
+			"permissions.deny, OpenCode permissions rules, the gabo-credentials Codex profile). Pi has no\n" +
+			"native deny format and reports not run. A deny list or profile the project already has is\n" +
+			"its own and is kept; the Codex workspace globs reach five directory levels deep.\n" +
 			"It writes the main-session key of every engine listed in runtimes.assistant (one engine\n" +
 			"or a list), and removes gabo's value only from an engine that is not listed.\n" +
 			"With claude listed it also sets the top-level \"agent\": \"gabo-assistant\" key of\n" +
@@ -45,9 +51,7 @@ func NewCommand(factory Factory) *cobra.Command {
 			engineconfig.OpencodeNewConfig + ", comments kept; another value of \"default_agent\" is yours and kept.\n" +
 			"With opencode not listed it removes that exact \"default_agent\" value from each of those\n" +
 			"files, also when opencode is no longer in runtimes.\n" +
-			"With opencode in runtimes it also raises experimental.subagent_depth to 3 in the first existing\n" +
-			"of those files, else in a new " + engineconfig.OpencodeNewConfig + ", when it is unset or lower; a whole number\n" +
-			"of 3 or more is kept.\n" +
+			"init never writes experimental.subagent_depth and leaves an existing value as it is.\n" +
 			"init never creates or edits " + ConfigFile + " or the user config.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {

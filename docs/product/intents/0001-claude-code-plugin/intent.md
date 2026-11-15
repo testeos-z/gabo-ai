@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0001-claude-code-plugin |
-| status | Draft |
+| status | Done on 2026-11-11. Intent issue [#172](https://github.com/testeos-z/gabo-ai/issues/172) is closed as completed; all 10 task issues are closed: T1-T9 closed as completed with merged PRs; the owner-machine verification T10 #186 was closed as not planned on the owner's decision of 2026-11-11 ("closed unverified"; code merged in `main` and shipped in gabo 0.2.10). |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-03 |

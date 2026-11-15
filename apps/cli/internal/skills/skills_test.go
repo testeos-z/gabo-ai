@@ -17,7 +17,7 @@ var want = []string{
 	"gabo-adapter-writer", "gabo-agent-host-local", "gabo-agent-host-railway-orca", "gabo-agent-templates", "gabo-assistant", "gabo-coder", "gabo-config-writer", "gabo-contract-agent-host", "gabo-contract-direct-sessions",
 	"gabo-contract-memory", "gabo-contract-methodology", "gabo-contract-notifications",
 	"gabo-contract-repository-host", "gabo-contract-reviewer-placement", "gabo-contract-tasks", "gabo-cycle", "gabo-db-master", "gabo-dev-lead",
-	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-config", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-runtime-builder", "gabo-runtime-claude", "gabo-runtime-codex", "gabo-runtime-opencode", "gabo-runtime-pi", "gabo-setup",
+	"gabo-direct-sessions-orca", "gabo-doc-guide", "gabo-eval-runner", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer-config", "gabo-reviewer-notes", "gabo-reviewer-placement-local", "gabo-runtime-builder", "gabo-runtime-claude", "gabo-runtime-codex", "gabo-runtime-opencode", "gabo-runtime-pi", "gabo-setup",
 	"gabo-wave-report",
 }
 
@@ -37,7 +37,7 @@ var contracts = map[string]struct {
 	"gabo-contract-repository-host": {
 		ops: []string{
 			"open PR", "comment on PR", "read PR status and checks",
-			"merge into integration branch", "delete branch",
+			"merge into integration branch", "delete branch", "protect branches",
 		},
 		examples: []string{"host-github.md"},
 	},
@@ -131,7 +131,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"`worktree.keep`", "before any removal", "unverified:",
 			"D23", "only writer of DONE", "lock error", "retry once",
 			// T016: the methodology comes from the slot; the TRD 9.2 outcome and the round limit stay.
-			"`gabo-methodology`", "`Closes #<n>`", "summary", "resources created", "test databases",
+			"`gabo-methodology`", "`Refs #<n>`", "summary", "resources created", "test databases",
 			"fix rounds used", "Max 4 fix rounds",
 			// Intent 0008 S10 (TRD 8.5): the PR body states the `gabo check` impact.
 			"`gabo check impact: <none, with the reason / updated in <file>>`",
@@ -161,8 +161,8 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"blocked-by links", "before each coder round", "rule 1", "rule 2", "rule 3",
 			"4 fix rounds", "Unverified writes", "test databases", "no `gabo` command",
 			"no state dir", "D15", "D17", "skips DONE", "reattach", "disagreement",
-			"never guess", "TRD 9.2", "save the wave report", "`gabo/trace/<wave>`",
-			"`gabo/ledger/<wave>`",
+			"never guess", "TRD 9.2", "save the wave report", "`gabo/trace/<run id>`",
+			"`gabo/ledger/<run id>`",
 			// T061: the report format lives in gabo-wave-report.
 			"`gabo-wave-report`",
 			// S11: one wave is one accepted intent, read through the tasks filter.
@@ -177,7 +177,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"answer and resolver", "R5", "interaction count", "reasons", "R29",
 			"Unverified writes", "R24", "leftovers", "test databases", "merged tasks still open", "R13",
 			"plan-change proposals", "denied board moves", "resume disagreements", "comfort answer", "R17",
-			"`memory`", "save wave trace", "last entry of `gabo/trace/<wave>`", "read it back", "unverified",
+			"`memory`", "save wave trace", "last entry of `gabo/trace/<run id>`", "read it back", "unverified",
 			"`Wave <n>: <done> done, <blocked> blocked`", "UX 1.5", "none",
 		},
 		// J9 and R16/R18: spokesperson, identity resolution and terminal rules; D23 task close.
@@ -188,7 +188,7 @@ func TestSkillsCarryTheProcessRules(t *testing.T) {
 			"resume the owning coder", "PR #<n> merged", "D23", "close report",
 			// T026: J3 and J4 wave start and report, modes, decision records, comfort
 			// question and the personalization layers (D22).
-			"## Wave Start", "launch `gabo-cycle`", "## Wave Close", "UX 1.5",
+			"## Wave Start", "load the `gabo-cycle` skill", "## Wave Close", "UX 1.5",
 			"`Wave <n>: <done> done, <blocked> blocked`", "answer and resolver",
 			"one question at a time", "`interaction_level`", "`low`", "`balanced`", "`high`",
 			"never prompt", "save decision", "`what`, `question`, `choice`, `reason`, `mode`, `wave`, `task`",
@@ -278,11 +278,14 @@ func TestCoderSkillHasNoHardcodedMethodology(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// the report field names of intent 0027 T2 (`RDD: <outcome>`) are report
+	// format, not methodology; the methodology rules stay in the adapter.
+	doc := strings.ReplaceAll(string(b), "`RDD: <granted|declined|passive|off|unavailable>`", "")
 	for _, s := range []string{
 		"ODD", "Test-first", "test-first", "gentle-ai", "receipt-driven", "RDD",
 		"Work-unit commits", "Conventional Commits", "no AI attribution",
 	} {
-		if strings.Contains(string(b), s) {
+		if strings.Contains(doc, s) {
 			t.Errorf("gabo-coder/SKILL.md: must not contain %q", s)
 		}
 	}
@@ -605,6 +608,8 @@ var reviewerFiles = []string{
 	"gabo-reviewer/scripts/tests/lib.sh",
 	"gabo-reviewer/scripts/tests/merge-head.test.sh",
 	"gabo-reviewer/scripts/tests/preflight.test.sh",
+	"gabo-reviewer/scripts/tests/prune.test.sh",
+	"gabo-reviewer/scripts/tests/repo-isolation.test.sh",
 	"gabo-reviewer/scripts/tests/review.test.sh",
 	"gabo-reviewer/scripts/tests/stubs.sh",
 }
@@ -669,8 +674,8 @@ func TestReviewerScriptsShellTests(t *testing.T) {
 		}
 	}
 	tests, err := filepath.Glob("gabo-reviewer/scripts/tests/*.test.sh")
-	if err != nil || len(tests) != 3 {
-		t.Fatalf("shell tests = %v (%v), want 3", tests, err)
+	if err != nil || len(tests) != 5 {
+		t.Fatalf("shell tests = %v (%v), want 5", tests, err)
 	}
 	for _, p := range tests {
 		t.Run(filepath.Base(p), func(t *testing.T) {
@@ -701,8 +706,8 @@ func TestCatalogShipsTheAgentSpec(t *testing.T) {
 }
 
 // T061: the wave report format lives only in gabo-wave-report; the cycle and
-// the assistant reference it instead of repeating its fields, and the cycle
-// agent loads it.
+// the assistant reference it instead of repeating its fields, and the main
+// session loads it.
 func TestWaveReportFormatLivesInOneSkill(t *testing.T) {
 	t.Parallel()
 	files, err := Files()
@@ -719,8 +724,8 @@ func TestWaveReportFormatLivesInOneSkill(t *testing.T) {
 				}
 			}
 		case "gabo-agent-templates/agents.yaml":
-			if !strings.Contains(string(f.Data), "skills: [gabo-cycle, gabo-wave-report]") {
-				t.Errorf("%s: the gabo-cycle agent must load gabo-wave-report", f.Path)
+			if !strings.Contains(string(f.Data), "skills: [gabo-assistant, gabo-cycle, gabo-wave-report]") {
+				t.Errorf("%s: the main session must load gabo-cycle and gabo-wave-report", f.Path)
 			}
 		}
 	}

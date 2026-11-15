@@ -113,3 +113,18 @@ func TestAgentHostOperationHeadingsAreUnchanged(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0015 S1 (plan T4): the host skills name the main session, not a
+// `gabo-cycle` agent, as the caller.
+func TestAgentHostsNameTheMainSessionAsCaller(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{agentHostLocal, agentHostRailway} {
+		doc := readCatalog(t, name)
+		requireIn(t, name, doc, []string{"the main session (the assistant running the `gabo-cycle` skill)"})
+		for _, s := range []string{"`gabo-cycle` or `gabo-assistant`", "`gabo-cycle` launching"} {
+			if strings.Contains(doc, s) {
+				t.Errorf("%s: must not say %q", name, s)
+			}
+		}
+	}
+}

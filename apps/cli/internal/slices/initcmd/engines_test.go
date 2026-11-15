@@ -1,14 +1,17 @@
 package initcmd
 
 import (
+	"context"
 	"flag"
 	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/engineconfig"
 )
@@ -44,7 +47,7 @@ func golden(t *testing.T, name, got string) {
 }
 
 func engineStep(s *memStore, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, nil, "0.2.6")
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, nil, "manual", "0.2.6")
 }
 
 func sectionOf(t *testing.T, r engineconfig.Report, engine string) engineconfig.Section {
@@ -78,7 +81,7 @@ func TestEngineStepAllFourEnginesGolden(t *testing.T) {
 		t.Fatalf("failed:\n%s", r.Render())
 	}
 	golden(t, "engines-all.golden", r.Render())
-	if want := slices.Sorted(slices.Values([]string{claudeFile, codexFile, opencodeNew, piFile})); !slices.Equal(slices.Sorted(slices.Values(s.Writes)), want) {
+	if want := slices.Sorted(slices.Values([]string{claudeFile, codexFile, piFile})); !slices.Equal(slices.Sorted(slices.Values(s.Writes)), want) {
 		t.Fatalf("writes = %v, want %v", s.Writes, want)
 	}
 	if _, ok := s.Files[stageGate]; ok {
@@ -139,11 +142,13 @@ func TestEngineStepLoadsOpencodeStageGate(t *testing.T) {
 	t.Parallel()
 	s := newStore(map[string]string{stageGate: "export default {}\n", opencodeRootCfg: depthOK})
 	r := engineStep(s, "opencode")
-	if got := sectionOf(t, r, "opencode").Lines; !slices.Equal(got, []string{"stage-gate plugin in place (built by gabo-runtime-opencode)"}) {
+	want := []string{"wrote opencode.json: added permissions deny rules", "stage-gate plugin in place (built by gabo-runtime-opencode)"}
+	if got := sectionOf(t, r, "opencode").Lines; !slices.Equal(got, want) {
 		t.Fatalf("opencode lines = %q", got)
 	}
-	if len(s.Writes) != 0 {
-		t.Fatalf("writes = %v", s.Writes)
+	// Only the existing config gets the credential rules; the plugin is not written.
+	if !slices.Equal(s.Writes, []string{opencodeRootCfg}) {
+		t.Fatalf("writes = %v, want only %s", s.Writes, opencodeRootCfg)
 	}
 }
 
@@ -248,13 +253,13 @@ func engineStepAs(s *memStore, assistant string, set ...string) engineconfig.Rep
 // engineStepList runs the engine step with runtimes.assistant listing
 // assistants (intent 0013 S3).
 func engineStepList(s *memStore, assistants []string, set ...string) engineconfig.Report {
-	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, assistants, "0.2.6")
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6"}).engineStep(set, assistants, "manual", "0.2.6")
 }
 
 const (
 	claudeAgent      = root + "/" + engineconfig.ClaudeAgentFile
-	integrationOnly  = "{\n  \"enabledPlugins\": {\n    \"gabo@gabo-ai\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"gabo-ai\": {\n      \"source\": {\n        \"source\": \"github\",\n        \"repo\": \"testeos-z/gabo-ai\"\n      }\n    }\n  }\n}\n"
-	withGaboAgent    = "{\n  \"enabledPlugins\": {\n    \"gabo@gabo-ai\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"gabo-ai\": {\n      \"source\": {\n        \"source\": \"github\",\n        \"repo\": \"testeos-z/gabo-ai\"\n      }\n    }\n  },\n  \"agent\": \"gabo-assistant\"\n}\n"
+	integrationOnly  = "{\n  \"enabledPlugins\": {\n    \"gabo@gabo-ai\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"gabo-ai\": {\n      \"source\": {\n        \"source\": \"github\",\n        \"repo\": \"testeos-z/gabo-ai\"\n      }\n    }\n  },\n  \"permissions\": {\n    \"deny\": [\n      \"Read(**/.env)\",\n      \"Edit(**/.env)\",\n      \"Read(**/.env.*)\",\n      \"Edit(**/.env.*)\",\n      \"Read(**/*.pem)\",\n      \"Edit(**/*.pem)\",\n      \"Read(**/*.key)\",\n      \"Edit(**/*.key)\",\n      \"Read(**/secrets/**)\",\n      \"Edit(**/secrets/**)\",\n      \"Read(~/.ssh/**)\",\n      \"Edit(~/.ssh/**)\",\n      \"Read(~/.aws/credentials)\",\n      \"Edit(~/.aws/credentials)\",\n      \"Read(~/.config/gh/hosts.yml)\",\n      \"Edit(~/.config/gh/hosts.yml)\",\n      \"Read(~/Library/Keychains/**)\",\n      \"Edit(~/Library/Keychains/**)\",\n      \"Read(~/.credentials/**)\",\n      \"Edit(~/.credentials/**)\"\n    ]\n  }\n}\n"
+	withGaboAgent    = "{\n  \"enabledPlugins\": {\n    \"gabo@gabo-ai\": true\n  },\n  \"extraKnownMarketplaces\": {\n    \"gabo-ai\": {\n      \"source\": {\n        \"source\": \"github\",\n        \"repo\": \"testeos-z/gabo-ai\"\n      }\n    }\n  },\n  \"permissions\": {\n    \"deny\": [\n      \"Read(**/.env)\",\n      \"Edit(**/.env)\",\n      \"Read(**/.env.*)\",\n      \"Edit(**/.env.*)\",\n      \"Read(**/*.pem)\",\n      \"Edit(**/*.pem)\",\n      \"Read(**/*.key)\",\n      \"Edit(**/*.key)\",\n      \"Read(**/secrets/**)\",\n      \"Edit(**/secrets/**)\",\n      \"Read(~/.ssh/**)\",\n      \"Edit(~/.ssh/**)\",\n      \"Read(~/.aws/credentials)\",\n      \"Edit(~/.aws/credentials)\",\n      \"Read(~/.config/gh/hosts.yml)\",\n      \"Edit(~/.config/gh/hosts.yml)\",\n      \"Read(~/Library/Keychains/**)\",\n      \"Edit(~/Library/Keychains/**)\",\n      \"Read(~/.credentials/**)\",\n      \"Edit(~/.credentials/**)\"\n    ]\n  },\n  \"agent\": \"gabo-assistant\"\n}\n"
 	buildAgentStep   = "  - claude: ask your agent to build the agents (the main session needs .claude/agents/gabo-assistant.md)\n"
 	removedGaboAgent = `removed .claude/settings.json agent: "gabo-assistant" (runtimes.assistant is codex)`
 )
@@ -407,7 +412,7 @@ func TestEngineStepOpencodeAssistantGolden(t *testing.T) {
 		t.Fatalf("failed:\n%s", r.Render())
 	}
 	golden(t, "engines-opencode-assistant.golden", r.Render())
-	if got := s.Files[opencodeNew]; got != "{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n" {
+	if got := s.Files[opencodeNew]; !strings.HasPrefix(got, "{\n  \"default_agent\": \"gabo-assistant\",\n  \"permissions\": [") {
 		t.Fatalf("%s =\n%s", opencodeNew, got)
 	}
 	s.Files[opencodeAgent] = "---\nname: gabo-assistant\n---\n"
@@ -434,11 +439,11 @@ func TestEngineStepOpencodeDefaultAgent(t *testing.T) {
 		failed bool
 	}{
 		{"jsonc with comments", map[string]string{opencodeJSONC: jsonc, opencodeNew: "{}\n"}, nil, opencodeJSONC,
-			"{\n  // mine\n  \"model\": \"x\", /* pinned */\n  \"experimental\": {\n    \"subagent_depth\": 3\n  },\n  \"default_agent\": \"gabo-assistant\"\n}\n",
-			[]string{"wrote opencode.jsonc: experimental.subagent_depth unset → 3; added default_agent", "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
+			"{\n  // mine\n  \"model\": \"x\", /* pinned */\n  \"default_agent\": \"gabo-assistant\"\n}\n",
+			[]string{"wrote opencode.jsonc: added default_agent; added permissions deny rules", "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
 		{"user's value", map[string]string{opencodeRootCfg: `{"default_agent": "gentle-orchestrator", "experimental": {"subagent_depth": 3}}`}, nil, opencodeRootCfg,
 			`{"default_agent": "gentle-orchestrator", "experimental": {"subagent_depth": 3}}`,
-			[]string{`kept opencode.json default_agent: "gentle-orchestrator" (your setting; gabo leaves it)`, "no .opencode/plugins/gabo-stage-gate.js yet; nothing written"}, false},
+			[]string{"wrote opencode.json: added permissions deny rules", `kept opencode.json default_agent: "gentle-orchestrator" (your setting; gabo leaves it)`, "no .opencode/plugins/gabo-stage-gate.js yet"}, false},
 		{"symlinked target", map[string]string{opencodeRootCfg: "{}"}, map[string]fs.FileMode{opencodeRootCfg: fs.ModeSymlink}, opencodeRootCfg, "{}",
 			[]string{"✗ opencode.json: it is a symlink; gabo init writes only inside the project, so replace it with a real file and run gabo init again"}, true},
 		{"symlinked .opencode", nil, map[string]fs.FileMode{root + "/.opencode": fs.ModeSymlink | fs.ModeDir}, opencodeNew, "",
@@ -456,7 +461,14 @@ func TestEngineStepOpencodeDefaultAgent(t *testing.T) {
 			s := newStore(files)
 			s.Modes = tt.modes
 			r := engineStepAs(s, "opencode", "opencode")
-			if got := s.Files[tt.target]; got != tt.want {
+			// The default_agent member is pinned here; the credential rules
+			// (intent 0028 S8) may be added to the same file.
+			got := s.Files[tt.target]
+			if m := defaultAgentMember.FindString(tt.want); m != "" {
+				if !strings.Contains(got, m) {
+					t.Fatalf("%s =\n%s\nwant %s", tt.target, got, m)
+				}
+			} else if got != tt.want {
 				t.Fatalf("%s =\n%s\nwant\n%s", tt.target, got, tt.want)
 			}
 			for _, w := range s.Writes {
@@ -496,7 +508,7 @@ func TestEngineStepRemovesTheGaboDefaultAgent(t *testing.T) {
 		}
 		golden(t, "engines-default-agent-removed.golden", r.Render())
 		for _, p := range engineconfig.OpencodeConfigs {
-			if got := s.Files[root+"/"+p]; got != noDefault {
+			if got := s.Files[root+"/"+p]; !noDefaultAgent(got) {
 				t.Fatalf("%s =\n%s", p, got)
 			}
 		}
@@ -511,11 +523,11 @@ func TestEngineStepRemovesTheGaboDefaultAgent(t *testing.T) {
 		s := newStore(all())
 		r := engineStepAs(s, "claude", engineconfig.Set("claude", "opencode")...)
 		lines := sectionOf(t, r, "opencode").Lines
-		if len(lines) != 5 || lines[0] != `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)` || len(failures(lines)) != 0 {
+		if len(lines) != 6 || lines[0] != "wrote opencode.json: added permissions deny rules" || lines[1] != `removed opencode.json default_agent: "gabo-assistant" (runtimes.assistant is claude)` || len(failures(lines)) != 0 {
 			t.Fatalf("lines = %q", lines)
 		}
 		for _, p := range engineconfig.OpencodeConfigs {
-			if got := s.Files[root+"/"+p]; got != noDefault {
+			if got := s.Files[root+"/"+p]; !noDefaultAgent(got) {
 				t.Fatalf("%s =\n%s", p, got)
 			}
 		}
@@ -531,44 +543,59 @@ func TestEngineStepRemovesTheGaboDefaultAgent(t *testing.T) {
 	})
 }
 
-// Intent 0010 S3, S8: with opencode in runtimes.* initcmd raises
-// experimental.subagent_depth in the first existing OpenCode config, keeps
-// its comments, reports the old and new value, and no step names the key.
-func TestEngineStepOpencodeSubagentDepth(t *testing.T) {
+// Intent 0015 S8, D6: gabo init neither writes nor requires
+// experimental.subagent_depth. With OpenCode a listed assistant engine the
+// config gains only default_agent and the report has no depth line; with
+// OpenCode not listed and no config file none is created; a file holding
+// the key, whatever its value, is byte-identical and gets no line and no
+// refusal for it; a second run writes nothing.
+func TestEngineStepOpencodeLeavesSubagentDepthAlone(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
-		name   string
-		files  map[string]string
-		target string
-		want   string
-		line   string
-		failed bool
+		name       string
+		files      map[string]string
+		assistants []string
+		target     string
+		want       string // "" with a missing file means none is created
+		writes     bool
 	}{
-		{"absent key in a new file", map[string]string{}, opencodeNew,
-			"{\n  \"experimental\": {\n    \"subagent_depth\": 3\n  }\n}\n", "wrote .opencode/opencode.json: experimental.subagent_depth unset → 3", false},
-		{"1 becomes 3", map[string]string{opencodeJSONC: "{\n  // mine\n  \"experimental\": {\"subagent_depth\": 1}\n}\n", opencodeNew: "{}\n"}, opencodeJSONC,
-			"{\n  // mine\n  \"experimental\": {\"subagent_depth\": 3}\n}\n", "wrote opencode.jsonc: experimental.subagent_depth 1 → 3", false},
-		{"5 is kept", map[string]string{opencodeRootCfg: `{"experimental": {"subagent_depth": 5}}`}, opencodeRootCfg,
-			`{"experimental": {"subagent_depth": 5}}`, "no .opencode/plugins/gabo-stage-gate.js yet; nothing written", false},
-		{"experimental not an object", map[string]string{opencodeRootCfg: `{"experimental": 3}`}, opencodeRootCfg,
-			`{"experimental": 3}`, "✗ opencode.json: experimental is not a JSON object; fix it and run gabo init again", true},
+		{"new file holds only default_agent", map[string]string{}, []string{"opencode"}, opencodeNew,
+			"{\n  \"default_agent\": \"gabo-assistant\"\n}\n", true},
+		{"OpenCode not listed creates no file", map[string]string{}, []string{"claude"}, opencodeNew, "", false},
+		{"3 is byte-identical", map[string]string{opencodeRootCfg: `{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 3}}`}, []string{"opencode"}, opencodeRootCfg,
+			`{"default_agent": "gabo-assistant", "experimental": {"subagent_depth": 3}}`, true},
+		{"1 is byte-identical", map[string]string{opencodeRootCfg: `{"experimental": {"subagent_depth": 1}}`}, []string{"claude"}, opencodeRootCfg,
+			`{"experimental": {"subagent_depth": 1}}`, true},
+		{"a value that is not a number is byte-identical", map[string]string{opencodeRootCfg: `{"experimental": {"subagent_depth": "deep"}}`}, []string{"claude"}, opencodeRootCfg,
+			`{"experimental": {"subagent_depth": "deep"}}`, true},
+		{"1 beside a new default_agent is kept", map[string]string{opencodeJSONC: "{\n  \"experimental\": {\"subagent_depth\": 1}\n}\n"}, []string{"opencode"}, opencodeJSONC,
+			"{\n  \"experimental\": {\"subagent_depth\": 1},\n  \"default_agent\": \"gabo-assistant\"\n}\n", true},
+		{"experimental not an object is no refusal", map[string]string{opencodeRootCfg: `{"default_agent": "gabo-assistant", "experimental": 3}`}, []string{"opencode"}, opencodeRootCfg,
+			`{"default_agent": "gabo-assistant", "experimental": 3}`, true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			s := newStore(maps.Clone(tt.files))
-			r := engineStep(s, engineconfig.Set("claude", "opencode")...)
-			if got := s.Files[tt.target]; got != tt.want {
-				t.Fatalf("%s =\n%s\nwant\n%s", tt.target, got, tt.want)
+			files := maps.Clone(tt.files)
+			s := newStore(files)
+			r := engineStepList(s, tt.assistants, engineconfig.Set("claude", "opencode")...)
+			got, exists := s.Files[tt.target]
+			// The depth member keeps its bytes; the credential rules (intent 0028
+			// S8) may be added around it.
+			keep := depthMember.FindString(tt.want)
+			if tt.want == "" && exists || tt.want != "" && !strings.Contains(got, keep) {
+				t.Fatalf("%s = %q (exists %v), want %q", tt.target, got, exists, tt.want)
 			}
-			if got := sectionOf(t, r, "opencode").Lines; got[0] != tt.line {
-				t.Fatalf("lines = %q, want %q first", got, tt.line)
+			if wrote := slices.Contains(s.Writes, tt.target); wrote != tt.writes {
+				t.Fatalf("wrote %s = %v, writes %v", tt.target, wrote, s.Writes)
 			}
-			if r.Failed() != tt.failed || (tt.failed && slices.Contains(s.Writes, tt.target)) {
-				t.Fatalf("Failed() = %v, writes %v", r.Failed(), s.Writes)
+			if r.Failed() || strings.Contains(r.Render(), "subagent_depth") {
+				t.Fatalf("report:\n%s", r.Render())
 			}
-			if _, steps, _ := strings.Cut(r.Render(), "you still need to:"); strings.Contains(steps, "subagent_depth") {
-				t.Fatalf("a step names subagent_depth:\n%s", r.Render())
+			s.Writes = nil
+			again := engineStepList(s, tt.assistants, engineconfig.Set("claude", "opencode")...)
+			if len(s.Writes) != 0 || again.Failed() || s.Files[tt.target] != got {
+				t.Fatalf("second run writes %v:\n%s", s.Writes, again.Render())
 			}
 		})
 	}
@@ -643,7 +670,7 @@ func TestEngineStepAssistantListRemovesOnlyTheUnlisted(t *testing.T) {
 		t.Fatalf("failed:\n%s", r.Render())
 	}
 	golden(t, "engines-list-default-agent-removed.golden", r.Render())
-	if got := s.Files[opencodeRootCfg]; got != noDefault {
+	if got := s.Files[opencodeRootCfg]; !noDefaultAgent(got) {
 		t.Fatalf("%s =\n%s", opencodeRootCfg, got)
 	}
 	if got := s.Files[claudeFile]; got != withGaboAgent {
@@ -673,11 +700,167 @@ func TestInitIntegratesEveryListedAssistant(t *testing.T) {
 	if strings.Contains(text, "\n  session:") {
 		t.Fatalf("session reported as an engine:\n%s", text)
 	}
-	if !slices.Contains(s.Writes, claudeFile) || !slices.Contains(s.Writes, piFile) || !slices.Contains(s.Writes, opencodeNew) {
+	if !slices.Contains(s.Writes, claudeFile) || !slices.Contains(s.Writes, piFile) {
 		t.Fatalf("writes = %v", s.Writes)
+	}
+	// OpenCode is a role engine but not listed: no config is created for it (intent 0015 S8).
+	if _, ok := s.Files[opencodeNew]; ok || slices.Contains(s.Writes, opencodeNew) {
+		t.Fatalf("%s created, writes = %v", opencodeNew, s.Writes)
 	}
 	// claude is listed, so its main-session key is written (intent 0013 S3).
 	if !strings.Contains(s.Files[claudeFile], `"agent": "gabo-assistant"`) {
 		t.Fatalf("%s =\n%s", claudeFile, s.Files[claudeFile])
 	}
+}
+
+// fakePi is a hand-written PiProbe: list is the output of `pi list` when
+// listed is true; shell is the gentle-shell PATH lookup; block makes
+// `pi list` wait until its deadline passes. calls counts the `pi list` runs.
+type fakePi struct {
+	list   []byte
+	listed bool
+	shell  bool
+	block  bool
+	calls  int
+}
+
+func (f *fakePi) PiList(ctx context.Context) ([]byte, bool) {
+	f.calls++
+	if f.block {
+		<-ctx.Done()
+		return nil, false
+	}
+	return f.list, f.listed
+}
+
+func (f *fakePi) GentleShellOnPath() bool { return f.shell }
+
+// engineStepPi runs the engine step with probe as the Pi probe (intent 0016
+// S1, S2).
+func engineStepPi(s *memStore, probe PiProbe, set ...string) engineconfig.Report {
+	return NewUseCase(s, catalog, Settings{ProjectDir: root, Version: "0.2.6", Pi: probe}).engineStep(set, nil, "manual", "0.2.6")
+}
+
+// piRefusalLines are the three lines today's Pi section prints without a
+// subagent package (S2, issue #463).
+var piRefusalLines = []string{"gabo refuses to build on Pi without a subagent package:", engineconfig.SubagentRefusal, "install a subagent package (see the refusal above)"}
+
+// S1: a subagent package found by `pi list` (npm:gentle-pi with or without a
+// version, or a git: source of gentle-pi), or gentle-shell on PATH, prints no
+// refusal and keeps the trust step.
+func TestEngineStepPiPackagePresentPrintsNoRefusal(t *testing.T) {
+	cases := []struct {
+		name  string
+		probe *fakePi
+	}{
+		{"npm", &fakePi{list: []byte("npm:gentle-pi\n"), listed: true}},
+		{"npm with version", &fakePi{list: []byte("npm:gentle-pi@1.2.3\n"), listed: true}},
+		{"git source", &fakePi{list: []byte("git:github.com/someone/gentle-pi\n"), listed: true}},
+		{"gentle-shell only", &fakePi{list: []byte("npm:@gabo-ai/pi\n"), listed: true, shell: true}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newStore(map[string]string{})
+			sec := sectionOf(t, engineStepPi(s, c.probe, engineconfig.Pi), engineconfig.Pi)
+			for _, l := range piRefusalLines[:2] {
+				if slices.Contains(sec.Lines, l) {
+					t.Errorf("refusal line %q with a package present: %v", l, sec.Lines)
+				}
+			}
+			for _, step := range sec.Steps {
+				if strings.Contains(step, "install a subagent package") {
+					t.Errorf("install step with a package present: %v", sec.Steps)
+				}
+			}
+			if !slices.ContainsFunc(sec.Steps, func(step string) bool { return strings.HasPrefix(step, "trust the project in Pi") }) {
+				t.Errorf("trust step missing: %v", sec.Steps)
+			}
+		})
+	}
+}
+
+// S2, PD4, D1: no package, a `pi list` that exits 1, a `pi` that is not on
+// PATH and a `pi list` listing only @gabo-ai/pi each print today's three
+// lines exactly.
+func TestEngineStepPiNoPackagePrintsTodaysRefusal(t *testing.T) {
+	cases := []struct {
+		name  string
+		probe *fakePi
+	}{
+		{"no package", &fakePi{list: []byte("npm:@gabo-ai/pi\n"), listed: true}},
+		{"pi not on PATH", &fakePi{}},
+		{"pi list exits 1", &fakePi{list: []byte("npm:gentle-pi\n")}},
+		{"pi not on PATH with gentle-shell", &fakePi{shell: true}},
+		{"pi list exits 1 with gentle-shell", &fakePi{list: []byte("npm:gentle-pi\n"), shell: true}},
+		{"no probe", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newStore(map[string]string{})
+			var probe PiProbe
+			if c.probe != nil {
+				probe = c.probe
+			}
+			sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
+			if got := sec.Lines[len(sec.Lines)-2:]; !slices.Equal(got, piRefusalLines[:2]) {
+				t.Errorf("refusal lines = %q", got)
+			}
+			if got := sec.Steps[len(sec.Steps)-1]; got != piRefusalLines[2] {
+				t.Errorf("last step = %q", got)
+			}
+		})
+	}
+}
+
+// S2: a `pi list` that outlives the deadline (PD3) counts as no package.
+func TestEngineStepPiListTimeoutIsNoPackage(t *testing.T) {
+	saved := piListDeadline
+	piListDeadline = 20 * time.Millisecond
+	t.Cleanup(func() { piListDeadline = saved })
+	s := newStore(map[string]string{})
+	for _, shell := range []bool{false, true} {
+		probe := &fakePi{block: true, shell: shell}
+		sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
+		if got := sec.Lines[len(sec.Lines)-2:]; !slices.Equal(got, piRefusalLines[:2]) {
+			t.Errorf("refusal lines after a timeout (gentle-shell %v) = %q", shell, got)
+		}
+		if probe.calls != 1 {
+			t.Errorf("pi list ran %d times, want once", probe.calls)
+		}
+	}
+}
+
+// PD2, S3: pi list runs once per run, when pi is in the engine set, and
+// never when it is not; the check writes no project file of its own.
+func TestEngineStepPiListRunsOnlyForAPiSet(t *testing.T) {
+	t.Parallel()
+	s := newStore(map[string]string{})
+	probe := &fakePi{list: []byte("npm:gentle-pi\n"), listed: true}
+	engineStepPi(s, probe, engineconfig.Claude, engineconfig.Pi)
+	if probe.calls != 1 {
+		t.Errorf("pi list ran %d times with pi in the set, want once", probe.calls)
+	}
+	none := &fakePi{list: []byte("npm:gentle-pi\n"), listed: true}
+	engineStepPi(newStore(map[string]string{}), none, engineconfig.Claude, engineconfig.Codex)
+	if none.calls != 0 {
+		t.Errorf("pi list ran %d times without pi in the set, want none", none.calls)
+	}
+	for _, w := range s.Writes {
+		if !strings.HasPrefix(w, root+"/") || strings.Contains(w, "gentle-pi") {
+			t.Errorf("unexpected write %s", w)
+		}
+	}
+}
+
+// depthMember is the experimental.subagent_depth member of an OpenCode config
+// in the test fixtures; the depth tests pin its bytes, not the whole file.
+var depthMember = regexp.MustCompile(`"experimental": (\{[^}]*\}|[^,}\n]+)`)
+
+// defaultAgentMember is the default_agent member of an OpenCode config fixture.
+var defaultAgentMember = regexp.MustCompile(`"default_agent": "[^"]*"`)
+
+// noDefaultAgent reports whether an OpenCode config holds no default_agent and
+// keeps the model and depth members of the fixture (intent 0013 D7 removal).
+func noDefaultAgent(got string) bool {
+	return !strings.Contains(got, "default_agent") && strings.Contains(got, `"model": "x"`)
 }

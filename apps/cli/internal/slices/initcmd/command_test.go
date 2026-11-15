@@ -39,9 +39,14 @@ func TestCommandHelpNamesTheEngineFiles(t *testing.T) {
 		t.Fatalf("err %v, factory called %v", err, called)
 	}
 	help := strings.Join(strings.Fields(out.String()), " ")
+	if strings.Contains(help, "raises") {
+		t.Errorf("help still says init raises a key:\n%s", out.String())
+	}
 	for _, s := range []string{
 		".claude/settings.json, .codex/config.toml, .pi/settings.json and the OpenCode configs named below are the only engine files it writes",
 		"it never writes user-level engine config",
+		"It also writes the base credential deny list into each engine's own deny format",
+		"Pi has no native deny format and reports not run",
 		"It writes the main-session key of every engine listed in runtimes.assistant (one engine or a list), and removes gabo's value only from an engine that is not listed",
 		`With claude listed it also sets the top-level "agent": "gabo-assistant" key of .claude/settings.json`,
 		`another value of "agent" is yours and kept`,
@@ -49,7 +54,8 @@ func TestCommandHelpNamesTheEngineFiles(t *testing.T) {
 		`With opencode listed it sets "default_agent": "gabo-assistant" in the first existing of opencode.json, opencode.jsonc, .opencode/opencode.json and .opencode/opencode.jsonc, else in a new .opencode/opencode.json, comments kept`,
 		`another value of "default_agent" is yours and kept`,
 		`With opencode not listed it removes that exact "default_agent" value from each of those files, also when opencode is no longer in runtimes`,
-		"With opencode in runtimes it also raises experimental.subagent_depth to 3 in the first existing of those files, else in a new .opencode/opencode.json, when it is unset or lower; a whole number of 3 or more is kept",
+		"init never writes experimental.subagent_depth and leaves an existing value as it is",
+		"on every run it replaces a copy whose VERSION differs from the binary version, and a copy of the same version whose content differs from the embedded reviewer (REVIEWER_HASH)",
 	} {
 		if !strings.Contains(help, s) {
 			t.Errorf("help is missing %q:\n%s", s, out.String())

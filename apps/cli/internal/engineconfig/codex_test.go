@@ -43,7 +43,7 @@ func TestCodexWritesTablesAppendOnly(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			in := codexIn(t, c.name)
-			res := codexRule(in)
+			res := codexSettingsRule(in, false)
 			got, ok := res.Writes[CodexConfigPath]
 			if !ok || len(res.Writes) != 1 {
 				t.Fatalf("Writes = %q, want only %s", res.Writes, CodexConfigPath)
@@ -64,7 +64,7 @@ func TestCodexWritesTablesAppendOnly(t *testing.T) {
 func TestCodexBothTablesPresentIsUnchanged(t *testing.T) {
 	for _, name := range []string{"present", "dotted"} {
 		t.Run(name, func(t *testing.T) {
-			res := codexRule(codexIn(t, name))
+			res := codexSettingsRule(codexIn(t, name), false)
 			if len(res.Writes) != 0 {
 				t.Errorf("Writes = %q, want none", res.Writes)
 			}
@@ -76,7 +76,7 @@ func TestCodexBothTablesPresentIsUnchanged(t *testing.T) {
 }
 
 func TestCodexKeepsAnotherValue(t *testing.T) {
-	res := codexRule(codexIn(t, "disabled"))
+	res := codexSettingsRule(codexIn(t, "disabled"), false)
 	if len(res.Writes) != 0 {
 		t.Errorf("Writes = %q, want none", res.Writes)
 	}
@@ -91,7 +91,7 @@ func TestCodexKeepsAnotherValue(t *testing.T) {
 
 func TestCodexKeepsAnotherSourceAndAddsTheRest(t *testing.T) {
 	in := Input{Files: map[string][]byte{CodexConfigPath: []byte("[marketplaces.gabo-ai]\nsource_type = \"local\"\nsource = \"./gabo\"\n")}}
-	res := codexRule(in)
+	res := codexSettingsRule(in, false)
 	want := []string{
 		`kept marketplaces.gabo-ai.source_type = "local" in .codex/config.toml (your choice)`,
 		`kept marketplaces.gabo-ai.source = "./gabo" in .codex/config.toml (your choice)`,
@@ -106,7 +106,7 @@ func TestCodexKeepsAnotherSourceAndAddsTheRest(t *testing.T) {
 }
 
 func TestCodexInvalidTOMLIsOneFailureLine(t *testing.T) {
-	res := codexRule(codexIn(t, "invalid"))
+	res := codexSettingsRule(codexIn(t, "invalid"), false)
 	if len(res.Writes) != 0 {
 		t.Errorf("Writes = %q, want none", res.Writes)
 	}
@@ -122,7 +122,7 @@ func TestCodexInvalidTOMLIsOneFailureLine(t *testing.T) {
 // a table defined by dotted keys) is refused, never written broken.
 func TestCodexRefusesAKeyItCannotAddSafely(t *testing.T) {
 	in := Input{Files: map[string][]byte{CodexConfigPath: []byte("marketplaces.gabo-ai.source_type = \"git\"\n")}}
-	res := codexRule(in)
+	res := codexSettingsRule(in, false)
 	if len(res.Writes) != 0 {
 		t.Errorf("Writes = %q, want none", res.Writes)
 	}
@@ -143,14 +143,14 @@ func TestCodexStepsWithTheFallbackFlag(t *testing.T) {
 		t.Fatal("the fallback flag is set until the S12 smoke confirms Codex installs from the project tables (D4)")
 	}
 	for _, name := range []string{"missing", "present", "disabled", "invalid"} {
-		if got := codexRule(codexIn(t, name)).Section.Steps; !slices.Equal(got, steps) {
+		if got := codexSettingsRule(codexIn(t, name), false).Section.Steps; !slices.Equal(got, steps) {
 			t.Errorf("%s: Steps = %q, want %q", name, got, steps)
 		}
 	}
 
 	codexFallback = false
 	t.Cleanup(func() { codexFallback = true })
-	got := codexRule(codexIn(t, "missing")).Section.Steps
+	got := codexSettingsRule(codexIn(t, "missing"), false).Section.Steps
 	if want := steps[:2]; !slices.Equal(got, want) {
 		t.Errorf("without the flag Steps = %q, want %q", got, want)
 	}
@@ -161,8 +161,8 @@ func TestIntegrateRunsTheCodexRule(t *testing.T) {
 	if len(report.Sections) != 1 || report.Sections[0].Engine != Codex {
 		t.Fatalf("Sections = %+v, want one codex section", report.Sections)
 	}
-	if want := codexGolden(t, "missing", "want.toml"); !bytes.Equal(writes[CodexConfigPath], want) || len(writes) != 1 {
-		t.Errorf("writes = %q, want only %s", writes, CodexConfigPath)
+	if want := codexGolden(t, "profile", "want.toml"); !bytes.Equal(writes[CodexConfigPath], want) || len(writes) != 1 {
+		t.Errorf("writes = %q, want only %s, the marketplace, the plugin and the credential profile", writes, CodexConfigPath)
 	}
 }
 
@@ -187,7 +187,7 @@ func TestCodexKeepsArrayAndTableValues(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			res := codexRule(Input{Files: map[string][]byte{CodexConfigPath: []byte(c.in)}})
+			res := codexSettingsRule(Input{Files: map[string][]byte{CodexConfigPath: []byte(c.in)}}, false)
 			if !slices.Equal(res.Section.Lines, c.lines) {
 				t.Errorf("Lines = %q, want %q", res.Section.Lines, c.lines)
 			}

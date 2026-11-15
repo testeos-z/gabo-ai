@@ -149,6 +149,8 @@ func piBuilt(t *testing.T, version string) fstest.MapFS {
 	proj[".agents/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
 	// The main-session entry of spec 0009 S1, S3: link and scoped block.
 	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".agents/skills/gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[".agents/skills/gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	proj["AGENTS.md"] = file("# Project\n\n" + assistantBlock(t))
 	return proj
 }
@@ -288,16 +290,6 @@ func TestPiBuiltAgentSkills(t *testing.T) {
 			wantSkillLines(t, runPi(t, proj, Settings{}), ".pi/agents/gabo-pm.md", tt.want)
 		})
 	}
-}
-
-// The agent with an empty spec list and no Skills: line passes.
-func TestPiBuiltReviewerHasNoSkillsLine(t *testing.T) {
-	t.Parallel()
-	proj := piBuilt(t, "1.2.3")
-	if strings.Contains(string(proj[".pi/agents/gabo-reviewer.md"].Data), "\nSkills: ") {
-		t.Fatalf("gabo-reviewer has a Skills: line:\n%s", proj[".pi/agents/gabo-reviewer.md"].Data)
-	}
-	wantSkillLines(t, runPi(t, proj, Settings{}), ".pi/agents/gabo-reviewer.md", nil)
 }
 
 // The directory the Skills: line names does not change the result.

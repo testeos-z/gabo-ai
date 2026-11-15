@@ -38,7 +38,7 @@ Long-lived agent sessions (Orca terminals, user `orca`, started by `gabo session
 
 - **gabo-coder** — coordinator. Computes eligible roadmap issues, launches up to 4 short coder sessions in parallel (one per issue, each in its own git worktree) following the `gabo-cycle` and `gabo-coder` skills.
 - **gabo-reviewer** — reviewer-side session; the review itself runs in detached terminals opened by `gabo review request`.
-- **gabo-assistant** — planning orchestrator (`gabo-assistant` skill) that keeps the six product docs current.
+- **gabo-assistant** — planning orchestrator (`gabo-assistant` skill) that keeps the six product docs current and runs the wave in its main session with the `gabo-cycle` skill (there is no `gabo-cycle` agent; each coder is a first-level subagent of that session).
 
 Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`), never through terminal handles. Messages are notifications only.
 
@@ -60,6 +60,8 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`),
 6. The terminal pipes that line to `gabo review notify`, which sends it to the coder's mailbox: `PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>`.
 7. If blocking: gabo-coder launches a fix session that reads the reviewer's marker comment findings on the PR, fixes, pushes, and goes back to step 4 (max 4 rounds, then `BLOCKED` + `needs-user`).
 8. If merged: gabo-coder recomputes eligibility (the merge may unblock other issues) and starts the next wave. With nothing eligible it ends its turn until a message arrives.
+
+A wave can be capped by three optional keys in `gabo.yaml`: `wave.max_coder_turns` (turns per coder), `wave.max_coders` (coders launched in the wave) and `wave.max_fix_rounds` (fix rounds per task, 1 to 4, the 4-round ceiling stays). Each unset keeps today's behavior. A capped wave pauses and asks to continue or stop. Spend is not capped by gabo.
 
 ## Identities and credentials
 
@@ -88,7 +90,7 @@ Sessions talk through **Orca durable mailboxes** (`run:<id>` / `dispatch:<id>`),
 | Audit merges (owner login only, verdict status and signed marker comment on merged heads, no coder merges) | `gabo audit` / `audit` |
 | Known gotchas | `gabo doctor` / `doctor` |
 | Which config files are read (user `$XDG_CONFIG_HOME/gabo/config.yaml`, else `~/.config/gabo/config.yaml` → project `gabo.yaml` at the git top-level; each overrides only the keys it sets; `--config <file>` reads exactly one file; `/etc/gabo/gabo.yaml` is no longer read, T006) and the resolved values, credential-looking values redacted | `gabo config` |
-| Install the `gabo-reviewer` skill with its `scripts/` at user level (`${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer/`, never in the repository) on every run, replacing a copy whose own `VERSION` differs from the binary; copy the skill catalog (without `gabo-reviewer`) into `.gabo/skills/` with the version stamp `.gabo/VERSION`; refresh it when the stamp is older or missing (TRD 9.4); once `gabo.yaml` exists, write each configured engine's project-level integration, only the keys gabo needs and only when they change: `claude` → `.claude/settings.json` `extraKnownMarketplaces."gabo-ai"` and `enabledPlugins."gabo@gabo-ai"`; `codex` → `.codex/config.toml` `[marketplaces.gabo-ai]` and `[plugins."gabo@gabo-ai"] enabled = true`; `pi` → `.pi/settings.json` `packages` entry `npm:@gabo-ai/pi@<version>`; `opencode` → nothing written, only a report on the stage-gate plugin; then report what the user still needs to do. User-level engine config (`~/.claude`, `CODEX_HOME`, the Pi agent dir) is never written | `gabo init` |
+| Install the `gabo-reviewer` skill with its `scripts/` at user level (`${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer/`, never in the repository) on every run, replacing a copy whose own `VERSION` differs from the binary, or whose content differs from the embedded reviewer at the same version (`REVIEWER_HASH`); copy the skill catalog (without `gabo-reviewer`) into `.gabo/skills/` with the version stamp `.gabo/VERSION`; refresh it when the stamp is older or missing (TRD 9.4); once `gabo.yaml` exists, write each configured engine's project-level integration, only the keys gabo needs and only when they change: `claude` → `.claude/settings.json` `extraKnownMarketplaces."gabo-ai"` and `enabledPlugins."gabo@gabo-ai"`; `codex` → `.codex/config.toml` `[marketplaces.gabo-ai]` and `[plugins."gabo@gabo-ai"] enabled = true`; `pi` → `.pi/settings.json` `packages` entry `npm:@gabo-ai/pi@<version>`; `opencode` → nothing written, only a report on the stage-gate plugin; then report what the user still needs to do. User-level engine config (`~/.claude`, `CODEX_HOME`, the Pi agent dir) is never written | `gabo init` |
 | Product docs for the planning agents | `gabo plan new|status` |
 | MCP server for the local agent | `gabo mcp` |
 

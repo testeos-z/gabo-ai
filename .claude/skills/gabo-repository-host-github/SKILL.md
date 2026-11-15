@@ -1,6 +1,6 @@
 ---
 name: gabo-repository-host-github
-description: "Trigger: gabo repository host, open PR, PR status, PR checks, merge into dev, delete branch. GitHub adapter for the gabo repository_host slot via gh and git."
+description: "Trigger: gabo repository host, open PR, PR status, PR checks, merge into dev, delete branch, protect branches, branch rules, rulesets. GitHub adapter for the gabo repository_host slot via gh and git."
 license: Apache-2.0
 metadata:
   author: gabo-ai
@@ -14,7 +14,7 @@ Use whenever a gabo agent works with branches or pull requests. Fills the `repos
 
 - Every PR targets the integration branch `dev`. Never open a PR to `main`, never merge into `main`, never push to `main` or `dev` directly (TRD D13).
 - Merge only into `dev`, only pinned to the head SHA that received a clean verdict, and only when the merge is yours to do (reviewer gate or explicit owner request). Coders never merge.
-- Never force-push. Delete only branches the workflow created and that are merged (ledger, D15, D23). Never force-delete a branch (`-D`): delete the local branch with `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it), so git checks it against that upstream ref (a squash merge never reaches `dev` for git), then the remote one. A `-d` refusal means unpushed work: leave it as a leftover.
+- Never force-push. Delete only branches the workflow created and that are merged (ledger, D15, D23). Never force-delete a branch (`-D`): delete the local branch with `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it), so git checks it against that upstream ref (the merge commit keeps the pushed head reachable from `dev`), then the remote one. A `-d` refusal means unpushed work: leave it as a leftover.
 - Re-read after every write: `gh pr view` must show the expected state.
 - Never post the reviewer marker (`gbai-reviewer-bot`) in a PR body, comment or review.
 
@@ -60,7 +60,7 @@ gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateSt
 Check `baseRefName == "dev"` first (`gh pr view <pr> -R $R --json baseRefName --jq .baseRefName`); refuse on any other base. Then:
 
 ```bash
-gh pr merge <pr> -R $R --squash --match-head-commit <sha>
+gh pr merge <pr> -R $R --merge --match-head-commit <sha>
 ```
 
 Read back: `gh pr view <pr> -R $R --json state,mergeCommit --jq '[.state,.mergeCommit.oid]'` must show `MERGED`; return the merged SHA.
@@ -82,6 +82,58 @@ After merge only: `gh pr view <pr> -R $R --json state,baseRefName,headRefName,he
    ```
 
 Read back: `git branch --list <branch>` and `git ls-remote --heads origin <branch>` are empty.
+
+### protect branches
+
+Uses repository rulesets (not classic branch protection): one ruleset per branch, named `gabo-protect-<branch>`, so a rerun finds it by name. Branches: `dev` (`repo.integration_branch`) and `main`. The rule list, as the contract states it:
+
+- On both branches: a pull request before a merge, no force-push and no deletion.
+- On `repo.integration_branch` only (`dev`): the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
+- On each branch: the approving reviews count from `repo.protection.required_approvals.integration` (dev) or `repo.protection.required_approvals.main`; zero when the key is absent.
+- On both branches: a bypass for the administrator role, which names that role and no user.
+
+1. Approving reviews per branch, from `gabo.yaml` with a YAML reader (for example `yq -r '.repo.protection.required_approvals.integration // 0' gabo.yaml` and the same with `.main`); a missing key reads as `0`.
+   The key is accepted by `gabo check` once intent 0029 T3 lands; until then a value set by hand is rejected, and an absent key reads as `0`.
+2. Find the ruleset of the branch by name; no output means none exists:
+
+   ```bash
+   gh api --paginate "repos/$R/rulesets?includes_parents=false" --jq '.[]|select(.name=="gabo-protect-<branch>")|.id'
+   ```
+
+3. Write the body to a file in `mktemp -d`, one per branch:
+
+   ```json
+   {
+     "name": "gabo-protect-<branch>",
+     "target": "branch",
+     "enforcement": "active",
+     "conditions": {"ref_name": {"include": ["refs/heads/<branch>"], "exclude": []}},
+     "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
+     "rules": [
+       {"type": "pull_request", "parameters": {"required_approving_review_count": <count>, "dismiss_stale_reviews_on_push": false, "require_code_owner_review": false, "require_last_push_approval": false, "required_review_thread_resolution": false}},
+       {"type": "non_fast_forward"},
+       {"type": "deletion"}
+     ]
+   }
+   ```
+
+   On `dev` only, add this rule to `rules`; `main` has no `required_status_checks` rule, so it requires no status:
+
+   ```json
+   {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": false, "required_status_checks": [{"context": "reviewer/tests"}, {"context": "reviewer/review"}]}}
+   ```
+
+   `actor_id` 5 is the repository administrator role (`RepositoryRole`); the bypass names that role only. The required statuses carry no `integration_id`, so any login that posts `reviewer/tests` or `reviewer/review` satisfies them; agents run with the owner's login, so that gap is accepted; the required contexts are D6.
+
+4. Write: no ruleset found, `gh api -X POST repos/$R/rulesets --input <file>`; one found, `gh api -X PUT repos/$R/rulesets/<id> --input <file>` with the same body; more than one found, write nothing and report `missing` with the ids.
+5. Not offered: when the host refuses the write and names one rule type or the bypass, remove that rule from the body, resend, and report that rule `not offered` with the host's reason. Repeat for each rule the host names, at most once per rule in the list. A refusal that names no rule is `missing` with the host's reason, with no retry.
+6. Read back and compare with the rule list, one result per rule and branch (`set` or `missing`); a rule already reported `not offered` in step 5 keeps that result and is not read back:
+
+   ```bash
+   gh api repos/$R/rulesets/<id> --jq '{name,enforcement,conditions,bypass_actors,rules:[.rules[]|{type,parameters}]}'
+   ```
+
+Running it again with the same config: the ruleset is found by name, the PUT replaces it with the same body, and the read-back is identical; no second ruleset is created.
 
 ## Output Contract
 

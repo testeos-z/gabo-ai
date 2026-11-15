@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0010-gabo-init-writes-the-main-session-key](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-07. All 12 task issues are closed (12 completed); see the intent status row. Tasks are in the tracker under [#354](https://github.com/testeos-z/gabo-ai/issues/354). |
 | owner | gabo-dev-lead |
 | date | 2026-11-06 |
 

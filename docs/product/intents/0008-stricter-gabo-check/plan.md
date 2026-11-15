@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0008-stricter-gabo-check](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-06. All 13 task issues are closed (13 completed); see the intent status row. Tasks are in the tracker under [#304](https://github.com/testeos-z/gabo-ai/issues/304). |
 | owner | gabo-dev-lead |
 | date | 2026-11-06 |
 

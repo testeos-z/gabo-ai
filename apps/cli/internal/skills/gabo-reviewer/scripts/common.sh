@@ -124,7 +124,15 @@ MODE="${REVIEWER_MODE:-single-user}"
 BOT_LOGIN="${REVIEWER_BOT_LOGIN:-}"
 WORKDIR="${GABO_REVIEWER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer}"
 STATE="$WORKDIR/state"
-BASE_DIR="$WORKDIR/base"
+# The reviewer's repository state carries the repository as <owner>__<repo>, the
+# qualifier pr_worktree_name gives the worktrees, so two repositories that share
+# one state dir share no mirror, PR ref or base checkout (intent 0026 S11). A
+# mirror, refs and base checkout from before (repo.git, refs/remotes/pr/<n>,
+# base) are left in place and read only by the legacy worktree removal.
+REPO_KEY="${REPO/\//__}"
+MIRROR_DIR="$WORKDIR/$REPO_KEY.git"
+BASE_DIR="$WORKDIR/base-$REPO_KEY"
+PR_REF_PREFIX="refs/remotes/pr/$REPO_KEY"
 MAX_ATTEMPTS="${REVIEWER_MAX_ATTEMPTS:-2}"
 CHECK_TIMEOUT="${REVIEWER_CHECK_TIMEOUT:-1800}"
 REVIEW_TIMEOUT="${REVIEWER_REVIEW_TIMEOUT:-900}"
@@ -139,6 +147,10 @@ CODEX_MODEL="${REVIEWER_CODEX_MODEL:-}"
 OPENCODE_MODEL="${REVIEWER_OPENCODE_MODEL:-}"
 DIFF_MAX_BYTES="${REVIEWER_DIFF_MAX_BYTES:-200000}"
 MERGE_TRIES="${REVIEWER_MERGE_TRIES:-5}"
+# Days an open PR's worktree may stay unused before prune removes it.
+KEEP_DAYS="${REVIEWER_KEEP_DAYS:-7}"
+# Size the Go caches and check-home may reach together before prune trims them.
+CACHE_MAX="${REVIEWER_CACHE_MAX:-1G}"
 MERGE_DELAY="${REVIEWER_MERGE_DELAY:-3}"
 REMOTE_URL="${REVIEWER_REMOTE_URL:-https://github.com/$REPO.git}"
 # The trusted install locations: the engine-neutral user-level copy (TRD 9.4)
@@ -428,7 +440,7 @@ validate_config() {
 # moves its own checkout ($BASE_DIR) to the tip. Prints the problem and fails
 # when that checkout is not a clean checkout of the integration branch.
 sync_base() {
-  local mirror="$WORKDIR/repo.git" base_ref="refs/remotes/origin/$BASE_BRANCH"
+  local mirror="$MIRROR_DIR" base_ref="refs/remotes/origin/$BASE_BRANCH"
   mkdir -p "$STATE/locks" || { echo "cannot create $STATE"; return 1; }
   (
     flock 7
@@ -655,25 +667,55 @@ run_bounded() {
   return "$code"
 }
 
-# remove_run_worktree <path>: removes the one merge-result worktree a run
-# created. Refuses anything that is not a direct child of $WORKDIR/worktrees
-# named merge-pr-*, a symlink, or not registered in the reviewer's own mirror.
+# pr_worktree_name <pr>: the name of PR <pr>'s head worktree in $REPO, and of
+# its lock, opencode home and run dir: <owner>__<repo>__pr-<n>. A GitHub owner
+# cannot contain "_", so the first "__" ends the owner and two repositories
+# never give one name (intent 0025 S7, D5).
+pr_worktree_name() { echo "${REPO/\//__}__pr-$1"; }
+
+# remove_run_worktree <path>: removes one worktree the reviewer created: the
+# merge-result worktree of a run (merge-pr-*), the head worktree of a PR of a
+# repository (<owner>__<repo>__pr-<n>) or an unqualified one from before the
+# names were qualified (pr-<n>). Refuses anything that is not a direct child of
+# $WORKDIR/worktrees with one of those names, a symlink, or not registered in
+# the reviewer's own mirror. The mirror is picked per worktree: the repository's
+# own <owner>__<repo>.git for <owner>__<repo>__pr-<n>, the run's repository
+# for merge-pr-*, and the unqualified repo.git for the legacy pr-<n> and for a
+# qualified worktree that only repo.git lists (made before this change). The
+# caller holds the mirror lock.
 remove_run_worktree() {
-  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$WORKDIR/repo.git" real_p line listed=false
+  local p="${1:-}" base="$WORKDIR/worktrees" mirror_dir="$MIRROR_DIR" real_p line listed=false name m
+  local qualified_re='^[^/]+__[^/]+__pr-[0-9]+$'
   [[ -n "$p" ]] || return 0
-  if [[ "$p" != "$base"/merge-pr-* || "${p#"$base"/}" == */* || -L "$p" ]]; then
-    log_event "WARN" "refusing to remove $p: not a merge-pr-* worktree directly under $base" >/dev/null
+  name="${p#"$base"/}"
+  if [[ ( "$p" != "$base"/merge-pr-* && "$p" != "$base"/pr-* && ! "$name" =~ $qualified_re ) || "$name" == */* || -L "$p" ]]; then
+    log_event "WARN" "refusing to remove $p: not a merge-pr-*, pr-* or <owner>__<repo>__pr-* worktree directly under $base" >/dev/null
     return 1
+  fi
+  if [[ "$name" =~ $qualified_re ]]; then
+    mirror_dir="$WORKDIR/${name%__pr-*}.git"
+  elif [[ "$name" == pr-* ]]; then
+    mirror_dir="$WORKDIR/repo.git"
   fi
   if [[ -e "$p" ]]; then
     real_p="$(realpath -e -- "$p" 2>/dev/null)" || real_p=""
-    while IFS= read -r line; do
-      [[ "$line" == "worktree "* ]] || continue
-      if [[ -n "$real_p" && "$(realpath -e -- "${line#worktree }" 2>/dev/null)" == "$real_p" ]]; then
-        listed=true
+    # A qualified worktree made before the mirrors were qualified is still
+    # registered in the unqualified repo.git: look there when its own mirror
+    # does not list it.
+    for m in "$mirror_dir" "$WORKDIR/repo.git"; do
+      [[ "$m" == "$mirror_dir" || "$name" =~ $qualified_re ]] || continue
+      while IFS= read -r line; do
+        [[ "$line" == "worktree "* ]] || continue
+        if [[ -n "$real_p" && "$(realpath -e -- "${line#worktree }" 2>/dev/null)" == "$real_p" ]]; then
+          listed=true
+          break
+        fi
+      done < <(git -C "$m" worktree list --porcelain 2>/dev/null)
+      if [[ "$listed" == true ]]; then
+        mirror_dir="$m"
         break
       fi
-    done < <(git -C "$mirror_dir" worktree list --porcelain 2>/dev/null)
+    done
     if [[ "$listed" != true ]]; then
       log_event "WARN" "refusing to remove $p: not a worktree of the mirror $mirror_dir" >/dev/null
       return 1
@@ -682,6 +724,198 @@ remove_run_worktree() {
       { log_event "WARN" "could not remove $p (remove it by hand)" >/dev/null; return 1; }
   fi
   git -C "$mirror_dir" worktree prune >/dev/null 2>&1 || true
+}
+
+# remove_named_worktree <name>: removes worktrees/<name> under the mirror lock.
+remove_named_worktree() {
+  local rc=0
+  (
+    exec 7>"$STATE/locks/mirror.lock"
+    flock -w 120 7 || exit 1
+    remove_run_worktree "$WORKDIR/worktrees/$1"
+  ) || rc=$?
+  return "$rc"
+}
+
+# remove_pr_worktree <pr>: removes the head worktree of PR <pr> of $REPO.
+remove_pr_worktree() { remove_named_worktree "$(pr_worktree_name "$1")"; }
+
+# prune_one <pr> <current pr> <days>: decides and removes the worktree of PR
+# <pr> of $REPO while holding its lock (<owner>__<repo>__pr-<n>.lock), so a
+# review that starts meanwhile waits for the lock (review-head.sh takes it
+# first) instead of losing its checkout. Returns 0 when removed, 1 when kept or
+# when the removal failed. The lock is taken before the mirror lock, the order
+# review-head.sh uses.
+prune_one() {
+  local n="$1" current="$2" days="$3" name state p
+  name="$(pr_worktree_name "$n")"
+  p="$WORKDIR/worktrees/$name"
+  (
+    exec 6>"$STATE/locks/$name.lock"
+    flock -n 6 || exit 1
+    state="$("$GH" pr view "$n" --repo "$REPO" --json state 2>/dev/null | jq -r '.state // empty' 2>/dev/null)" || state=""
+    [[ -n "$state" ]] || log_event "WARN" "prune: could not read the state of PR #$n; only the age rule applies" >/dev/null
+    if [[ -z "$state" || "$state" == OPEN ]]; then
+      # Open or unknown: only the age rule, never for the current PR.
+      [[ "$n" != "$current" ]] || exit 1
+      [[ -n "$(find "$p" -maxdepth 0 -mmin "+$((days * 1440))" 2>/dev/null)" ]] || exit 1
+    fi
+    remove_named_worktree "$name"
+  )
+}
+
+# prune_legacy <name> <days>: removes an unqualified worktree pr-<n> (made before
+# the names were qualified) by the age rule only: it has no known repository,
+# so its PR state is never asked and it is never judged by the caller's
+# repository. Returns 0 when removed, 1 when kept or refused (intent 0025 S7).
+prune_legacy() {
+  local name="$1" days="$2"
+  [[ -n "$(find "$WORKDIR/worktrees/$name" -maxdepth 0 -mmin "+$((days * 1440))" 2>/dev/null)" ]] || return 1
+  remove_named_worktree "$name" || return 1
+  log_event "PRUNED" "legacy worktree $name (unused more than $days days)" >/dev/null
+}
+
+# prune_worktrees [current pr]: removes every worktree of $REPO whose PR is not
+# open, and every one that is not the current PR's and has not been used for
+# more than KEEP_DAYS days (its directory mtime; review-head.sh touches it on
+# every run). Worktrees of another repository are never touched. Unqualified
+# worktrees pr-<n> have no known repository and go by the age rule only (logged
+# as legacy worktree). Skips the worktree of a run in progress (its lock is
+# held) and a PR whose state cannot be read (only the age rule applies). Best
+# effort: every problem is logged and never changes the exit code.
+prune_worktrees() {
+  local current="${1:-}" base="$WORKDIR/worktrees" p name n days="$KEEP_DAYS" removed=0 own
+  [[ "$days" =~ ^[0-9]+$ ]] || days=7
+  [[ -d "$base" ]] || return 0
+  mkdir -p "$STATE/locks"
+  own="${REPO/\//__}__pr-"
+  for p in "$base"/pr-* "$base/$own"*; do
+    { [[ -e "$p" || -L "$p" ]] || continue; }
+    name="${p##*/}"
+    if [[ "$name" == pr-* ]]; then
+      n="${name#pr-}"
+      is_number "$n" || continue
+      ! prune_legacy "$name" "$days" || removed=$((removed + 1))
+    else
+      n="${name#"$own"}"
+      is_number "$n" || continue
+      ! prune_one "$n" "$current" "$days" || removed=$((removed + 1))
+    fi
+  done
+  ((removed == 0)) || log_event "PRUNED" "$removed worktree(s)" >/dev/null
+  return 0
+}
+
+# size_bytes <K|M|G number>: "2G", "512M", "100K" or plain bytes to bytes; empty
+# when it is not a size.
+size_bytes() {
+  local v="${1:-}" n u
+  [[ "$v" =~ ^([0-9]+)([KkMmGg]?)$ ]] || return 1
+  n="${BASH_REMATCH[1]}"
+  u="${BASH_REMATCH[2]}"
+  case "$u" in
+    K | k) echo $((n * 1024)) ;;
+    M | m) echo $((n * 1048576)) ;;
+    G | g) echo $((n * 1073741824)) ;;
+    *) echo "$n" ;;
+  esac
+}
+
+# human_bytes <bytes>: 1.5G, 12M, 340K.
+human_bytes() {
+  awk -v b="${1:-0}" 'BEGIN { if (b >= 1073741824) printf "%.1fG", b / 1073741824; else if (b >= 1048576) printf "%.1fM", b / 1048576; else printf "%dK", b / 1024 }'
+}
+
+# dir_bytes <dir>: apparent size in bytes of one cache folder; 0 when it is
+# missing or a symlink.
+dir_bytes() {
+  local b
+  [[ -d "$1" && ! -L "$1" ]] || { echo 0; return 0; }
+  b="$(du -sb "$1" 2>/dev/null | cut -f1)"
+  echo "${b:-0}"
+}
+
+# cache_bytes: size in bytes of cache/go-build, cache/go-mod and check-home
+# together.
+cache_bytes() {
+  echo $(($(dir_bytes "$WORKDIR/cache/go-build") + $(dir_bytes "$WORKDIR/cache/go-mod") + $(dir_bytes "$WORKDIR/check-home")))
+}
+
+# trim_check_home <days>: removes the check-home files not modified for more
+# than <days> days, then the directories left empty. A symlink is never
+# followed. Called under the cache.lock of prune_caches.
+trim_check_home() {
+  local d="$WORKDIR/check-home"
+  [[ -d "$d" && ! -L "$d" ]] || return 0
+  { find "$d" -type f -mmin "+$(($1 * 1440))" -delete &&
+    find "$d" -mindepth 1 -type d -empty -delete; } >/dev/null 2>&1 ||
+    log_event "WARN" "prune: could not trim check-home" >/dev/null
+}
+
+# prune_caches: when cache/go-build, cache/go-mod and check-home together
+# exceed CACHE_MAX, prunes step by step, each step only while the total is
+# still over the limit: `go clean -cache` with the reviewer's own GOCACHE, the
+# check-home files older than KEEP_DAYS, and the check-home files older than one
+# day (each trim also removes the directories it leaves empty). It never runs
+# `go clean -modcache`: a module cache rebuilt on every review costs more than
+# the disk it frees, so the owner clears it by hand. It prints one line
+# `pruned: <what> (<size freed>)` per step that freed something; when the total
+# is still over the limit after every step it logs one WARN with the size of
+# each folder. Under the limit it does nothing and prints nothing. The checks of
+# a review run under a shared cache.lock (reviewer.sh, review_head); prune takes
+# it exclusive without waiting and skips when it is held, so it never trims
+# while a review runs and a review that starts meanwhile waits for it. Only
+# paths under $WORKDIR are touched. Best effort: every problem is logged and
+# never changes the exit code.
+prune_caches() {
+  local max days="$KEEP_DAYS" before lines line
+  max="$(size_bytes "$CACHE_MAX")" || { log_event "WARN" "prune: REVIEWER_CACHE_MAX '$CACHE_MAX' is not a size; caches not pruned" >/dev/null; return 0; }
+  [[ "$days" =~ ^[0-9]+$ ]] || days=7
+  before="$(cache_bytes)"
+  ((before > max)) || return 0
+  mkdir -p "$STATE/locks"
+  lines="$(
+    exec 5>"$STATE/locks/cache.lock"
+    if ! flock -n -x 5; then
+      log_event "WARN" "prune: a review is in progress (cache.lock held); caches not pruned" >/dev/null
+      exit 0
+    fi
+    cur="$before"
+    # step <what>: prints `pruned: <what> (<size freed>)` when the step freed bytes.
+    step() {
+      local now
+      now="$(cache_bytes)"
+      ((cur > now)) && echo "pruned: $1 ($(human_bytes $((cur - now))) freed)"
+      cur="$now"
+    }
+    # go_clean <flag> <cache assignment>: a failure is logged, never fatal.
+    go_clean() {
+      if ! command -v go >/dev/null 2>&1; then
+        log_event "WARN" "prune: go clean $1 failed (go not found)" >/dev/null
+      elif ! env "$2" go clean "$1" >/dev/null 2>&1; then
+        log_event "WARN" "prune: go clean $1 failed" >/dev/null
+      fi
+    }
+    go_clean -cache "GOCACHE=$WORKDIR/cache/go-build"
+    step "go-build cache"
+    if ((cur > max)); then
+      trim_check_home "$days"
+      step "check-home files older than $days days"
+    fi
+    if ((cur > max)); then
+      trim_check_home 1
+      step "check-home files older than 1 day"
+    fi
+    if ((cur > max)); then
+      log_event "WARN" "prune: caches still over REVIEWER_CACHE_MAX ($CACHE_MAX): go-build $(human_bytes "$(dir_bytes "$WORKDIR/cache/go-build")"), go-mod $(human_bytes "$(dir_bytes "$WORKDIR/cache/go-mod")"), check-home $(human_bytes "$(dir_bytes "$WORKDIR/check-home")")" >/dev/null
+    fi
+  )" || true
+  while IFS= read -r line; do
+    [[ -n "$line" ]] || continue
+    log_event "PRUNED" "${line#pruned: }" >/dev/null
+    echo "$line"
+  done <<<"$lines"
+  return 0
 }
 
 strip_ansi() { sed -E $'s/\e\\[[0-9;]*[A-Za-z]//g; s/\r$//'; }

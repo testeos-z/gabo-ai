@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ .claude/agents/gabo-cycle.md: agent gabo-cycle is no longer in the agent spec
+next: ask your agent to rebuild the agents, then rerun gabo check

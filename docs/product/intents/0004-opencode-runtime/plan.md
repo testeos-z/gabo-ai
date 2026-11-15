@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0004-opencode-runtime](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-11. All 11 task issues are closed (8 completed); see the intent status row. Tasks are in the tracker under [#175](https://github.com/testeos-z/gabo-ai/issues/175). |
 | owner | gabo-dev-lead |
 | date | 2026-11-03 |
 

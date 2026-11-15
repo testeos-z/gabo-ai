@@ -1,0 +1,1 @@
+wrote .pi/gentle-ai/runtime-guardrails.json: autonomousMode true (mode auto; gentle-pi will not ask before git push; the file is project config, commit it or set GENTLE_PI_AUTONOMOUS_MODE=1 for the session instead)

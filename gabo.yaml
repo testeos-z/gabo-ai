@@ -27,7 +27,7 @@ slots:
   methodology:
     adapter: .claude/skills/gabo-methodology-gentle-ai/SKILL.md
   # Owner choice 2026-10-28: the catalog local placement adapter covers the
-  # reviewer_placement contract; the gabo-reviewer agent stays template-built.
+  # reviewer_placement contract; it runs the user-level gabo-reviewer skill scripts.
   reviewer_placement:
     adapter: .gabo/skills/gabo-reviewer-placement-local/SKILL.md
   # Owner choice 2026-10-28: agents run on the owner's machine (catalog adapter).
@@ -50,7 +50,15 @@ review:
   # heads into dev, never into main (TRD D13). The hand-installed reviewer scripts
   # also need REVIEWER_AUTO_MERGE=true in the user-level skill config.env.
   auto_merge: true
-  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/, .codex/, .agents/, plugins/]
+  human_only_paths: [.github/, AGENTS.md, CLAUDE.md, gabo.yaml, .claude/, .codex/, .agents/, .pi/, .opencode/, opencode.json, opencode.jsonc]
+
+# Agent evals (intent 0030, owner-set 2026-11-15, see #841): a complete run below
+# pass_threshold posts a notice on the PR and holds the automatic merge (S9, S10).
+eval:
+  pass_threshold: 1.0
+  cap:
+    turns_per_task_run: 300
+    task_runs_per_eval_run: 10
 
 # Git email -> alias (TRD D10). OWNER: change "Leo" if you prefer another alias.
 # The local git user.email is dimasmerida15@gmail.com; both emails map to the owner.

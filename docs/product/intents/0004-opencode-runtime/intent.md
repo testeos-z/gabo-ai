@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0004-opencode-runtime |
-| status | Draft |
+| status | Done on 2026-11-11. Intent issue [#175](https://github.com/testeos-z/gabo-ai/issues/175) is closed as completed; all 11 task issues are closed: 8 tasks closed as completed with merged PRs; T1 #193 and T7 #200 were removed from the plan on 2026-11-03 as duplicates of I0002 tasks (#204, #206, #207); the owner-machine verification T11 #208 was closed as not planned on the owner's decision of 2026-11-11 ("closed unverified"; code merged in `main` and shipped in gabo 0.2.10). |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-03 |

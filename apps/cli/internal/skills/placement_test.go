@@ -76,3 +76,37 @@ func TestReviewerPlacementContractEngineField(t *testing.T) {
 		}
 	}
 }
+
+// Intent 0015 S4 (plan T5): the coder is the caller of the reviewer
+// placement; no relay agent runs the scripts.
+func TestReviewerPlacementNamesTheCoderAsCaller(t *testing.T) {
+	t.Parallel()
+	for name, want := range map[string]string{
+		"gabo-reviewer-placement-local":    "The coder runs the scripts itself",
+		"gabo-contract-reviewer-placement": "The coder that runs the review never reviews",
+	} {
+		doc := readCatalog(t, name+"/SKILL.md")
+		if !strings.Contains(doc, want) {
+			t.Errorf("%s/SKILL.md: missing %q", name, want)
+		}
+		for _, bad := range []string{"relaying agent", "agent relaying", "reviewer agent", "relay"} {
+			if strings.Contains(doc, bad) {
+				t.Errorf("%s/SKILL.md: still says %q", name, bad)
+			}
+		}
+	}
+}
+
+// The caller's gabo.yaml sets the integration branch the review trusts, so the
+// coder runs the script from the main checkout, never from its worktree.
+func TestReviewerRunsFromTheMainCheckout(t *testing.T) {
+	t.Parallel()
+	local := readCatalog(t, "gabo-reviewer-placement-local/SKILL.md")
+	requireIn(t, "gabo-reviewer-placement-local/SKILL.md", local, []string{
+		"Run from the repository's main checkout", "never from a task worktree", "then run one command from the main checkout",
+	})
+	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	requireIn(t, "gabo-coder template", tmpl, []string{
+		"the main checkout (the parent of `git -C <worktree> rev-parse --path-format=absolute --git-common-dir`) as the working directory and never the task worktree",
+	})
+}

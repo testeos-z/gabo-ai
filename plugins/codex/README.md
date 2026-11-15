@@ -13,7 +13,7 @@ codex plugin marketplace add testeos-z/gabo-ai
 codex plugin add gabo@gabo-ai
 ```
 
-Then trust the two hooks: in a Codex session, open `/hooks` and trust the gabo `PreToolUse` and `PostToolUse` hooks. Codex runs a plugin hook only after you trust it, and skips a hook that changed until you trust it again. Hook trust is your own approval in `~/.codex/config.toml`; neither the plugin nor gabo writes it.
+Then trust the gabo hooks: in a Codex session, open `/hooks` and trust the gabo `PreToolUse` (`apply_patch` and `Bash`) and `PostToolUse` hooks. Codex runs a plugin hook only after you trust it, and skips a hook that changed until you trust it again. Hook trust is your own approval in `~/.codex/config.toml`; neither the plugin nor gabo writes it.
 
 Update with `codex plugin marketplace upgrade gabo-ai`. Codex caches the plugin per version (`~/.codex/plugins/cache/gabo-ai/gabo/<version>/`), so an update arrives when a release bumps `version`. Check `/hooks` again after an update.
 
@@ -25,11 +25,12 @@ The plugin does not replace `gabo init` and builds no agents. Per-project config
 |---|---|
 | `.codex-plugin/plugin.json` | Manifest: name `gabo`, `version`, `skills` (`./skills/`) and `hooks` (`./hooks/hooks.codex.json`). No apps and no MCP servers. |
 | `skills/` | A real copy (not a symlink) of every catalog skill in `apps/cli/internal/skills/` except those that run reviews (`gabo-reviewer`, `gabo-reviewer-placement-local`): the same set as the Claude Code plugin. Codex leaves symlinked skill folders and files out of its plugin cache, so the copies are real files. |
-| `hooks/hooks.codex.json` | `PreToolUse` and `PostToolUse` on `apply_patch`, each running a script with the argument `codex`. A file of its own, so Codex does not load the Claude Code `hooks/hooks.json`. |
-| `scripts/gabo-pre-write.sh` | Pre-write hook: pipes the tool call to `gabo check --pre-write`; a patch that breaks the stage gate is denied with gabo's reason. |
+| `hooks/hooks.codex.json` | `PreToolUse` on `apply_patch` and on `Bash` (the shell tool), and `PostToolUse` on `apply_patch`, each running a script with the argument `codex`. A file of its own, so Codex does not load the Claude Code `hooks/hooks.json`. |
+| `scripts/gabo-pre-write.sh` | Pre-write hook: pipes every patch to `gabo check --pre-write`, gabo paths or not; a patch gabo denies is denied with gabo's reason. |
+| `scripts/gabo-pre-command.sh` | Pre-command hook: pipes every shell call to `gabo check --pre-command`; a call gabo denies is denied with gabo's reason. |
 | `scripts/gabo-check.sh` | Post-write hook: runs `gabo check` and returns its failures to Codex as additional context. |
-| `scripts/gabo-hook-filter.sh` | Shared filter: both hooks stay silent when the project has no `.gabo/VERSION`, `gabo` is not on `PATH`, or no file in the patch is a gabo path (`gabo.yaml`, `.gabo/`, `.claude/agents/`, `.claude/skills/`, `docs/product/`). |
-| `scripts/tests/` | Shell tests for both hooks on Codex inputs, run by the Go tests in `apps/cli/internal/skills`. |
+| `scripts/gabo-hook-filter.sh` | Shared helper: the relay that maps gabo's exit (0 runs the call, 1 denies it with gabo's lines, 3 denies it because Codex shows no prompt for an ask, any other exit or a missing reply denies it and names the failure), and the path filter the post-write hook uses (`gabo.yaml`, `.gabo/`, `.claude/agents/`, `.claude/skills/`, `docs/product/`). The hooks stay silent when the project has no `.gabo/VERSION`; with `gabo` not on `PATH` the call runs and one warning line is shown. |
+| `scripts/tests/` | Shell tests for the hooks on Codex inputs, run by the Go tests in `apps/cli/internal/skills`. |
 
 The hooks hold no check rule; every rule lives in `gabo check`. To turn them off, leave them untrusted in `/hooks`.
 

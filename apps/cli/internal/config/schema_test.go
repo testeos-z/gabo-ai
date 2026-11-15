@@ -83,6 +83,11 @@ func TestSchemasHaveNoSecretValueFields(t *testing.T) {
 					continue
 				}
 				p, _ := v.(map[string]any)
+				// The lock named credentials (intent 0028 D2) holds one of the
+				// lock states, an enum, never a value: only that key is exempt.
+				if path == "/$defs/projectKeys/properties/locks" && key == "credentials" && p["enum"] != nil {
+					continue
+				}
 				if !strings.HasSuffix(key, "_env") || p["pattern"] != "^([A-Z_][A-Z0-9_]*)?$" {
 					t.Errorf("%s %s/properties/%s: secret-like key must be an env var name ending in _env", name, path, key)
 				}
@@ -108,6 +113,9 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"opencode in every role":  with("runtimes: {coder: opencode, reviewer: opencode, assistant: opencode}"),
 		"assistant list":          with("runtimes: {coder: session, reviewer: pi, assistant: [claude, pi]}"),
 		"one-item assistant list": with("runtimes: {assistant: [opencode]}"),
+		"well-formed coder name":  with("runtimes: {coder: foo}"),
+		"well-formed assistant":   with("runtimes: {assistant: foo}"),
+		"well-formed assistants":  with("runtimes: {assistant: [claude, gpt]}"),
 		"reviewer session":        with("runtimes: {reviewer: session}"),
 		"claude reviewer env":     with("review: {pi_credential_env: ANTHROPIC_API_KEY}"),
 		"bot coder login":         with("coder: {login: 'gabo-coder[bot]'}"),
@@ -125,6 +133,19 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"wave after wait":         with("wave: {after: wait}"),
 		"null wave":               with("wave:\n"),
 		"empty wave after":        with(`wave: {after: ""}`),
+		"wave caps":               with("wave: {max_coder_turns: 30, max_coders: 1, max_fix_rounds: 4}"),
+		"null wave caps":          with("wave: {max_coder_turns: null, max_coders: null, max_fix_rounds: null}"),
+		"eval keys":               with("eval: {min_tasks: 3, max_tasks: 12, runs_per_task: 2, pass_threshold: 1, cap: {turns_per_task_run: 1, task_runs_per_eval_run: 1}}"),
+		"eval threshold zero":     with("eval: {pass_threshold: 0}"),
+		"null eval":               with("eval:\n"),
+		"null eval values":        with("eval: {min_tasks: null, pass_threshold: null, cap: null}"),
+		"approvals per branch":    with("repo: {protection: {required_approvals: {integration: 0, main: 1}}}"),
+		"null approvals":          with("repo: {protection: {required_approvals: {integration: null, main: null}}}"),
+		"locks every state":       with("locks: {shell_guard: off, release_gate: warn, human_only_paths: ask, credentials: block, test_files: warn}"),
+		"locks test files off":    with("locks: {test_files: off}"),
+		"locks enabled false":     with("locks: {enabled: false}"),
+		"null locks":              with("locks:\n"),
+		"empty lock state":        with(`locks: {shell_guard: ""}`),
 	}
 	reject := map[string]string{
 		"missing runtimes.coder":      string(without(t, "runtimes.coder")),
@@ -133,13 +154,14 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"missing review.checks":       string(without(t, "review.checks")),
 		"missing human_only_paths":    string(without(t, "review.human_only_paths")),
 		"unknown reviewer runtime":    with("runtimes: {reviewer: foo}"),
+		"malformed coder name":        with(`runtimes: {coder: "Foo Bar"}`),
+		"malformed assistant name":    with(`runtimes: {assistant: "foo bar"}`),
+		"malformed assistant in list": with(`runtimes: {assistant: [claude, "gpt 5"]}`),
 		"null parallelism":            with("parallelism: null"),
 		"null runtimes.coder":         with("runtimes: {coder: null}"),
 		"empty runtimes.coder":        with(`runtimes: {coder: ""}`),
-		"unknown runtime":             with("runtimes: {assistant: foo}"),
 		"empty assistant list":        with("runtimes: {assistant: []}"),
 		"duplicate assistant":         with("runtimes: {assistant: [pi, pi]}"),
-		"unknown assistant in list":   with("runtimes: {assistant: [claude, gpt]}"),
 		"session assistant":           with("runtimes: {assistant: session}"),
 		"session in assistant list":   with("runtimes: {assistant: [claude, session]}"),
 		"assistant mapping":           with("runtimes: {assistant: {engine: claude}}"),
@@ -195,8 +217,30 @@ func TestSchemaAndGoValidationAgree(t *testing.T) {
 		"string global_without_owner": with("plan_change: {global_without_owner: maybe}"),
 		"bad wave after":              with("wave: {after: later}"),
 		"unknown wave field":          with("wave: {chain: true}"),
+		"zero max coders":             with("wave: {max_coders: 0}"),
+		"zero max coder turns":        with("wave: {max_coder_turns: 0}"),
+		"zero max fix rounds":         with("wave: {max_fix_rounds: 0}"),
+		"five max fix rounds":         with("wave: {max_fix_rounds: 5}"),
+		"string max coders":           with("wave: {max_coders: many}"),
+		"unknown eval key":            with("eval: {chain: 1}"),
+		"unknown eval cap key":        with("eval: {cap: {turns: 1}}"),
+		"zero eval min tasks":         with("eval: {min_tasks: 0}"),
+		"zero eval runs per task":     with("eval: {runs_per_task: 0}"),
+		"eval threshold above one":    with("eval: {pass_threshold: 1.5}"),
+		"eval threshold negative":     with("eval: {pass_threshold: -0.1}"),
+		"eval threshold string":       with(`eval: {pass_threshold: "high"}`),
+		"zero eval cap turns":         with("eval: {cap: {turns_per_task_run: 0}}"),
+		"zero eval cap task runs":     with("eval: {cap: {task_runs_per_eval_run: 0}}"),
 		"bad interaction level":       with("interaction_level: max"),
 		"bad language":                with("language: 'not a tag'"),
+		"negative approvals":          with("repo: {protection: {required_approvals: {main: -1}}}"),
+		"string approvals":            with("repo: {protection: {required_approvals: {main: one}}}"),
+		"unknown approvals branch":    with("repo: {protection: {required_approvals: {dev: 1}}}"),
+		"unknown lock name":           with("locks: {shell_gard: block}"),
+		"unknown lock state":          with("locks: {shell_guard: deny}"),
+		"test files ask":              with("locks: {test_files: ask}"),
+		"test files block":            with("locks: {test_files: block}"),
+		"string lock enabled":         with("locks: {enabled: nope}"),
 		"not a mapping":               "- a\n- b\n",
 	}
 	run := func(name, doc string, want bool) {
@@ -323,10 +367,10 @@ func TestUserSchema(t *testing.T) {
 		}
 	}
 	for doc, key := range map[string]string{
-		"nickname: Leo\n":           "nickname",
-		"interaction_level: max\n":  "interaction_level",
-		"runtimes: {coder: foo}\n":  "runtimes.coder",
-		"users: {orca: {uid: 1}}\n": "users",
+		"nickname: Leo\n":                  "nickname",
+		"interaction_level: max\n":         "interaction_level",
+		"runtimes: {coder: \"Foo Bar\"}\n": "runtimes.coder",
+		"users: {orca: {uid: 1}}\n":        "users",
 	} {
 		err := ValidateSchema(SchemaUser, []byte(doc))
 		if err == nil || !strings.Contains(err.Error(), key) {
@@ -398,7 +442,7 @@ func walkSchema(s map[string]any, path string, fn func(string, map[string]any)) 
 func TestLoadLayersValidatesEveryLayerAgainstItsSchema(t *testing.T) {
 	t.Parallel()
 	r := files{
-		"/home/o/.config/gabo/config.yaml": "runtimes: {coder: foo}\n",
+		"/home/o/.config/gabo/config.yaml": "runtimes: {coder: \"Foo Bar\"}\n",
 		"/src/p/gabo.yaml":                 minimal,
 	}
 	_, err := LoadLayers(r, twoLayers())
@@ -452,22 +496,42 @@ func TestSchemaRuntimeRefusalsAreOneLine(t *testing.T) {
 	t.Parallel()
 	const oldEnum = ": value must be one of 'claude', 'codex', 'pi', 'opencode', <nil>"
 	for name, tt := range map[string]struct{ doc, key, want string }{
-		"empty list":       {"runtimes: {assistant: []}", "runtimes.assistant", "runtimes.assistant: minItems: got 0, want 1"},
-		"duplicate":        {"runtimes: {assistant: [pi, pi]}", "runtimes.assistant", "runtimes.assistant: items at 0 and 1 are equal"},
-		"unknown in list":  {"runtimes: {assistant: [claude, gpt]}", "runtimes.assistant", "runtimes.assistant.1: value must be one of 'claude', 'codex', 'pi', 'opencode'"},
-		"session":          {"runtimes: {assistant: session}", "runtimes.assistant", "runtimes.assistant" + oldEnum},
-		"scalar assistant": {"runtimes: {assistant: foo}", "runtimes.assistant", "runtimes.assistant" + oldEnum},
-		"scalar coder":     {"runtimes: {coder: foo}", "runtimes.coder", "runtimes.coder" + oldEnum},
-		"scalar reviewer":  {"runtimes: {reviewer: foo}", "runtimes.reviewer", "runtimes.reviewer" + oldEnum},
+		"empty list":        {"runtimes: {assistant: []}", "runtimes.assistant", "runtimes.assistant: minItems: got 0, want 1"},
+		"duplicate":         {"runtimes: {assistant: [pi, pi]}", "runtimes.assistant", "runtimes.assistant: items at 0 and 1 are equal"},
+		"malformed in list": {`runtimes: {assistant: [claude, "gpt 5"]}`, "runtimes.assistant", "runtimes.assistant.1: 'gpt 5' does not match pattern '^[a-z][a-z0-9-]*$'"},
+		"session":           {"runtimes: {assistant: session}", "runtimes.assistant", "runtimes.assistant: 'not' failed"},
+		"malformed scalar":  {`runtimes: {assistant: "Foo Bar"}`, "runtimes.assistant", "runtimes.assistant: 'Foo Bar' does not match pattern '^[a-z][a-z0-9-]*$'"},
+		"scalar reviewer":   {"runtimes: {reviewer: foo}", "runtimes.reviewer", "runtimes.reviewer" + oldEnum},
 	} {
 		err := ValidateSchema(SchemaLayer, []byte(tt.doc))
 		if got := linesNaming(err, tt.key); len(got) != 1 || got[0] != tt.want {
 			t.Errorf("%s: lines naming %s = %q, want [%q]", name, tt.key, got, tt.want)
 		}
 	}
-	for _, doc := range []string{"runtimes: {coder: session, reviewer: session, assistant: [codex, opencode]}", "runtimes: {assistant: null}"} {
+	for _, doc := range []string{"runtimes: {coder: session, reviewer: session, assistant: [codex, opencode]}", "runtimes: {assistant: null}", "runtimes: {coder: foo, assistant: [claude, foo]}"} {
 		if err := ValidateSchema(SchemaLayer, []byte(doc)); err != nil {
 			t.Errorf("%s: error = %v, want valid", doc, err)
 		}
+	}
+}
+
+// A non-integer cap fails the schema (the Go decoder alone truncates it).
+func TestSchemaRejectsFloatWaveCap(t *testing.T) {
+	t.Parallel()
+	doc := "wave: {max_coders: 1.5}\n"
+	err := ValidateSchema(SchemaFile, []byte(doc))
+	if err == nil || !strings.Contains(err.Error(), "wave.max_coders") {
+		t.Errorf("ValidateSchema() error = %v, want a float cap rejected", err)
+	}
+}
+
+// yaml.v3 truncates a float into an int field, so the Go loader cannot tell
+// 1.5 from 1; the schema refuses it, and gabo check runs the schema first.
+func TestSchemaRejectsFloatApprovals(t *testing.T) {
+	t.Parallel()
+	doc := "repo: {protection: {required_approvals: {main: 1.5}}}\n"
+	err := ValidateSchema(SchemaFile, []byte(doc))
+	if err == nil || !strings.Contains(err.Error(), "repo.protection.required_approvals.main") {
+		t.Errorf("ValidateSchema() error = %v, want a fractional approval count rejected", err)
 	}
 }

@@ -7,7 +7,7 @@
 | version | 0.8 |
 | date | 2026-11-03 |
 | linked docs | [PRD](PRD.md), [TRD](TRD.md), [UX_UI](UX_UI.md), intents [`docs/product/intents/`](intents/README.md), previous version [APP_FLOW 0.7](archive/APP_FLOW-0.7.md) |
-| diagrams | [team-flow.html](diagrams/team-flow.html), [configuration-flow.html](diagrams/configuration-flow.html) |
+| diagrams | [team-flow.md](diagrams/team-flow.md), [configuration-flow.html](diagrams/configuration-flow.html) |
 
 gabo-ai has no graphical UI. Its "screens" are the surfaces where the owner meets the system: the assistant conversation, an optional direct session, the CLI and the tracker or PR. This document holds only the global flows of gabo-ai itself. Amended (owner 2026-11-03, per-change-sdlc): under the per-change model the UX and flow of each change belong to its intent's `spec.md` (section 3), and global design norms belong to an optional `DESIGN.md`; this document keeps the journey ids J1–J11 and the rule ids A3–A7, because skills cite them. The auto-mode proposal history, the story links and the superseded steps are kept in [APP_FLOW 0.7](archive/APP_FLOW-0.7.md).
 
@@ -49,7 +49,7 @@ While a proposal is debated or waits, only the affected task is BLOCKED (operati
 
 ## Journeys
 
-Actors: **owner**, **assistant**, **directiva** (pm, dev-lead, db-master, frontend), **cycle** (gabo-cycle), **coders**, **reviewer**, **plan-change reviewer**. Each journey: trigger, steps, outcome, failure and escalation.
+Actors: **owner**, **assistant**, **directiva** (pm, dev-lead, db-master, frontend), **cycle** (gabo-cycle), **coders**, **reviewer**, **plan-change reviewer**. Each journey: trigger, steps, outcome, failure and escalation. Amended (owner 2026-11-11, [intent 0015](intents/0015-one-subagent-layer-on-every-engine/spec.md)), S1 to S4: the **cycle** is the wave skill the assistant runs in its own main session, not a separate agent, and the **reviewer** is the reviewer script each coder starts; wherever a journey says "the cycle", the assistant's main session does that step.
 
 ### J1 Configure the team (R8, R12, R16, R31–R36)
 
@@ -98,7 +98,7 @@ Amended (owner 2026-11-03, per-change-sdlc): a wave is one intent.
 ### J4 Resolve questions by mode (R5, R6, R17)
 
 - **Trigger.** A coder or agent raises a question.
-- **Steps.** The question travels coder → cycle → assistant. A critical one becomes a plan-change proposal (J6). Otherwise, in manual mode the assistant asks the owner one question at a time; in auto mode it decides, or asks directiva for a researched answer, and records the decision with its reason. At wave close the comfort answer adjusts `interaction_level` and `tone`.
+- **Steps.** The question travels coder → cycle → assistant (Amended (owner 2026-11-11, intent 0015 S4): coder → assistant). A critical one becomes a plan-change proposal (J6). Otherwise, in manual mode the assistant asks the owner one question at a time; in auto mode it decides, or asks directiva for a researched answer, and records the decision with its reason. At wave close the comfort answer adjusts `interaction_level` and `tone`.
 - **Outcome.** Every question closed with answer and resolver; preferences updated.
 - **Failure and escalation.** A4.
 
@@ -130,7 +130,7 @@ Amended (owner 2026-11-03, per-change-sdlc): a wave is one intent.
 ### J8 Trust what gets merged (R9, R10)
 
 - **Trigger.** A coder opens or updates a PR.
-- **Steps** ([TRD 5.2](TRD.md#52-review-r9)): optional coder-side review per methodology; the coder asks the reviewer agent for a review of the PR head; the reviewer script, in its own clone, home and cache, test-merges, runs the checks and an independent agent review once per head, comments the verdict and applies the merge gate (never main); the reviewer agent relays the `VERDICT` line; the coder fixes or reports HANDED.
+- **Steps** ([TRD 5.2](TRD.md#52-review-r9)): optional coder-side review per methodology; the coder asks the reviewer agent for a review of the PR head; the reviewer script, in its own clone, home and cache, test-merges, runs the checks and an independent agent review once per head, comments the verdict and applies the merge gate (never main); the reviewer agent relays the `VERDICT` line; the coder fixes or reports HANDED. Amended (owner 2026-11-11, intent 0015 S3): the coder validates the request, starts the reviewer script itself and reads its `VERDICT` line; there is no reviewer agent.
 - **Outcome.** Only validated PRs merge; the task shows status and PR.
 - **Failure and escalation.** After 4 fix rounds the task is BLOCKED and escalated (PRD 8.1, rule 3).
 
@@ -156,7 +156,7 @@ Amended (owner 2026-11-03, per-change-sdlc): a wave is one intent.
 
 ## Flow
 
-Detailed references: [team-flow.html](diagrams/team-flow.html) and [configuration-flow.html](diagrams/configuration-flow.html). Those diagrams predate the per-change model and still show one global plan; this chart is the current overview.
+Detailed references: [team-flow.md](diagrams/team-flow.md) and [configuration-flow.html](diagrams/configuration-flow.html). Those diagrams predate the per-change model and still show one global plan; this chart is the current overview.
 
 ```mermaid
 flowchart TD

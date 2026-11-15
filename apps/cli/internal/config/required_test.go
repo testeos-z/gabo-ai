@@ -109,7 +109,7 @@ func TestParseAcceptsEveryRuntimeInEveryRole(t *testing.T) {
 func TestParseRejectsUnknownRuntime(t *testing.T) {
 	t.Parallel()
 	_, err := Parse([]byte(strings.Replace(minimal, "reviewer: claude", "reviewer: foo", 1)))
-	want := `runtimes.reviewer: must be one of "claude", "codex", "pi", "opencode", got "foo"`
+	want := reviewerLine("foo")
 	if err == nil || !slices.Contains(strings.Split(err.Error(), "\n"), want) {
 		t.Fatalf("foo reviewer: error = %v, want the line %q", err, want)
 	}
