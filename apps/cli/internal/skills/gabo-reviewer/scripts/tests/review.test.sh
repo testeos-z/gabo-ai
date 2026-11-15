@@ -179,6 +179,19 @@ expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario
 check "the Important finding is posted with its pass tag" grep -qF '[security] Important:' "$work/imp_clean/posted_7.md"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario high_only CLAUDE_MODE=high_only)" "a High finding without a tagged Important never blocks and never merges"
 
+echo "# test-edit rule (S29)"
+origin testedit O_PR=testedit
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario testedit CLAUDE_MODE=loosened)" "a loosened existing test without a reason is blocking"
+expect_eq "Blocking issues found." "$(first_line testedit)" "the loosened-test comment opens with the blocking verdict"
+check "the loosened test is an Important finding with its pass tag" grep -qF '[bugs] Important: apps/cli/main_test.go:6' "$work/testedit/posted_7.md"
+check "the prompt names the existing Go test file the PR modifies" grep -qxF -- '- apps/cli/main_test.go' "$work/testedit/prompt_seen.txt"
+check "the prompt names a modified .test.js file and a modified file under tests/" bash -c "grep -qxF -- '- apps/cli/fixture.test.js' '$work/testedit/prompt_seen.txt' && grep -qxF -- '- tests/run.sh' '$work/testedit/prompt_seen.txt'"
+check "the prompt does not name a test file the PR adds" bash -c "! grep -qxF -- '- apps/cli/new_test.go' '$work/testedit/prompt_seen.txt'"
+check "the prompt does not name a modified file that is not a test" bash -c "! grep -qxF -- '- apps/cli/main.go' '$work/testedit/prompt_seen.txt'"
+check "the prompt states the loosened-test rule with its reason exception" grep -qF 'loosens an existing test without a stated reason' "$work/testedit/prompt_seen.txt"
+check "a PR that modifies no existing test file lists none" bash -c "grep -A1 -F 'Existing test files this pull request modifies' '$work/clean/prompt_seen.txt' | tail -n 1 | grep -qxF none"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario testedit_ok CLAUDE_MODE=nothing)" "an edit the review does not flag, with no finding, stays clean"
+
 echo "# review errors"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario garbage CLAUDE_MODE=garbage)" "no verdict line is an error"
 check "first error attempt posts no comment" bash -c "! test -f '$work/garbage/posted_7.md'"

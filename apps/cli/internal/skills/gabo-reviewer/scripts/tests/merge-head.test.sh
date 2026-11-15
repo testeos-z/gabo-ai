@@ -125,8 +125,10 @@ expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$inner]" gate injec
   "a cleared marker on a later line of a bot comment never releases the hold"
 
 echo "# the reviewer verdict and review are untouched (S10)"
+# A deliberate pin: changing review-head.sh means updating this digest on purpose.
+# The digest moved for the test-edit rule of intent 0027 S29 (the review prompt).
 check "review-head.sh is byte-identical to its pinned digest" \
-  bash -c "echo '94933732571c62757ebe802381d887aab2a4d50382568cfc6cfd189ce2ac9326  $src/review-head.sh' | sha256sum -c --status"
+  bash -c "echo '24cdea30bfe12d408b2d56725fa76555cfcaae39d9517e647d4bf369fa3da596  $src/review-head.sh' | sha256sum -c --status"
 
 echo "# the merge gate is unchanged by the comment order (S13)"
 # A deliberate pin: the comment order and the code read line never touch the

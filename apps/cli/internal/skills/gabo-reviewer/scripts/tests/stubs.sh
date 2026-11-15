@@ -111,6 +111,7 @@ case "${CLAUDE_MODE:-pass}" in
   drift) result $'Blocking issues found.\n\n1. [security] Important: apps/cli/main.go:3 leak\n- [bugs] Nit: apps/cli/main.go:4 naming' ;;
   nitcont) result "No blocking issues found."$'\n\n'"$(for i in 1 2 3 4 5 6; do printf -- '- [bugs] Nit: apps/cli/main.go:%d naming\n  continuation of nit %d\n' "$i" "$i"; done)" ;;
   imp_clean) result $'No blocking issues found.\n\n- [security] Important: apps/cli/main.go:3 secret in log' ;;
+  loosened) result $'Blocking issues found.\n\n- [bugs] Important: apps/cli/main_test.go:6 loosened test TestMain: the second assertion was removed without a stated reason' ;;
   qa_pass) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] S2: pass `gabo version` exit 0\n[qa] S3: pass\n[qa] neighbor 1 (gabo version): pass `gabo version` exit 0\n[qa] neighbor 2 (gabo check): pass' ;;
   qa_exit1) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 1' ;;
   qa_wrongcmd) result $'No blocking issues found.\n\n[qa] S1: pass `gabo check` exit 0\n[qa] S2: pass `gabo check` exit 0' ;;
@@ -342,6 +343,12 @@ make_origin() {
     echo "# Dev spec" >"$src/docs/product/spec.md"
   fi
   echo "package main" >"$src/apps/cli/main.go"
+  if [[ "${O_PR:-code}" == testedit ]]; then
+    # Existing test files at the base: a Go test, a .test.js file and a file under tests/.
+    printf 'package main\n\nimport "testing"\n\nfunc TestMain(t *testing.T) {\n\tif 1 != 1 {\n\t\tt.Fatal("bad")\n\t}\n\tif 2 != 2 {\n\t\tt.Fatal("bad")\n\t}\n}\n' >"$src/apps/cli/main_test.go"
+    echo "// fixture" >"$src/apps/cli/fixture.test.js"
+    mkdir -p "$src/tests" && echo "echo run" >"$src/tests/run.sh"
+  fi
   write_yaml "$src/gabo.yaml"
   printf -- '---\nname: gabo-coder\n---\nCoder rules.\n' >"$src/.gabo/skills/gabo-coder/SKILL.md"
   printf -- '---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\nRuntime.\n' \
@@ -386,6 +393,15 @@ make_origin() {
     session)
       printf 'package main\n\nfunc main() {}\n' >"$src/apps/cli/main.go"
       O_REVIEWER=session O_ASSISTANT='[claude, pi, codex, opencode]' write_yaml "$src/gabo.yaml"
+      ;;
+    testedit)
+      # Modifies main_test.go (drops the second assertion), fixture.test.js and tests/run.sh,
+      # adds new_test.go, and modifies main.go, which is not a test file.
+      printf 'package main\n\nfunc main() {}\n' >"$src/apps/cli/main.go"
+      printf 'package main\n\nimport "testing"\n\nfunc TestMain(t *testing.T) {\n\tif 1 != 1 {\n\t\tt.Fatal("bad")\n\t}\n}\n' >"$src/apps/cli/main_test.go"
+      echo "// fixture, changed" >"$src/apps/cli/fixture.test.js"
+      echo "echo run again" >"$src/tests/run.sh"
+      printf 'package main\n\nimport "testing"\n\nfunc TestNew(t *testing.T) {}\n' >"$src/apps/cli/new_test.go"
       ;;
   esac
   "${g[@]}" -C "$src" add -A
