@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0028-deterministic-hooks-as-locks](intent.md) |
 | spec | [spec](spec.md) (accepted by the owner on 2026-11-14, section 7: "si ya acepte los 4 spec 27 ao 30") |
-| status | Draft. Not started: no wave runs until the owner orders it. Tasks are in the tracker under [#765](https://github.com/testeos-z/gabo-ai/issues/765). |
+| status | Done. All 16 task issues are closed (T15 removed); see the closing Log line of 2026-11-15. Tasks are in the tracker under [#765](https://github.com/testeos-z/gabo-ai/issues/765). |
 | owner | gabo-dev-lead |
 | date | 2026-11-14 |
 
@@ -142,3 +142,7 @@ Runnable at once: T1 only. After T2 and T3: T4. After T4: T5, T6, T7 (T7 edits `
 2. **PRD R31 and TRD 9.4 wording.** The PRD is gabo-pm's document; spec section 5 gives only the opening words of R31 and no TRD text, so the rest of R31 is unchanged and the TRD 9.4 text is derived from S2 and D3. gabo-pm and the owner read it in this PR. (gabo-pm)
 3. **Per-engine credential formats (T9).** Which native formats `codex`, `pi` and `opencode` offer is unverified until T1; T9 splits by engine if it exceeds about 400 changed lines. (T1, then gabo-dev-lead)
 4. **Engine versions in the probe (T1).** The record names the versions it ran on; a later engine upgrade may change a result and needs a re-probe. (owner, when upgrading an engine)
+
+## Log
+
+- 2026-11-15, gabo-pm, intent done (#765): wave I0028-20261114T183645Z closed at 15:11Z and all 16 task issues are closed. Merged PRs: T1 #844, T2 #862, T3 #865, T4 #866, T5 #870, T6 #871, T7 #869, T8 #874, T9 #882, T10 #873, T11 #877, T12 #876, T13 #878, T14 #881. T15 #816 was removed on 2026-11-14 and closed as not planned (the S18 amendment to PRD R31 and TRD 9.4 landed with plan PR #818). T16 #817 is done without a PR; its probe results are in the #765 comments of 2026-11-15. T6 was BLOCKED after 4 of 4 fix rounds on PR #871; the owner reset its budget under the auto order and it merged on 2026-11-15. Not observed (T16): the `ask` prompt answered by a person on each engine (`not run: needs a person`, which S10 allows), the Codex credential read (S8; the Codex sandbox does not start on this host) and the S1 human read of `probe.md`, which stays an owner item. Known gaps recorded in the wave trace: `$(...)` in command position is not judged; the hook env vars are not observed per engine; release order: the CLI must ship before the plugins, because installed 0.2.10 lacks `--pre-command`. Owner acceptance, relayed by the gabo-a assistant (not the owner's words): on 2026-11-15 the owner confirmed directly that owner-pending items proceed with the assistant's recommended option; the not-observed items are accepted under that order.
