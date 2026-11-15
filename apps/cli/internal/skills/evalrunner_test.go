@@ -96,6 +96,26 @@ func TestEvalRunnerShellTests(t *testing.T) {
 	}
 }
 
+// withoutEvalBlock drops the top-level eval block of the repository config, so
+// each case adds its own and the owner's values (intent 0030 T17) never leak
+// into the "defaults" case or make the appended block a duplicate key.
+func withoutEvalBlock(doc []byte) []byte {
+	var out []string
+	inEval := false
+	for _, line := range strings.Split(string(doc), "\n") {
+		if strings.HasPrefix(line, "eval:") {
+			inEval = true
+			continue
+		}
+		if inEval && (line == "" || line[0] == ' ' || line[0] == '\t') {
+			continue
+		}
+		inEval = false
+		out = append(out, line)
+	}
+	return []byte(strings.Join(out, "\n"))
+}
+
 // The script reads eval.min_tasks and eval.max_tasks itself, because a shell
 // script cannot call the config accessors. This pins it to the config loader
 // (T1): where the loader accepts a config, the script reports the counts it
@@ -109,10 +129,11 @@ func TestEvalRunnerReadsCountsLikeTheConfigLoader(t *testing.T) {
 	if _, err := exec.LookPath("jq"); err != nil {
 		t.Skipf("jq not found: %v", err)
 	}
-	base, err := os.ReadFile(filepath.Join(repoRoot, "gabo.yaml"))
+	repoConfig, err := os.ReadFile(filepath.Join(repoRoot, "gabo.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	base := withoutEvalBlock(repoConfig)
 	script, err := filepath.Abs(filepath.Join(evalRunnerSkill, "scripts", "eval-set.sh"))
 	if err != nil {
 		t.Fatal(err)
