@@ -97,6 +97,34 @@ func TestAssistantWaveCloseRunsSavesUnverified(t *testing.T) {
 	})
 }
 
+// Intent 0030 S13 (plan T14): an incident is one stamp line of the wave trace,
+// written by the cycle through wave-record.sh; a BLOCKED or refused task is not
+// one.
+func TestCycleStampsIncident(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	trace := section(t, doc, "- Trace (D17)", "\n\n")
+	requireIn(t, "gabo-cycle Trace incident", trace, []string{
+		waveRecord + " stamp incident <task id> <pr> <who>` (who is owner, assistant or reviewer)",
+		"reported done and was later found wrong",
+		"a BLOCKED or refused task is not an incident",
+		"the stamp reaches the trace with the stamps entry",
+	})
+}
+
+// Intent 0030 S13 (plan T14): the wave report prints each incident of the trace
+// as its own line, and the Tasks lines stay as they are.
+func TestWaveReportPrintsIncidents(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
+	tasks := section(t, doc, "2. **Tasks**", "\n3. ")
+	requireIn(t, "gabo-wave-report Tasks incident", tasks, []string{
+		"`incident <task id>: PR #<pr>, found by <who>`",
+		"`incidents: none`",
+		"the Tasks lines above stay unchanged",
+	})
+}
+
 // Every command the skills document must pass the script's own argument checks
 // (wave id, the event table, saves): the review of PR 684 found a missing
 // --wave that wording tests cannot see.
@@ -107,7 +135,8 @@ func TestDocumentedWaveRecordCommandsRun(t *testing.T) {
 		t.Fatal(err)
 	}
 	re := regexp.MustCompile("`sh \\.gabo/skills/gabo-wave-report/scripts/wave-record\\.sh ([^`]*)`")
-	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<createdAt>", "2026-11-13T09:00:00Z", "<mergedAt>", "2026-11-13T09:30:00Z", "'<topic key>#<entry>'", "k#start", "'<topic key>#start'", "k#start", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures", "<lock>", "shell_guard", "<session engine>", "claude", "<reason>", "probe item (a) is no on claude", "<outcome file>", "/nonexistent/outcomes.jsonl")
+	repl := strings.NewReplacer("<run id>", "w1", "<agent>", "gabo-coder", "<task id>", "T1", "<pr>", "7", "<createdAt>", "2026-11-13T09:00:00Z", "<mergedAt>", "2026-11-13T09:30:00Z", "<who>", "owner", "'<topic key>#<entry>'", "k#start", "'<topic key>#start'", "k#start", "<topic key>", "k", "<observation id>", "1", "<subcommand>", "measures", "<lock>", "shell_guard", "<session engine>", "claude", "<reason>", "probe item (a) is no on claude", "<outcome file>", "/nonexistent/outcomes.jsonl")
+
 	seen := 0
 	for _, name := range []string{"gabo-cycle", "gabo-wave-report", "gabo-assistant"} {
 		for _, m := range re.FindAllStringSubmatch(readCatalog(t, name+"/SKILL.md"), -1) {
