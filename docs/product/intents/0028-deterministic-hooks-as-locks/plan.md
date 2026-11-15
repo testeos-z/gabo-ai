@@ -14,7 +14,7 @@ The spec is not edited. Its six open questions (section 6) take their **Proposed
 
 **Task T1 is the engine probe (S1) and runs first.** A human reads its record before any other task starts. Every task reaches T1 through `depends_on`, directly or through T2 or T9.
 
-**Cross-intent edges.** `0027/T12` (the test-edit rule) waits for T8 (the test-file warning) and T14 (the `gabo/trace` record it reads). Intent 0029 relies on the local shell guard, which is **T4** (`gabo check --pre-command` with the S4 rules); the relays T10 to T13 make it fire on each engine. 0029's plan, still being written, will reference it as `0028/T4`.
+**Cross-intent edges.** `0027/T12` (the test-edit rule) waits for T8 (the test-file warning, whose test-file rule it applies to the PR diff) and T14 (the `gabo/trace` record) as an ordering guarantee; it does not read the `gabo/trace` record (0027 PD3). Intent 0029 relies on the local shell guard, which is **T4** (`gabo check --pre-command` with the S4 rules); the relays T10 to T13 make it fire on each engine. 0029's plan, still being written, will reference it as `0028/T4`.
 
 Human merge: T14 edits `.gabo/skills/` and T9 writes engine config files that are human-only in a project (`.claude/`, `.codex/`, `.agents/`); a person merges those PRs. Each such row says so.
 
@@ -37,7 +37,7 @@ Human merge: T14 edits `.gabo/skills/` and T9 writes engine config files that ar
 1. **Probe first.** T1 runs the four engines and records sixteen results (S1). A person reads the record. Where item (a) is `no` for an engine, S14 applies to it and T14 and T16 show `not run: <reason>` for that engine.
 2. **Core.** T2 adds the lock states, the `gabo.yaml` keys and their validation, and the decision function (`off`, `warn`, `ask`, `block`; auto mode turns `ask` into `block`; exit code 3). T3 adds the outcome record (one JSON line to the file the cycle names). Both live in the `check` slice.
 3. **Shell rules.** T4 adds `gabo check --pre-command` with the shell guard (S2, S4, S6). T5 adds the release gate (S5, D4). T6 adds the shell forms that write a human-only path (question 6), so `gabo.yaml` is protected from the shell too (S13).
-4. **Write rules.** T7 sends every write through `--pre-write` and judges human-only paths (S7). T8 adds the test-file warning (S9, D6) and T14 writes it to `gabo/trace`; both unblock `0027/T12`.
+4. **Write rules.** T7 sends every write through `--pre-write` and judges human-only paths (S7). T8 adds the test-file warning (S9, D6) and T14 writes it to `gabo/trace`; both unblock `0027/T12` as an ordering guarantee, and `0027/T12` applies T8's test-file rule to the PR diff without reading `gabo/trace` (0027 PD3).
 5. **Credentials.** T9 writes the base deny list per engine at project level in `gabo init` and adds the Pi and OpenCode project config paths to the human-only lists (S8, question 5).
 6. **Relays.** T10 (Claude Code), T11 (Codex), T12 (Pi, with S17) and T13 (OpenCode) each become a thin relay for the two modes with the failure rule (S3, S15). They run in parallel once T4 and T7 are merged.
 7. **Cycle and report.** T14 teaches the cycle and the wave report to carry the records and the `not run:` lines (S14, S16). PRD R31 and TRD 9.4 are amended in this plan PR (S18); no task is needed.
