@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0028-deterministic-hooks-as-locks |
-| status | The owner accepted the spec on 2026-11-14 (spec section 7; decision 6: the spec only, not this intent and not the plan). The plan may now be written by `gabo-dev-lead`. |
+| status | Done on 2026-11-15. All 16 task issues of #765 are closed: T1 #844, T2 #862, T3 #865, T4 #866, T5 #870, T6 #871, T7 #869, T8 #874, T9 #882, T10 #873, T11 #877, T12 #876, T13 #878, T14 #881 (PRs); T15 #816 was removed on 2026-11-14 (S18 landed with plan PR #818); T16 #817 is done without a PR. Wave I0028-20261114T183645Z closed at 15:11Z. T16 probe results are in the #765 comments of 2026-11-15. Not observed: the `ask` prompt answered by a person on each engine (`not run: needs a person`, allowed by S10), the Codex credential read (its sandbox does not start on this host) and the S1 human read of `probe.md` (an owner item). Known gaps in the wave trace: `$(...)` in command position is not judged, the hook env vars are not observed per engine, and the CLI must ship before the plugins (installed 0.2.10 lacks `--pre-command`). |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) (closed; intent issue linked under it, as [#758](https://github.com/testeos-z/gabo-ai/issues/758) was) |
 | intent issue | [#765 I0028: Deterministic hooks as locks](https://github.com/testeos-z/gabo-ai/issues/765) |
