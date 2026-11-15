@@ -32,7 +32,8 @@ func TestCycleWritesNotRunFromTheProbeRecord(t *testing.T) {
 	requireIn(t, "gabo-cycle not run lines", doc, []string{
 		"`probe.md` in `docs/product/intents/<NNNN>-<slug>/`",
 		"item (a) `no` or `not testable`",
-		"outcome not-run <lock> <task id> <session engine> <reason>",
+		"outcome not-run <lock> <task id> <session engine> '<reason>'",
+		"its default when unset",
 		"`probe item (a) is <no|not testable> on <engine>`",
 		"`yes`",
 		"stops no task",

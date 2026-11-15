@@ -213,12 +213,24 @@ case $cmd in
     # No file means no hook wrote a record yet: nothing to print.
     [ -f "$file" ] || exit 0
     awk '
+      function unesc(s,   out, i, n, c, d) {
+        out = ""; n = length(s)
+        for (i = 1; i <= n; i++) {
+          c = substr(s, i, 1)
+          if (c == "\\" && i < n) {
+            d = substr(s, i + 1, 1)
+            if (d == "\"" || d == "\\") { out = out d; i++; continue }
+            if (d == "n" || d == "t" || d == "r") { out = out " "; i++; continue }
+          }
+          out = out c
+        }
+        return out
+      }
       function field(key,   re, s) {
         re = "\"" key "\":\"([^\"\\\\]|\\\\.)*\""
         if (!match($0, re)) return ""
         s = substr($0, RSTART + length(key) + 4, RLENGTH - length(key) - 5)
-        gsub(/\\"/, "\"", s)
-        return s
+        return unesc(s)
       }
       {
         kind = field("outcome"); lock = field("lock"); task = field("task")
@@ -227,14 +239,10 @@ case $cmd in
           printf "wave-record: outcomes: unreadable record on line %d\n", NR > "/dev/stderr"
           exit 1
         }
-        if (kind == "asked") {
-          printf "asked: %s %s %s %s; answer: %s\n", lock, task, engine, rule, field("answer")
-        } else {
-          line = kind ": " lock " " task " " engine " " rule
-          note = field("note")
-          if (note != "") line = line "; note: " note
-          print line
-        }
+        line = (kind == "asked") ? "asked: " lock " " task " " engine " " rule "; answer: " field("answer") : kind ": " lock " " task " " engine " " rule
+        note = field("note")
+        if (note != "") line = line "; note: " note
+        print line
       }' "$file"
     ;;
   *)

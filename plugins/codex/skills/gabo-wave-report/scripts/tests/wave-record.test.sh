@@ -252,7 +252,6 @@ expect_eq "gabo.yaml" "$(ls "$proj")" "nothing new in the project dir"
 expect_eq "" "$(find "$work" -type f -not -path "$waves/*" -not -path "$proj/*" -not -path "$cproj/*")" "no file outside the wave folders"
 
 echo "# outcome (intent 0028 S16: one trace line per lock record)"
-ow="$work/ow"
 expect_eq "blocked: shell_guard I0028/T4 claude git push --force" \
   "$(run --wave o1 outcome blocked shell_guard I0028/T4 claude git push --force)" "outcome prints a blocked line with the four fields"
 expect_eq "warned: test_files I0028/T8 claude edit of a test file" \
@@ -283,10 +282,12 @@ cat >"$ofile" <<'EOF'
 {"outcome":"blocked","lock":"shell_guard","task":"I0028/T4","engine":"claude","rule":"git push --force","note":"the state was ask; mode auto blocks instead of prompting"}
 {"outcome":"asked","lock":"human_only_paths","task":"I0028/T7","engine":"codex","rule":"write to \"gabo.yaml\"","answer":"pending"}
 {"outcome":"warned","lock":"test_files","task":"I0028/T8","engine":"opencode","rule":"edit of a test file"}
+{"outcome":"warned","lock":"shell_guard","task":"I0028/T9","engine":"claude","rule":"grep 'a\\b' \\ x"}
 EOF
 expect_eq "blocked: shell_guard I0028/T4 claude git push --force; note: the state was ask; mode auto blocks instead of prompting
 asked: human_only_paths I0028/T7 codex write to \"gabo.yaml\"; answer: pending
-warned: test_files I0028/T8 opencode edit of a test file" "$(run --wave o1 outcomes "$ofile")" "outcomes prints one line per record, in file order, unescaping quotes"
+warned: test_files I0028/T8 opencode edit of a test file
+warned: shell_guard I0028/T9 claude grep 'a\b' \ x" "$(run --wave o1 outcomes "$ofile")" "outcomes prints one line per record, in file order, unescaping quotes"
 expect_eq "" "$(run --wave o1 outcomes "$work/absent.jsonl")" "a missing file prints nothing"
 sh "$script" --wave o1 outcomes "$work/absent.jsonl" >/dev/null 2>&1
 expect_eq "0" "$?" "a missing file exits 0"
