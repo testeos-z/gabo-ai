@@ -164,7 +164,7 @@ Approved (owner 2026-10-26, TRD D18–D20; extended owner 2026-10-27). Each comm
 | `gbai doctor` (removed) | Config validation folds into `gabo check` (updated 2026-10-27; earlier `gbai generate`) |
 | `gbai config [--json]` (removed 2026-10-26) | The assistant reads the config files; `gabo check` reports schema and agent errors (updated 2026-10-27; earlier `gbai generate`) |
 | `gbai plan new\|status\|story\|check` (removed) | Templates and the traceability check live in the directiva skills (D19) |
-| `gbai review request\|run\|ci\|notify` (removed) | Scripts of the user-level `gabo-reviewer` skill, installed by `gabo init` (updated 2026-10-27; earlier the compiler); the reviewer agent invokes them (D20) |
+| `gbai review request\|run\|ci\|notify` (removed) | Scripts of the user-level `gabo-reviewer` skill, installed by `gabo init` (updated 2026-10-27; earlier the compiler); the coder invokes them (D20). Amended (owner 2026-11-12, intent 0015 S3, S10, D2): earlier a reviewer agent invoked them |
 
 Auto-mode decisions (R30) are queried through the assistant and the memory slot, not a compiled command, because memory access is tool-specific (D2). The same holds for wave work: the next wave, the resource ledger, cleanup and resume are done by the cycle through its skill (TRD D12, D15, D17).
 
@@ -182,9 +182,9 @@ Format: `✗ <what happened>` on one line, then `why:` and `next:` lines, then o
 
 | case | example |
 |---|---|
-| Refusal (auto-mode limit, R23, 10.2; coder at task close or cycle agent at the wave-close sweep) | `✗ refused to delete worktree feat-x` · `why: it was not created by this workflow` · `next: remove it yourself or add it to worktree.keep` |
+| Refusal (auto-mode limit, R23, 10.2; coder at task close or the main session running `gabo-cycle` at the wave-close sweep) | `✗ refused to delete worktree feat-x` · `why: it was not created by this workflow` · `next: remove it yourself or add it to worktree.keep` |
 | Refusal (merge; reviewer script merge gate) | `✗ refused to merge into main` · `why: auto mode merges only into the integration branch (dev)` |
-| Blocked task (cycle agent, wave report) | `✗ task #42 BLOCKED` · `why: 4 review rounds without approval` · `next: owner decision needed` (also in the wave report) |
+| Blocked task (main session running `gabo-cycle`, wave report) | `✗ task #42 BLOCKED` · `why: 4 review rounds without approval` · `next: owner decision needed` (also in the wave report) |
 | Verification failure (setup; assistant after the subagent smoke test) | `✗ tasks slot not verified` · `why: "read one task" failed: gh: not authenticated` · `next: run gh auth login, then retry verify` |
 | Coverage gap (`gabo check`, slot coverage; also raised by the setup agent; earlier `gbai generate`) | `✗ adapter tasks-gh.md does not cover: link PR, verify by re-read` · `next: add those operations or write them with the assistant` |
 | Traceability gap (reported by the directiva agent, D19; example amended 2026-11-03, per-change-sdlc) | `✗ planning step blocked` · `why: 0007-shared-memory/spec.md R2 has no plan task; plan task T3 has no tracker task` · `next: close the gaps; the check reruns before the next step` |

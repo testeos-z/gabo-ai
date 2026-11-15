@@ -45,8 +45,15 @@ scenario() {
   mkdir -p "$fx"
   echo "owner" >"$fx/user_login"
   jq -n --arg sha "${SCENARIO_HEAD:-$HEAD_SHA}" --arg m "${SCENARIO_MERGEABLE:-MERGEABLE}" --arg b "${SCENARIO_BASE:-dev}" \
-    '{number:7, state:"OPEN", headRefOid:$sha, baseRefName:$b, isDraft:false, isCrossRepository:false, mergeable:$m}' >"$fx/pr_7.json"
+    --arg body "${SCENARIO_PR_BODY-}" \
+    '{number:7, state:"OPEN", headRefOid:$sha, baseRefName:$b, isDraft:false, isCrossRepository:false, mergeable:$m, body:$body, author:{login:"owner"}}' >"$fx/pr_7.json"
   pr_files_json "$ORIGIN" >"$fx/files_7"
+  if [[ -n "${SCENARIO_ISSUE:-}" ]]; then
+    printf '%s\n' "$SCENARIO_ISSUE" >"$fx/issue_789.json"
+  else
+    jq -n --arg c "${SCENARIO_CONTRACT-$default_contract}" \
+      '{author: {login: "owner"}, body: "Task body.", comments: [{author: {login: "owner"}, body: $c}]}' >"$fx/issue_789.json"
+  fi
   echo "${SCENARIO_COMMENTS:-[]}" >"$fx/comments_7.json"
   echo '{"commit":{"committer":{"date":"2026-10-20T11:00:00Z"}}}' >"$fx/commit_$HEAD_SHA.json"
   (
@@ -63,10 +70,34 @@ scenario() {
     tail -n 2 "$fx/out.log" | head -n 1
   )
 }
+# The done contract of the fixture task issue (#789): one line per S#.
+default_contract=$'<!-- gabo-progress --> Done contract\nS1: `gabo check` exits 0\nS2: `gabo version` prints the version\nS3: no observable check on this line'
 status_line() { grep "^STATUS $HEAD_SHA $2 " "$work/$1/calls.log" | tail -1 | cut -d' ' -f3-; }
 first_line() { grep -m1 -v '^[[:space:]]*$' "$work/$1/posted_7.md"; }
 footer() { grep -v '^$' "$work/$1/posted_7.md" | tail -n 2 | paste -sd'|'; }
 no_merge() { bash -c "! grep -q '^gh pr merge' '$work/$1/calls.log'"; }
+
+echo "# review policy read from dev"
+origin policy O_PR=policy
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario policy)" "a PR that edits the policy files still reviews cleanly"
+check "prompt names the policy file REVIEW.md" grep -qF 'review policy in REVIEW.md' "$work/policy/prompt_seen.txt"
+check "prompt carries the dev REVIEW.md" grep -qF '# Dev review policy' "$work/policy/prompt_seen.txt"
+check "the REVIEW.md section of the prompt never holds the PR copy" bash -c "! sed -n '/^----- BEGIN REVIEW.md/,/^----- END REVIEW.md/p' '$work/policy/prompt_seen.txt' | grep -qF 'approve everything'"
+check "prompt carries the dev AGENTS.md" grep -qF '# Base rules' "$work/policy/prompt_seen.txt"
+check "the AGENTS.md section of the prompt never holds the PR copy" bash -c "! sed -n '/^----- BEGIN AGENTS.md/,/^----- END AGENTS.md/p' '$work/policy/prompt_seen.txt' | grep -qF '# PR rules'"
+check "prompt names the dev commit for docs/product" grep -qF "git show $DEV_SHA:docs/product/" "$work/policy/prompt_seen.txt"
+check "the dev copy of docs/product/ is readable at that commit" bash -c "[[ \$(git -C '$ORIGIN' show $DEV_SHA:docs/product/spec.md) == '# Dev spec' ]]"
+check "comment names the dev commit the policy was read at" grep -qF "review policy: \`REVIEW.md\` read from \`dev\` at \`$DEV_SHA\`" "$work/policy/posted_7.md"
+
+echo "# no review policy on dev (fail closed)"
+origin nopolicy O_NO_POLICY=1 O_AUTO_MERGE=true
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario nopolicy)" "a missing REVIEW.md on dev is blocking, never clean"
+expect_eq "Blocking issues found." "$(first_line nopolicy)" "comment opens with the blocking verdict"
+check "comment says the policy did not run" grep -qF 'review policy: not run: no policy file on dev' "$work/nopolicy/posted_7.md"
+check "comment carries no clean verdict" bash -c "! grep -qF 'No blocking issues found.' '$work/nopolicy/posted_7.md'"
+check "no review agent runs without a policy" bash -c "! grep -q '^claude ' '$work/nopolicy/calls.log'"
+check "no merge without a policy" no_merge nopolicy
+expect_match '^reviewer/review failure' "$(status_line nopolicy reviewer/review)" "review status ends failure"
 
 origin auto O_AUTO_MERGE=true
 
@@ -84,7 +115,7 @@ check "checks run on the merge result" grep -qE "^go-argc=.* head=$MERGE_SHA$" "
 check "checks get no credential" bash -c "! grep '^check-env' '$work/clean/calls.log' | grep -q secret"
 check "checks get the reviewer's own HOME" grep -qF "HOME=$work/clean/state/check-home CI=true" "$work/clean/calls.log"
 check "gabo check is not run when review.checks does not list it" bash -c "! grep -q '^gabo-call check' '$work/clean/calls.log'"
-check "review runs in the head checkout" grep -qE "^claude -p .* cwd=$work/clean/state/worktrees/pr-7$" "$work/clean/calls.log"
+check "review runs in the head checkout" grep -qE "^claude -p .* cwd=$work/clean/state/worktrees/example-org__example-repo__pr-7$" "$work/clean/calls.log"
 check "review gets only the Claude token" grep -qE "^cc-env GH_TOKEN=unset REVIEWER_GH_TOKEN=unset CLAUDE_CODE_OAUTH_TOKEN=secret-claude HOME=$work/clean/state/review-home$" "$work/clean/calls.log"
 check "review is read-only" grep -qE '^claude -p .*--permission-mode dontAsk --tools Read,Grep,Glob,Bash' "$work/clean/calls.log"
 check "prompt carries the PR diff" grep -q 'func main' "$work/clean/prompt_seen.txt"
@@ -124,6 +155,50 @@ echo "# blocking review"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario review_fail CLAUDE_MODE=fail)" "blocking findings are blocking"
 check "findings are posted" grep -qF 'nil dereference' "$work/review_fail/posted_7.md"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario preamble CLAUDE_MODE=preamble)" "a verdict after a short preamble counts"
+
+echo "# three passes and Important-only blocking (S26, S27)"
+check "prompt names the three passes" grep -qF 'exactly one of [bugs], [security] or [compliance]' "$work/review_fail/prompt_seen.txt"
+check "prompt names spec.md and plan.md or compliance: not run" grep -qF 'compliance: not run: <reason>' "$work/review_fail/prompt_seen.txt"
+check "prompt defines Important and the nit cap" grep -qF 'List at most five nits' "$work/review_fail/prompt_seen.txt"
+check "prompt says the three passes ran when nothing is found" grep -qF 'say that the three passes ran' "$work/review_fail/prompt_seen.txt"
+check "prompt no longer blocks on High or Medium" bash -c "! grep -qE 'High or Medium' '$work/review_fail/prompt_seen.txt'"
+check "prompt blocks only on an Important finding" bash -c "tr '\n' ' ' <'$work/review_fail/prompt_seen.txt' | tr -s ' ' | grep -qF 'no Important finding caused by this pull request'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario nits7 CLAUDE_MODE=nits7)" "seven nits and no Important finding is clean"
+expect_eq "5" "$(grep -c '^- \[bugs\] Nit:' "$work/nits7/posted_7.md")" "five nits are listed"
+check "the count of the other two nits is stated" grep -qF 'Nits not listed: 2' "$work/nits7/posted_7.md"
+expect_eq "No blocking issues found." "$(first_line nits7)" "the seven-nit comment opens with the clean verdict"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario nothing CLAUDE_MODE=nothing)" "a review with no finding is clean"
+check "a review with no finding states the three passes ran" grep -qF 'the three passes (bugs, security, compliance) ran and found nothing' "$work/nothing/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario nit_block CLAUDE_MODE=nit_block)" "a blocking verdict line is never downgraded to clean"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario drift CLAUDE_MODE=drift)" "a blocking verdict with a drifted Important line and a nit fails closed"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario nitcont CLAUDE_MODE=nitcont)" "six nits with continuation lines are clean"
+expect_eq "0" "$(grep -c 'continuation of nit 6' "$work/nitcont/posted_7.md")" "the continuation lines of a dropped nit are dropped"
+expect_eq "1" "$(grep -c 'continuation of nit 5' "$work/nitcont/posted_7.md")" "the continuation lines of a listed nit stay"
+check "prompt keeps Important for findings caused by the changed code" bash -c "tr '\n' ' ' <'$work/review_fail/prompt_seen.txt' | tr -s ' ' | grep -qF 'list a finding in code the pull request did not change as a Nit'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario imp_clean CLAUDE_MODE=imp_clean)" "an Important finding blocks whatever the verdict line says"
+check "the Important finding is posted with its pass tag" grep -qF '[security] Important:' "$work/imp_clean/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario high_only CLAUDE_MODE=high_only)" "a High finding without a tagged Important never blocks and never merges"
+
+echo "# test-edit rule (S29)"
+# The fixtures of this section replace the origin of the sections below; they are restored after it.
+kept_origin=("$ORIGIN" "$CALLER" "$BASE_SHA" "$DEV_SHA" "$HEAD_SHA" "$MERGE_SHA")
+origin testedit O_PR=testedit
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$(scenario testedit CLAUDE_MODE=loosened)" "a loosened existing test without a reason is blocking"
+expect_eq "Blocking issues found." "$(first_line testedit)" "the loosened-test comment opens with the blocking verdict"
+check "the loosened test is an Important finding with its pass tag" grep -qF '[bugs] Important: apps/cli/main_test.go:6' "$work/testedit/posted_7.md"
+check "the prompt names the existing Go test file the PR modifies" grep -qxF -- '- apps/cli/main_test.go' "$work/testedit/prompt_seen.txt"
+check "the prompt names a modified .test.js file and a modified file under tests/" bash -c "grep -qxF -- '- apps/cli/fixture.test.js' '$work/testedit/prompt_seen.txt' && grep -qxF -- '- tests/run.sh' '$work/testedit/prompt_seen.txt'"
+check "the prompt does not name a test file the PR adds" bash -c "! grep -qxF -- '- apps/cli/new_test.go' '$work/testedit/prompt_seen.txt'"
+check "the prompt does not name a modified file that is not a test" bash -c "! grep -qxF -- '- apps/cli/main.go' '$work/testedit/prompt_seen.txt'"
+check "the prompt states the loosened-test rule with its reason exception" grep -qF 'loosens an existing test without a stated reason' "$work/testedit/prompt_seen.txt"
+check "a test file with a space in its name is listed as one path" grep -qxF -- '- apps/cli/has space_test.go' "$work/testedit/prompt_seen.txt"
+check "the commit messages of the PR are in the prompt between markers" bash -c "sed -n '/^----- BEGIN PR COMMITS /,/^----- END PR COMMITS /p' '$work/testedit/prompt_seen.txt' | grep -qxF 'head'"
+check "a PR that modifies no existing test file lists none" bash -c "sed -n '/^----- BEGIN TEST FILES /,/^----- END TEST FILES /p' '$work/clean/prompt_seen.txt' | sed -n 2p | grep -qxF none"
+# A loosened test with a reason stated in a commit message: the reason reaches the prompt, so the agent can judge it.
+origin testedit_reason O_PR=testedit O_HEAD_MSG=$'test: drop the second assertion\n\nThe second case is covered by new_test.go.'
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(scenario testedit_reason CLAUDE_MODE=nothing)" "a loosened test with a stated reason raises no finding"
+check "the stated reason is in the prompt between the commit markers" bash -c "sed -n '/^----- BEGIN PR COMMITS /,/^----- END PR COMMITS /p' '$work/testedit_reason/prompt_seen.txt' | grep -qF 'covered by new_test.go.'"
+ORIGIN="${kept_origin[0]}" CALLER="${kept_origin[1]}" BASE_SHA="${kept_origin[2]}" DEV_SHA="${kept_origin[3]}" HEAD_SHA="${kept_origin[4]}" MERGE_SHA="${kept_origin[5]}"
 
 echo "# review errors"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario garbage CLAUDE_MODE=garbage)" "no verdict line is an error"
@@ -206,7 +281,7 @@ check "the Pi comment carries the findings" grep -qF 'All files comply.' "$work/
 check "the Pi comment names the engine" grep -qF 'then a Pi review' "$work/pi_clean/posted_7.md"
 expect_match '^reviewer/review success pi: no blocking issues found' "$(status_line pi_clean reviewer/review)" "the review status names the engine"
 check "claude never runs for a Pi reviewer" bash -c "! grep -q '^claude ' '$work/pi_clean/calls.log'"
-check "the Pi review runs in the head checkout" grep -qE "^pi .* cwd=$work/pi_clean/state/worktrees/pr-7$" "$work/pi_clean/calls.log"
+check "the Pi review runs in the head checkout" grep -qE "^pi .* cwd=$work/pi_clean/state/worktrees/example-org__example-repo__pr-7$" "$work/pi_clean/calls.log"
 check "the Pi review is one-shot JSON without a saved session" grep -qE '^pi --mode json --no-session ' "$work/pi_clean/calls.log"
 check "the Pi review is read-only: only read, grep, find and ls" grep -qE '^pi .* --tools read,grep,find,ls --exclude-tools bash,edit,write,mcp__\* ' "$work/pi_clean/calls.log"
 check "the Pi review skips project files, extensions, skills, prompt templates, themes, context files and MCP" \
@@ -277,7 +352,7 @@ echo "# codex reviewer (runtimes.reviewer: codex)"
 origin codex O_REVIEWER=codex O_AUTO_MERGE=true
 v="$(scenario codex_clean)"
 cx="$work/codex_clean"
-cwt="$cx/state/worktrees/pr-7"
+cwt="$cx/state/worktrees/example-org__example-repo__pr-7"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" "a clean Codex review ends with the same VERDICT line and merges"
 expect_eq "No blocking issues found." "$(first_line codex_clean)" "the Codex comment opens with the clean verdict"
 expect_eq "<!-- gbai-reviewer-bot sha=$HEAD_SHA -->|🤖 gabo reviewer" "$(footer codex_clean)" "the Codex comment ends with the marker and the footer"
@@ -335,8 +410,8 @@ echo '{"openai": {"type": "oauth"}}' >"$fake_home/.local/share/opencode/auth.jso
 oc() { scenario "$1" REVIEWER_OPENCODE="$work/bin/opencode" "${@:2}"; }
 v="$(oc opencode_clean)"
 ox="$work/opencode_clean"
-owt="$ox/state/worktrees/pr-7"
-oxh="$ox/state/review-home/opencode/pr-7"
+owt="$ox/state/worktrees/example-org__example-repo__pr-7"
+oxh="$ox/state/review-home/opencode/example-org__example-repo__pr-7"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" \
   "a clean OpenCode review ends with the same VERDICT line and merges"
 expect_eq "No blocking issues found." "$(first_line opencode_clean)" "the OpenCode comment opens with the clean verdict"
@@ -413,8 +488,8 @@ expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$(oc openco
 expect_eq "opencode-project=none" "$(grep '^opencode-project=' "$op/calls.log")" \
   "opencode.json and .opencode/ above the state dir are not loaded"
 check "the run directory is the root of a git repository with a commit" \
-  git -C "$op/state/opencode-run/pr-7" rev-parse --verify -q HEAD
-expect_eq "$op/state/opencode-run/pr-7" "$(git -C "$op/state/opencode-run/pr-7" rev-parse --show-toplevel)" \
+  git -C "$op/state/opencode-run/example-org__example-repo__pr-7" rev-parse --verify -q HEAD
+expect_eq "$op/state/opencode-run/example-org__example-repo__pr-7" "$(git -C "$op/state/opencode-run/example-org__example-repo__pr-7" rev-parse --show-toplevel)" \
   "the git root of the run is the run directory"
 check "without REVIEWER_OPENCODE_MODEL the owner's default model is used" bash -c "! grep -qE '^opencode run .* -m ' '$ox/calls.log'"
 oc opencode_model REVIEWER_OPENCODE_MODEL=openai/gpt-5.5 >/dev/null
@@ -460,12 +535,139 @@ check "no merge call for an upgrade PR" no_merge upgrade
 check "the CLI runs with GABO_UPGRADE_PR=1" grep -qE '^gabo-call check GABO_UPGRADE_PR=1 ' "$work/upgrade/calls.log"
 check "the comment reports the upgrade PR" grep -qxF 'upgrade PR: only config validated, human merge required' "$work/upgrade/all_posted_7.md"
 check "the output reports the upgrade PR" grep -qF 'upgrade PR: only config validated, human merge required' "$work/upgrade/out.log"
-up="$(sed -n '/^### Upgrade PR/,/^### Review/p' "$work/upgrade/all_posted_7.md")"
+up="$(sed -n '/^### Upgrade PR/,/^### Code read/p' "$work/upgrade/all_posted_7.md")"
 expect_match '`apps/cli/main.go`' "$up" "the report lists changed paths outside the catalog and agent directories"
 expect_match '`.gabo/VERSION`' "$up" "the report lists the stamp"
 check "the report leaves out the catalog subtree" bash -c "! grep -q '^- \`.gabo/skills/' <<<\"\$1\"" _ "$up"
 check "the report leaves out the declared agent directory" bash -c "! grep -q '^- \`.claude/agents/' <<<\"\$1\"" _ "$up"
 expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=error merge=none" "$(scenario upgrade_old GABO_VERSION=0.3.0)" \
   "an upgrade PR still needs the base minimum"
+
+# line_no <name> <fixed text>: the first line of fixture <name>'s comment that holds the text.
+line_no() { grep -nF -m1 -- "$2" "$work/$1/posted_7.md" | cut -d: -f1; }
+# last_before_marker <name>: the last non-empty line before the marker and footer.
+last_before_marker() { grep -v '^$' "$work/$1/posted_7.md" | tail -n 3 | head -n 1; }
+# in_order <name> <first text> <second text>: both texts are present and the first starts on an earlier line.
+in_order() {
+  local a b
+  a="$(line_no "$1" "$2")"
+  b="$(line_no "$1" "$3")"
+  [[ -n "$a" && -n "$b" ]] && ((a < b))
+}
+
+echo "# comment order and the code read line (S13, S14)"
+expect_eq "No blocking issues found." "$(first_line clean)" "the comment opens with the VERDICT line"
+check "the checks section comes before the code read section" in_order clean '### Checks (' '### Code read ('
+expect_eq "code read: pass" "$(last_before_marker clean)" "a clean comment ends with the code read line"
+expect_eq "<!-- gbai-reviewer-bot sha=$(jq -r .headRefOid "$work/clean/pr_7.json") -->|🤖 gabo reviewer" "$(footer clean)" \
+  "the marker and footer follow the code read line"
+check "the nits are listed above the code read line" in_order nits7 'Nits not listed: 2' 'code read: pass'
+expect_eq "code read: pass" "$(last_before_marker nits7)" "a comment with only nits reads code read: pass"
+expect_eq "code read: fail: [security] Important: apps/cli/main.go:3 secret in log" "$(last_before_marker imp_clean)" \
+  "an Important finding is named on the code read line"
+expect_eq "code read: fail: [bugs] Important: apps/cli/main.go:3 nil dereference" "$(last_before_marker review_fail)" \
+  "a blocking review names its finding on the code read line"
+check "a failed review.checks command is named above the code read section" \
+  in_order failing '| `go -C apps/cli vet ./...` | failed' '### Code read ('
+check "the failure output of a failed check sits in the checks section" in_order failing 'Failure output:' '### Code read ('
+expect_eq "code read: pass" "$(last_before_marker failing)" "a failed check does not change the code read line"
+expect_eq "code read: not run: no policy file on dev" "$(last_before_marker nopolicy)" \
+  "a missing policy file reads code read: not run"
+expect_eq "code read: not run: the review agent modified the checkout" "$(last_before_marker modify)" \
+  "an agent that edits the checkout reads code read: not run"
+
+# qa_scenario <name> [VAR=value...]: a scenario whose PR body links the task issue #789.
+qa_scenario() {
+  local name="$1"
+  shift
+  SCENARIO_PR_BODY='Refs #789' scenario "$name" "$@"
+}
+# qa_build_dir <name>: the scratch directory of the QA build of fixture <name>.
+qa_build_dir() { grep -oE 'build -o [^ ]+' "$work/$1/calls.log" | head -n 1 | awk '{print $3}' | xargs -r dirname; }
+
+echo "# product QA (intent 0027 S11, S12, S13)"
+origin qa
+v="$(qa_scenario qapass CLAUDE_MODE=qa_pass)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$v" \
+  "a product QA line the reviewer did not run never blocks a clean head"
+expect_eq "No blocking issues found." "$(first_line qapass)" "the comment still opens with the VERDICT line"
+check "the QA section sits between the VERDICT line and the checks" in_order qapass '### Product QA' '### Checks ('
+check "the QA section sits before the code read section" in_order qapass '### Product QA' '### Code read ('
+check "S1 names its contract line and passes" grep -qF -- '- S1 (`gabo check` exits 0): pass' "$work/qapass/posted_7.md"
+check "S2 names its contract line and passes" grep -qF -- '- S2 (`gabo version` prints the version): pass' "$work/qapass/posted_7.md"
+check "S3 with no gabo command reads not run, never pass" grep -qxF -- '- S3 (no observable check on this line): not run: no runnable gabo command on the line' "$work/qapass/posted_7.md"
+check "a neighboring flow the reviewer did not run never reads pass" grep -qxF -- '- neighbor 1 (gabo version): not run: the reviewer runs no neighboring flow' "$work/qapass/posted_7.md"
+check "a neighboring flow with no command reads not run too" grep -qxF -- '- neighbor 2 (gabo check): not run: the reviewer runs no neighboring flow' "$work/qapass/posted_7.md"
+check "the QA lines are not repeated in the code read section" bash -c "! grep -q '^\[qa\] ' '$work/qapass/posted_7.md'"
+check "the contract command runs in the scratch project, not the checkout" grep -qE '^gabo-call version .*cwd=.*gabo-reviewer-qa\.' "$work/qapass/calls.log"
+check "the build under test is built in a mktemp scratch project" grep -qE 'go-argc=.* args=go -C .*gabo-reviewer-qa\.[^ ]*/apps/cli build -o ' "$work/qapass/calls.log"
+check "the scratch project is removed when the run ends" bash -c 'd="$1"; [[ -n "$d" && ! -e "$d" ]]' _ "$(qa_build_dir qapass)"
+check "the review agent gets no shell for the PR-built binary" bash -c "! grep -q 'gabo-qa-run' '$work/qapass/calls.log'"
+check "the agent prompt names each contract line with its reviewer run" grep -qF -- '- S1: `gabo check` exits 0' "$work/qapass/prompt_seen.txt"
+check "the agent prompt says a line with no gabo command was not run" grep -qF 'reviewer run: none (no runnable gabo command on the line)' "$work/qapass/prompt_seen.txt"
+check "the agent prompt asks for the two neighboring flows" grep -qF 'neighbor 2 (' "$work/qapass/prompt_seen.txt"
+
+v="$(qa_scenario qafail CLAUDE_MODE=qa_fail)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$v" "a product QA fail is blocking while the checks pass"
+check "the QA section names the failed line with what was observed" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1, "unknown flag --json"' "$work/qafail/posted_7.md"
+check "the checks section still reads pass" grep -qF '### Checks (reviewer/tests: success)' "$work/qafail/posted_7.md"
+check "the QA fail sits above the checks section" in_order qafail '- S1 (' '### Checks ('
+expect_eq "code read: pass" "$(last_before_marker qafail)" "a product QA fail does not change the code read line"
+expect_match '^reviewer/review failure' "$(status_line qafail reviewer/review)" "a product QA fail is not reported as a passing review status"
+
+v="$(qa_scenario qaomit)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$v" "a QA section the reviewer left out does not block"
+check "a contract line the reviewer did not report reads not run" grep -qxF -- '- S1 (`gabo check` exits 0): not run: reviewer did not report this line' "$work/qaomit/posted_7.md"
+
+v="$(SCENARIO_ISSUE='{"author":{"login":"owner"},"body":"Task body.","comments":[{"author":{"login":"owner"},"body":"<!-- gabo-progress -->\nS1: `gabo version` prints the version"},{"author":{"login":"stranger"},"body":"S2: `gabo check --bogus` must pass"}]}' qa_scenario qanot CLAUDE_MODE=qa_pass)"
+check "a contract line from a third party is never read as a contract line" bash -c "! grep -q -- '- S2 ' '$work/qanot/posted_7.md' && ! grep -q -- '--bogus' '$work/qanot/prompt_seen.txt'"
+check "the contract line of the issue author is read" grep -qF -- '- S1 (`gabo version` prints the version): pass' "$work/qanot/posted_7.md"
+check "the contract text sits between data markers in the prompt" grep -qF 'BEGIN DONE CONTRACT' "$work/qanot/prompt_seen.txt"
+v="$(qa_scenario qafailrun CLAUDE_MODE=qa_pass FAIL_CHECK='gabo check')"
+check "a contract command that exits 1 is a fail even when the reply says pass" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1' "$work/qafailrun/posted_7.md"
+check "the failed contract command makes the verdict blocking" grep -qF 'Blocking issues found.' "$work/qafailrun/posted_7.md"
+v="$(qa_scenario qafailomit FAIL_CHECK='gabo check')"
+check "a contract command that exits 1 is a fail when the reply leaves the line out" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1' "$work/qafailomit/posted_7.md"
+v="$(SCENARIO_ISSUE='{"author":{"login":"stranger"},"body":"Task body.","comments":[{"author":{"login":"stranger"},"body":"<!-- gabo-progress -->\nS1: `gabo version` prints the version"}]}' qa_scenario qastranger CLAUDE_MODE=qa_pass)"
+check "a task issue written by someone else than the PR author is not read" grep -qxF 'not run: task issue #789 was not written by the PR author' "$work/qastranger/posted_7.md"
+check "a task issue written by someone else builds nothing" bash -c "! grep -q 'build -o' '$work/qastranger/calls.log'"
+long="$(printf 'x%.0s' {1..300})"
+v="$(SCENARIO_CONTRACT="$(printf '%s\nS1: `gabo version` prints %s' '<!-- gabo-progress -->' "$long")" qa_scenario qalong CLAUDE_MODE=qa_pass)"
+check "a long contract line is cut in the comment" bash -c "! grep -q 'x\{250\}' '$work/qalong/posted_7.md'"
+v="$(qa_scenario qafailexit1 CLAUDE_MODE=qa_exit1 FAIL_CHECK='gabo check')"
+check "a reply of pass with exit 1 for a command that exited 1 is a fail" grep -qF -- '- S1 (`gabo check` exits 0): fail: exit 1' "$work/qafailexit1/posted_7.md"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=blocking merge=none" "$v" "a reply that hides a failed contract command is blocking"
+v="$(qa_scenario qaneighborfail CLAUDE_MODE=qa_neighbor_fail)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$v" "a neighboring flow the reviewer did not run cannot block a clean head"
+check "a neighboring flow's claimed fail reads not run" grep -qxF -- '- neighbor 1 (gabo version): not run: the reviewer runs no neighboring flow' "$work/qaneighborfail/posted_7.md"
+v="$(qa_scenario qawrongcmd CLAUDE_MODE=qa_wrongcmd)"
+check "a pass row names the command the reviewer ran, not the one the reply named" grep -qF -- '- S2 (`gabo version` prints the version): pass `gabo version` exit 0' "$work/qawrongcmd/posted_7.md"
+v="$(SCENARIO_CONTRACT=$'<!-- gabo-progress -->\nS1: `gabo check; touch x`\nS2: `gabo version`' qa_scenario qanotplain CLAUDE_MODE=qa_pass)"
+check "a contract command that is not a plain gabo invocation is never run" grep -qxF -- '- S1 (`gabo check; touch x`): not run: the gabo command is not a plain invocation' "$work/qanotplain/posted_7.md"
+long_contract=$'<!-- gabo-progress -->'
+for k in 1 2 3 4 5 6 7 8 9 10 11 12; do long_contract+=$'\n'"S$k: \`gabo version\` prints the version"; done
+v="$(SCENARIO_CONTRACT="$long_contract" qa_scenario qacap)"
+expect_eq 10 "$(grep -c '^- S[0-9]* (' "$work/qacap/posted_7.md")" "at most ten contract lines are read"
+v="$(SCENARIO_CONTRACT=$'<!-- gabo-progress -->\nS1: `gabo version`\nS1: `gabo check`' qa_scenario qadup)"
+check "a repeated S# gets its own line with a suffix" grep -qF -- '- S1.2 (`gabo check`): ' "$work/qadup/posted_7.md"
+v="$(qa_scenario qabare CLAUDE_MODE=qa_bare)"
+check "a pass without its command reads not run, for a contract line too" grep -qxF -- '- S1 (`gabo check` exits 0): not run: no command recorded' "$work/qabare/posted_7.md"
+v="$(SCENARIO_CONTRACT=$'S1: `gabo version` prints the version\nS4: not provable: the wording is a judgment' qa_scenario qanot2)"
+check "a requirement no check can prove reads not run with its reason" grep -qxF -- '- S4 (not provable: the wording is a judgment): not run: the wording is a judgment' "$work/qanot2/posted_7.md"
+
+origin qadocs O_PR=docs
+v="$(qa_scenario qadocs)"
+check "a docs-only head reads not applicable: no product behavior change" grep -qxF 'not applicable: no product behavior change' "$work/qadocs/posted_7.md"
+check "a docs-only head builds nothing" bash -c "! grep -q 'build -o' '$work/qadocs/calls.log'"
+
+origin qabuild
+v="$(qa_scenario qabuild FAIL_CHECK='build -o')"
+check "a build under test that fails names every line not run" grep -qF -- '- S1 (`gabo check` exits 0): not run: the build under test failed' "$work/qabuild/posted_7.md"
+check "a failed build under test is named in the QA section" grep -qxF 'build under test: failed' "$work/qabuild/posted_7.md"
+
+origin qanoref
+v="$(scenario qanoref CLAUDE_MODE=qa_pass)"
+check "a PR that links no task issue reads QA not run" grep -qxF 'not run: no task issue linked (no Refs #<n> in the PR body)' "$work/qanoref/posted_7.md"
+check "a PR that links no task issue builds nothing" bash -c "! grep -q 'build -o' '$work/qanoref/calls.log'"
 
 finish

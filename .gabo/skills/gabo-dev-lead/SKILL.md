@@ -53,4 +53,4 @@ Any gap blocks the next planning step: fix it in your own documents or return it
 
 ## Output Contract
 
-Return the intent and its tracker item, issue numbers per task, cross-intent dependencies, unverified writes, traceability gaps (or none), specs blocked on acceptance, tasks blocked on an open product question, and for research the researched answer with its sources.
+Return the intent and its tracker item, issue numbers per task, cross-intent dependencies, unverified writes, traceability gaps (or none), the plan-change proposals opened (the count, and the issue or PR and the scope of each) or `proposals: none`, specs blocked on acceptance, tasks blocked on an open product question, and for research the researched answer with its sources.

@@ -53,4 +53,4 @@ Any gap blocks the next planning step: fix it in your own documents or return it
 
 ## Output Contract
 
-Return the intent folder and its number, requirement ids added or changed, whether the spec awaits the owner's acceptance, open questions, traceability gaps (or none), and paths written.
+Return the intent folder and its number, requirement ids added or changed, whether the spec awaits the owner's acceptance, open questions, traceability gaps (or none), the plan-change proposals opened (the count, and the issue or PR and the scope of each) or `proposals: none`, and paths written.

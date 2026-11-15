@@ -34,8 +34,8 @@ sha=0123456789abcdef0123456789abcdef01234567
 echo "# preflight"
 expect_match '^PREFLIGHT-OK repo=example-org/example-repo base=dev login=owner mode=single-user engine=claude placement=local minimum=none$' \
   "$(pre bash "$skill/reviewer.sh" preflight)" "installed skill passes; repo, base and placement come from gabo.yaml"
-check "the reviewer keeps its own checkout of the integration branch" test -f "$work/state/base/gabo.yaml"
-expect_eq "$DEV_SHA" "$(git -C "$work/state/base" rev-parse HEAD)" "its checkout is the integration branch tip"
+check "the reviewer keeps its own checkout of the integration branch" test -f "$work/state/base-example-org__example-repo/gabo.yaml"
+expect_eq "$DEV_SHA" "$(git -C "$work/state/base-example-org__example-repo" rev-parse HEAD)" "its checkout is the integration branch tip"
 expect_match '^PREFLIGHT-OK repo=other/repo ' "$(pre REVIEWER_REPO=other/repo bash "$skill/reviewer.sh" preflight)" \
   "REVIEWER_REPO overrides the caller's repo.name"
 expect_match '^PREFLIGHT-FAILED no repository' \
@@ -67,14 +67,14 @@ expect_match '^PREFLIGHT-FAILED single-user mode runs as the calling user, never
 
 echo "# clean checkout of the integration branch"
 PRE_STATE="$work/state2" pre bash "$skill/reviewer.sh" preflight >/dev/null
-echo "local edit" >>"$work/state2/base/AGENTS.md"
+echo "local edit" >>"$work/state2/base-example-org__example-repo/AGENTS.md"
 expect_match '^PREFLIGHT-FAILED .*checkout of dev .* is not clean' \
   "$(PRE_STATE="$work/state2" pre bash "$skill/reviewer.sh" preflight)" "a modified base checkout is refused"
-git -C "$work/state2/base" checkout -q -- AGENTS.md
-echo "stray" >"$work/state2/base/stray.txt"
+git -C "$work/state2/base-example-org__example-repo" checkout -q -- AGENTS.md
+echo "stray" >"$work/state2/base-example-org__example-repo/stray.txt"
 expect_match '^PREFLIGHT-FAILED .*is not clean' \
   "$(PRE_STATE="$work/state2" pre bash "$skill/reviewer.sh" preflight)" "an untracked file in the base checkout is refused"
-rm "$work/state2/base/stray.txt"
+rm "$work/state2/base-example-org__example-repo/stray.txt"
 expect_match '^PREFLIGHT-OK ' "$(PRE_STATE="$work/state2" pre bash "$skill/reviewer.sh" preflight)" "a clean base checkout passes again"
 
 echo "# login and config"

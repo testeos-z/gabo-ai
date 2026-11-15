@@ -6,9 +6,13 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"io/fs"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -20,6 +24,9 @@ import (
 // version is the release version the test binary is built with; gabo init
 // stamps it on the sample and installs the reviewer skill at it.
 const version = "0.9.0"
+
+// templateSlotRE finds the slots of an agent template that name a fixed-name link.
+var templateSlotRE = regexp.MustCompile(`\{\{(methodology|adapter:([A-Za-z0-9_-]+))\}\}`)
 
 // claudeMode is what the fake review engine answers (stubs.sh: pass, fail, ...).
 var claudeMode = "pass"
@@ -166,16 +173,36 @@ func (w *world) write(rel, data string) {
 // the spec; then the bare origin and two dependent tasks in the fake tracker.
 func (w *world) sample() {
 	w.git(w.main, "init", "-q", "-b", "dev")
-	w.run(w.main, nil, w.bin, "init")
+	// gabo.yaml first: init writes the engine files of runtimes.assistant.
 	w.write("gabo.yaml", sampleConfig)
+	w.run(w.main, nil, w.bin, "init")
 	w.write(".gabo/runtimes/gabo-runtime-claude/SKILL.md",
 		"---\nname: gabo-runtime-claude\nmetadata:\n  agent_dir: .claude/agents\n---\n")
 	spec, err := agentspec.Load(skills.Catalog())
 	w.must(err)
-	for _, a := range spec.Agents {
-		w.write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\ngabo-version: "+version+"\n---\n")
+	agents := []agentspec.Agent{{ID: spec.MainSession.ID, Skills: spec.MainSession.Skills, Template: spec.MainSession.Template}}
+	agents = append(agents, spec.Agents...)
+	for _, a := range agents {
+		// The agent file lists its spec skills and the fixed-name links its
+		// template names (gabo check compares both).
+		listed := slices.Clone(a.Skills)
+		tmpl, err := fs.ReadFile(skills.Catalog(), path.Join(agentspec.Dir, a.Template))
+		w.must(err)
+		for _, m := range templateSlotRE.FindAllStringSubmatch(string(tmpl), -1) {
+			link := "gabo-methodology"
+			if m[2] != "" {
+				link = "gabo-" + strings.ReplaceAll(m[2], "_", "-")
+			}
+			if !slices.Contains(listed, link) {
+				listed = append(listed, link)
+			}
+		}
+		w.write(".claude/agents/"+a.ID+".md", "---\nname: "+a.ID+"\ngabo-version: "+version+"\nskills:\n  - "+strings.Join(listed, "\n  - ")+"\n---\n")
 		for _, name := range a.Skills {
-			w.link("../../.gabo/skills/"+name, filepath.Join(w.main, ".claude", "skills", name))
+			dst := filepath.Join(w.main, ".claude", "skills", name)
+			if _, err := os.Lstat(dst); err != nil {
+				w.link("../../.gabo/skills/"+name, dst)
+			}
 		}
 	}
 	// The user-level reviewer link gabo-runtime-claude makes (build step 4).

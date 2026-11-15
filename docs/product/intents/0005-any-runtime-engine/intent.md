@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0005-any-runtime-engine |
-| status | Draft |
+| status | Superseded by intent 0017 on 2026-11-11. Intent issue [#176](https://github.com/testeos-z/gabo-ai/issues/176) was closed as not planned: "Superseded by intent 0017 (#490), which carries this goal (any runtime engine accepted without a Go change) with a spec in PR #491. Closed on the owner's decision of 2026-11-11." |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-03 |

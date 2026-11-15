@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0003-pi-package |
-| status | Draft |
+| status | Done on 2026-11-11. Intent issue [#174](https://github.com/testeos-z/gabo-ai/issues/174) is closed as completed; all 9 task issues are closed: T1-T8 closed as completed with merged PRs; the owner-machine verification T9 #209 was closed as not planned on the owner's decision of 2026-11-11 ("closed unverified"; code merged in `main` and shipped in gabo 0.2.10). |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-03 |

@@ -22,10 +22,13 @@ import (
 )
 
 //go:embed */SKILL.md */examples/*.md */templates/*.md
+//go:embed gabo-setup/instruction-blocks.md
 //go:embed gabo-agent-templates/agents.yaml gabo-agent-templates/agents/*.md
 //go:embed gabo-runtime-opencode/plugins/*.js
 //go:embed gabo-reviewer-config/scripts/*.sh gabo-reviewer-config/scripts/tests/*.sh
 //go:embed gabo-reviewer/README.md gabo-reviewer/scripts/*.sh gabo-reviewer/scripts/config.env gabo-reviewer/scripts/tests/*.sh
+//go:embed gabo-wave-report/scripts/*.sh gabo-wave-report/scripts/tests/*.sh
+//go:embed gabo-eval-runner/scripts/*.sh gabo-eval-runner/scripts/tests/*.sh
 var content embed.FS
 
 // File is one embedded file; Path is relative, like gabo-setup/SKILL.md or

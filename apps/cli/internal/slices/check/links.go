@@ -20,7 +20,7 @@ import (
 // NextLink follows a missing or wrong skill or reviewer link.
 const NextLink = "next: ask your agent to make the links with the runtime skill, then rerun gabo check"
 
-// reviewerScript is the script the gabo-reviewer agent runs through the link.
+// reviewerScript is the script the gabo-coder agent runs through the link.
 const reviewerScript = "scripts/reviewer.sh"
 
 // runtimeMeta is the metadata a runtime skill declares in its frontmatter.
@@ -286,7 +286,7 @@ func (u *UseCase) checkReviewerLink(r *Report, rt, declared string) {
 	}
 	link = filepath.Clean(link)
 	dir := filepath.Clean(u.s.ReviewerDir)
-	why := "why: the gabo-reviewer agent runs " + filepath.Join(link, reviewerScript) + "; link it to " + dir + " (runtime " + rt + ")"
+	why := "why: the gabo-coder agent runs " + filepath.Join(link, reviewerScript) + "; link it to " + dir + " (runtime " + rt + ")"
 	mode, err := u.user.Lstat(link)
 	if err != nil {
 		r.fail("✗ reviewer link "+link+" missing", why, NextLink)

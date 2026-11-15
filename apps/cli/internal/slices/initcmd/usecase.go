@@ -1,14 +1,18 @@
 // Package initcmd copies the embedded gabo skill catalog into the project
-// (.gabo/skills/) and keeps its version stamp (.gabo/VERSION), TRD 9.4.
+// (.gabo/skills/) and keeps its version stamp (.gabo/VERSION) and content hash
+// (.gabo/CATALOG_HASH), TRD 9.4.
 package initcmd
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io/fs"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -17,8 +21,11 @@ import (
 
 // Project-relative locations (TRD 9.4).
 const (
-	CatalogDir  = ".gabo/skills"
-	StampFile   = ".gabo/VERSION"
+	CatalogDir = ".gabo/skills"
+	StampFile  = ".gabo/VERSION"
+	// HashFile holds the content hash of the catalog copied next to the stamp,
+	// so equal versions with different content are told apart.
+	HashFile    = ".gabo/CATALOG_HASH"
 	ConfigFile  = "gabo.yaml"
 	installPath = "github.com/testeos-z/gabo-ai/apps/cli/cmd/gabo"
 )
@@ -35,6 +42,9 @@ type Settings struct {
 	ProjectDir  string
 	Version     string
 	SetupPrompt string
+	// Pi is the subagent-package probe of the Pi section; nil means no
+	// package is found (intent 0016 S2).
+	Pi PiProbe
 }
 
 // Output is the human-readable report.
@@ -56,7 +66,8 @@ func NewUseCase(store Store, files []File, s Settings) *UseCase {
 }
 
 // Run copies the catalog on a fresh project and refreshes it when the stamp
-// is older or missing; it never touches the config and never moves the
+// is older or missing, or equal while the content hash of the embedded
+// catalog differs from the stamped one; it never touches the config and never moves the
 // catalog to an older version. Every successful path then runs the engine
 // step (intent 0006 S10).
 func (u *UseCase) Run(context.Context) (Output, error) {
@@ -88,6 +99,19 @@ func (u *UseCase) Run(context.Context) (Output, error) {
 		}
 		return Output{Lines: lines}, nil
 	case hasStamp && cur.compare(bin) == 0:
+		same, err := u.sameContent()
+		if err != nil {
+			return Output{}, err
+		}
+		if !same {
+			if err := u.copyCatalog(bin); err != nil {
+				return Output{}, err
+			}
+			return u.withEngines([]string{
+				"catalog refreshed " + bin.String() + ": content differs from the embedded catalog",
+				"next: ask your agent to rebuild the agents, then run gabo check",
+			}, hasConfig, bin)
+		}
 		return u.withEngines([]string{"catalog is current (" + bin.String() + "); nothing changed"}, hasConfig, bin)
 	case hasStamp && cur.compare(bin) > 0:
 		return Output{}, fmt.Errorf("catalog version %s is newer than gabo %s; upgrade with: go install %s@v%s",
@@ -124,7 +148,7 @@ func (u *UseCase) withEngines(lines []string, hasConfig bool, bin version) (Outp
 		line := engineconfig.FailurePrefix + " " + ConfigFile + ": " + err.Error() + "; fix it and run gabo init again"
 		return Output{Lines: append(lines, line)}, ErrEngineFailures
 	}
-	report := u.engineStep(set, assistant, bin.String())
+	report := u.engineStep(set, assistant, configMode(b), bin.String())
 	lines = append(lines, strings.Split(strings.TrimSuffix(report.Render(), "\n"), "\n")...)
 	if report.Failed() {
 		return Output{Lines: lines}, ErrEngineFailures
@@ -162,11 +186,46 @@ func (u *UseCase) copyCatalog(v version) error {
 			return fmt.Errorf("write %s: %w", target, err)
 		}
 	}
+	hash := u.path(HashFile)
+	if err := u.store.WriteFile(hash, []byte(u.contentHash()+"\n")); err != nil {
+		return fmt.Errorf("write %s: %w", hash, err)
+	}
 	stamp := u.path(StampFile)
 	if err := u.store.WriteFile(stamp, []byte(v.String()+"\n")); err != nil {
 		return fmt.Errorf("write %s: %w", stamp, err)
 	}
 	return nil
+}
+
+// contentHash is the digest of the embedded catalog (see digest).
+func (u *UseCase) contentHash() string { return digest(u.files) }
+
+// digest is a stable SHA-256 of a set of embedded files: every path and
+// content, in path order. The catalog (HashFile) and the user-level
+// reviewer (ReviewerHashFile) stamp it, so one function decides both (intent 0016 PD5).
+func digest(files []File) string {
+	files = slices.Clone(files)
+	slices.SortFunc(files, func(a, b File) int { return strings.Compare(a.Path, b.Path) })
+	h := sha256.New()
+	for _, f := range files {
+		fmt.Fprintf(h, "%d:%s\n%d:", len(f.Path), f.Path, len(f.Data))
+		h.Write(f.Data)
+		h.Write([]byte("\n"))
+	}
+	return hex.EncodeToString(h.Sum(nil))
+}
+
+// sameContent reports whether the hash stamped at the last copy equals the
+// embedded catalog's; a missing hash counts as different.
+func (u *UseCase) sameContent() (bool, error) {
+	b, err := u.store.ReadFile(u.path(HashFile))
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("read %s: %w", HashFile, err)
+	}
+	return strings.TrimSpace(string(b)) == u.contentHash(), nil
 }
 
 // checkOwnPaths refuses a .gabo, .gabo/skills or stamp that is a symlink or of
@@ -175,7 +234,7 @@ func (u *UseCase) checkOwnPaths() error {
 	for _, p := range []struct {
 		rel, kind string
 		dir       bool
-	}{{".gabo", "directory", true}, {CatalogDir, "directory", true}, {StampFile, "regular file", false}} {
+	}{{".gabo", "directory", true}, {CatalogDir, "directory", true}, {StampFile, "regular file", false}, {HashFile, "regular file", false}} {
 		mode, err := u.store.Lstat(u.path(p.rel))
 		switch {
 		case errors.Is(err, fs.ErrNotExist):

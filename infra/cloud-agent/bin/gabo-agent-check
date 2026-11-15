@@ -5,7 +5,7 @@
 set -uo pipefail
 
 repo_dir="${GABO_REPO_DIR:-$HOME/gabo-ai}"
-tools="${GABO_REQUIRED_TOOLS:-gentle-ai engram claude codegraph gh git go node npm bun}"
+tools="${GABO_REQUIRED_TOOLS:-gentle-ai engram claude codegraph gh git go node bun}"
 failures=0
 
 ok() { printf 'ok   %s\n' "$1"; }

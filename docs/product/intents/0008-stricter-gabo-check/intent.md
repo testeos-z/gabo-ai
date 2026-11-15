@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0008-stricter-gabo-check |
-| status | Accepted |
+| status | Done on 2026-11-06. Intent issue [#304](https://github.com/testeos-z/gabo-ai/issues/304) is closed as completed; all 13 task issues are closed: "All 13 tasks (#307-#319) are merged into dev (PRs #332-#343); T9 #315 was a probe with no PR.". |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-06 |

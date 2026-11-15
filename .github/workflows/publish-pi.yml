@@ -29,11 +29,6 @@ jobs:
         with:
           bun-version-file: package.json
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org
-
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
@@ -46,8 +41,8 @@ jobs:
         working-directory: packages/pi
         run: |
           set -euo pipefail
-          echo "name=$(node -p 'require("./package.json").name')" >> "$GITHUB_OUTPUT"
-          echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+          echo "name=$(bun -e 'console.log(require("./package.json").name)')" >> "$GITHUB_OUTPUT"
+          echo "version=$(bun -e 'console.log(require("./package.json").version)')" >> "$GITHUB_OUTPUT"
 
       - name: Check whether the version is published
         id: check
@@ -56,9 +51,19 @@ jobs:
           VERSION: ${{ steps.pkg.outputs.version }}
         run: bash packages/pi/scripts/publish-decision.sh "$NAME" "$VERSION"
 
+      # bun publish reads its registry token from NPM_CONFIG_TOKEN. This step asks the
+      # registry who the token belongs to, so a token bun cannot use fails here,
+      # before anything is published.
+      - name: Check the registry token
+        if: steps.check.outputs.published == 'false'
+        working-directory: packages/pi
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bun pm whoami
+
       - name: Publish to npm
         if: steps.check.outputs.published == 'false'
         working-directory: packages/pi
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bun publish --access public

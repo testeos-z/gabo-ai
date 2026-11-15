@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0014-agent-name-and-duplicate-skill-checks](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-07. All 2 task issues are closed (2 completed); see the intent status row. Tasks are in the tracker under [#444](https://github.com/testeos-z/gabo-ai/issues/444). |
 | owner | gabo-dev-lead |
 | date | 2026-11-07 |
 

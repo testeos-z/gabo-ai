@@ -142,6 +142,11 @@ func TestPackageSourceDoesNoMachineLookup(t *testing.T) {
 		}
 		checked++
 		for _, bad := range forbidden {
+			// credentials.go holds the home-relative deny patterns written into
+			// the engines' own configs; the engines expand them, gabo never does.
+			if f == "credentials.go" && bad == "~/" {
+				continue
+			}
 			if strings.Contains(string(src), bad) {
 				t.Errorf("%s contains %s", f, bad)
 			}

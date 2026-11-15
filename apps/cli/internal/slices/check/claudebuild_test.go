@@ -47,6 +47,8 @@ func claudeBuilt(t *testing.T, version string) fstest.MapFS {
 	// The main-session entry of spec 0009 S1, S2: link, agent file and the
 	// agent key above.
 	proj[".claude/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".claude/skills/gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[".claude/skills/gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	proj[".claude/agents/"+assistantID+".md"] = file("---\nname: " + assistantID +
 		"\ndescription: 'The gabo assistant'\nskills:\n  - gabo-assistant\ngabo-version: " + version + "\n---\n" + assistantBody(t))
 	return proj
@@ -170,16 +172,16 @@ func TestClaudeBuiltSetFromAnotherVersionFails(t *testing.T) {
 	wantFailed(t, r, "✗ agent gabo-coder built with 1.2.3, catalog is 1.2.4: ask your agent to rebuild")
 }
 
-// #135: a spec skill without its .claude/skills link (gabo-wave-report) and
+// #135: a spec skill without its .claude/skills link (gabo-reviewer-notes) and
 // a link left pointing at the CLI source fail the shipped runtime's check.
 func TestClaudeBuiltSetWithMissingOrStaleLinksFails(t *testing.T) {
 	t.Parallel()
 	proj := claudeBuilt(t, "1.2.3")
-	delete(proj, ".claude/skills/gabo-wave-report")
+	delete(proj, ".claude/skills/gabo-reviewer-notes")
 	proj[".claude/skills/gabo-coder"] = symlink("../../apps/cli/internal/skills/gabo-coder")
 	r := run(t, proj, configFiles{projectFile: validConfig}, Settings{})
 	wantFailed(t, r,
-		"✗ skill link .claude/skills/gabo-wave-report missing",
+		"✗ skill link .claude/skills/gabo-reviewer-notes missing",
 		"✗ skill link .claude/skills/gabo-coder points to ../../apps/cli/internal/skills/gabo-coder, not ../../.gabo/skills/gabo-coder")
 }
 

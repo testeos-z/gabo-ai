@@ -37,8 +37,10 @@ The extension calls the `gabo` CLI, so install the CLI too (see [Install](../../
 The extension is a thin connection layer. It collects the session facts (the names of every registered tool and the package version), pipes them as JSON to `gabo check --pre-write` and shows or applies what gabo returns. Every rule, comparison and message text lives in the gabo CLI (`gabo check --help` describes the input and output). Outside a gabo project (no `gabo.yaml` in the working directory) it does nothing.
 
 - **`session_start`.** Runs `gabo` once and shows each notification it returns, level and text unchanged. gabo warns when no subagent package is loaded (no `subagent_run` tool), with the same refusal text as `gabo-runtime-pi`, and adds one info notification when the package version differs from the project's `.gabo/VERSION`.
-- **`tool_call`.** For `write` and `edit` only, runs `gabo` once with the call's `path` as the target. When gabo blocks, the call is blocked with gabo's reason: a write under `.pi/agents/` while no subagent package is loaded, or a `plan.md` whose intent `spec.md` is not accepted (the stage gate).
-- **gabo unavailable.** When `gabo` is not on `PATH`, exits 2, times out (30 s) or prints unreadable output, the extension blocks nothing and shows one warning that gabo's checks were skipped.
+- **`tool_call`.** For `write` and `edit`, runs `gabo check --pre-write` once with the call's `path` as the target. When gabo blocks, the call is blocked with gabo's reason: a write under `.pi/agents/` while no subagent package is loaded, a `plan.md` whose intent `spec.md` is not accepted (the stage gate), or a human-only path.
+- **`tool_call` on `bash`.** Runs `gabo check --pre-command` once with the tool-call JSON, unchanged. gabo's text blocks the call. Every run sets `GABO_ENGINE=pi`, so gabo records its outcomes for this engine (intent 0028 S3, S16).
+- **Exit mapping of a judged call.** Exit 0 runs the call. Exit 1 blocks it with gabo's text. Exit 3 (an ask) blocks it as exit 1 and says Pi shows no prompt for an ask. Exit 1 with no text blocks with one generic line. Any other exit, a signal or the 30 s timeout blocks the call and names the failure (intent 0028 S15). Exit 0 with unreadable session facts shows one warning and runs the call.
+- **gabo unavailable.** When `gabo` is not on `PATH`, the call runs and one warning says that gabo's checks were skipped. The extension never edits or reads gentle-pi's guardrail list: when gentle-pi blocks a call that gabo allows, the call stays blocked, and the reverse holds too (intent 0028 S17). The allowed case returns no result, so Pi's other handlers still decide.
 
 ## Coexistence with `gabo init` and `gabo-runtime-pi`
 
@@ -57,16 +59,16 @@ Publishing to npm is automated:
 
 1. A merge to `main` runs [`sync-pi-pkg-up.yml`](../../.github/workflows/sync-pi-pkg-up.yml): it runs [`scripts/sync-pkg-up.sh`](scripts/sync-pkg-up.sh), which merges `main` into the `pi/pkg-up` branch (fast-forward when possible, a merge commit otherwise; it fails on a conflict outside `.github/workflows/`) and pushes it. The push uses `GITHUB_TOKEN`, which GitHub refuses for any change under `.github/workflows/`, so the merge always keeps `pi/pkg-up`'s own `.github/workflows/`: workflow changes on `main` do not reach `pi/pkg-up` automatically (see [Updating workflows on `pi/pkg-up`](#updating-workflows-on-pipkg-up)). `test/sync-pkg-up.test.ts` covers it against a temporary git repository.
 2. It then dispatches [`publish-pi.yml`](../../.github/workflows/publish-pi.yml) on `pi/pkg-up` (a push made with the workflow token starts no workflow by itself). A direct push to `pi/pkg-up` that touches `packages/pi/` starts it too.
-3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `npm publish --access public` only when `@gabo-ai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
+3. `publish-pi.yml` runs `bun test` in `packages/pi`, and publishes with `bun publish --access public` only when `@gabo-ai/pi@<version>` is not on npm yet. An unchanged version is a no-op, so bump `version` to release.
 
 The owner's gate is the merge into `main`, which only the owner performs. Before merging a release to `main`, the owner runs the [verification procedure](VERIFY.md) on a real Pi.
 
-It needs the repository secret `NPM_TOKEN`: an npm granular access token with read and write on the `@gabo-ai` scope and 2FA bypass for publishing. Two npm limits apply (the npm token page shows both):
+It needs the repository secret `NPM_TOKEN`, passed to `bun publish` as `NPM_CONFIG_TOKEN`: an npm granular access token with read and write on the `@gabo-ai` scope and 2FA bypass for publishing. Two npm limits apply (the npm token page shows both):
 
 - Granular tokens with write permissions have a maximum lifetime of 90 days ([GitHub changelog, 2025-11-05](https://github.blog/changelog/2025-11-05-npm-security-update-classic-token-creation-disabled-and-granular-token-changes/): "All npm existing granular tokens with write permissions are now capped at 90-day maximum lifetime"), so rotate the secret before it expires.
 - npm removes direct publishing with granular tokens in January 2027 ([npm docs, About access tokens](https://docs.npmjs.com/about-access-tokens): "The ability to publish new package versions directly with a granular access token will be removed in January 2027"). After that this workflow can no longer publish with `NPM_TOKEN`; the follow-up is npm trusted publishing (OIDC from GitHub Actions), which needs no stored token.
 
-The publish decision lives in [`scripts/publish-decision.sh`](scripts/publish-decision.sh) (already published: exit 0, no publish; `npm view` E404 or empty: publish; any other `npm view` error: the job fails). `test/publish-decision.test.ts` runs it against a fake `npm`.
+The publish decision lives in [`scripts/publish-decision.sh`](scripts/publish-decision.sh) (already published: exit 0, no publish; `bun info` reports a 404 or an empty result: publish; any other `bun info` error: the job fails). `test/publish-decision.test.ts` runs it against a fake `bun`.
 
 ### Updating workflows on `pi/pkg-up`
 

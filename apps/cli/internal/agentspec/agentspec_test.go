@@ -216,7 +216,7 @@ func TestEmbeddedSpecIsValid(t *testing.T) {
 	}
 	want := []string{
 		"gabo-pm", "gabo-dev-lead", "gabo-db-master", "gabo-frontend",
-		"gabo-plan-reviewer", "gabo-cycle", "gabo-coder", "gabo-reviewer",
+		"gabo-plan-reviewer", "gabo-coder",
 	}
 	if got := spec.IDs(); !slices.Equal(got, want) {
 		t.Fatalf("IDs() = %v\nwant  %v", got, want)
@@ -225,12 +225,18 @@ func TestEmbeddedSpecIsValid(t *testing.T) {
 		if a.Template != "agents/"+a.ID+".md" {
 			t.Errorf("agent %s: template %q, want agents/%s.md", a.ID, a.Template, a.ID)
 		}
+		if a.LaunchedBy != MainSession {
+			t.Errorf("agent %s: launched_by %q, want %s", a.ID, a.LaunchedBy, MainSession)
+		}
+		if slices.Contains(a.Tools, "subagents") {
+			t.Errorf("agent %s: tools %v has subagents", a.ID, a.Tools)
+		}
 	}
 	m := spec.MainSession
 	if m == nil {
 		t.Fatal("embedded spec has no main_session entry")
 	}
-	if m.ID != "gabo-assistant" || !slices.Equal(m.Skills, []string{"gabo-assistant"}) ||
+	if m.ID != "gabo-assistant" || !slices.Equal(m.Skills, []string{"gabo-assistant", "gabo-cycle", "gabo-wave-report"}) ||
 		m.Template != "agents/gabo-assistant.md" || m.Block != "agents/gabo-assistant-block.md" {
 		t.Fatalf("main_session = %+v", *m)
 	}

@@ -1,0 +1,18 @@
+{
+  "id": "eval-001",
+  "source_issue": 827,
+  "source_pr": 846,
+  "source_wave": "I0029-20261114T184447Z",
+  "starting_commit": "9b7b745f43f53c692f027a03d41c5ac223675b98",
+  "task_input": "### Change type\nTask of intent I0029 (plan task T3).\n\n### Summary\nConfig key for the required approvals per branch, and the S11 pin\n\n### Context and problem\nIntent #766, folder docs/product/intents/0029-branch-protection-on-main-and-dev/ (spec.md accepted by the owner 2026-11-14; plan.md in the plan PR). Spec refs: S3, S11; D4.\n\n### Proposed outcome\nSee the acceptance below and the plan row T3.\n\n### Scope and non-goals\nOne reviewable PR of about 400 changed lines (owner actions without a PR where the row says so). No new CLI command (S11). Plan changes travel in their own PR (D7), never in this one.\n\n### Acceptance criteria\nNot human-only (`schemas/` and `apps/cli/internal/config`); `gabo.yaml` itself is not edited. Test first: a schema and config test fails until `repo.protection.required_approvals` is accepted with the sub-keys `integration` and `main`, each an integer of zero or more, both optional (PD2); an absent key and a project without it pass `gabo check` unchanged; a negative or non-integer value is rejected with the existing `gabo check` error shape. A CLI test pins that the commands are exactly `init`, `check`, `version` and `prompt`, and a `gabo check` run with no network and no host call gives the same result with and without this change (S11). The embedded copy of the schema is regenerated if the repository keeps one.\n\n### Verification plan\nTest first (RED before GREEN) where a runnable test exists. `go -C apps/cli build ./...`, `vet`, `test ./...` and `gabo check` pass. Size S.\n\n### Related issues, PRs, or references\nIntent #766. depends_on: —. unblocks: T4. Local ids; the tracker blocked-by links match depends_on.\n\n",
+  "spec_refs": [
+    "S3"
+  ],
+  "outcome_checks": [
+    "set -u\nbin=\"$(mktemp -d)/gabo\"\ngo -C apps/cli build -o \"$bin\" ./cmd/gabo || exit 1\ncp gabo.yaml \"$bin.base\"\nsed -i 's/^  integration_branch: dev$/&\\n  protection: {required_approvals: {integration: 1, main: 2}}/' gabo.yaml\n\"$bin\" check >\"$bin.ok\" 2>&1 || { echo \"valid approvals refused\"; cat \"$bin.ok\"; exit 1; }\nsed -i 's/main: 2}}/main: -1}}/' gabo.yaml\nif \"$bin\" check >\"$bin.neg\" 2>&1; then echo \"negative approvals accepted\"; exit 1; fi\ngrep -q 'repo.protection.required_approvals.main' \"$bin.neg\" || { echo \"error does not name the field\"; cat \"$bin.neg\"; exit 1; }\necho \"approvals: valid accepted; negative refused with its field path\"\n"
+  ],
+  "acceptance": {
+    "accepted_by": "owner",
+    "accepted_on": "2026-11-15"
+  }
+}

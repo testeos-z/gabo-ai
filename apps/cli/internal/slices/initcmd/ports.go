@@ -25,3 +25,13 @@ type Store interface {
 type Updater interface {
 	Update(ctx context.Context, want, have string) (lines []string, updated bool, err error)
 }
+
+// PiProbe reads whether a Pi subagent package is installed (intent 0016 S1,
+// D1). It runs only `pi list` and a PATH lookup and writes nothing.
+type PiProbe interface {
+	// PiList returns the output of `pi list` run until ctx ends; ok is false
+	// when pi is not on PATH, exits non-zero or the deadline passes.
+	PiList(ctx context.Context) (out []byte, ok bool)
+	// GentleShellOnPath reports whether gentle-shell is on PATH.
+	GentleShellOnPath() bool
+}

@@ -40,6 +40,25 @@ Merge a pull request into `repo.integration_branch` only, pinned to the head SHA
 
 Delete a merged task branch, without force, only when the PR merged into the integration branch from that branch. Delete the local copy first, while the host copy still exists to check it against, then the host copy only if it still points at the merged head. Any refusal is reported as a leftover, never forced.
 
+### protect branches
+
+Set the branch rules on `repo.integration_branch` and on `main`, read them back from the host, and report one result per rule and branch. The rule list:
+
+1. On both branches: a pull request before a merge, no force-push and no deletion.
+2. On `repo.integration_branch` only: the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
+3. On each branch: the required approving reviews count, from `gabo.yaml`: `repo.protection.required_approvals.integration` for `repo.integration_branch` and `repo.protection.required_approvals.main` for `main`; zero when the key is absent.
+4. On both branches: a bypass for the host's administrator role. The bypass names the administrator role and no user.
+
+Set each rule, read it back from the host and compare it with this list. Report one line per rule and branch:
+
+- `set`: the host shows the rule as this list states it.
+- `missing`: the write failed or the read back does not show the rule; give the host's reason.
+- `not offered`: the host or its plan does not offer the rule; give the host's reason; the other rules are still set, and the operation does not fail for it.
+
+Running it again with the same config leaves the rules unchanged: the read back is identical and no second rule set exists for a branch.
+
+An adapter for a host with no implementation yet carries this heading and states that the operation is not offered.
+
 ## Output Contract
 
 An adapter answers every operation with the exact commands or tool calls and how to read the result back. An agent using it returns PR number, base, head SHA and state, the merged SHA for merges, and any refused operation with its reason.

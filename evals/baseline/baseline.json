@@ -1,0 +1,14 @@
+{
+  "commit": "35dc79e8cb3bde5402a97ffb740a60c46234dbdf",
+  "run_id": "eval-20261115T153047Z-bd25f9",
+  "engine": "claude",
+  "runs_per_task": 1,
+  "engine_timeout_seconds": 1800,
+  "tasks": {
+    "eval-001": "pass",
+    "eval-002": "pass"
+  },
+  "accepted_by": "owner",
+  "accepted_on": "2026-11-15",
+  "acceptance": "accepted under the owner's order of 2026-11-15 to proceed with the recommended option, relayed by the gabo-b assistant"
+}

@@ -203,6 +203,19 @@ func TestLoadLayersNoFileFound(t *testing.T) {
 	}
 }
 
+// I0028 PD2: a project with no config file is the named ErrNoConfig, so the
+// shell hook can read every missing key as its default; the text is unchanged.
+func TestLoadLayersNoFileIsErrNoConfig(t *testing.T) {
+	t.Parallel()
+	_, err := LoadLayers(files{}, twoLayers())
+	if !errors.Is(err, ErrNoConfig) {
+		t.Fatalf("error = %v, want ErrNoConfig", err)
+	}
+	if _, err := LoadLayers(files{"/src/p/gabo.yaml": "review:\n  checks: [go test ./...]\n"}, twoLayers()); errors.Is(err, ErrNoConfig) {
+		t.Fatalf("an unreadable or invalid file must not read as ErrNoConfig: %v", err)
+	}
+}
+
 func TestLoadLayersReadErrorIsNotSkipped(t *testing.T) {
 	t.Parallel()
 	_, err := LoadLayers(failingReader{}, twoLayers())

@@ -64,7 +64,7 @@ func linkedProject() fstest.MapFS {
 		".gabo/skills/gabo-contract-methodology/SKILL.md":        "## Operations\n",
 		".gabo/skills/gabo-contract-reviewer-placement/SKILL.md": "## Operations\n",
 		".claude/skills/gabo-tasks-github/SKILL.md":              "# T\n",
-		".claude/agents/gabo-reviewer.md":                        "---\nname: gabo-reviewer\ngabo-version: 1.2.3\n---\n",
+		".claude/agents/gabo-reviewer.md":                        "---\nname: gabo-reviewer\n---\n",
 		".claude/agents/alpha.md":                                "---\nname: alpha\nskills:\n  - sk-a\n  - sk-b\ngabo-version: 1.2.3\n---\nbody\n",
 		".claude/agents/beta.md":                                 "---\nname: beta\nskills: [sk-b]\ngabo-version: 1.2.3\n---\nbody\n",
 	})
@@ -266,7 +266,7 @@ func TestReviewerLinkMissingFails(t *testing.T) {
 	r := runLinked(t, linkedProject(), u, linkedSettings())
 	wantFailed(t, r,
 		"✗ reviewer link "+userLink+" missing",
-		"why: the gabo-reviewer agent runs "+userLink+"/scripts/reviewer.sh; link it to "+reviewerDir+" (runtime claude)",
+		"why: the gabo-coder agent runs "+userLink+"/scripts/reviewer.sh; link it to "+reviewerDir+" (runtime claude)",
 		NextLink)
 }
 
@@ -448,7 +448,7 @@ func TestReviewerLinkForEveryListedAssistantUnderSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantFailed(t, rep, "✗ reviewer link "+piUserLink+" missing",
-		"why: the gabo-reviewer agent runs "+piUserLink+"/scripts/reviewer.sh; link it to "+reviewerDir+" (runtime pi)")
+		"why: the gabo-coder agent runs "+piUserLink+"/scripts/reviewer.sh; link it to "+reviewerDir+" (runtime pi)")
 	noLineWith(t, rep, "reviewer link "+userLink)
 	noLineWith(t, rep, "runtime session")
 

@@ -10,7 +10,7 @@ metadata:
 
 Use when an agent starts, stops or reports agent sessions that run on the owner's own machine. This adapter fills the `agent_host` slot contract (`gabo-contract-agent-host`, TRD 9.1; R8, R11, US-007) with the agent CLI of the role's resolved engine (`claude` or `pi`, see Engine Resolution) run as a local process inside the task worktree. Point `slots.agent_host.adapter` at this skill's `SKILL.md`. Verified against Claude Code 2.1.312 (`claude --help`) and pi 1.4.0 (`pi --help`).
 
-Subagents launched inside the owner's runtime session (for example `gabo-cycle` launching `gabo-coder`) need no agent host; use this adapter only when a role must run as its own session process.
+Subagents launched inside the owner's runtime session (for example the main session launching `gabo-coder`) need no agent host; use this adapter only when a role must run as its own session process.
 
 ## Hard Rules
 
@@ -41,7 +41,7 @@ The role's prompt comes from its built agent and the brief of the caller; the OS
 
 Resolve the role's engine from `gabo.yaml` before any check of `start agent session` (intent 0013 S10); a refusal starts nothing and is reported instead of a handle:
 
-- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the agent that loaded this adapter (for example `gabo-cycle` or `gabo-assistant`). A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
+- `session` is the engine of the calling session: the `gabo-engine:` value of the caller's built agent (`{{engine}}`, intent 0013 S6), the main session (the assistant running the `gabo-cycle` skill) that loaded this adapter. A caller whose built agent has no engine line (built before the slot) cannot resolve `session`: start nothing and report `refused: session engine unknown (rebuild the agents)`.
 - Start a `coder` on the resolved coder engine: `runtimes.coder` `session` resolves to the calling session's engine, and a fixed `runtimes.coder` is that engine. Example: `coder: session` from a Pi session ⇒ `pi`.
 - Start an `assistant` only on an engine listed in `runtimes.assistant` (one engine or a list, intent 0013 S4): the engine the caller asks for, or the calling session's engine when it names none. Refuse any other with `refused: <engine> is not listed in runtimes.assistant (<value>)`, `<value>` as written in `gabo.yaml`. Example: with `assistant: [claude, pi]`: an `assistant` on `codex` ⇒ `refused: codex is not listed in runtimes.assistant ([claude, pi])`.
 - This adapter has start commands for `claude` and `pi` only: a resolved `codex` or `opencode` is refused with `refused: <engine> has no local start command in gabo-agent-host-local`.
@@ -53,7 +53,9 @@ Resolve the role's engine from `gabo.yaml` before any check of `start agent sess
 A session runs headless (`--print`), so nobody can answer a permission prompt. The adapter never relies on one: it pins on the command line the tools the session may use, and anything else is denied at once instead of waiting.
 
 - `claude`: `--permission-mode dontAsk --permission-prompts none` denies every tool that is not pre-approved, and `--allowedTools "$tools"` pre-approves exactly the tools of the role's built agent (the one `tools:` line of its frontmatter, for example `Read, Grep, Glob, Edit, Write, Bash, Skill, Agent` for `gabo-coder`). The owner's settings `deny` rules still apply on top. The session also reads the worktree's project settings; that is safe only because the worktree holds the task's own branch, written by the same role, which is why a `reviewer` session is never started.
-- `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. It starts only the `coder` and `assistant` roles, which need edit and shell tools anyway: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, `--append-system-prompt <role agent file>` reads the file (pi 1.4.0 `--help`: "Append text or file contents to the system prompt"), and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same role.
+- `pi`: it has no tool approval prompt; every enabled tool runs, and the adapter has no per-role tool list for it. It starts only a `coder`, which needs edit and shell tools: `--tools read,bash,edit,write,grep,find,ls` pins the built-in tools, `--append-system-prompt <role agent file>` reads the file (pi 1.4.0 `--help`: "Append text or file contents to the system prompt"), and `--approve` trusts the worktree's project-local files (its built agents and skills) for this run, so no trust question is left open. The worktree holds the task's own branch, written by the same role.
+
+An `assistant` on `pi` is refused before any check and before any process starts, with the line `refused: a Pi assistant cannot run a wave under --print; start it from an interactive session or pi --mode rpc`. `--print` ends a Pi session after its first turn, which would kill the coder subagents of a wave. The refusal reports a handle of none; no process starts and no ledger entry is written. A `coder` on `pi` and every `claude` session are unaffected. The host passes `--print` itself, so this refusal reads no session mode; the unreadable-mode warning of `gabo-assistant` covers only the owner's main session.
 
 Check before starting, after Engine Resolution, on the resolved engine, and start nothing when a check fails; report which one failed instead of a handle. When the `tools:` check fails, say that the built agent needs exactly one one-line `tools: A, B, C` entry in its frontmatter (a YAML list under `tools:` is refused, never guessed):
 
@@ -64,6 +66,7 @@ Check before starting, after Engine Resolution, on the resolved engine, and star
 case "<runtime role>" in coder|assistant) ;; *) false ;; esac &&
   tools=$(awk '/^---$/ { if (++n == 2) exit; next } n == 1 && sub(/^tools: */, "") { print; c++ } END { exit c != 1 }' <role agent file>) &&
   [ -n "$tools" ] && claude --help | grep -qF -- --permission-prompts && claude --help | grep -qF -- --allowedTools
+# pi: an assistant is refused above, before this check; the role check keeps reviewers out
 # pi: the installed version must support every flag the start command relies on
 case "<runtime role>" in coder|assistant) ;; *) false ;; esac &&
   pi --help | grep -qF -- --approve && pi --help | grep -qF -- --tools &&

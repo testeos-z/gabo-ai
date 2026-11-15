@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ runtime bar has no runtime skill gabo-runtime-bar
+next: ask your agent to write it with gabo-runtime-builder, then rerun gabo check

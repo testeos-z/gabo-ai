@@ -12,6 +12,10 @@ import (
 // ReviewerStamp is the user copy's own version file, inside the skill dir.
 const ReviewerStamp = "VERSION"
 
+// ReviewerHashFile is the user copy's content stamp, next to ReviewerStamp: the
+// digest of the embedded reviewer files at install (intent 0016 S4, D2).
+const ReviewerHashFile = "REVIEWER_HASH"
+
 // ReviewerSettings locate the user-level gabo-reviewer copy (TRD 9.4, D20).
 type ReviewerSettings struct {
 	// Dir is ${XDG_DATA_HOME:-~/.local/share}/gabo/skills/gabo-reviewer.
@@ -36,7 +40,9 @@ func NewReviewer(store Store, files []File, s ReviewerSettings) *Reviewer {
 }
 
 // Install writes the user copy when it is missing or its VERSION differs from
-// the binary version, and leaves a current copy untouched.
+// the binary version. A copy whose VERSION equals the binary version is
+// refreshed only when its REVIEWER_HASH differs from the embedded reviewer
+// (a missing hash counts as different); otherwise it is left untouched.
 func (r *Reviewer) Install(context.Context) (Output, error) {
 	bin, ok := parseVersion(strings.TrimPrefix(r.s.Version, "v"))
 	if !ok {
@@ -65,7 +71,17 @@ func (r *Reviewer) Install(context.Context) (Output, error) {
 		}
 		if cur, ok := parseVersion(strings.TrimSpace(string(b))); ok {
 			if cur.compare(bin) == 0 {
-				return Output{Lines: []string{"reviewer skill is current (" + bin.String() + ") in " + dir}}, nil
+				same, err := r.sameContent(dir)
+				if err != nil {
+					return Output{}, err
+				}
+				if same {
+					return Output{Lines: []string{"reviewer skill is current (" + bin.String() + ") in " + dir}}, nil
+				}
+				if err := r.write(dir, bin); err != nil {
+					return Output{}, err
+				}
+				return Output{Lines: []string{"reviewer skill refreshed " + bin.String() + " in " + dir + ": content differs from the embedded reviewer"}}, nil
 			}
 			old = cur.String()
 		}
@@ -77,6 +93,20 @@ func (r *Reviewer) Install(context.Context) (Output, error) {
 		return Output{Lines: []string{"reviewer skill installed to " + dir + " (" + bin.String() + ")"}}, nil
 	}
 	return Output{Lines: []string{"reviewer skill replaced " + old + " → " + bin.String() + " in " + dir}}, nil
+}
+
+// sameContent reports whether the hash stamped at the last install equals the
+// digest of the embedded reviewer; a missing hash counts as different.
+func (r *Reviewer) sameContent(dir string) (bool, error) {
+	path := filepath.Join(dir, ReviewerHashFile)
+	b, err := r.store.ReadFile(path)
+	switch {
+	case errors.Is(err, fs.ErrNotExist):
+		return false, nil
+	case err != nil:
+		return false, fmt.Errorf("read %s: %w", path, err)
+	}
+	return strings.TrimSpace(string(b)) == digest(r.files), nil
 }
 
 // checkDir refuses a relative dir and one inside the project.
@@ -91,8 +121,8 @@ func (r *Reviewer) checkDir(dir string) error {
 	return nil
 }
 
-// write replaces the dir and writes VERSION last, so an interrupted install
-// is repeated on the next run.
+// write replaces the dir, stamps the content hash and writes VERSION last, so
+// an interrupted install is repeated on the next run.
 func (r *Reviewer) write(dir string, v version) error {
 	if err := r.store.RemoveAll(dir); err != nil {
 		return fmt.Errorf("remove %s: %w", dir, err)
@@ -102,6 +132,10 @@ func (r *Reviewer) write(dir string, v version) error {
 		if err := r.store.WriteFile(target, f.Data); err != nil {
 			return fmt.Errorf("write %s: %w", target, err)
 		}
+	}
+	hash := filepath.Join(dir, ReviewerHashFile)
+	if err := r.store.WriteFile(hash, []byte(digest(r.files)+"\n")); err != nil {
+		return fmt.Errorf("write %s: %w", hash, err)
 	}
 	stamp := filepath.Join(dir, ReviewerStamp)
 	if err := r.store.WriteFile(stamp, []byte(v.String()+"\n")); err != nil {

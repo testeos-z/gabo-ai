@@ -6,9 +6,11 @@ import (
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/config"
@@ -17,6 +19,9 @@ import (
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/setupprompt"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/skills"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/basecommit"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/outcomefile"
+	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/check/adapters/prbase"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/initcmd"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate"
 	"github.com/testeos-z/gabo-ai/apps/cli/internal/slices/selfupdate/adapters"
@@ -80,6 +85,7 @@ func initFactory(runner kernel.Runner, version string, upd updateDeps) initcmd.F
 			}),
 			Catalog: initcmd.NewUseCase(osfs.FS{}, toFiles(embedded, ""), initcmd.Settings{
 				ProjectDir: project, Version: version, SetupPrompt: setupprompt.Text,
+				Pi: piProbe{project: project},
 			}),
 		}, nil
 	}
@@ -99,18 +105,24 @@ func checkFactory(runner kernel.Runner, version string, getenv func(string) stri
 		// An unknown reviewer dir is reported by the check, not here.
 		reviewerDir, _ := reviewerSkillDir(getenv)
 		return check.NewUseCase(os.DirFS(project), osfs.FS{}, osfs.FS{}, check.Settings{
-			Version:     version,
-			Layers:      config.LayerPaths(getenv, project),
-			UpgradePR:   getenv("GABO_UPGRADE_PR") == "1",
-			Former:      config.FormerNames(getenv, project),
-			Getenv:      getenv,
-			ReviewerDir: reviewerDir,
-			Root:        project,
-			Resolve:     filepath.EvalSymlinks,
-			Readlink:    readlink,
-			WorkDir:     wd,
-			FoldCase:    foldsCase(project),
-			CI:          getenv("CI") != "",
+			Version:      version,
+			Layers:       config.LayerPaths(getenv, project),
+			UpgradePR:    getenv("GABO_UPGRADE_PR") == "1",
+			Former:       config.FormerNames(getenv, project),
+			Getenv:       getenv,
+			ReviewerDir:  reviewerDir,
+			Root:         project,
+			Resolve:      filepath.EvalSymlinks,
+			Readlink:     readlink,
+			WorkDir:      wd,
+			FoldCase:     foldsCase(project),
+			CI:           getenv("CI") != "",
+			OutcomePath:  getenv(check.EnvOutcomePath),
+			Outcomes:     outcomefile.File{},
+			PullRequests: prbase.GH{Runner: runner, Dir: project},
+			Base:         basecommit.Git{Runner: runner, Dir: project},
+			Task:         getenv(check.EnvTask),
+			Engine:       getenv(check.EnvEngine),
 		}), nil
 	}
 }
@@ -165,4 +177,32 @@ func toFiles(embedded []skills.File, prefix string) []initcmd.File {
 		files = append(files, initcmd.File{Path: strings.TrimPrefix(f.Path, prefix), Data: f.Data})
 	}
 	return files
+}
+
+// piProbe is the os/exec adapter of initcmd.PiProbe (intent 0016 S1, D1). It
+// runs `pi list` in the project, read-only, and looks gentle-shell up on PATH;
+// it writes nothing.
+type piProbe struct{ project string }
+
+// PiList runs `pi list`; ok is false when pi is not on PATH, exits non-zero
+// or ctx ends first.
+func (p piProbe) PiList(ctx context.Context) ([]byte, bool) {
+	bin, err := exec.LookPath("pi")
+	if err != nil {
+		return nil, false
+	}
+	cmd := exec.CommandContext(ctx, bin, "list")
+	cmd.Dir = p.project
+	cmd.WaitDelay = time.Second // a grandchild that keeps stdout open cannot hold init
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, false
+	}
+	return out, true
+}
+
+// GentleShellOnPath reports whether the gentle-shell launcher is on PATH.
+func (piProbe) GentleShellOnPath() bool {
+	_, err := exec.LookPath("gentle-shell")
+	return err == nil
 }

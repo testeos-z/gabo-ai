@@ -30,6 +30,36 @@ type hookCall struct {
 // that is not one JSON object, and a tool_input with neither key, a
 // non-string value or an empty path are usage errors (ErrPreWriteUsage).
 func PreWriteTargets(data []byte) ([]string, error) {
+	paths, _, err := PreWriteCall(data)
+	return paths, err
+}
+
+// PreWriteCall is PreWriteTargets with the call's agent_id: the id of a
+// subagent's call, "" for the main session (intent 0028 S7, decision 13). A
+// non-string agent_id still names a subagent, so it is judged as one (fail
+// closed).
+func PreWriteCall(data []byte) ([]string, string, error) {
+	paths, err := preWriteTargets(data)
+	if err != nil {
+		return nil, "", err
+	}
+	var who struct {
+		AgentID json.RawMessage `json:"agent_id"`
+	}
+	// The object was decoded above, so this cannot fail.
+	_ = json.Unmarshal(data, &who)
+	if !set(who.AgentID) {
+		return paths, "", nil
+	}
+	var id string
+	if err := json.Unmarshal(who.AgentID, &id); err != nil {
+		id = string(who.AgentID)
+	}
+	return paths, id, nil
+}
+
+// preWriteTargets is PreWriteTargets' reading of the tool-call JSON.
+func preWriteTargets(data []byte) ([]string, error) {
 	if len(bytes.TrimSpace(data)) == 0 {
 		return nil, fmt.Errorf("%w: no path given and stdin is empty", ErrPreWriteUsage)
 	}

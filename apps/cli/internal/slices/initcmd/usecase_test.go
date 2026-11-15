@@ -24,6 +24,12 @@ const (
 	cfgYAML = "repo:\n  name: o/r\nruntimes:\n  coder: claude\n  reviewer: claude\n  assistant: claude\n"
 )
 
+// hashFile and catalogHash are the content stamp a current project holds for
+// the fixture catalog.
+const hashFile = root + "/.gabo/CATALOG_HASH"
+
+func catalogHash() string { return NewUseCase(nil, catalog, Settings{}).contentHash() + "\n" }
+
 // claudeBlock is the engine integration block a run with cfgYAML prints
 // for the given project files, as lines; cfgYAML names claude as the
 // assistant engine.
@@ -185,15 +191,19 @@ func TestOlderOrMissingStampRefreshesCatalog(t *testing.T) {
 
 func TestMatchingStampChangesNothing(t *testing.T) {
 	t.Parallel()
-	integrated := map[string]string{config: cfgYAML, stamp: "1.2.3\n", setup: "edited", claudeFile: claudeIntegrated()}
+	integrated := map[string]string{config: cfgYAML, claudeFile: claudeIntegrated()}
 	for _, tt := range []struct {
 		files map[string]string
 		after []string
 	}{
 		{integrated, claudeBlock(integrated)},
-		{map[string]string{stamp: "1.2.3\n"}, nil},
+		{map[string]string{}, nil},
 	} {
 		s := newStore(tt.files)
+		if _, err := run(t, s, "1.2.3"); err != nil {
+			t.Fatal(err)
+		}
+		s.Writes, s.Removed = nil, nil
 		before := maps.Clone(s.Files)
 		out, err := run(t, s, "v1.2.3")
 		if err != nil {
@@ -206,6 +216,102 @@ func TestMatchingStampChangesNothing(t *testing.T) {
 		if joined(out) != strings.Join(want, "\n") {
 			t.Fatalf("output:\n%s", joined(out))
 		}
+	}
+}
+
+// runWith runs init with a given embedded catalog.
+func runWith(t *testing.T, s *memStore, files []File, version string) (Output, error) {
+	t.Helper()
+	return NewUseCase(s, files, Settings{ProjectDir: root, Version: version}).Run(context.Background())
+}
+
+// Equal stamp but a catalog that differs from the embedded one: init refreshes
+// the copy and says so (issue #524).
+func TestSameVersionDifferentContentRefreshesCatalog(t *testing.T) {
+	t.Parallel()
+	for _, tt := range []struct {
+		name  string
+		files map[string]string
+		next  []File
+	}{
+		{"changed file", map[string]string{config: cfgYAML}, []File{{Path: "gabo-coder/SKILL.md", Data: []byte("coder v2")}, catalog[1]}},
+		{"removed file", nil, catalog[:1]},
+		{"added file", nil, append(slices.Clone(catalog), File{Path: "gabo-new/SKILL.md", Data: []byte("new")})},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			s := newStore(maps.Clone(tt.files))
+			if _, err := run(t, s, "1.2.3"); err != nil {
+				t.Fatal(err)
+			}
+			files := maps.Clone(s.Files)
+			out, err := runWith(t, s, tt.next, "1.2.3")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(s.Removed) == 0 || s.Removed[len(s.Removed)-1] != root+"/.gabo/skills" {
+				t.Fatalf("catalog dir not replaced: %v", s.Removed)
+			}
+			for _, f := range tt.next {
+				if got := s.Files[root+"/.gabo/skills/"+f.Path]; got != string(f.Data) {
+					t.Fatalf("%s = %q, want %q", f.Path, got, f.Data)
+				}
+			}
+			for _, old := range catalog {
+				if !slices.ContainsFunc(tt.next, func(f File) bool { return f.Path == old.Path }) {
+					if _, ok := s.Files[root+"/.gabo/skills/"+old.Path]; ok {
+						t.Fatalf("stale %s kept", old.Path)
+					}
+				}
+			}
+			if got := s.Files[stamp]; got != "1.2.3\n" {
+				t.Fatalf("stamp = %q", got)
+			}
+			want := []string{
+				"catalog refreshed 1.2.3: content differs from the embedded catalog",
+				"next: ask your agent to rebuild the agents, then run gabo check",
+			}
+			if tt.files != nil {
+				want = append(want, claudeBlock(files)...)
+			}
+			if joined(out) != strings.Join(want, "\n") {
+				t.Fatalf("output:\n%s", joined(out))
+			}
+			// The refresh is stable: a second run with the same catalog is a no-op.
+			before := maps.Clone(s.Files)
+			writes := len(s.Writes)
+			out, err = runWith(t, s, tt.next, "1.2.3")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(s.Writes) != writes || !maps.Equal(s.Files, before) {
+				t.Fatalf("second run wrote %v", s.Writes[writes:])
+			}
+			if !strings.HasPrefix(joined(out), "catalog is current (1.2.3); nothing changed") {
+				t.Fatalf("second output:\n%s", joined(out))
+			}
+		})
+	}
+}
+
+// A project stamped with the binary version but never given a content
+// stamp (copied by an older gabo) is refreshed once, then stays current.
+func TestSameVersionWithoutContentStampRefreshesOnce(t *testing.T) {
+	t.Parallel()
+	s := newStore(map[string]string{stamp: "1.2.3\n", setup: "setup", coder: "coder"})
+	out, err := run(t, s, "1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(joined(out), "catalog refreshed 1.2.3: content differs from the embedded catalog") {
+		t.Fatalf("output:\n%s", joined(out))
+	}
+	out, err = run(t, s, "1.2.3")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if joined(out) != "catalog is current (1.2.3); nothing changed" {
+		t.Fatalf("second output:\n%s", joined(out))
 	}
 }
 
@@ -333,8 +439,8 @@ func TestSetupPromptPrintedOnlyOnFreshProject(t *testing.T) {
 	for name, files := range map[string]map[string]string{
 		"config without stamp":   {config: cfgYAML},
 		"config, older stamp":    {config: cfgYAML, stamp: "1.2.2\n"},
-		"config, matching stamp": {config: cfgYAML, stamp: "1.2.3\n"},
-		"stamp without config":   {stamp: "1.2.3\n"},
+		"config, matching stamp": {config: cfgYAML, stamp: "1.2.3\n", hashFile: catalogHash()},
+		"stamp without config":   {stamp: "1.2.3\n", hashFile: catalogHash()},
 	} {
 		out, err := runWith(newStore(files))
 		if err != nil {
@@ -358,7 +464,7 @@ func TestEngineStepRunsOnEveryPathWithConfig(t *testing.T) {
 	}{
 		{"missing stamp", map[string]string{config: cfgYAML}, []string{"catalog updated none → 1.2.3", "next: ask your agent to rebuild the agents, then run gabo check"}},
 		{"older stamp", map[string]string{config: cfgYAML, stamp: "1.2.2\n"}, []string{"catalog updated 1.2.2 → 1.2.3", "next: ask your agent to rebuild the agents, then run gabo check"}},
-		{"current stamp", map[string]string{config: cfgYAML, stamp: "1.2.3\n"}, []string{"catalog is current (1.2.3); nothing changed"}},
+		{"current stamp", map[string]string{config: cfgYAML, stamp: "1.2.3\n", hashFile: catalogHash()}, []string{"catalog is current (1.2.3); nothing changed"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

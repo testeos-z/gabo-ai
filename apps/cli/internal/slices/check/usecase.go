@@ -2,8 +2,7 @@
 // 9.4), engine-neutral except for the full-tier engine files: the config files, every agent of the neutral
 // agent spec in each runtime's declared agent directory, each agent's
 // version line, the skill and reviewer links a runtime skill declares
-// (metadata.skill_dir, metadata.reviewer_link), OpenCode's project-level
-// experimental.subagent_depth when a role runs on OpenCode, the engine
+// (metadata.skill_dir, metadata.reviewer_link), the engine
 // integration keys gabo init writes for claude, codex and pi, every slot adapter's
 // contract coverage, the catalog version stamp and the stage of each
 // intent folder under docs/product/intents/.
@@ -84,6 +83,23 @@ type Settings struct {
 	// CI (CI set) skips the user-level reviewer link: the reviewer scripts
 	// and CI run with their own HOME.
 	CI bool
+	// OutcomePath is the file the cycle names for the run's outcome records
+	// (GABO_OUTCOME_FILE); empty means no record is written (intent 0028 S16).
+	OutcomePath string
+	// Outcomes appends the records to OutcomePath; RecordDecision needs it
+	// only when OutcomePath is set.
+	Outcomes OutcomeAppender
+	// PullRequests reads the base of a pull request a merge names (the
+	// release gate, intent 0028 D4); nil reads nothing, so every such merge
+	// counts as unreadable.
+	PullRequests PRBaseReader
+	// Task and Engine name the run's task and engine on every record
+	// (GABO_TASK, GABO_ENGINE).
+	Task   string
+	Engine string
+	// Base reads whether a test file is tracked at the worktree's base commit
+	// (intent 0028 D6); nil reads nothing, so no test file is recorded.
+	Base BaseTracker
 }
 
 // Report is the human-readable result. Failed is true when any check failed.
@@ -134,9 +150,6 @@ func (u *UseCase) Run() (Report, error) {
 		if err := u.checkReviewerIsolation(&r, cfg); err != nil {
 			return Report{}, err
 		}
-		if err := u.checkSubagentDepth(&r, cfg); err != nil {
-			return Report{}, err
-		}
 		if err := u.checkEngineKeys(&r, cfg); err != nil {
 			return Report{}, err
 		}
@@ -146,6 +159,7 @@ func (u *UseCase) Run() (Report, error) {
 		if err := u.checkSlots(&r, cfg); err != nil {
 			return Report{}, err
 		}
+		u.checkEval(&r, cfg)
 	}
 	if err := u.checkIntents(&r); err != nil {
 		return Report{}, err
@@ -327,6 +341,9 @@ func (u *UseCase) checkAgents(r *Report, cfg config.Config, stamp string, hasSta
 					return err
 				}
 			}
+		}
+		if err := u.checkFormerAgents(r, dir, files, spec); err != nil {
+			return err
 		}
 	}
 	return nil

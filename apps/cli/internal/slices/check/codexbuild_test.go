@@ -100,6 +100,8 @@ func codexBuilt(t *testing.T, version string) fstest.MapFS {
 	proj[".agents/skills/gabo-agent-host"] = symlink("../../.gabo/skills/gabo-agent-host-local")
 	// The main-session entry of spec 0009 S1, S3: link and scoped block.
 	proj[".agents/skills/gabo-assistant"] = symlink("../../.gabo/skills/gabo-assistant")
+	proj[".agents/skills/gabo-cycle"] = symlink("../../.gabo/skills/gabo-cycle")
+	proj[".agents/skills/gabo-wave-report"] = symlink("../../.gabo/skills/gabo-wave-report")
 	proj["AGENTS.md"] = file("# Project\n\n" + assistantBlock(t))
 	return proj
 }
@@ -234,7 +236,7 @@ func TestCodexBuiltAgentsParseAsTOML(t *testing.T) {
 		}
 	}
 	slices.Sort(ids)
-	want := []string{"gabo-coder", "gabo-cycle", "gabo-db-master", "gabo-dev-lead", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm", "gabo-reviewer"}
+	want := []string{"gabo-coder", "gabo-db-master", "gabo-dev-lead", "gabo-frontend", "gabo-plan-reviewer", "gabo-pm"}
 	if !slices.Equal(ids, want) {
 		t.Fatalf("spec ids %v, want %v", ids, want)
 	}
@@ -290,13 +292,13 @@ func TestCodexBuiltSetFromAnotherVersionFails(t *testing.T) {
 func TestCodexBuiltSetWithMissingLinksFails(t *testing.T) {
 	t.Parallel()
 	proj := codexBuilt(t, "1.2.3")
-	delete(proj, ".agents/skills/gabo-wave-report")
+	delete(proj, ".agents/skills/gabo-reviewer-notes")
 	delete(proj, ".agents/skills/gabo-agent-host")
 	u := codexUser()
 	delete(u.links, codexUserLink)
 	rep := runCodex(t, proj, u, "1.2.3")
 	wantFailed(t, rep,
-		"✗ skill link .agents/skills/gabo-wave-report missing",
+		"✗ skill link .agents/skills/gabo-reviewer-notes missing",
 		"✗ skill link .agents/skills/gabo-agent-host missing",
 		"✗ reviewer link "+codexUserLink+" missing")
 }

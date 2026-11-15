@@ -1,0 +1,5 @@
+exit 1
+error: ""
+--- stdout
+✗ /src/p/gabo.yaml: runtimes.reviewer: must be one of "claude", "codex", "pi", "opencode", got "bar"; next: set one of them (the reviewer scripts run only these engines) or ask your agent to configure the reviewer with gabo-reviewer-config
+next: fix the keys above, then rerun gabo check

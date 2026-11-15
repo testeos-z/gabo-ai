@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0012-design-norms-template](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-07. All 5 task issues are closed (5 completed); see the intent status row. Tasks are in the tracker under [#374](https://github.com/testeos-z/gabo-ai/issues/374). |
 | owner | gabo-dev-lead |
 | date | 2026-11-06 |
 

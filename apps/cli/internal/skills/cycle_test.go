@@ -86,30 +86,29 @@ func TestCoderSendsTheEngineOnlyUnderSession(t *testing.T) {
 	t.Parallel()
 	skill := readCatalog(t, "gabo-coder/SKILL.md")
 	requireIn(t, "gabo-coder/SKILL.md", skill, []string{
-		"request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`",
+		"exactly `PR #<n> head <40-hex pushed sha>`",
 		"`PR #<n> head <40-hex pushed sha> engine <engine>`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 		"your session engine", "`gabo-engine:`",
 	})
 	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
 	requireIn(t, "gabo-coder template", tmpl, []string{
-		"launch it with exactly `PR #<n> head <40-hex sha>`",
+		"build the request `PR #<n> head <40-hex sha>`",
 		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 	})
 }
 
-// Intent 0013 S11 (plan T8): the reviewer relay and the reviewer notes
-// describe the optional engine field; the relay passes it as an argument.
+// Intent 0013 S11 (plan T8): the coder and the reviewer notes
+// describe the optional engine field; the coder passes it as an argument.
 func TestReviewerDescribesTheOptionalEngineField(t *testing.T) {
 	t.Parallel()
-	tmpl := agentTemplates(t)[templatesPrefix+"gabo-reviewer.md"]
-	requireIn(t, "gabo-reviewer template", tmpl, []string{
-		"`PR #<n> head <sha> engine <engine>`",
+	tmpl := agentTemplates(t)[templatesPrefix+"gabo-coder.md"]
+	requireIn(t, "gabo-coder template", tmpl, []string{
+		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"`^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
 		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
-		"as an argument, never as environment",
 	})
 	notes := readCatalog(t, "gabo-reviewer-notes/SKILL.md")
 	requireIn(t, "gabo-reviewer-notes/SKILL.md", notes, []string{
@@ -141,7 +140,7 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	const (
-		claim   = "`intent claimed by session <session id> (engine <engine>)`"
+		claim   = "`intent claimed by session <session id> (engine <engine>) run <run id>`"
 		refusal = "`intent <I####> is claimed by session <session id> (engine <engine>) since <UTC time>; it is released when that wave closes`"
 		release = "`intent released by session <session id>`"
 		owner   = "`intent released by owner for session <session id>`"
@@ -149,7 +148,7 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
 		"intent 0013 S8",
 		// the session id: made once per wave start, kept in the trace.
-		"`<engine>-<8 hex>`", "once per wave start", "`gabo/trace/<wave>`",
+		"`<engine>-<8 hex>`", "once per wave start", "`gabo/trace/<run id>`",
 		// the claim goes through existing operations on the intent issue.
 		"`log progress`", "`read one`", "on the intent issue", claim,
 		"no new `tasks` operation (D4)",
@@ -166,7 +165,7 @@ func TestCycleClaimsItsIntentBeforeAnyTask(t *testing.T) {
 		// the trace is shared: a resume keeps a claim only with its own id,
 		// and a refused session writes nothing to it.
 		"`resume <session id>`", "never adopted on its own",
-		"that id equals the session id in the trace", "never adopting the trace's id",
+		"that id equals the session id in the trace", "never adopting the trace's session id",
 		"`session id: <session id>`", "a refused session writes nothing to the trace",
 		// one refusal form; an owner release stops the next coder launch.
 		"returns only three lines", "re-checks it with `read one` before each coder launch",
@@ -208,7 +207,7 @@ func TestCycleKeepsAndCleansOnlyItsOwnWave(t *testing.T) {
 		"`<repo-parent>/<repo-name>-worktrees/<wave>/<task>`",
 		"`git worktree add <repo-parent>/<repo-name>-worktrees/<wave>/<task> -b <branch> origin/dev`",
 		// the sweep touches only this wave's ledger.
-		"only entries of this wave's ledger (`gabo/ledger/<wave>`)",
+		"only entries of this wave's ledger (`gabo/ledger/<run id>`)",
 		"A resource of another wave",
 		"is neither removed nor reported as a leftover of this wave",
 	})
@@ -239,32 +238,125 @@ func lineWith(t *testing.T, doc, s string) string {
 	return ""
 }
 
-// Intent 0013 S18, D12 (plan T21): on a Pi main session the assistant loads
-// this skill in that session; the session engine is the block line (S16) and
-// each coder is one first-level `subagent_run`.
-func TestCycleRunsInThePiMainSession(t *testing.T) {
+// Intent 0015 S1, S4, S5, D1 (plan T4; supersedes intent 0013 S18 for every
+// engine): the main session loads this skill on every engine; "return to the
+// assistant" means continuing with its Wave Close; each coder is one
+// first-level in-process subagent; no sentence names a `gabo-cycle` subagent
+// or agent file, and no rule on where the cycle runs names one engine.
+func TestCycleRunsInTheMainSession(t *testing.T) {
 	t.Parallel()
 	doc := readCatalog(t, "gabo-cycle/SKILL.md")
 	_, act, _ := strings.Cut(doc, "## Activation Contract")
 	act, _, _ = strings.Cut(act, "\n## ")
 	requireIn(t, "gabo-cycle Activation Contract", act, []string{
-		"Load in the `gabo-cycle` subagent on Claude Code, Codex and OpenCode",
-		"on a Pi main session, in that main session itself",
-		"`gabo-assistant` loads this skill there and runs it with the same inputs",
-		"a gentle-pi subagent gets no `subagent_*` tools (intent 0013 S18, D12)",
+		"Load in the main session, on every engine: `gabo-assistant` loads this skill there and runs it with the same inputs",
+		"\"return to the assistant\" means continue with the assistant's Wave Close in the same session",
 	})
 	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
-		// session engine from the block line there.
-		"On a Pi main session your session engine is the block's fixed session-engine line (`pi`, intent 0013 S16), not an agent file",
-		// coders as first-level subagent runs.
-		"On a Pi main session each coder is one first-level `subagent_run` of that session",
-		// what wakes the session for steps 6 and 7.
-		"gentle-pi delivers each finished subagent's result to that session and wakes it (gentle-pi 4.5.1 completion notice)",
-		"a run in task mode returns only when the coder ends",
-		"each wake is the next outcome of step 6",
+		"the engine of your main-session entry: the `gabo-engine:` line of your built agent file (`{{engine}}`, intent 0013 S6) or the fixed session-engine line of the block",
+		"each coder is one first-level in-process subagent of the main session, and its handle goes to the ledger",
+		"never a named teammate in its own pane unless the owner asks",
+		"a compacted or restarted main session resumes the wave from the tracker, the ledger and the trace, without asking the owner to repeat anything",
+		"Between coders the session ends its turn and never polls",
 	})
-	step5 := lineWith(t, doc, "5. Per task:")
-	if !strings.Contains(step5, "on a Pi main session one first-level `subagent_run`") {
-		t.Error("gabo-cycle step 5: the coder launch does not name the Pi first-level `subagent_run`")
+	for _, s := range []string{
+		"`gabo-cycle` subagent", "`gabo-cycle` agent", "subagent_run", "subagent_continue", "gentle-pi", "On a Pi main session",
+		"on a Pi main session", "Claude Code, Codex and OpenCode",
+	} {
+		if strings.Contains(doc, s) {
+			t.Errorf("gabo-cycle/SKILL.md: must not say %q", s)
+		}
 	}
+	step5 := lineWith(t, doc, "5. Per task:")
+	if !strings.Contains(step5, "launch `gabo-coder` as a first-level in-process subagent of this session") {
+		t.Error("gabo-cycle step 5: the coder launch does not name a first-level in-process subagent")
+	}
+}
+
+// Intent 0015 S1: the wave report loads in the main session.
+func TestWaveReportLoadsInTheMainSession(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-wave-report/SKILL.md")
+	requireIn(t, "gabo-wave-report/SKILL.md", doc, []string{"Load in the main session when it runs the `gabo-cycle` skill"})
+	if strings.Contains(doc, "Load in `gabo-cycle`") {
+		t.Error("gabo-wave-report/SKILL.md: still loads in `gabo-cycle`")
+	}
+}
+
+// Intent 0015 S3, S5, PD10 (plan T15): a wave that returns with HANDED tasks
+// says that it keeps its intent claim.
+func TestCycleReturnWithHandedTasksKeepsTheClaim(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"A wave that returns with HANDED tasks says that it keeps its intent claim and that the claim ends with the wave close or the owner's release.",
+	})
+	// the rule it states already holds.
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"The wave closes when every task of that intent is DONE or BLOCKED",
+	})
+}
+
+// Intent 0015 S5, PD11 (plan T16): a resumed holder launches a new coder for
+// a coder that cannot be resumed; the sweep keeps the entries of open tasks.
+func TestCycleResumeLaunchesANewCoderForAnUnresumableOne(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	step3 := lineWith(t, doc, "3. Resume (D17)")
+	requireIn(t, "gabo-cycle step 3", step3, []string{
+		"a coder handle that cannot be resumed (no transcript after a session close or restart)",
+		"launch a new `gabo-coder` on the ledger worktree and branch with the same input as a first launch (task, worktree path, branch, mode)",
+		"`PR #<n> merged` when `repository_host` shows the PR merged",
+		"when the PR is `CONFLICTING`, with the instruction to run the coder's `CONFLICTING` fix round (merge `origin/dev` into the task branch, never a rebase, never a force-push, resolve the conflict, run the task's checks, push, request a new review)",
+		"read the PR status and the latest reviewer comment and continue from them",
+		"When the worktree or the branch is already gone and the PR is merged, the new coder runs the Task Close from the main checkout (verify the merge through `repository_host`, close the issue with DONE via PR; nothing else to remove)",
+		"give it the main checkout path (your own working directory) in its input",
+		"the new coder recreates it in the main checkout with `git worktree add <worktree path> <branch>`",
+		"The new coder is the only writer of DONE",
+	})
+	coder := lineWith(t, doc, "The coder owns its task close")
+	if strings.Contains(coder, "its merged task stays open") || strings.Contains(coder, "leaves its entry to the fallback sweep") {
+		t.Errorf("gabo-cycle coder rule still leaves a merged task open: %q", coder)
+	}
+	requireIn(t, "gabo-cycle coder rule", coder, []string{"the holder launches a new `gabo-coder` for it (step 3)"})
+}
+
+// The sweep keeps its 0.2.10 rule (only entries no coder could close, only
+// after the PR is merged) and never takes the entry of a task still open.
+func TestCycleSweepKeepsOpenTasks(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	sweep := lineWith(t, doc, "fallback sweep) runs only")
+	requireIn(t, "gabo-cycle sweep rule", sweep, []string{
+		"only for entries no coder could close, only after `repository_host` shows the PR merged",
+		"never removes the worktree or the branch of a task that is neither DONE nor BLOCKED, even when its PR is merged (its issue is open and a coder can still close it, step 3)",
+		"so it takes an entry only after its task is DONE or BLOCKED; a BLOCKED task's issue stays open, and its entries are swept only when its PR is merged, as before",
+	})
+	step7 := lineWith(t, doc, "7. The wave closes when")
+	requireIn(t, "gabo-cycle step 7", step7, []string{
+		"The wave closes when every task of that intent is DONE or BLOCKED",
+		"skip the entries of a task that is neither DONE nor BLOCKED",
+	})
+}
+
+// Existing rules the T16 change must not touch.
+func TestCycleResumeRulesStayPinned(t *testing.T) {
+	t.Parallel()
+	doc := readCatalog(t, "gabo-cycle/SKILL.md")
+	requireIn(t, "gabo-cycle/SKILL.md", doc, []string{
+		"3. Resume (D17), only as the holder: read `gabo/trace/<run id>` and `gabo/ledger/<run id>`",
+		"The cycle skips DONE tasks (closed issues).",
+		"An open PR (`repository_host` read status) or a live ledger worktree ⇒ reattach: resume its coder by its handle, or launch a new coder on that worktree and branch.",
+		"When tracker, host and trace disagree (for example the trace says HANDED and the issue has no PR), record the disagreement in the report and leave that task alone; never guess.",
+		"The coder owns its task close and is the only writer of DONE (D23); the cycle never writes DONE. A coder that gets `merge=merged` closes on its own",
+		"a resume keeps a claim only when the assistant passes `resume <session id>` and that id equals the session id in the trace",
+		"The holder keeps its claim on resume",
+		"Skip `worktree.keep` entries. A removal that fails is REFUSED",
+	})
+	coder := readCatalog(t, "gabo-coder/SKILL.md")
+	requireIn(t, "gabo-coder/SKILL.md", coder, []string{
+		"`verdict=clean merge=skipped`, PR `CONFLICTING`",
+		"`verdict=clean merge=merged`",
+		"run it from the main checkout, the parent of",
+	})
 }

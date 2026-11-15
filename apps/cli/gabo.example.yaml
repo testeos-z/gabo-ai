@@ -4,6 +4,7 @@
 # gabo merges up to two layers, lowest to highest precedence
 # (there is no system layer: /etc/gabo/gabo.yaml is never read):
 #   1. user:    $XDG_CONFIG_HOME/gabo/config.yaml, else ~/.config/gabo/config.yaml
+#               (profile.yaml beside it is no layer: setup's sync mode reads it, not gabo)
 #   2. project: gabo.yaml at the git top-level of the current directory
 #               (the current directory itself outside a git repository)
 # A higher layer overrides only the keys it sets: mappings merge key by key,

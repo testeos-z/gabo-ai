@@ -334,9 +334,6 @@ func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(project, ".gabo"), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(project, ".gabo", "VERSION"), []byte("1.2.3\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
 		// The assistant is OpenCode, so a config already holding gabo's
 		// default_agent and experimental.subagent_depth keeps init from
 		// writing to the project.
@@ -344,6 +341,17 @@ func TestInitInstallsReviewerUnderHomeWhenXDGUnsetOrRelative(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(filepath.Join(project, ".opencode", "opencode.json"), []byte("{\"default_agent\": \"gabo-assistant\", \"experimental\": {\"subagent_depth\": 3}}\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		// A first init stamps the catalog version and content hash, so the
+		// second one finds a current project.
+		first := newRootCommand(deps{version: "1.2.3"})
+		first.SetOut(&bytes.Buffer{})
+		first.SetArgs([]string{"init"})
+		if err := first.Execute(); err != nil {
+			t.Fatalf("XDG_DATA_HOME=%q: first init: %v", xdg, err)
+		}
+		if err := os.RemoveAll(filepath.Join(home, ".local")); err != nil {
 			t.Fatal(err)
 		}
 		before := snapshot(t, project)

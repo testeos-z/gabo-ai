@@ -8,18 +8,21 @@ metadata:
 ---
 ## Activation Contract
 
-Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git worktree. The cycle gives you the wave id, the task, the worktree, the branch and the mode; the worktree is `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, inside your wave's folder (intent 0013 S9, D6). Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
+Load in a `gabo-coder` subagent launched by the main session (the assistant that runs the `gabo-cycle` skill) for one task in one git worktree. The assistant gives you the wave id, the task, the worktree, the branch and the mode; the worktree is `<repo-parent>/<repo-name>-worktrees/<wave>/<task>`, inside your wave's folder (intent 0013 S9, D6). Before reading code, load the `methodology` slot adapter under its fixed name `gabo-methodology` (`slots.methodology.adapter`) and build the way it says; this skill carries no methodology of its own. Use the `tasks` and `repository_host` adapters for issue and PR operations.
 
 ## Hard Rules
 
 - Never merge, approve or set commit statuses; the reviewer does that.
 - Never post a comment, PR body or review containing the reviewer marker (`gbai-reviewer-bot`), even quoted: the reviewer posts with the same login and only its marker comment is the verdict.
-- Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Closes #<n>`. On a base that is not the default branch the keyword closes nothing; the Task Close does. Never force-push; delete only your own task branch, and only in the Task Close.
+- Open the PR to `repo.integration_branch` (`dev`), never `main`, through `repository_host` (open PR), with a body that links the task as `Refs #<n>` on every base, never with a closing keyword: a closing keyword that merges into the default branch closes the task before the Task Close removes its worktree and labels, and the Task Close is the only writer of DONE (TRD D23). Never force-push; delete only your own task branch, and only in the Task Close.
 - The PR body also holds one line `gabo check impact: <none, with the reason / updated in <file>>` (TRD 8.5): whether the change adds or alters something `gabo check` should verify (an agent file, a runtime skill, the neutral agent spec, a slot contract or a project file gabo writes) and where the check was updated, or why it needs no update.
-- After every push, request one review from the `gabo-reviewer` subagent with exactly `PR #<n> head <40-hex pushed sha>`. Act on the `VERDICT` line it returns; the PR comment holds the findings.
-- Pi exception (intent 0013 S20, D14): On Pi (`gabo-engine: pi`) you run as a gentle-pi subagent with no `subagent_*` tools, so you cannot launch `gabo-reviewer`: validate the request and run the reviewer script yourself, exactly as your agent file says, and act on its `VERDICT` line as on the relay's reply; on every other engine you launch the `gabo-reviewer` subagent.
-- Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the reviewer refuses it.
-- Questions go back to the cycle in your outcome; never ask the owner directly.
+- After every push, run the user-level reviewer script yourself from the main checkout, never from your worktree (the caller's `gabo.yaml` names the integration branch the review trusts), exactly as your agent file says, and act on its `VERDICT` line; the request is exactly `PR #<n> head <40-hex pushed sha>` and the PR comment holds the findings.
+- Review engine (intent 0013 S11): only when `runtimes.reviewer` in `gabo.yaml` is `session`, the request is exactly `PR #<n> head <40-hex pushed sha> engine <engine>`, where `<engine>` is your session engine: the `gabo-engine:` value of your built agent (`{{engine}}`), the engine of the wave that launched you. With a fixed `runtimes.reviewer` never add an `engine` field; the script refuses it.
+- A coder whose input carries `turn limit: <n>` stops at it: it commits nothing new and reports `STOPPED at turn limit` with its resources (worktree, branch, containers) and the state of the work; the cycle then pauses the wave. The limit never changes the fix-round cap below.
+- A coder whose input carries `fix round limit: <n>` stops when it has used that many fix rounds in total without a clean review, counting from `fix rounds used: <k>` when the input carries it (a resumed or replacement coder; none means zero): it commits nothing new and reports `STOPPED at fix round limit` with its resources (worktree, branch, containers) and the state of the work; the cycle then pauses the wave. The limit never raises the fix-round cap: "Max 4 fix rounds" below is unchanged. When the review of the head you report is clean at the limit, you do not stop: a clean head at the limit is reported as finished at the limit, not as paused, with the status HANDED (or DONE after the Task Close), the head SHA and the words `finished at the fix round limit (clean head)`; the cycle also accepts `STOPPED at fix round limit` with a clean head SHA and treats it the same way.
+- Done contract (intent 0027 S12): before your first commit, write the done contract on the task issue through the `tasks` adapter (log progress): one line per linked S# with the observable check that proves it (command, input, expected output or exit code); a requirement that no observable check can prove reads `not provable: <reason>`. Re-read the issue to confirm it. When you could not write it, the report says `contract: not run: <reason>`.
+- Questions go back to the assistant in your outcome; never ask the owner directly.
+- Model and approval gate (intent 0026 S2, S3, PD4): the coder takes the model of the engine's configuration and names none; a coder launch the account refuses for its model stops the task with the engine's error on its ledger line, and no other model is tried. A gabo coder opens its PR without the `status:approved` label and stops on no approval gate: the gabo coder contract has no approval-label gate, and gabo never creates, adds or requires that label.
 - You own your task to the end (D23): after the merge you close it yourself (Task Close), and you are the only writer of DONE. Between hand-off and merge stay resumable: end your turn, never poll or wait for the merge.
 
 ## Clean Worktree and Resources
@@ -35,6 +38,7 @@ Load in a `gabo-coder` subagent launched by `gabo-cycle` for one task in one git
 | VERDICT | Action |
 |---|---|
 | `verdict=clean merge=merged` | Run the Task Close now. |
+| `verdict=clean merge=skipped`, PR `CONFLICTING` | Read the PR status through `repository_host` (read PR status): `mergeable` is `CONFLICTING`. Then merge `origin/dev` into the task branch in the worktree (never a rebase, never a force-push), resolve the conflict, run the task's checks, push, and request a new review for the new head; it counts as one fix round. A merge you cannot resolve ends BLOCKED with the question, never HANDED. |
 | `verdict=clean` other merge | Report "needs human merge"; HANDED. You are resumed with `PR #<n> merged` once it merges. |
 | `verdict=blocking` | Fix round: read the latest marker comment, fix, push, request review for the new head. |
 | `verdict=error` | Request once more; a second error ⇒ BLOCKED. |
@@ -44,33 +48,55 @@ Max 4 fix rounds; then label the issue `needs-user`, report BLOCKED with the que
 
 ## Task Close
 
-Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. This is the one exception to working only inside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome: they are entries of your wave's ledger, and the close touches only entries of your own wave's ledger (`gabo/ledger/<wave>`), per intent 0013 S9 and D6. A resource of another wave (a worktree under another `<repo-name>-worktrees/<wave>/` folder, or a branch or container of another wave's task) is neither removed nor reported as a leftover of this wave; `leftovers:` lists only resources of this task (its worktree and branch). Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover.
+Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. Like the review request, this runs outside the worktree: run it from the main checkout, the parent of `git -C <wt> rev-parse --path-format=absolute --git-common-dir`. Touch only the worktree and branch of this task that you reported in your outcome: they are entries of your wave's ledger, and the close touches only entries of your own wave's ledger (`gabo/ledger/<run id>`), per intent 0013 S9 and D6. A resource of another wave (a worktree under another `<repo-name>-worktrees/<wave>/` folder, or a branch or container of another wave's task) is neither removed nor reported as a leftover of this wave; `leftovers:` lists only resources of this task (its worktree and branch). Other coders share that checkout: on a git lock error (`*.lock` exists), retry once before you report a leftover. If your worktree or branch is already gone (a new coder launched after a session restart), the caller gives you the main checkout path in your input: run steps 1 and 2 from it without `git -C <wt>`, skip steps 3 and 4 for what is gone, and list nothing as a leftover for it. With the PR still open and only the worktree gone, recreate it there with `git worktree add <worktree path> <branch>` and continue; with the branch gone too, return the question.
 
 1. Verify through `repository_host` (read status) that the PR is merged into `repo.integration_branch` from your branch, and note its merged head SHA. Not merged, or another base or head branch ⇒ change nothing, report HANDED "not merged".
-2. Close the task issue (`tasks` change status DONE) and re-read it: it must show closed. Retry once, then report it under `unverified:`.
+2. Close the task issue (`tasks` change status DONE), which removes every status label it carries (`status:in-progress`, `status:blocked`, `needs-user`), and re-read it: it must show state closed and no status label. Retry once, then report it under `unverified:`, naming each status label that survives.
 3. Remove the worktree only if all hold, else keep it and its local branch, list them under `leftovers:` and skip the local branch in step 4:
    - it is not in `worktree.keep` (`gabo.yaml`);
    - `git -C <wt> status --porcelain --ignored=matching`, run before any removal, shows only committed work and rebuildable output (removal deletes ignored files);
    - `git worktree remove <wt>` succeeds, never `--force`.
-4. Delete the branch through `repository_host` (delete branch). A refused branch goes under `leftovers:`.
+4. Delete the branch through `repository_host` (delete branch): the local branch always, and in `mode: auto`, after the merge, the remote branch of the merged task the workflow created. It never deletes any other remote branch nor a branch the workflow did not create. A refused branch goes under `leftovers:`. When the engine asks about deleting the merged remote branch or refuses it, do not retry it by another route (no API call, no force push, no other delete): list it under `leftovers:` as `merged remote branch left (<reason>)` with the exact command `git push origin --delete <branch>` for the owner, and the task still closes (step 2 unchanged). A delete that succeeds leaves no leftover.
 5. Containers stay: the cycle removes them from the ledger.
+
+### Fresh-context verifier
+
+Fixed gabo rule (intent 0027 S28), no configuration. When the change alters behavior, run a fresh-context verifier before you open the PR, after your own checks pass and the head is committed. When the change alters no behavior (documentation or text only), skip it and report `verifier: not applicable: no behavior change`.
+
+- Launch it through your engine's subagent mechanism, or, with no such mechanism, as a separate fresh session; it runs on your engine in a fresh context and gabo pins no model for it (intent 0027 Q34). Start a separate session only in the engine's read-only mode (no write tool), with the worktree as its working directory and a time limit of 10 minutes. When your engine offers neither path (your tool list has no subagent tool and no read-only fresh session can be started), do not run the check in your own conversation: report `verifier: not run: <reason>` and name the missing launch path under open questions. It starts without your conversation: give it only the task issue, the done contract, the worktree path, the diff range and the command forms to run.
+- It exercises the changed behavior and the two nearest neighboring flows (the existing behavior that shares the code you changed), reports the commands it ran and what it saw for the changed behavior and for each of the two flows, and lists each behavior that does not match a linked S# or a done-contract line.
+- It runs in the worktree as is, changes no file and leaves no scratch there (its scratch goes in a `mktemp -d` dir), and never approves or blocks: it reports, you decide. The reviewer stays the only merge gate.
+- A difference it reports that nobody asked for is a regression: fix it and pin it with a test before the PR. Put the report in the outcome as `verifier: <commands and what it saw>`, with one result per flow and each mismatch against the S# or the done contract.
 
 ## Output Contract
 
 The outcome to the cycle (TRD 9.2) holds, in this order:
 
 - `status`: `HANDED` (review clean, you stay resumable), `BLOCKED` (with the reason) or, only after the Task Close, `DONE`;
-- task id and the PR link (number and URL, the PR that carries `Closes #<n>`), with the last reviewed SHA;
+- task id and the PR link (number and URL, the PR that carries `Refs #<n>`), with the last reviewed SHA;
 - a one-paragraph summary of the change;
 - open questions for the cycle, each with what it blocks;
 - resources created: worktrees, branches, containers and test databases, so the cycle can add them to the wave ledger;
 - fix rounds used (at most 4);
-- the `methodology` adapter's per-task report.
+- the methodology report block below, then the `methodology` adapter's per-task report.
+
+### Methodology report block
+
+The outcome carries this methodology report block (intent 0027 S1, S2, S8, S12, S15, S18, S28), one line per item, in this order. A field you did not produce reads `not run: <reason>`, never as a pass; a field is never left out.
+
+- Test evidence: `odd: RED <test name and failure>; GREEN <test name and run>`, or, when no relevant deterministic test exists, `odd: exception: <reason>; checks: <proportional checks run>` (no RED or GREEN is claimed).
+- Spec lines: one line for every S# the task links, each `spec S<n>: covered` (with the acceptance criteria you verified) or `spec S<n>: not covered: <reason>`.
+- Done contract: `contract: written on the task issue` (the lines of the Hard Rule above), or `contract: not run: <reason>`.
+- Tests: `tests: <test name>: <result>` for the unit test of each changed rule; and, where the task crosses a boundary (a CLI command, a file, a skill that runs a command), `integration: <test name>: <result>` through the public interface, or `integration: not applicable: <reason>`.
+- Checks: for each command of `review.checks` in `gabo.yaml`, the line `check: <command line as listed in review.checks>`, its pasted output, then an `exit: <n>` line. The gate reads shape and command identity; the reviewer's own run stays the proof.
+- Commits: `commits: <sha> <message>` for each work-unit commit.
+- Verifier: `verifier: <commands and what it saw>` (the Fresh-context verifier rule above), or `verifier: not applicable: no behavior change`.
+- Review outcome: `RDD: <granted|declined|passive|off|unavailable>`, with `risk` and `review_due_reason` for each assessed commit.
 
 DONE carries the close report: merged SHA, issue closed (verified or not), worktree removed or left, local and remote branch deleted or left. Then always:
 
 ```
-leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output>
+leftovers: <none | one path per line from status --ignored=matching that is not committed work or rebuildable output, and each merged remote branch left (<reason>) with its command>
 containers: <none | name and image of every container you created>
 unverified: <none | each tracker or host write whose re-read did not show it>
 resources: <worktree path, branch, and any test database you created>

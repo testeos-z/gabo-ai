@@ -1,0 +1,308 @@
+#!/usr/bin/env bash
+# Tests for wave-record.sh (intent 0024 S1, S2): every run uses a fake HOME and
+# XDG_STATE_HOME under one mktemp -d directory.
+
+src="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+script="$src/wave-record.sh"
+failures=0
+passes=0
+unset GABO_WAVE_ID XDG_STATE_HOME
+work="$(mktemp -d "${TMPDIR:-/tmp}/gabo-wave-record-test.XXXXXX")"
+export HOME="$work/home"
+mkdir -p "$HOME"
+export XDG_STATE_HOME="$work/state"
+waves="$XDG_STATE_HOME/gabo/waves"
+
+expect_eq() {
+  if [[ "$2" == "$1" ]]; then
+    echo "ok    $3"
+    passes=$((passes + 1))
+  else
+    echo "FAIL  $3"
+    echo "      want: $1"
+    echo "      got:  $2"
+    failures=$((failures + 1))
+  fi
+}
+
+expect_match() {
+  if grep -Eq -- "$1" <<<"$2"; then
+    echo "ok    $3"
+    passes=$((passes + 1))
+  else
+    echo "FAIL  $3"
+    echo "      want match: $1"
+    echo "      got: $2"
+    failures=$((failures + 1))
+  fi
+}
+
+run() { sh "$script" "$@" 2>&1; }
+
+echo "# the script"
+[[ -f "$script" ]] || { echo "FAIL  wave-record.sh is missing"; echo "1 failed"; exit 1; }
+expect_eq "" "$(sh -n "$script" 2>&1)" "sh -n is clean"
+if command -v dash >/dev/null 2>&1; then
+  expect_eq "" "$(dash -n "$script" 2>&1)" "dash -n is clean"
+fi
+
+echo "# stamp"
+RFC='[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z'
+out="$(run --wave w1 stamp wave-started)"
+expect_match "^wave-started $RFC\$" "$out" "stamp prints <event> <time>"
+expect_eq "$out" "$(cat "$waves/w1/stamps")" "stamp appends the printed line"
+out="$(run --wave w1 stamp session-started coder-a T1)"
+expect_match "^session-started coder-a T1 $RFC\$" "$out" "session-started keeps its args"
+expect_match "^pr-opened 7 $RFC\$" "$(run --wave w1 stamp pr-opened 7)" "pr-opened"
+expect_match "^pr-merged 7 $RFC\$" "$(run --wave w1 stamp pr-merged 7)" "pr-merged"
+expect_match "^wave-reported $RFC\$" "$(run --wave w1 stamp wave-reported)" "wave-reported"
+expect_eq "5" "$(wc -l <"$waves/w1/stamps" | tr -d ' ')" "one line per stamp"
+out="$(GABO_WAVE_ID=w2 sh "$script" stamp wave-started 2>&1)"
+expect_match "^wave-started $RFC\$" "$out" "GABO_WAVE_ID gives the wave id"
+
+expect_eq "$out" "$(cat "$waves/w2/stamps")" "GABO_WAVE_ID writes its own folder"
+
+run --wave w1 stamp bogus-event >/dev/null
+expect_eq "2" "$?" "an unknown event exits 2"
+expect_eq "5" "$(wc -l <"$waves/w1/stamps" | tr -d ' ')" "an unknown event writes nothing"
+
+echo "# stamp incident (intent 0030 S13)"
+out="$(run --wave w3 stamp incident T14 838 reviewer)"
+expect_match "^incident T14 838 reviewer $RFC\$" "$out" "incident prints <task> <pr> <who> <time>"
+expect_eq "$out" "$(cat "$waves/w3/stamps")" "incident appends the printed line"
+expect_eq "incident T15 839 assistant 2026-11-14T10:00:00Z" "$(run --wave w3 stamp incident T15 839 assistant --at 2026-11-14T10:00:00Z)" "incident keeps its own --at time"
+run --wave w3 stamp incident T14 838 nobody >/dev/null
+expect_eq "2" "$?" "incident with an unknown finder exits 2"
+run --wave w3 stamp incident T14 PR838 owner >/dev/null
+expect_eq "2" "$?" "incident with a non-numeric PR exits 2"
+run --wave w3 stamp incident T14 owner >/dev/null
+expect_eq "2" "$?" "incident without a PR exits 2"
+expect_eq "2" "$(wc -l <"$waves/w3/stamps" | tr -d ' ')" "a refused incident writes nothing"
+sh "$script" stamp wave-started >/dev/null 2>&1
+expect_eq "2" "$?" "no wave id exits 2"
+expect_eq "wave-record: no wave id" "$(sh "$script" stamp wave-started 2>&1)" "no wave id message"
+
+echo "# wave id guard"
+before="$(find "$work" | sort)"
+for bad in "a/b" ".." "../x" "a b"; do
+  run --wave "$bad" stamp wave-started >/dev/null
+  expect_eq "2" "$?" "id '$bad' is refused"
+done
+expect_eq "$before" "$(find "$work" | sort)" "a refused id writes nothing"
+
+echo "# measures"
+d="$waves/w3"
+mkdir -p "$d"
+cat >"$d/stamps" <<'EOS'
+wave-started 2026-11-12T10:00:00Z
+session-started coder-a T1 2026-11-12T10:01:00Z
+session-started coder-b T2 2026-11-12T10:02:00Z
+session-started coder-a T3 2026-11-12T10:03:00Z
+pr-opened 11 2026-11-12T10:20:00Z
+pr-opened 12 2026-11-12T10:25:00Z
+pr-merged 11 2026-11-12T10:30:00Z
+pr-merged 12 2026-11-12T10:40:00Z
+wave-reported 2026-11-12T11:30:05Z
+EOS
+want="wall time: 5405 s
+session-started coder-a: 2
+session-started coder-b: 1
+pr-opened: 2
+pr-merged: 2"
+m1="$(run --wave w3 measures)"
+expect_eq "$want" "$m1" "two coders, two merged PRs"
+expect_eq "$m1" "$(run --wave w3 measures)" "the same input twice gives the same output"
+case "$m1" in *"~"*) expect_eq "no tilde" "tilde" "no ~ in output" ;; *) expect_eq "ok" "ok" "no ~ in output" ;; esac
+
+d="$waves/w4"
+mkdir -p "$d"
+printf 'session-started coder-a T1 2026-11-12T10:01:00Z\nwave-reported 2026-11-12T11:00:00Z\n' >"$d/stamps"
+expect_match "^wall time: unknown \(no wave-started stamp\)\$" "$(run --wave w4 measures | head -1)" "no wave-started reads unknown"
+
+expect_match "^wall time: unknown \\(no wave-started stamp\\)\$" "$(run --wave w9 measures | head -1)" "a wave with no stamps reads unknown"
+
+echo "# stamp --at"
+out="$(run --wave at1 stamp pr-opened 7 --at 2026-11-13T09:00:00Z)"
+expect_eq "pr-opened 7 2026-11-13T09:00:00Z" "$out" "--at writes the given time in place of the clock"
+expect_eq "pr-opened 7 2026-11-13T09:00:00Z" "$(cat "$waves/at1/stamps")" "--at appends the printed line"
+expect_eq "wave-reported 2026-11-13T10:00:00Z" "$(run --wave at1 stamp wave-reported --at 2026-11-13T10:00:00Z)" "--at works on an event with no arguments"
+expect_eq "session-started coder-a T1 2026-11-13T08:00:00Z" "$(run --wave at1 stamp session-started coder-a T1 --at 2026-11-13T08:00:00Z)" "--at works on session-started"
+before="$(cat "$waves/at1/stamps")"
+for bad in not-a-time 2026-11-13 2026-11-13T09:00:00 2026-11-13T09:00:00+01:00 ""; do
+  run --wave at1 stamp pr-merged 7 --at "$bad" >/dev/null
+  expect_eq "2" "$?" "--at '$bad' exits 2"
+  expect_eq "$before" "$(cat "$waves/at1/stamps")" "--at '$bad' leaves the stamps file unchanged"
+done
+run --wave at1 stamp pr-merged 7 --at >/dev/null
+expect_eq "2" "$?" "--at without a value exits 2"
+expect_eq "$before" "$(cat "$waves/at1/stamps")" "--at without a value leaves the stamps file unchanged"
+run --wave at-new stamp wave-started --at not-a-time >/dev/null
+expect_eq "2" "$?" "a refused --at on a new wave exits 2"
+expect_eq "no" "$([ -e "$waves/at-new" ] && echo yes || echo no)" "a refused --at on a new wave creates no folder"
+expect_match "^pr-merged 9 $RFC\$" "$(run --wave at1 stamp pr-merged 9)" "without --at the clock time is still written"
+expect_match "usage: stamp" "$(run --wave at1 stamp pr-opened)" "a missing argument still prints the usage"
+run --wave at1 stamp pr-opened >/dev/null
+expect_eq "2" "$?" "a missing argument still exits 2"
+
+echo "# measures with out-of-order stamps"
+d="$waves/w10"
+mkdir -p "$d"
+cat >"$d/stamps" <<'EOS'
+wave-started 2026-11-12T10:00:00Z
+wave-reported 2026-11-12T11:00:00Z
+pr-merged 11 2026-11-12T10:30:00Z
+wave-reported 2026-11-12T11:30:05Z
+pr-opened 11 2026-11-12T10:20:00Z
+EOS
+expect_eq "wall time: 5405 s" "$(run --wave w10 measures | head -1)" "out of order stamps: first wave-started to the last wave-reported"
+d="$waves/w11"
+mkdir -p "$d"
+cat >"$d/stamps" <<'EOS'
+wave-started 2026-11-12T10:00:00Z
+wave-reported 2026-11-12T11:00:00Z
+wave-reported 2026-11-12T11:30:05Z
+EOS
+expect_eq "wall time: 5405 s" "$(run --wave w11 measures | head -1)" "two wave-reported lines in order"
+
+echo "# saves keys with an entry label"
+run --wave s2 saves add 'gabo/trace/I0001-20261113T101500Z#start' 21 >/dev/null
+run --wave s2 saves add 'gabo/trace/I0001-20261113T101500Z#T1' 21 >/dev/null
+expect_eq "2" "$(grep -c '^add ' "$waves/s2/saves")" "two labels of one observation id are two entries"
+run --wave s2 saves read 'gabo/trace/I0001-20261113T101500Z#T1' >/dev/null
+expect_eq "gabo/trace/I0001-20261113T101500Z#start" "$(run --wave s2 saves unverified)" "reading only the later label lists the #start key"
+run --wave s2 saves read 'gabo/trace/I0001-20261113T101500Z#start' >/dev/null
+expect_eq "none" "$(run --wave s2 saves unverified)" "reading both labels prints none"
+
+echo "# caps"
+cproj="$work/capsproj"
+mkdir -p "$cproj"
+caps() { (cd "$cproj" && sh "$script" caps "$@" 2>&1); }
+printf 'wave:\n  max_fix_rounds: 2\n' >"$cproj/gabo.yaml"
+for e in claude codex opencode pi other; do
+  expect_eq "max_fix_rounds: advisory
+spend is not capped by gabo" "$(caps --engine $e)" "max_fix_rounds is advisory on $e"
+done
+printf 'wave:\n  max_coders: 2\n' >"$cproj/gabo.yaml"
+expect_eq "max_coders: enforced by the cycle
+spend is not capped by gabo" "$(caps --engine claude)" "max_coders is enforced by the cycle"
+printf 'review:\n  x: 1\nwave:\n  max_coders: 2 # c\n  max_coder_turns: 30\n  max_fix_rounds: 1\nother:\n  max_coders: 9\n' >"$cproj/gabo.yaml"
+want="max_coders: enforced by the cycle
+max_fix_rounds: advisory
+max_coder_turns: enforced by the engine
+spend is not capped by gabo"
+expect_eq "$want" "$(caps --engine claude)" "all keys on claude, other sections ignored"
+expect_match "^max_coder_turns: advisory\$" "$(caps --engine codex | grep turns)" "max_coder_turns is advisory on codex"
+expect_match "^max_coder_turns: enforced by the engine\$" "$(caps --engine opencode | grep turns)" "max_coder_turns is enforced by the engine on opencode (steps)"
+for e in pi other; do
+  expect_match "^max_coder_turns: advisory\$" "$(caps --engine $e | grep turns)" "max_coder_turns is advisory on $e"
+done
+expect_eq "continue or stop" "$(caps --engine claude --paused | tail -1)" "--paused ends with continue or stop"
+expect_eq "spend is not capped by gabo" "$(caps --engine claude --paused | tail -2 | head -1)" "spend line precedes the paused line"
+printf 'name: x\n' >"$cproj/gabo.yaml"
+expect_eq "spend is not capped by gabo" "$(caps --engine claude)" "no wave key prints only the spend line"
+rm "$cproj/gabo.yaml"
+expect_eq "spend is not capped by gabo" "$(caps --engine claude)" "no gabo.yaml prints only the spend line"
+caps >/dev/null
+expect_eq "2" "$?" "caps without --engine exits 2"
+printf 'wave:\n  max_coders: 2\n' >"$cproj/gabo.yaml"
+h1="$(cksum <"$cproj/gabo.yaml")"
+caps --engine claude --paused >/dev/null
+expect_eq "$h1" "$(cksum <"$cproj/gabo.yaml")" "caps leaves gabo.yaml unchanged"
+expect_eq "gabo.yaml" "$(ls "$cproj")" "caps writes nothing in the project dir"
+
+printf 'wave:\n  max_coder_turns: 30\n' >"$cproj/gabo.yaml"
+expect_match "^max_coder_turns: advisory\$" "$(caps --engine none)" "caps --engine none prints max_coder_turns: advisory"
+rm "$cproj/gabo.yaml"
+
+echo "# saves"
+expect_eq "none" "$(run --wave s1 saves unverified)" "no saves prints none"
+run --wave s1 saves add k/one 11 >/dev/null
+run --wave s1 saves add k/two 12 >/dev/null
+run --wave s1 saves add k/three 13 >/dev/null
+run --wave s1 saves read k/one >/dev/null
+run --wave s1 saves read k/three >/dev/null
+expect_eq "k/two" "$(run --wave s1 saves unverified)" "three adds and two reads print the unread key"
+run --wave s1 saves add k/two 14 >/dev/null
+expect_eq "k/two" "$(run --wave s1 saves unverified)" "a key added twice counts once"
+run --wave s1 saves read k/two >/dev/null
+expect_eq "none" "$(run --wave s1 saves unverified)" "every key read prints none"
+run --wave s1 saves add k/one 15 >/dev/null
+expect_eq "none" "$(run --wave s1 saves unverified)" "a re-add of a read key stays read"
+out="$(run --wave s1 saves read k/never)"
+rc=$?
+expect_eq "2" "$rc" "reading a key never added exits 2"
+expect_match "never added" "$out" "reading a key never added says so"
+run --wave s1 saves add k/onlykey >/dev/null
+expect_eq "2" "$?" "add without an observation id exits 2"
+run --wave s1 saves bogus >/dev/null
+expect_eq "2" "$?" "an unknown saves action exits 2"
+run --wave s1 saves add "a b" 1 >/dev/null
+expect_eq "2" "$?" "a key with a space is refused"
+expect_eq "none" "$(run --wave s1 saves unverified)" "a refused add writes nothing"
+expect_eq "" "$(find "$waves/s1" -type f -not -name saves)" "saves writes only its file in the wave folder"
+
+echo "# read-only on gabo.yaml and no stray files"
+proj="$work/proj"
+mkdir -p "$proj"
+printf 'wave:\n  max_coders: 2\n' >"$proj/gabo.yaml"
+h1="$(cksum <"$proj/gabo.yaml")"
+(cd "$proj" && sh "$script" --wave w5 stamp wave-started >/dev/null && sh "$script" --wave w5 measures >/dev/null)
+expect_eq "$h1" "$(cksum <"$proj/gabo.yaml")" "gabo.yaml is unchanged"
+expect_eq "gabo.yaml" "$(ls "$proj")" "nothing new in the project dir"
+expect_eq "" "$(find "$work" -type f -not -path "$waves/*" -not -path "$proj/*" -not -path "$cproj/*")" "no file outside the wave folders"
+
+echo "# outcome (intent 0028 S16: one trace line per lock record)"
+expect_eq "blocked: shell_guard I0028/T4 claude git push --force" \
+  "$(run --wave o1 outcome blocked shell_guard I0028/T4 claude git push --force)" "outcome prints a blocked line with the four fields"
+expect_eq "warned: test_files I0028/T8 claude edit of a test file" \
+  "$(run --wave o1 outcome warned test_files I0028/T8 claude edit of a test file)" "outcome prints a warned line"
+expect_eq "asked: human_only_paths I0028/T7 codex write to gabo.yaml; answer: pending" \
+  "$(run --wave o1 outcome asked --answer pending human_only_paths I0028/T7 codex write to gabo.yaml)" "outcome prints an asked line with its answer"
+expect_eq 'not run: release_gate I0028/T5 pi probe item (a) is not testable' \
+  "$(run --wave o1 outcome not-run release_gate I0028/T5 pi probe item \(a\) is not testable)" "outcome prints a not run line"
+run --wave o1 outcome asked human_only_paths I0028/T7 codex write >/dev/null
+expect_eq "2" "$?" "asked without --answer exits 2"
+run --wave o1 outcome blocked --answer pending shell_guard I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "--answer on a blocked line exits 2"
+run --wave o1 outcome bogus shell_guard I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "an unknown kind exits 2"
+run --wave o1 outcome blocked not_a_lock I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "an unknown lock exits 2"
+run --wave o1 outcome blocked shell_guard "I0028 T4" claude x >/dev/null
+expect_eq "2" "$?" "a task with a space exits 2"
+run --wave o1 outcome blocked shell_guard I0028/T4 claude >/dev/null
+expect_eq "2" "$?" "a line without a rule exits 2"
+run --wave o1 outcome "not run" shell_guard I0028/T4 claude x >/dev/null
+expect_eq "2" "$?" "the quoted kind not run exits 2; the CLI kind is not-run"
+expect_eq "" "$(find "$waves/o1" -type f 2>/dev/null)" "outcome writes no file"
+
+echo "# outcomes (the scratch file the hooks append to)"
+ofile="$work/outcomes.jsonl"
+cat >"$ofile" <<'EOF'
+{"outcome":"blocked","lock":"shell_guard","task":"I0028/T4","engine":"claude","rule":"git push --force","note":"the state was ask; mode auto blocks instead of prompting"}
+{"outcome":"asked","lock":"human_only_paths","task":"I0028/T7","engine":"codex","rule":"write to \"gabo.yaml\"","answer":"pending"}
+{"outcome":"warned","lock":"test_files","task":"I0028/T8","engine":"opencode","rule":"edit of a test file"}
+{"outcome":"warned","lock":"shell_guard","task":"I0028/T9","engine":"claude","rule":"grep 'a\\b' \\ x"}
+EOF
+expect_eq "blocked: shell_guard I0028/T4 claude git push --force; note: the state was ask; mode auto blocks instead of prompting
+asked: human_only_paths I0028/T7 codex write to \"gabo.yaml\"; answer: pending
+warned: test_files I0028/T8 opencode edit of a test file
+warned: shell_guard I0028/T9 claude grep 'a\b' \ x" "$(run --wave o1 outcomes "$ofile")" "outcomes prints one line per record, in file order, unescaping quotes"
+expect_eq "" "$(run --wave o1 outcomes "$work/absent.jsonl")" "a missing file prints nothing"
+sh "$script" --wave o1 outcomes "$work/absent.jsonl" >/dev/null 2>&1
+expect_eq "0" "$?" "a missing file exits 0"
+printf 'not a record\n' >"$work/bad.jsonl"
+run --wave o1 outcomes "$work/bad.jsonl" >/dev/null
+expect_eq "1" "$?" "an unreadable record exits 1"
+run --wave o1 outcomes >/dev/null
+expect_eq "2" "$?" "outcomes without a file exits 2"
+expect_eq "" "$(find "$waves/o1" -type f 2>/dev/null)" "outcomes writes no file"
+
+echo
+echo "$passes passed, $failures failed"
+if ((failures)); then
+  echo "kept $work for inspection"
+  exit 1
+fi
+rm -rf -- "$work"
+echo "all tests passed"

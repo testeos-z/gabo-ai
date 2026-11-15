@@ -4,6 +4,9 @@
 #   reviewer.sh head <pr> <sha>      reviews that head (40-hex) if it is due
 #   reviewer.sh due <pr> <sha>       exit 0 when that head is due, else 1
 #   reviewer.sh list-due             prints "<pr> <sha>" for each due head
+#   reviewer.sh prune                removes the <owner>__<repo>__pr-<n> worktrees of PRs that are not open and
+#                                    the stale ones (REVIEWER_KEEP_DAYS) and keeps the caches under
+#                                    REVIEWER_CACHE_MAX; also runs at the start of head
 #   reviewer.sh once                 reviews every due head, one at a time
 # Every mode takes a trailing `engine <claude|codex|pi|opencode>`, required
 # when runtimes.reviewer (or REVIEWER_ENGINE) is `session` and refused
@@ -26,10 +29,10 @@ source "$(dirname "$0")/common.sh"
 HEAD_SCRIPT="$reviewer_dir/review-head.sh"
 mode="${1:-}"
 usage() {
-  echo "usage: reviewer.sh preflight|once|list-due|due <pr> <sha>|head <pr> <40-hex sha> [engine <engine>]" >&2
+  echo "usage: reviewer.sh preflight|prune|once|list-due|due <pr> <sha>|head <pr> <40-hex sha> [engine <engine>]" >&2
   exit 2
 }
-[[ "$mode" =~ ^(once|preflight|list-due|due|head)$ ]] || usage
+[[ "$mode" =~ ^(once|preflight|list-due|due|head|prune)$ ]] || usage
 nargs=1
 if [[ "$mode" == due || "$mode" == head ]]; then
   is_number "${2:-}" && [[ "${3:-}" =~ ^[0-9a-f]{40}$ ]] || usage
@@ -127,7 +130,21 @@ review_head() {
   local log="$STATE/logs/head-$1.log" code=0 verdict merge outcome
   # The Claude token reaches the child only; review-head.sh moves it out of the
   # environment again and hands it to the review step alone.
-  CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN" run_bounded "$HEAD_TIMEOUT" "$log" bash "$HEAD_SCRIPT" "$1" "$2" || code=$?
+  # The whole run holds cache.lock shared: prune_caches takes it exclusive, so
+  # it never deletes a cache under a running check and a review that starts
+  # during a prune waits for it instead of being skipped.
+  (
+    mkdir -p "$STATE/locks"
+    exec 5>"$STATE/locks/cache.lock"
+    # A bounded wait: a stuck prune never hangs the head. The run itself does
+    # not inherit the descriptor (5>&-), so PR code and the review cannot drop
+    # the lock or keep it.
+    if ! flock -s -w "$HEAD_TIMEOUT" 5; then
+      echo "$(now_utc) RETRY #$1 $2 the cache lock stayed held; run the review again" >"$log"
+      exit 1
+    fi
+    CLAUDE_CODE_OAUTH_TOKEN="$CLAUDE_TOKEN" run_bounded "$HEAD_TIMEOUT" "$log" bash "$HEAD_SCRIPT" "$1" "$2" 5>&-
+  ) || code=$?
   outcome="$(cat "$log")"
   has() { grep -qE "^[^ ]+ $1 #$2( |$)" <<<"$outcome"; }
   grep -E '^[^ ]+ (CONFLICT|UPGRADE-PR|REVIEWED|MERGED|MERGE-SKIPPED|NEEDS-HUMAN-MERGE|MERGE-FAILED|SKIP|RETRY) #' <<<"$outcome" ||
@@ -158,7 +175,13 @@ review_head() {
   return "$code"
 }
 
+# Best effort: a prune problem is logged and never changes a review or its verdict.
+[[ "$mode" != head && "$mode" != prune ]] || prune_worktrees "${2:-}" >/dev/null 2>&1 || true
+# Same for the caches: prints one `pruned:` line only when it trimmed something.
+[[ "$mode" != head && "$mode" != prune ]] || prune_caches 2>/dev/null || true
+
 case "$mode" in
+  prune) exit 0 ;;
   preflight)
     echo "PREFLIGHT-OK repo=$REPO base=$BASE_BRANCH login=$BOT_LOGIN mode=$MODE engine=$ENGINE placement=$PLACEMENT minimum=$MINIMUM"
     exit 0

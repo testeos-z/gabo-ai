@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0009-main-session-defaults-to-the-gabo-assistant](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-07. All 11 task issues are closed (11 completed); see the intent status row. Tasks are in the tracker under [#305](https://github.com/testeos-z/gabo-ai/issues/305). |
 | owner | gabo-dev-lead |
 | date | 2026-11-06 |
 
