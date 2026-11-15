@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0017-any-runtime-engine-without-a-go-change |
-| status | Specified |
+| status | Done on 2026-11-12. Intent issue [#490](https://github.com/testeos-z/gabo-ai/issues/490) is closed as completed; all 4 task issues are closed: all 4 tasks closed as completed; the wave report is in the #490 comments. |
 | owner | gabo-pm |
 | product card | [#171 Runtime integrations](https://github.com/testeos-z/gabo-ai/issues/171) |
 | date | 2026-11-11 |

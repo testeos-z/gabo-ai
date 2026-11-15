@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0007-update-documentation-for-0-2-6](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-04. All 6 task issues are closed (6 completed); see the intent status row. Tasks are in the tracker under [#263](https://github.com/testeos-z/gabo-ai/issues/263). |
 | owner | gabo-dev-lead |
 | date | 2026-11-04 |
 

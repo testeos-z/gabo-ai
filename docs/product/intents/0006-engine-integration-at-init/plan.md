@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0006-engine-integration-at-init](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-11. All 12 task issues are closed (11 completed); see the intent status row. Tasks are in the tracker under [#261](https://github.com/testeos-z/gabo-ai/issues/261). |
 | owner | gabo-dev-lead |
 | date | 2026-11-04 |
 

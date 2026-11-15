@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0006-engine-integration-at-init |
-| status | Accepted |
+| status | Done on 2026-11-11. Intent issue [#261](https://github.com/testeos-z/gabo-ai/issues/261) is closed as completed; all 12 task issues are closed: 11 tasks closed as completed with merged PRs; the owner-machine verification T11 #274 was closed as not planned on the owner's decision of 2026-11-11 ("closed unverified"; code merged in `main` and shipped in gabo 0.2.10). |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-04 |

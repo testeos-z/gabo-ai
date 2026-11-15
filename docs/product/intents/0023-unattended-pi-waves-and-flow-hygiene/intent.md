@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0023-unattended-pi-waves-and-flow-hygiene |
-| status | Specified |
+| status | Done on 2026-11-13. Intent issue [#575](https://github.com/testeos-z/gabo-ai/issues/575) is closed as completed; all 26 task issues are closed: all 26 tasks closed as completed with merged PRs, except T12 #596 (the one-off label cleanup), done without a PR as recorded in its comments. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) |
 | date | 2026-11-12 |

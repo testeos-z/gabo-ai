@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0018-config-sync](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-11. All 4 task issues are closed (4 completed); see the intent status row. Tasks are in the tracker under [#493](https://github.com/testeos-z/gabo-ai/issues/493). |
 | owner | gabo-dev-lead |
 | date | 2026-11-11 |
 

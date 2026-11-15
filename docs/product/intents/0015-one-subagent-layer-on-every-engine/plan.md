@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0015-one-subagent-layer-on-every-engine](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-12. All 18 task issues are closed (18 completed); see the intent status row. Tasks are in the tracker under [#474](https://github.com/testeos-z/gabo-ai/issues/474). |
 | owner | gabo-dev-lead |
 | date | 2026-11-11 |
 

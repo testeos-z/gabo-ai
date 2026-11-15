@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0015-one-subagent-layer-on-every-engine |
-| status | Accepted |
+| status | Done on 2026-11-12. Intent issue [#474](https://github.com/testeos-z/gabo-ai/issues/474) is closed as completed; all 18 task issues are closed: all 18 tasks closed as completed; the wave report is in the #474 comments. |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-11 |

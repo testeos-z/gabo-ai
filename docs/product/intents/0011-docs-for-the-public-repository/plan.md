@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0011-docs-for-the-public-repository](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-06. All 4 task issues are closed (4 completed); see the intent status row. Tasks are in the tracker under [#355](https://github.com/testeos-z/gabo-ai/issues/355). |
 | owner | gabo-dev-lead |
 | date | 2026-11-06 |
 

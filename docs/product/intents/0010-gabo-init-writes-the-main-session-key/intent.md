@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0010-gabo-init-writes-the-main-session-key |
-| status | Accepted |
+| status | Done on 2026-11-07. Intent issue [#354](https://github.com/testeos-z/gabo-ai/issues/354) is closed as completed; all 12 task issues are closed: "All tasks closed; last ones done in PR #449.". |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-06 |

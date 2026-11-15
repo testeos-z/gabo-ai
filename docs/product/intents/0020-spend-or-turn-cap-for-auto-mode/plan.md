@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0020-spend-or-turn-cap-for-auto-mode](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-12. All 7 task issues are closed (7 completed); see the intent status row. Tasks are in the tracker under [#495](https://github.com/testeos-z/gabo-ai/issues/495). |
 | owner | gabo-dev-lead |
 | date | 2026-11-12 |
 

@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0007-update-documentation-for-0-2-6 |
-| status | Accepted |
+| status | Done on 2026-11-04. Intent issue [#263](https://github.com/testeos-z/gabo-ai/issues/263) is closed as completed; all 6 task issues are closed: "All six tasks (#275-#280) are merged into dev and released to main in #302 (gabo 0.2.6).". |
 | owner | gabo-pm |
 | product card | #171 Runtime integrations |
 | date | 2026-11-04 |

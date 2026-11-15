@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0019-talk-to-cloud-agent-sessions](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-12. All 8 task issues are closed (8 completed); see the intent status row. Tasks are in the tracker under [#494](https://github.com/testeos-z/gabo-ai/issues/494). |
 | owner | gabo-dev-lead |
 | date | 2026-11-11 |
 

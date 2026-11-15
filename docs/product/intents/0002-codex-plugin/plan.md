@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0002-codex-plugin](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-11. All 11 task issues are closed (10 completed); see the intent status row. Tasks are in the tracker under [#173](https://github.com/testeos-z/gabo-ai/issues/173). |
 | owner | gabo-dev-lead |
 | date | 2026-11-03 |
 

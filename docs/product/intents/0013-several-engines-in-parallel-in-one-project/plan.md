@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0013-several-engines-in-parallel-in-one-project](intent.md) |
 | spec | [spec](spec.md) |
-| status | Draft |
+| status | Done on 2026-11-07. All 22 task issues are closed (22 completed); see the intent status row. Tasks are in the tracker under [#393](https://github.com/testeos-z/gabo-ai/issues/393). |
 | owner | gabo-dev-lead |
 | date | 2026-11-06 |
 
