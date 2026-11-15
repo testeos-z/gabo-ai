@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0030-agent-evals-when-skills-change |
-| status | The owner accepted the spec on 2026-11-14 (spec section 7; decision 6: the spec only, not this intent and not the plan). The plan may now be written by `gabo-dev-lead`. |
+| status | Done on 2026-11-15. All 18 tasks of #767 are closed (T1 to T18; T18 #891 was added by plan change #890). The first baseline is `evals/baseline/baseline.json` at 35dc79e, 2 of 2 tasks pass (PR #893 fixed the runner; PR #888 holds the first baseline). The eval values are in `gabo.yaml` (PR #894): `pass_threshold` 1.0, cap 300 turns per task run and 10 task runs per eval run. T17 probe results are in the #767 comment 6897705587: S9 and S3 were shown; S10 was not observed in the probe (the reviewer blocked probe PR #895) and the hold is covered by `tests/merge-head.test.sh`. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) (closed; intent issue linked under it, as [#758](https://github.com/testeos-z/gabo-ai/issues/758) was) |
 | intent issue | [#767 I0030: Agent evals when skills change](https://github.com/testeos-z/gabo-ai/issues/767) (its title predates the retitle of decision 15) |

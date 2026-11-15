@@ -3,7 +3,7 @@
 | field | value |
 |---|---|
 | intent id | 0029-branch-protection-on-main-and-dev |
-| status | The owner accepted the spec on 2026-11-14 (spec section 7; decision 6: the spec only, not this intent and not the plan). The plan may now be written by `gabo-dev-lead`. |
+| status | Done on 2026-11-15. All 5 tasks of #766 are closed: T1 #824, T2 #829, T3 #827, T4 #831, T5 #833 (the live setup). Rulesets `gabo-protect-main` (27316519) and `gabo-protect-dev` (27316520) are set on `testeos-z/gabo-ai`; `dev` requires `reviewer/tests` and `reviewer/review`; the administrator role bypasses both. Probe PRs: #885 merged, #886 blocked by the host. Results are in the #766 comments of 2026-11-15. Not observed: the `main` = 1 approvals step (the `gabo.yaml` key is an owner step and is not set) and the owner-login bypass path. |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) (closed; intent issue linked under it, as [#758](https://github.com/testeos-z/gabo-ai/issues/758) was) |
 | intent issue | [#766 I0029: Branch protection on main and dev](https://github.com/testeos-z/gabo-ai/issues/766) |

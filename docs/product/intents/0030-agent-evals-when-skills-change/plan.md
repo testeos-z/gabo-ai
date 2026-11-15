@@ -4,7 +4,7 @@
 |---|---|
 | intent | [0030-agent-evals-when-skills-change](intent.md) |
 | spec | [spec](spec.md) (accepted by the owner on 2026-11-14, section 7) |
-| status | Draft. Not started: no wave runs until the owner orders it. Tasks are in the tracker under [#767](https://github.com/testeos-z/gabo-ai/issues/767). |
+| status | Done. All 18 tasks are closed; see the closing Log line of 2026-11-15. Tasks are in the tracker under [#767](https://github.com/testeos-z/gabo-ai/issues/767). |
 | owner | gabo-dev-lead |
 | date | 2026-11-14 |
 
@@ -152,3 +152,4 @@ Runnable at once (pairwise disjoint): T1, T11, T12. Then T2 after T1, T15 after 
 ## Log
 
 - 2026-11-15: plan change proposed (T18 and PD10): the first baseline is all-fail, suspected because the outcome checks fail on a correct run (T16 #840, PR #888); the cause is not yet confirmed from `checks.log`. T17's `depends_on` gains T18; T16's `unblocks` gains T18. Scope: one intent's plan.
+- 2026-11-15, gabo-pm, intent done (#767): all 18 tasks are closed (T1 to T18; T18 #891 was added by plan change #890). The baseline `evals/baseline/baseline.json` at 35dc79e records 2 of 2 tasks passing (fix in PR #893; first baseline PR #888). The eval values are in `gabo.yaml` (PR #894): `pass_threshold` 1.0, cap 300 turns per task run and 10 task runs per eval run. T17 probe results are in the #767 comment 6897705587: S9 (threshold notice) and S3 were shown; S10 (the automatic merge hold) was not observed in the probe, because the reviewer blocked probe PR #895 (disposable, closed); the hold is covered by `tests/merge-head.test.sh`. Owner acceptance, relayed by the gabo-b assistant (not the owner's words): on 2026-11-15 the owner confirmed directly that owner-pending items proceed with the assistant's recommended option; the not-observed items are accepted under that order.
