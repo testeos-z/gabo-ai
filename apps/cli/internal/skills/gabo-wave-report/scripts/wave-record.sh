@@ -51,9 +51,18 @@ case $cmd in
       fi
     fi
     case $event:$# in
-      wave-started:0 | wave-reported:0 | pr-opened:1 | pr-merged:1 | session-started:2) ;;
-      *) echo "wave-record: usage: stamp wave-started | session-started <agent> <task id> | pr-opened <pr> | pr-merged <pr> | wave-reported" >&2; exit 2 ;;
+      wave-started:0 | wave-reported:0 | pr-opened:1 | pr-merged:1 | session-started:2 | incident:3) ;;
+      *) echo "wave-record: usage: stamp wave-started | session-started <agent> <task id> | pr-opened <pr> | pr-merged <pr> | incident <task id> <pr> owner|assistant|reviewer | wave-reported" >&2; exit 2 ;;
     esac
+    if [ "$event" = incident ]; then
+      case $3 in
+        owner | assistant | reviewer) ;;
+        *) echo "wave-record: stamp incident: who is owner, assistant or reviewer" >&2; exit 2 ;;
+      esac
+      case $2 in
+        '' | *[!0-9]*) echo "wave-record: stamp incident: the PR is a number" >&2; exit 2 ;;
+      esac
+    fi
     mkdir -p "$dir"
     line="$event${*:+ $*} ${at:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
     echo "$line" >>"$stamps"
