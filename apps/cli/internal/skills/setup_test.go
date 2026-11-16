@@ -442,3 +442,44 @@ func TestSetupAsksTheWaveCaps(t *testing.T) {
 		"pauses and asks to continue or stop",
 	})
 }
+
+// Issue #904: the review.checks question states the fresh worktree, clean
+// environment and missing install step, and suggests the lockfile install
+// command first; the integration branch is verified and REVIEW.md is offered.
+func TestSetupWarnsAboutFreshTreeAndInstallStep(t *testing.T) {
+	t.Parallel()
+	requireAll(t, setupDoc(t), []string{
+		"fresh worktree of the merge result",
+		"clean environment",
+		"nothing is installed there",
+		"must install dependencies",
+		"`bun.lock` -> `bun install --frozen-lockfile`",
+		"`package-lock.json` -> `npm ci`",
+		"suggest that install command as the first check",
+	})
+}
+
+func TestSetupVerifiesIntegrationBranchAndOffersReviewPolicy(t *testing.T) {
+	t.Parallel()
+	requireAll(t, setupDoc(t), []string{
+		"Verify `repo.integration_branch` exists",
+		"`git rev-parse --verify <branch>`",
+		"`git ls-remote --heads origin <branch>`",
+		"whether to create it or report it as missing",
+		"needs `REVIEW.md` on the integration branch",
+		"fails closed with no clean verdict",
+		"offer to scaffold",
+		"Never write it without the owner's answer",
+	})
+}
+
+func TestSetupOutputContractListsReviewReadiness(t *testing.T) {
+	t.Parallel()
+	requireAll(t, setupDoc(t), []string{
+		"review readiness",
+		"`REVIEW.md` on the integration branch",
+		"dependency install step",
+		"`repo.integration_branch` existing",
+		"each as done, skipped with its reason, or missing",
+	})
+}
