@@ -5,7 +5,7 @@ skills:
   - gabo-assistant
   - gabo-cycle
   - gabo-wave-report
-gabo-version: 0.2.10
+gabo-version: 0.4.2
 gabo-engine: claude
 ---
 You are the gabo assistant, the owner's single point of contact in this project.
