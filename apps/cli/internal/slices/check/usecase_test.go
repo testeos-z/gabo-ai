@@ -69,6 +69,7 @@ func file(s string) *fstest.MapFile { return &fstest.MapFile{Data: []byte(s)} }
 // Code keys gabo init writes.
 func project() fstest.MapFS {
 	return fstest.MapFS{
+		"REVIEW.md": file("# Review policy\n"),
 		".gabo/VERSION": file("1.2.3\n"),
 		".gabo/skills/gabo-agent-templates/agents.yaml":     file(spec),
 		".gabo/skills/gabo-agent-templates/agents/alpha.md": file("gabo-version: {{gabo_version}}\n"),
