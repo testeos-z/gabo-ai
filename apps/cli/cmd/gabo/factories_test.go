@@ -39,7 +39,8 @@ exit 1`
 
 // S1, S2 through `gabo init`: a fake pi on PATH decides the Pi refusal; the
 // fake logs any call other than `pi list` and init writes no file of its own
-// for the check.
+// for the check. Issue #905: a probe that cannot run still refuses, but
+// names the probe failure instead of the install paragraph.
 func TestInitPiRefusalFollowsThePackageCheck(t *testing.T) {
 	cfg := "runtimes:\n  coder: pi\n  reviewer: pi\n"
 	cases := []struct {
@@ -56,6 +57,7 @@ func TestInitPiRefusalFollowsThePackageCheck(t *testing.T) {
 		{"pi list exits 1", map[string]string{"pi": `if [ "$1" = list ]; then exit 1; fi
 exit 1`}, true},
 	}
+	const probeLine = "gabo refuses to build on Pi: the subagent-package check could not run"
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			project := t.TempDir()
@@ -68,8 +70,16 @@ exit 1`}, true},
 				t.Fatalf("init: %v\n%s", err, out)
 			}
 			const line = "gabo refuses to build on Pi without a subagent package:"
-			if got := strings.Contains(out, line) || strings.Contains(out, engineconfig.SubagentRefusal) || strings.Contains(out, "install a subagent package (see the refusal above)"); got != c.refusal {
+			refused := strings.Contains(out, line) || strings.Contains(out, probeLine) || strings.Contains(out, engineconfig.SubagentRefusal) || strings.Contains(out, "install a subagent package (see the refusal above)")
+			if got := refused; got != c.refusal {
 				t.Errorf("refusal printed = %v, want %v:\n%s", got, c.refusal, out)
+			}
+			if c.name == "other package" {
+				if strings.Contains(out, probeLine) {
+					t.Errorf("probe line with a genuine missing package:\n%s", out)
+				}
+			} else if c.refusal && (!strings.Contains(out, probeLine) || strings.Contains(out, engineconfig.SubagentRefusal)) {
+				t.Errorf("probe failure not named accurately:\n%s", out)
 			}
 			if !strings.Contains(out, "trust the project in Pi") {
 				t.Errorf("trust step missing:\n%s", out)
