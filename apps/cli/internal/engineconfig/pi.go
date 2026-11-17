@@ -35,6 +35,11 @@ func piRule(in Input) Result {
 	if in.PiPackage {
 		return res
 	}
+	if in.PiProbeFailed {
+		res.Section.Lines = append(res.Section.Lines, "gabo refuses to build on Pi: the subagent-package check could not run (`pi list` failed or timed out), so no package could be confirmed")
+		res.Section.Steps = append(res.Section.Steps, "run `pi list` until it exits 0, then rerun gabo init")
+		return res
+	}
 	res.Section.Lines = append(res.Section.Lines, "gabo refuses to build on Pi without a subagent package:", SubagentRefusal)
 	res.Section.Steps = append(res.Section.Steps, "install a subagent package (see the refusal above)")
 	return res

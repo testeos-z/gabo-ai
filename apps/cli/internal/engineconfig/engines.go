@@ -78,6 +78,11 @@ type Input struct {
 	// (intent 0016 S1, D1); piRule then omits the refusal. Unset means no
 	// package, which prints the refusal (S2).
 	PiPackage bool
+	// PiProbeFailed reports that the Pi subagent-package check could not run
+	// (`pi list` missing, failing or timing out, issue #905); piRule then
+	// refuses without the install paragraph and names the probe failure.
+	// Unset with PiPackage unset means genuinely missing.
+	PiProbeFailed bool
 }
 
 // assistants returns the listed assistant engines, trimmed, without empty
