@@ -113,7 +113,7 @@ func (u *UseCase) integrateEngine(engine string, assistants []string, mode, vers
 		}
 	}
 	if engine == engineconfig.Pi {
-		in.PiPackage = u.piPackage()
+		in.PiPackage, in.PiProbeFailed = u.piPackage()
 	}
 	if engine == engineconfig.Claude {
 		// The rule only needs to know whether the main session's agent is built (S8).
@@ -179,20 +179,25 @@ func (u *UseCase) guardrailsStep(in *engineconfig.Input) (engineconfig.Result, [
 
 // piPackage runs the subagent-package check of intent 0016 S1 and D1: `pi
 // list` under piListDeadline, then gentle-shell on PATH, which counts only
-// when `pi list` ran and exited 0 (S1). A `pi list` that is missing, fails or
-// outlives the deadline counts as no package, gentle-shell or not (S2); a
-// missing probe is no package too.
-func (u *UseCase) piPackage() bool {
+// when `pi list` ran and exited 0 (S1). It reports found, and separately
+// whether the probe itself failed: a `pi list` that is missing, fails or
+// outlives the deadline, or a missing probe, is a probe failure (issue
+// #905), not a confirmed absence, gentle-shell or not; only an exit-0 run
+// with neither marker is genuinely missing.
+func (u *UseCase) piPackage() (found, probeFailed bool) {
 	if u.s.Pi == nil {
-		return false
+		return false, true
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), piListDeadline)
 	defer cancel()
 	out, ok := u.s.Pi.PiList(ctx)
 	if !ok {
-		return false
+		return false, true
 	}
-	return engineconfig.PiListNamesPackage(out) || u.s.Pi.GentleShellOnPath()
+	if engineconfig.PiListNamesPackage(out) || u.s.Pi.GentleShellOnPath() {
+		return true, false
+	}
+	return false, false
 }
 
 // loadOpencodeConfigs reads the OpenCode configs the rule may change

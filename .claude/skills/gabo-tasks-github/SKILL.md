@@ -14,7 +14,7 @@ Use whenever a gabo agent reads or writes tasks. This adapter fills the `tasks` 
 
 - **Re-read after every write (R24).** After each create, label, claim, comment, dependency or close, read the issue back and compare. A write that does not show up is an *unverified write*: retry once, then report it under `unverified:` in your outcome. Never claim success from the command's exit code alone.
 - GitHub REST needs the issue **`id`** (global integer) for sub-issue and dependency bodies, not the `number`: `gh api repos/$R/issues/<n> --jq .id`.
-- PRs target `dev`, not the default branch, so closing keywords do not close issues. Close issues explicitly (see Change status).
+- Task PRs target the intent branch and intent PRs target `dev`, never the default branch, so closing keywords do not close issues. Close issues explicitly (see Change status).
 - Never post the reviewer marker (`gbai-reviewer-bot`) anywhere, even quoted.
 - Never close, relabel or reassign an issue you were not asked to work on.
 - Hierarchy: product card issue → intent sub-issue (`I####: <title>`, body links `docs/product/intents/<NNNN-slug>/`) → task sub-issues (`T###: <title>`). A task has exactly one parent intent; `blocked_by` edges may cross intents.
@@ -86,12 +86,12 @@ gh issue comment <n> -R $R --body "<!-- gabo-progress --> <one line>"
 
 ### change status
 
-- DONE, only after the PR merged: `gh issue edit <n> -R $R --remove-label status:in-progress,status:blocked,needs-user`, then `gh issue close <n> -R $R --reason completed --comment "DONE via PR #<pr>"`. The removal covers every status label, not only `status:in-progress`, so a closed task keeps none. Re-read the issue: it must show closed with no status label.
+- DONE, only after the PR merged (the task PR into the intent branch; the intent issue only after its intent PR merged into `dev`): `gh issue edit <n> -R $R --remove-label status:in-progress,status:blocked,needs-user`, then `gh issue close <n> -R $R --reason completed --comment "DONE via PR #<pr>"`. The removal covers every status label, not only `status:in-progress`, so a closed task keeps none. Re-read the issue: it must show closed with no status label.
 - BLOCKED: `gh issue edit <n> -R $R --add-label status:blocked --remove-label status:in-progress`, then `gh issue comment <n> -R $R --body "<reason>"`.
 
 ### link PR
 
-The PR body carries `Refs #<n>`; then `gh issue comment <n> -R $R --body "PR #<pr>"`.
+The task PR body carries `Refs #<task>`; the intent PR body carries one `Refs #<task>` line per task it pours. Then `gh issue comment <n> -R $R --body "PR #<pr>"`.
 
 ### verify by re-read
 

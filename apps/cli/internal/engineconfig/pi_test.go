@@ -174,6 +174,35 @@ func TestPiRuleOmitsTheRefusalWhenAPackageIsPresent(t *testing.T) {
 	}
 }
 
+// Issue #905: a probe that could not run refuses without the install
+// paragraph and names the probe failure; a present package still wins.
+func TestPiRuleNamesProbeFailure(t *testing.T) {
+	res := piRule(Input{Version: "0.2.6", PiProbeFailed: true})
+	wantLine := "gabo refuses to build on Pi: the subagent-package check could not run (`pi list` failed or timed out), so no package could be confirmed"
+	if got := res.Section.Lines[len(res.Section.Lines)-1]; got != wantLine {
+		t.Errorf("last line = %q, want %q", got, wantLine)
+	}
+	for _, l := range res.Section.Lines {
+		if l == piTail[0] || l == SubagentRefusal {
+			t.Errorf("install-paragraph line with a failed probe: %q", l)
+		}
+	}
+	if got := res.Section.Steps[len(res.Section.Steps)-1]; got != "run `pi list` until it exits 0, then rerun gabo init" {
+		t.Errorf("last step = %q", got)
+	}
+	for _, s := range res.Section.Steps {
+		if strings.Contains(s, "install a subagent package") {
+			t.Errorf("install step with a failed probe: %q", s)
+		}
+	}
+	res = piRule(Input{Version: "0.2.6", PiPackage: true, PiProbeFailed: true})
+	for _, l := range res.Section.Lines {
+		if strings.Contains(l, "refuses to build on Pi") {
+			t.Errorf("refusal with a package present: %q", l)
+		}
+	}
+}
+
 // S2: without a package the refusal stays exactly as today.
 func TestPiRuleKeepsTheRefusalWithoutAPackage(t *testing.T) {
 	res := piRule(Input{Version: "0.2.6"})

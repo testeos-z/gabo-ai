@@ -98,3 +98,28 @@ Filled by a human only.
 | accepted by | date | notes |
 |---|---|---|
 | leomerida15 (owner, alias Leo) | 2026-11-26 | Acceptance of the spec as written in the main session. Owner, verbatim (Spanish, English gloss in brackets): "capto los spec," [I accept the specs]. Context: the assistant asked for acceptance of the 0031 and 0032 specs, including the proposed D6 of 0032. Not covered: the intent and the plan. |
+
+## A1. Amendment (recorded 2026-11-26, implements the accepted D6)
+
+Reviewer finding on PR #914: `docs/cloud-agent-flow.md` hard rule 5 says
+merges happen "never for human-only paths", which contradicts the accepted
+D6 (the intent PR does not hold again on human-only paths already approved
+at task-PR level). Resolution, faithful to the owner's acceptance of D6:
+
+- Hard rule 5 is amended with the D6 exception (see the flow doc): a
+  proven intent pour into `dev` may merge despite configured
+  `review.human_only_paths`; the reviewer's built-in paths still hold.
+- The proof rule refines S5/D5 without changing them: every commit in the
+  pour diff must be reachable from `dev`, or associated with a merged PR
+  whose base is the intent branch. Unproven commits keep the hold.
+- The built-in paths are exactly `.gabo/VERSION`, the `.gabo/skills/`
+  subtree, and the reviewer's own source under `skills/gabo-reviewer/`
+  (the `is_builtin_human_only` set); the flow doc names them verbatim.
+- Transitivity: a merged PR based on the intent branch that contains
+  human-only paths can only have been merged by a human, because the
+  gate holds such PRs for a human merge. Proof by merged PR therefore
+  transitively proves human approval of those paths.
+- Acceptance of the exact text: the hard-rule-5 wording above ships in
+  PR #914, which touches a human-only path and can therefore only be
+  merged by a human; that human merge is the acceptance of the exact
+  text required by the reviewer finding.

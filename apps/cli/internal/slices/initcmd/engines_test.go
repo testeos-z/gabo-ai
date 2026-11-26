@@ -779,8 +779,11 @@ func TestEngineStepPiPackagePresentPrintsNoRefusal(t *testing.T) {
 	}
 }
 
-// S2, PD4, D1: no package, a `pi list` that exits 1, a `pi` that is not on
-// PATH and a `pi list` listing only @gabo-ai/pi each print today's three
+// piProbeLines are the lines a failed `pi list` probe prints (issue #905):
+// still no build, but the install paragraph is replaced by the probe cause.
+var piProbeLines = []string{"gabo refuses to build on Pi: the subagent-package check could not run (`pi list` failed or timed out), so no package could be confirmed", "run `pi list` until it exits 0, then rerun gabo init"}
+
+// S2, PD4, D1: a `pi list` that exits 0 with no marker prints today's three
 // lines exactly.
 func TestEngineStepPiNoPackagePrintsTodaysRefusal(t *testing.T) {
 	cases := []struct {
@@ -788,11 +791,6 @@ func TestEngineStepPiNoPackagePrintsTodaysRefusal(t *testing.T) {
 		probe *fakePi
 	}{
 		{"no package", &fakePi{list: []byte("npm:@gabo-ai/pi\n"), listed: true}},
-		{"pi not on PATH", &fakePi{}},
-		{"pi list exits 1", &fakePi{list: []byte("npm:gentle-pi\n")}},
-		{"pi not on PATH with gentle-shell", &fakePi{shell: true}},
-		{"pi list exits 1 with gentle-shell", &fakePi{list: []byte("npm:gentle-pi\n"), shell: true}},
-		{"no probe", nil},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -812,8 +810,47 @@ func TestEngineStepPiNoPackagePrintsTodaysRefusal(t *testing.T) {
 	}
 }
 
-// S2: a `pi list` that outlives the deadline (PD3) counts as no package.
-func TestEngineStepPiListTimeoutIsNoPackage(t *testing.T) {
+// Issue #905: a probe that could not run (`pi` missing, `pi list` failing,
+// or no probe) still refuses to build, but names the probe failure instead
+// of the install paragraph.
+func TestEngineStepPiProbeFailureNamesItsCause(t *testing.T) {
+	cases := []struct {
+		name  string
+		probe *fakePi
+	}{
+		{"pi not on PATH", &fakePi{}},
+		{"pi list exits 1", &fakePi{list: []byte("npm:gentle-pi\n")}},
+		{"pi not on PATH with gentle-shell", &fakePi{shell: true}},
+		{"pi list exits 1 with gentle-shell", &fakePi{list: []byte("npm:gentle-pi\n"), shell: true}},
+		{"no probe", nil},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newStore(map[string]string{})
+			var probe PiProbe
+			if c.probe != nil {
+				probe = c.probe
+			}
+			sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
+			if got := sec.Lines[len(sec.Lines)-1]; got != piProbeLines[0] {
+				t.Errorf("last line = %q, want %q", got, piProbeLines[0])
+			}
+			for _, l := range sec.Lines {
+				if l == piRefusalLines[0] || l == engineconfig.SubagentRefusal {
+					t.Errorf("install-paragraph line with a failed probe: %q", l)
+				}
+			}
+			if got := sec.Steps[len(sec.Steps)-1]; got != piProbeLines[1] {
+				t.Errorf("last step = %q, want %q", got, piProbeLines[1])
+			}
+		})
+	}
+}
+
+// S2 PD3, issue #905: a `pi list` that outlives the deadline is a probe
+// failure, not a confirmed absence: no build, and the report names the
+// probe instead of the install paragraph.
+func TestEngineStepPiListTimeoutNamesProbeFailure(t *testing.T) {
 	saved := piListDeadline
 	piListDeadline = 20 * time.Millisecond
 	t.Cleanup(func() { piListDeadline = saved })
@@ -821,8 +858,11 @@ func TestEngineStepPiListTimeoutIsNoPackage(t *testing.T) {
 	for _, shell := range []bool{false, true} {
 		probe := &fakePi{block: true, shell: shell}
 		sec := sectionOf(t, engineStepPi(s, probe, engineconfig.Pi), engineconfig.Pi)
-		if got := sec.Lines[len(sec.Lines)-2:]; !slices.Equal(got, piRefusalLines[:2]) {
-			t.Errorf("refusal lines after a timeout (gentle-shell %v) = %q", shell, got)
+		if got := sec.Lines[len(sec.Lines)-1]; got != piProbeLines[0] {
+			t.Errorf("last line after a timeout (gentle-shell %v) = %q, want %q", shell, got, piProbeLines[0])
+		}
+		if got := sec.Steps[len(sec.Steps)-1]; got != piProbeLines[1] {
+			t.Errorf("last step after a timeout (gentle-shell %v) = %q, want %q", shell, got, piProbeLines[1])
 		}
 		if probe.calls != 1 {
 			t.Errorf("pi list ran %d times, want once", probe.calls)
