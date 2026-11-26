@@ -38,8 +38,12 @@ echo '[]' >"$work/unit_intent/intent_dir_0000-probe.json"
 expect_eq "rc=0 " "$(probe unit_intent REVIEWER_BASE_BRANCH=0000-probe)" "an existing intent folder is accepted"
 expect_match '^rc=1 .*does not exist on dev' "$(probe unit_unknown REVIEWER_BASE_BRANCH=0099-unknown)" \
   "an unknown folder is refused without verdict or merge"
-expect_match '^rc=1 .*never merges into it|not the integration branch' "$(probe unit_main REVIEWER_BASE_BRANCH=main)" \
+expect_match '^rc=1 .*(never merges into it|not the integration branch)' "$(probe unit_main REVIEWER_BASE_BRANCH=main)" \
   "main is refused"
+# A transient folder-check failure refuses with its own message, never as a
+# missing folder (reviewer finding on PR 913).
+expect_match '^rc=1 .*could not be verified' "$(probe unit_transient REVIEWER_BASE_BRANCH=0000-probe G_API_FAIL_CONTENTS=1)" \
+  "an unverifiable intent folder is refused without verdict or merge"
 
 echo "# merge-head integration"
 # gate <name> [VAR=value...]: a fixture where every rule holds, then the

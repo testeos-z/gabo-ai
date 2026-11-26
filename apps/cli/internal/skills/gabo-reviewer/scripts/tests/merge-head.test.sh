@@ -32,6 +32,11 @@ gate() {
     '[{user:{login:$l}, created_at:"2026-10-20T12:00:00Z", body:$b}] + $x' >"$fx/comments_7.json"
   local files='[{"filename":"apps/cli/main.go"}]'
   echo "${G_FILES:-$files}" >"$fx/files_7"
+  echo "${G_COMMITS:-[]}" >"$fx/commits_7.json"
+  for s in ${G_APPROVED:-}; do
+    jq -n --arg b "${G_HEAD_BRANCH:-probe/task-1}" \
+      '[{state:"closed", merged_at:"2026-10-20T12:00:00Z", base:{ref:$b}}]' >"$fx/commit_pulls_$s.json"
+  done
   (
     export HOME="$fake_home" STUB_LOG="$fx/calls.log" FIXTURE="$fx" REVIEWER_GH="$work/bin/gh" \
       GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_AUTO_MERGE=true REVIEWER_NOW=2026-10-20T13:00:00Z \
@@ -63,11 +68,17 @@ expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".claude/agents/x
 check "needs-human comment carries no verdict marker" bash -c "! grep -q 'gbai-reviewer-bot sha=' '$work/human/posted_7.md'"
 expect_match '^MERGE-FAILED ' "$(gate refused MERGE_FAIL=1)" "a refused merge is MERGE-FAILED"
 
-echo "# intent pour (0032 S5, D6): human-only paths do not hold it again"
+echo "# intent pour (0032 S5, D6, amended by A1): only a proven pour skips the hold"
 mkdir -p "$work/pour"; echo '[{"type":"dir","name":"intent.md"}]' >"$work/pour/intent_dir_0032-intent-landing.json"
-expect_eq "MERGED #7 $sha" "$(G_FILES='[{"filename":".claude/agents/x.md"}]' G_HEAD_BRANCH=0032-intent-landing gate pour)" \
-  "an intent pour with a human-only path still merges"
-check "pour merged with one merge call" bash -c "grep -qxF 'gh pr merge 7 --repo example-org/example-repo --merge --match-head-commit $sha' '$work/pour/calls.log'"
+expect_eq "MERGED #7 $sha" "$(G_FILES='[{"filename":".claude/agents/x.md"}]' G_HEAD_BRANCH=0032-intent-landing G_COMMITS='[{"sha":"'"$sha"'"}]' G_APPROVED="$sha" gate pour)" \
+  "a proven intent pour with a configured human-only path still merges"
+check "proven pour merged with one merge call" bash -c "grep -qxF 'gh pr merge 7 --repo example-org/example-repo --merge --match-head-commit $sha' '$work/pour/calls.log'"
+expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".claude/agents/x.md"}]' G_HEAD_BRANCH=0032-intent-landing G_COMMITS='[{"sha":"'"$sha"'"}]' gate pour_unproven)" \
+  "an unproven intent pour still needs a human merge"
+check "no merge call for the unproven pour" bash -c "! grep -q '^gh pr merge' '$work/pour_unproven/calls.log'"
+expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".gabo/skills/gabo-coder/SKILL.md"}]' G_HEAD_BRANCH=0032-intent-landing G_COMMITS='[{"sha":"'"$sha"'"}]' G_APPROVED="$sha" gate pour_builtin)" \
+  "a proven pour with a built-in human-only path still needs a human merge"
+check "no merge call for the builtin pour" bash -c "! grep -q '^gh pr merge' '$work/pour_builtin/calls.log'"
 expect_eq "NEEDS-HUMAN-MERGE #7 $sha" "$(G_FILES='[{"filename":".claude/agents/x.md"}]' G_HEAD_BRANCH=0099-unknown gate pour_unknown)" \
   "a head without an intent folder still needs a human merge"
 check "no merge call for the unknown head" bash -c "! grep -q '^gh pr merge' '$work/pour_unknown/calls.log'"
@@ -136,18 +147,23 @@ expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$inner]" gate injec
 echo "# the reviewer verdict and review are untouched (S10)"
 # A deliberate pin: changing review-head.sh means updating this digest on purpose.
 # The digest moved for the test-edit rule of intent 0027 S29 (the review prompt),
-# for the base-branch guard of intent 0032 S6, and for the array-envelope
-# unwrap the current engine CLIs emit (without it every review errors with
-# no verdict line, proven by the 913 review log of 2026-11-26).
+# for the base-branch guard of intent 0032 S6, for the array-envelope unwrap the
+# current engine CLIs emit (without it every review errors with no verdict line,
+# seen on PR 913), and for the write-the-verdict-once line (the engine drafted
+# one verdict then corrected it, failing the strict parser with both verdict
+# lines on PRs 913 and 914).
 check "review-head.sh is byte-identical to its pinned digest" \
-  bash -c "echo 'b790139dfe7ed1ebf0e8f5a1e2086eae50821d5a85e78ac08dcb42c59c46dcd0  $src/review-head.sh' | sha256sum -c --status"
+  bash -c "echo '0165d9443c9d60041074f716174c90e384ffc30c753cece6a2226f80f8d8a1ec  $src/review-head.sh' | sha256sum -c --status"
 
 echo "# the merge gate is unchanged by the comment order (S13)"
 # A deliberate pin: the comment order and the code read line never touch the
 # gate. Changing merge-head.sh means updating this digest on purpose; it moved
-# for the base-branch guard of intent 0032 S6 and for the intent-pour bypass
-# of human-only paths (0032 S5, D6).
+# for the base-branch guard of intent 0032 S6, for the intent-pour bypass of
+# human-only paths (0032 S5, D6), and for amendment A1: only a proven pour
+# (every commit associated with a merged PR based on the intent branch)
+# skips the configured-paths hold, and built-in paths always hold
+# (reviewer findings on PRs 913 and 914).
 check "merge-head.sh is byte-identical to the pinned gate" \
-  bash -c "echo '5e52701ef54efd77f7f929a98de31ebd27632eb6039f4a2d0bd1251ef20535f6  $src/merge-head.sh' | sha256sum -c --status"
+  bash -c "echo 'cf5cedd707b62917c42eee908a85c144e3ca0dea68da8fe843d9d7f5a7e7f4b1  $src/merge-head.sh' | sha256sum -c --status"
 
 finish

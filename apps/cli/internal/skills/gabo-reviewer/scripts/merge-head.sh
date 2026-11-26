@@ -110,29 +110,59 @@ verdict="$(latest_bot_verdict "$comments" "$head_date")" || skip "could not read
 files="$("$GH" api --paginate "repos/$REPO/pulls/$pr/files" 2>/dev/null | jq -r '.[].filename')" ||
   skip "could not read the PR files"
 [[ -n "$files" ]] || skip "could not read the PR files (empty list)"
-# Intent pour (intent 0032 S5, D6): the head is an <NNNN-slug> intent branch
-# with a folder on the integration branch, pouring into it. Human-only paths
-# were already approved on the task PRs, so they do not hold it again; the
-# eval hold below still applies.
+# Intent pour (intent 0032 S5, D6, amended by A1): the head is an
+# <NNNN-slug> intent branch with a folder on the integration branch,
+# pouring into it. The pour is proven only when every commit in the pour
+# diff is provably approved: associated with a merged PR based on the
+# intent branch (a task PR or a sync PR), as seen by the reviewer's own API
+# queries, never by PR claims. Proven pours skip the hold for configured
+# human-only paths (already approved on the task PRs); built-in paths
+# always hold, and the eval hold below still applies.
 pour=false
+pour_proven=false
 head_branch="$(jq -r .headRefName <<<"$info")"
 if [[ "$pr_base" == "$INTEGRATION_BRANCH" && "$head_branch" =~ ^[0-9]{4}-[A-Za-z0-9._-]+$ ]] &&
   intent_dir_exists "$head_branch"; then
   pour=true
+  pour_proven=true
+  commits="$("$GH" api --paginate "repos/$REPO/pulls/$pr/commits" 2>/dev/null | jq -r '.[].sha')" ||
+    pour_proven=false
+  [[ -n "${commits:-}" ]] || pour_proven=false
+  if [[ "$pour_proven" == true ]]; then
+    for c in $commits; do
+      pulls="$("$GH" api --paginate "repos/$REPO/commits/$c/pulls" 2>/dev/null)" ||
+        { pour_proven=false; break; }
+      jq -e --arg b "$head_branch" \
+        '[.[] | select(.state == "closed" and .merged_at != null and .base.ref == $b)] | length > 0' \
+        <<<"$pulls" >/dev/null || { pour_proven=false; break; }
+    done
+  fi
 fi
 protected=""
+builtin=""
 while IFS= read -r f; do
+  is_builtin_human_only "$f" && builtin+="$f"$'\n'
   is_human_only "$f" && protected+="$f"$'\n'
 done <<<"$files"
 hold="$(eval_notice_hold "$comments" "$sha")" || skip "could not read the eval markers"
-if [[ -n "$hold" || ( -n "$protected" && "$pour" == false ) ]]; then
+if [[ -n "$hold" || -n "$builtin" || ( -n "$protected" && "$pour_proven" == false ) ]]; then
   body="$(
     if [[ -n "$hold" ]]; then
       echo "Needs human merge: the review of \`$sha\` is clean, but an eval notice holds this head (intent 0030 S10), so gabo-reviewer does not merge it. A head is released only by a cleared marker from an eval run on that head at or above the threshold, and never while a notice names it."
       echo
     fi
-    if [[ -n "$protected" && "$pour" == false ]]; then
-      echo "Needs human merge: the review of \`$sha\` is clean, but this PR changes human-only paths, so gabo-reviewer does not merge it:"
+    if [[ -n "$builtin" ]]; then
+      echo "Needs human merge: the review of \`$sha\` is clean, but this PR changes built-in human-only paths, which always need a human merge, even on a proven intent pour (intent 0032 A1):"
+      echo
+      head -n 20 <<<"${builtin%$'\n'}" | sed 's/^/- `/; s/$/`/'
+      echo
+    fi
+    if [[ -n "$protected" && "$pour_proven" == false ]]; then
+      if [[ "$pour" == true ]]; then
+        echo "Needs human merge: the review of \`$sha\` is clean, but this intent pour is not proven (at least one commit is not associated with a merged PR based on the intent branch), so the human-only paths still hold it (intent 0032 A1):"
+      else
+        echo "Needs human merge: the review of \`$sha\` is clean, but this PR changes human-only paths, so gabo-reviewer does not merge it:"
+      fi
       echo
       head -n 20 <<<"${protected%$'\n'}" | sed 's/^/- `/; s/$/`/'
       echo
