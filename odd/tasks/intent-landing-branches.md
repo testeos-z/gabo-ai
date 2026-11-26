@@ -16,6 +16,12 @@ Order: local workflow first, then two intents (fix + improvement), then release 
 
 - T1 [S1-S4] Map current branch flow (skills, reviewer scripts, gabo.yaml, cycle) — explore — commit: n/a
 - T2 [S1-S4] Change local repo workflow to one landing branch per intent (`intent/<NNNN>-<slug>` from `dev`, task PRs into it, intent PR into `dev`) — inline — commit: pending
+  - T2.1 [S1-S4] `.agents/skills/gabo-repository-host-github/SKILL.md`: branch from the intent branch; open PR with base = intent branch (task) or `dev` (intent PR); merge gate accepts `dev` or an existing intent folder name, refuses main/master; delete branch for task and intent branches; protect branches also on each intent branch (and lift deletion rule at close); new `sync` reverse-merge steps (0032 S9).
+  - T2.2 [S1-S4] `.agents/skills/gabo-tasks-github/SKILL.md`: drop "PRs target `dev`"; new op `read parent intent folder` (0032 S6) from the intent issue body line.
+  - T2.3 [S1-S4] `.gabo/skills/gabo-cycle/SKILL.md`: wave open cuts `<NNNN-slug>` from `dev`, protects it, passes it in each handoff; worktrees from `origin/<NNNN-slug>`; wave close = sync branch reverse merge, intent PR into `dev`, review request, close intent, delete branch (0032 S7, S9, S10).
+  - T2.4 [S1-S4] `.gabo/skills/gabo-coder/SKILL.md`, `gabo-assistant`, `gabo-reviewer-placement-local`, `gabo-reviewer-notes`, `gabo-contract-repository-host`, `gabo-contract-tasks`, `gabo-agent-templates/agents/gabo-coder.md`: base = intent branch from handoff, verify against parent intent folder, CONFLICTING merges `origin/<intent branch>`.
+  - T2.5 [S1-S4] User-level reviewer scripts `~/.local/share/gabo/skills/gabo-reviewer/scripts/{common,reviewer,review-head,merge-head}.sh`: accept base `dev` or an intent folder existing on `dev`; test-merge against the PR's own base; list PRs of all accepted bases. Outside the project: needs owner permission per path.
+  - T2.6 Try it: dry probe with a throwaway intent branch + one task PR (no merge to `dev`); record what worked and what broke in the Log as input for 0032 implementation.
 - T3 [S5] Create intent 0031 (folder + issue): fix #908 — worker — commit: pending
 - T4 [S5,S1-S3] Create intent 0032 (folder + issue): intent landing branches in the gabo product (L4 decisions) — worker — commit: pending
 - T5 [S6] Release 0.6.0 (after T3/T4 delivered; push/tag are user decisions) — inline — commit: pending
