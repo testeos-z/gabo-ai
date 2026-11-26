@@ -120,6 +120,41 @@ GABO_INSTALL="${REVIEWER_GABO_INSTALL:-github.com/testeos-z/gabo-ai/apps/cli/cmd
 REPO="${REVIEWER_REPO:-$(caller_yaml repo.name | head -n 1)}"
 BASE_BRANCH="${REVIEWER_BASE_BRANCH:-$(caller_yaml repo.integration_branch | head -n 1)}"
 BASE_BRANCH="${BASE_BRANCH:-dev}"
+INTEGRATION_BRANCH="$(caller_yaml repo.integration_branch | head -n 1)"
+INTEGRATION_BRANCH="${INTEGRATION_BRANCH:-dev}"
+
+# intent_dir_exists <branch>: 0 when docs/product/intents/<branch> exists on
+# the integration branch, 1 when the API confirms it is missing (HTTP 404),
+# 2 when the check itself failed (auth, network). Callers refuse in both
+# non-zero cases but report them differently, so a transient error is never
+# misdiagnosed as a missing folder.
+intent_dir_exists() {
+  local err
+  err="$("$GH" api "repos/$REPO/contents/docs/product/intents/$1?ref=$INTEGRATION_BRANCH" 2>&1 >/dev/null)" && return 0
+  [[ "$err" == *"Not Found"* ]] && return 1
+  return 2
+}
+
+# validate_base_branch: the caller's base must be the integration branch or an
+# intent folder existing under docs/product/intents/ on it (intent 0032 S6).
+# Prints nothing and returns 0 when accepted; prints the skip reason and
+# returns 1 otherwise, so callers skip without verdict or merge.
+validate_base_branch() {
+  [[ "$BASE_BRANCH" == "$INTEGRATION_BRANCH" ]] && return 0
+  [[ "$BASE_BRANCH" =~ ^[0-9]{4}-[A-Za-z0-9._-]+$ ]] || {
+    echo "base $BASE_BRANCH is not the integration branch nor an <NNNN-slug> intent branch; refusing without verdict or merge"
+    return 1
+  }
+  intent_dir_exists "$BASE_BRANCH"
+  local rc=$?
+  [[ $rc == 0 ]] && return 0
+  if [[ $rc == 2 ]]; then
+    echo "base $BASE_BRANCH could not be verified (the intent-folder check failed); refusing without verdict or merge"
+  else
+    echo "base $BASE_BRANCH is not the integration branch and docs/product/intents/$BASE_BRANCH does not exist on $INTEGRATION_BRANCH; refusing without verdict or merge"
+  fi
+  return 1
+}
 MODE="${REVIEWER_MODE:-single-user}"
 BOT_LOGIN="${REVIEWER_BOT_LOGIN:-}"
 WORKDIR="${GABO_REVIEWER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer}"
@@ -265,11 +300,19 @@ parse_checks() {
 # review.checks, which runs with GABO_BIN.
 is_gabo_check() { [[ "$1" == gabo && "$2" == check ]]; }
 
+# is_builtin_human_only <path>: true for the reviewer's own paths, which
+# always need a human merge, even on a proven intent pour (intent 0032 A1).
 # is_human_only <path>: true when a human must merge a change to <path>.
-is_human_only() {
-  local p="$1" entry
+is_builtin_human_only() {
+  local p="$1"
   [[ "$p" == "$BUILTIN_STAMP" || "$p" == "$BUILTIN_CATALOG"* ]] && return 0
   [[ "$p" == "$BUILTIN_REVIEWER"* || "$p" == */"$BUILTIN_REVIEWER"* ]] && return 0
+  return 1
+}
+
+is_human_only() {
+  local p="$1" entry
+  is_builtin_human_only "$p" && return 0
   for entry in $HUMAN_ONLY_PATHS; do
     if [[ "$entry" == */ ]]; then
       [[ "$p" == "$entry"* ]] && return 0

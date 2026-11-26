@@ -511,9 +511,9 @@ func TestCoderTemplateRunsTheReviewerScript(t *testing.T) {
 	for _, s := range []string{
 		"an agent of the gabo assistant", "You launch no agent",
 		"report `REJECTED: expected \"PR #<n> head <40-hex sha>\"` and run nothing",
-		"allowing it up to 10 minutes, with no extra arguments or environment",
-		"`bash \"{{reviewer_script}}\" head <n> <sha>`",
-		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
+		"allowing it up to 10 minutes, with exactly one environment export and no extra arguments",
+		"`REVIEWER_BASE_BRANCH=<the intent branch the handoff names> bash \"{{reviewer_script}}\" head <n> <sha>`",
+		"`REVIEWER_BASE_BRANCH=<the intent branch the handoff names> bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
 		"the last line of its output that starts with `VERDICT `",
 		"If it carries `verdict=retry`, run the same command exactly once more",
 		"never rerun for any other reason",
@@ -543,7 +543,7 @@ func TestCoderTemplateMergesDevOnAConflictingCleanPR(t *testing.T) {
 	for _, s := range []string{
 		"After a clean review that is not yet merged, end HANDED and stay resumable; never poll.",
 		"except `verdict=clean merge=skipped` with the PR `CONFLICTING`",
-		"merge `origin/dev` into the task branch (never a rebase, never a force-push), resolve the conflict, run the task's checks, push and request a new review for the new head, as one fix round",
+		"merge `origin/<intent-branch>` (the handoff names it; re-derive it through the parent intent task and stop on a mismatch) into the task branch (never a rebase, never a force-push), resolve the conflict, run the task's checks, push and request a new review for the new head, as one fix round",
 		"a conflict you cannot resolve ends BLOCKED with the question, never HANDED",
 	} {
 		if !strings.Contains(doc, s) {
