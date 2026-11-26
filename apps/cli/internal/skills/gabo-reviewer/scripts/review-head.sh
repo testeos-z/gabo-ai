@@ -968,7 +968,9 @@ elif [[ "$ENGINE" == pi ]]; then
     jq -c '{type: "result", is_error: (.stopReason != "stop"), subtype: (if .stopReason == "stop" then "success" else (.stopReason // "unknown") end),
       result: ([.content[]? | select(.type == "text") | .text] | join(""))}' 2>/dev/null)"
 else
-  result="$(jq -Rc 'fromjson? | select(type == "object" and .type == "result")' "$review_log" 2>/dev/null | tail -n 1)"
+  # The engine prints a stream of JSON lines ending in one `result` object;
+  # current CLIs wrap the stream in an array envelope, so unwrap both forms.
+  result="$(jq -Rc 'fromjson? | if type == "array" then .[] else . end | select(type == "object" and .type == "result")' "$review_log" 2>/dev/null | tail -n 1)"
 fi
 text="$(jq -r '.result // empty' <<<"$result" 2>/dev/null)"
 if [[ -n "$policy_missing" ]]; then

@@ -136,10 +136,11 @@ expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$inner]" gate injec
 echo "# the reviewer verdict and review are untouched (S10)"
 # A deliberate pin: changing review-head.sh means updating this digest on purpose.
 # The digest moved for the test-edit rule of intent 0027 S29 (the review prompt),
-# for the base-branch guard of intent 0032 S6, and back when an unrelated
-# array-form log hunk was reverted out of scope.
+# for the base-branch guard of intent 0032 S6, and for the array-envelope
+# unwrap the current engine CLIs emit (without it every review errors with
+# no verdict line, proven by the 913 review log of 2026-11-26).
 check "review-head.sh is byte-identical to its pinned digest" \
-  bash -c "echo '3d6eee58cb282b9496531eac597e36f4b736b711dbd84c170b942571b7fd6426  $src/review-head.sh' | sha256sum -c --status"
+  bash -c "echo 'b790139dfe7ed1ebf0e8f5a1e2086eae50821d5a85e78ac08dcb42c59c46dcd0  $src/review-head.sh' | sha256sum -c --status"
 
 echo "# the merge gate is unchanged by the comment order (S13)"
 # A deliberate pin: the comment order and the code read line never touch the
