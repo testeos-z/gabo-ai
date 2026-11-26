@@ -38,7 +38,7 @@ The owner also ordered (L2, S5) two intents in parallel — one for the #908 fix
 - No new `gabo.yaml` key (L4: the owner rejected a new key as breaking the recommended flow; the branch name is homonymous with the intent folder, e.g. `0032-intent-landing-branches`).
 - `main`/`master` stay refused as landing targets (intent 0029 branch protection; reviewer `common.sh` refusal).
 - Intent branches get the same ruleset as `dev` (L4).
-- Planning only: this change writes `intent.md` and `spec.md`; no code, no task issues, no plan yet (the plan comes after the owner's acceptance of the spec).
+- Planning only: this change writes `intent.md` and `spec.md`; no code, no task issues. The plan (`plan.md`) and the D6 hard-rule amendment to `docs/cloud-agent-flow.md` land together with the spec amendment A1 in PR #914.
 
 ## Open questions
 
@@ -58,5 +58,5 @@ The owner also ordered (L2, S5) two intents in parallel — one for the #908 fix
 | PRD | [PRD](../../PRD.md) |
 | TRD | [TRD](../../TRD.md) |
 | spec | [spec](spec.md) |
-| plan | none yet; written after the owner accepts the spec |
+| plan | [plan](plan.md) (landed together with spec amendment A1 in PR #914) |
 | source | `odd/tasks/intent-landing-branches.md` (S1–S6, T1–T5, L1–L5) |

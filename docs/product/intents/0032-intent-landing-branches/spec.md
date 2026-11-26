@@ -112,3 +112,14 @@ at task-PR level). Resolution, faithful to the owner's acceptance of D6:
 - The proof rule refines S5/D5 without changing them: every commit in the
   pour diff must be reachable from `dev`, or associated with a merged PR
   whose base is the intent branch. Unproven commits keep the hold.
+- The built-in paths are exactly `.gabo/VERSION`, the `.gabo/skills/`
+  subtree, and the reviewer's own source under `skills/gabo-reviewer/`
+  (the `is_builtin_human_only` set); the flow doc names them verbatim.
+- Transitivity: a merged PR based on the intent branch that contains
+  human-only paths can only have been merged by a human, because the
+  gate holds such PRs for a human merge. Proof by merged PR therefore
+  transitively proves human approval of those paths.
+- Acceptance of the exact text: the hard-rule-5 wording above ships in
+  PR #914, which touches a human-only path and can therefore only be
+  merged by a human; that human merge is the acceptance of the exact
+  text required by the reviewer finding.
