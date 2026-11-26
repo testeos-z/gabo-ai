@@ -29,8 +29,11 @@ The intent PR into `dev` auto-merges on a clean verdict and no conflicts,
 with two reviewer-side restrictions (reviewer finding, PR #913):
 
 - Every commit in the pour diff must be provably approved: reachable from
-  `dev` (arrived via a sync), or associated with a merged PR whose base is
-  the intent branch (a task PR or an `<NNNN-slug>-sync` PR). Anything else
+  `dev` (arrived via a sync), or its SHA appears in the pour PR's own commit
+  list AND the tracker shows that SHA belongs to a merged PR whose base is
+  the intent branch (a task PR or an `<NNNN-slug>-sync` PR; checked through
+  the reviewer's own tracker queries at merge time, never through PR-body
+  claims; an empty or unreadable commit list proves nothing). Anything else
   keeps the human-only hold.
 - Built-in human-only paths (`.gabo/VERSION`, the `.gabo/skills/`
   subtree, the reviewer's own source) always hold, pour or not. Only

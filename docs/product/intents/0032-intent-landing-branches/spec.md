@@ -110,8 +110,14 @@ at task-PR level). Resolution, faithful to the owner's acceptance of D6:
   proven intent pour into `dev` may merge despite configured
   `review.human_only_paths`; the reviewer's built-in paths still hold.
 - The proof rule refines S5/D5 without changing them: every commit in the
-  pour diff must be reachable from `dev`, or associated with a merged PR
-  whose base is the intent branch. Unproven commits keep the hold.
+  pour diff must be proven approved, else it keeps the hold. Proven means
+  either (a) the commit is reachable from `dev` (it arrived via a sync
+  merge of `dev` into the intent branch), or (b) the commit's SHA appears
+  in the pour PR's own commit list AND the tracker's record for that SHA
+  shows it belongs to a PR whose base is the intent branch and whose state
+  is merged (a task PR or an `<NNNN-slug>-sync` PR). The reviewer checks
+  this through its own tracker queries at merge time, never through claims
+  in the PR body. An empty or unreadable commit list proves nothing.
 - The built-in paths are exactly `.gabo/VERSION`, the `.gabo/skills/`
   subtree, and the reviewer's own source under `skills/gabo-reviewer/`
   (the `is_builtin_human_only` set); the flow doc names them verbatim.
@@ -119,7 +125,10 @@ at task-PR level). Resolution, faithful to the owner's acceptance of D6:
   human-only paths can only have been merged by a human, because the
   gate holds such PRs for a human merge. Proof by merged PR therefore
   transitively proves human approval of those paths.
-- Acceptance of the exact text: the hard-rule-5 wording above ships in
-  PR #914, which touches a human-only path and can therefore only be
-  merged by a human; that human merge is the acceptance of the exact
-  text required by the reviewer finding.
+- Acceptance of the exact text: the hard-rule-5 wording above shipped in
+  PR #914. That PR is merged; its diff contains only `docs/cloud-agent-flow.md`
+  and the three intent documents (`intent.md`, `spec.md`, `plan.md`), none of
+  which is listed in `review.human_only_paths` in `gabo.yaml` or in the
+  built-in set, so it merged with no human-only hold. The exception's
+  principle is the owner-accepted D6; the exact wording is accepted in the
+  row the owner entered in section 7 of this spec.
