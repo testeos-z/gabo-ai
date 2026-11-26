@@ -120,6 +120,23 @@ GABO_INSTALL="${REVIEWER_GABO_INSTALL:-github.com/testeos-z/gabo-ai/apps/cli/cmd
 REPO="${REVIEWER_REPO:-$(caller_yaml repo.name | head -n 1)}"
 BASE_BRANCH="${REVIEWER_BASE_BRANCH:-$(caller_yaml repo.integration_branch | head -n 1)}"
 BASE_BRANCH="${BASE_BRANCH:-dev}"
+INTEGRATION_BRANCH="$(caller_yaml repo.integration_branch | head -n 1)"
+INTEGRATION_BRANCH="${INTEGRATION_BRANCH:-dev}"
+
+# validate_base_branch: the caller's base must be the integration branch or an
+# intent folder existing under docs/product/intents/ on it (intent 0032 S6).
+# Prints nothing and returns 0 when accepted; prints the skip reason and
+# returns 1 otherwise, so callers skip without verdict or merge.
+validate_base_branch() {
+  [[ "$BASE_BRANCH" == "$INTEGRATION_BRANCH" ]] && return 0
+  [[ "$BASE_BRANCH" =~ ^[0-9]{4}-[A-Za-z0-9._-]+$ ]] || {
+    echo "base $BASE_BRANCH is not the integration branch nor an <NNNN-slug> intent branch; refusing without verdict or merge"
+    return 1
+  }
+  "$GH" api "repos/$REPO/contents/docs/product/intents/$BASE_BRANCH?ref=$INTEGRATION_BRANCH" >/dev/null 2>&1 && return 0
+  echo "base $BASE_BRANCH is not the integration branch and docs/product/intents/$BASE_BRANCH does not exist on $INTEGRATION_BRANCH; refusing without verdict or merge"
+  return 1
+}
 MODE="${REVIEWER_MODE:-single-user}"
 BOT_LOGIN="${REVIEWER_BOT_LOGIN:-}"
 WORKDIR="${GABO_REVIEWER_STATE_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/gabo/reviewer}"

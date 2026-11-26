@@ -84,6 +84,7 @@ case "$args" in
   *"/issues/"*"/comments"*) n="$(grep -Eo 'issues/[0-9]+' <<<"$args" | cut -d/ -f2)"; answer "comments_$n.json" ;;
   *"/commits/"*"/statuses"*) sha="$(grep -Eo 'commits/[0-9a-f]+' <<<"$args" | cut -d/ -f2)"; answer "statuses_$sha.json" ;;
   *"/commits/"*) sha="$(grep -Eo 'commits/[0-9a-f]+' <<<"$args" | cut -d/ -f2)"; answer "commit_$sha.json" ;;
+  *"/contents/docs/product/intents/"*) p="${args##*/intents/}"; p="${p%%\?*}"; answer "intent_dir_$p.json" ;;
   *) echo "unexpected gh call: $args" >&2; exit 1 ;;
 esac
 GH

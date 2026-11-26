@@ -126,14 +126,16 @@ expect_eq "$held" "$(G_EXTRA="[$(note owner notice "$other"),$inner]" gate injec
 
 echo "# the reviewer verdict and review are untouched (S10)"
 # A deliberate pin: changing review-head.sh means updating this digest on purpose.
-# The digest moved for the test-edit rule of intent 0027 S29 (the review prompt).
+# The digest moved for the test-edit rule of intent 0027 S29 (the review prompt)
+# and for the base-branch guard of intent 0032 S6.
 check "review-head.sh is byte-identical to its pinned digest" \
-  bash -c "echo 'f8328145e0d781671e373b8e1fb90585664d570deba374d8d07ec4c526bcee55  $src/review-head.sh' | sha256sum -c --status"
+  bash -c "echo '97cd4a9e92285c0ce90126439b9b20e295e314ff68bc72862f5e2aa4615fcdad  $src/review-head.sh' | sha256sum -c --status"
 
 echo "# the merge gate is unchanged by the comment order (S13)"
 # A deliberate pin: the comment order and the code read line never touch the
-# gate. Changing merge-head.sh means updating this digest on purpose.
+# gate. Changing merge-head.sh means updating this digest on purpose; it moved
+# for the base-branch guard of intent 0032 S6.
 check "merge-head.sh is byte-identical to the pinned gate" \
-  bash -c "echo 'da1249168b8cf116ee2f45632e98c9d1dc0f2eb6d0874c5dfb3cfa4dd59415ba  $src/merge-head.sh' | sha256sum -c --status"
+  bash -c "echo '377ea55ca0b5a837a4c935b472e3f7f6f7fcd2210ed7b92453d64fa87dd305d1  $src/merge-head.sh' | sha256sum -c --status"
 
 finish

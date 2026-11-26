@@ -81,6 +81,7 @@ info="$("$GH" pr view "$pr" --repo "$REPO" --json number,state,baseRefName,isDra
 pr_base="$(jq -r .baseRefName <<<"$info")"
 [[ "$pr_base" != main && "$pr_base" != master ]] || skip "the PR targets $pr_base; the reviewer never merges into it"
 [[ "$pr_base" == "$BASE_BRANCH" ]] || skip "the PR does not target $BASE_BRANCH"
+msg="$(validate_base_branch)" || skip "$msg"
 [[ "$(jq -r .isDraft <<<"$info")" == false ]] || skip "the PR is a draft"
 [[ "$(jq -r .isCrossRepository <<<"$info")" == false ]] || skip "the PR comes from a fork"
 [[ "$(jq -r .headRefOid <<<"$info")" == "$sha" ]] || skip "head moved since the review"
