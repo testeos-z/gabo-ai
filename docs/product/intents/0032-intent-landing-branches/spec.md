@@ -98,7 +98,7 @@ Filled by a human only.
 | accepted by | date | notes |
 |---|---|---|
 | leomerida15 (owner, alias Leo) | 2026-11-26 | Acceptance of the spec as written in the main session. Owner, verbatim (Spanish, English gloss in brackets): "capto los spec," [I accept the specs]. Context: the assistant asked for acceptance of the 0031 and 0032 specs, including the proposed D6 of 0032. Not covered: the intent and the plan. |
-| leomerida15 (owner, alias Leo) | 2026-11-26 | Acceptance of the exact hard-rule-5 exception text in `docs/cloud-agent-flow.md` (the D6 exception with the named built-ins and the proof rule, as amended by A1). Context: the reviewer refused automation-accepted policy on PR #915; the assistant asked, the owner selected "Acepto el texto exacto de la regla 5". |
+| leomerida15 (owner, alias Leo) | 2026-11-26 | Acceptance of the exact hard-rule-5 exception text in `docs/cloud-agent-flow.md` (the D6 exception with the named built-ins and the proof rule, as amended by A1). Owner, verbatim: "Acepto el texto exacto de la regla 5". Context: approval prompt on PR #915 (the reviewer refused automation-accepted policy); the owner chose that option. |
 
 ## A1. Amendment (recorded 2026-11-26, implements the accepted D6)
 
@@ -121,8 +121,9 @@ at task-PR level). Resolution, faithful to the owner's acceptance of D6:
   gate holds such PRs for a human merge. Proof by merged PR therefore
   transitively proves human approval of those paths.
 - Acceptance of the exact text: the hard-rule-5 wording above shipped in
-  PR #914. That PR's diff (the three intent documents plus this flow doc)
-  contains no human-only path, so the reviewer merged it on a clean verdict
-  against this spec. The exception's principle is the owner-accepted D6;
-  the exact wording stays owner-ratifiable and can be amended by a human
-  merge at any time.
+  PR #914. That PR is merged; its diff contains only `docs/cloud-agent-flow.md`
+  and the three intent documents (`intent.md`, `spec.md`, `plan.md`), none of
+  which is listed in `review.human_only_paths` in `gabo.yaml` or in the
+  built-in set, so it merged with no human-only hold. The exception's
+  principle is the owner-accepted D6; the exact wording is accepted in the
+  row the owner entered in section 7 of this spec.
