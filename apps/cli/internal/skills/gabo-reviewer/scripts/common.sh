@@ -123,6 +123,12 @@ BASE_BRANCH="${BASE_BRANCH:-dev}"
 INTEGRATION_BRANCH="$(caller_yaml repo.integration_branch | head -n 1)"
 INTEGRATION_BRANCH="${INTEGRATION_BRANCH:-dev}"
 
+# intent_dir_exists <branch>: 0 when docs/product/intents/<branch> exists on
+# the integration branch, 1 otherwise.
+intent_dir_exists() {
+  "$GH" api "repos/$REPO/contents/docs/product/intents/$1?ref=$INTEGRATION_BRANCH" >/dev/null 2>&1
+}
+
 # validate_base_branch: the caller's base must be the integration branch or an
 # intent folder existing under docs/product/intents/ on it (intent 0032 S6).
 # Prints nothing and returns 0 when accepted; prints the skip reason and
@@ -133,7 +139,7 @@ validate_base_branch() {
     echo "base $BASE_BRANCH is not the integration branch nor an <NNNN-slug> intent branch; refusing without verdict or merge"
     return 1
   }
-  "$GH" api "repos/$REPO/contents/docs/product/intents/$BASE_BRANCH?ref=$INTEGRATION_BRANCH" >/dev/null 2>&1 && return 0
+  intent_dir_exists "$BASE_BRANCH" && return 0
   echo "base $BASE_BRANCH is not the integration branch and docs/product/intents/$BASE_BRANCH does not exist on $INTEGRATION_BRANCH; refusing without verdict or merge"
   return 1
 }

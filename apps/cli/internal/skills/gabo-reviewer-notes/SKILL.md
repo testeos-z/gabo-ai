@@ -50,7 +50,7 @@ Use when an agent needs to understand or explain a review result. Agents never r
 
 ## Modes and placement
 
-- Single-user mode (the local default): the scripts run as the owner with the owner's `gh` login; no extra users. The preflight refuses unless the scripts run from a clean checkout of the PR base (intent branch or integration branch). A base that is neither `dev` nor an existing intent folder is skipped without verdict or merge. The marker is trust-based in this mode.
+- Single-user mode (the local default): the scripts run as the owner with the owner's `gh` login; no extra users. The preflight refuses unless the scripts run from a clean checkout of the PR base (intent branch or integration branch). A base that is neither `dev` nor an existing intent folder is skipped without verdict or merge. An intent pour (intent 0032 S5, D6: the PR head is the intent branch pouring into the integration branch) merges despite human-only paths, already approved on the task PRs; it is still held by an eval notice. The marker is trust-based in this mode.
 - Isolated mode: a separate reviewer user and identity, available only through the `reviewer_placement` or `agent_host` adapter; the bundled scripts refuse `REVIEWER_MODE=isolated`.
 - Placement: only `local` is implemented in the first release (D6). Separate server, GitHub Actions and GitLab CI placements are Later.
 

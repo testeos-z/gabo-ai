@@ -104,6 +104,6 @@ review() {
 expect_match '^SKIP .*does not exist on dev' \
   "$(G_BASE=0099-unknown review r_unknown REVIEWER_BASE_BRANCH=0099-unknown)" \
   "review of an unknown base is skipped without verdict"
-check "unknown base: no verdict comment posted" bash -c "! -f '$work/r_unknown/posted_7.md'"
+check "unknown base: no verdict comment posted" bash -c "[[ ! -f '$work/r_unknown/posted_7.md' ]]"
 
 finish

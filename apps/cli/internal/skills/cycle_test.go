@@ -108,7 +108,7 @@ func TestReviewerDescribesTheOptionalEngineField(t *testing.T) {
 		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"`^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
-		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
+		"`REVIEWER_BASE_BRANCH=<the intent branch the handoff names> bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
 	})
 	notes := readCatalog(t, "gabo-reviewer-notes/SKILL.md")
 	requireIn(t, "gabo-reviewer-notes/SKILL.md", notes, []string{

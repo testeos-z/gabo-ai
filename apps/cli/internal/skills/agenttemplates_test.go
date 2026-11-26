@@ -511,9 +511,9 @@ func TestCoderTemplateRunsTheReviewerScript(t *testing.T) {
 	for _, s := range []string{
 		"an agent of the gabo assistant", "You launch no agent",
 		"report `REJECTED: expected \"PR #<n> head <40-hex sha>\"` and run nothing",
-		"allowing it up to 10 minutes, with no extra arguments or environment",
-		"`bash \"{{reviewer_script}}\" head <n> <sha>`",
-		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
+		"allowing it up to 10 minutes, with exactly one environment export and no extra arguments",
+		"`REVIEWER_BASE_BRANCH=<the intent branch the handoff names> bash \"{{reviewer_script}}\" head <n> <sha>`",
+		"`REVIEWER_BASE_BRANCH=<the intent branch the handoff names> bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
 		"the last line of its output that starts with `VERDICT `",
 		"If it carries `verdict=retry`, run the same command exactly once more",
 		"never rerun for any other reason",

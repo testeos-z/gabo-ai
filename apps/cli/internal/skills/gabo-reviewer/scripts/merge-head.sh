@@ -9,8 +9,12 @@
 # reviewer/tests and reviewer/review statuses by the bot login on that SHA are
 # success, the newest marker comment by the bot login newer than the head
 # commit opens with the clean verdict and signs that SHA, and no changed path
-# is human-only: review.human_only_paths plus the built-in .gabo/VERSION and
-# .gabo/skills/, and no eval notice holds the head (intent 0030 S10): a head
+# human-only: review.human_only_paths plus the built-in .gabo/VERSION and
+# .gabo/skills/, except on an intent pour (intent 0032 S5, D6: the head is an
+# <NNNN-slug> intent branch with a folder on the integration branch, pouring
+# into it): those paths were already approved on the task PRs, so holding
+# again would make every intent merge manual. The eval hold still applies to
+# a pour. No eval notice holds the head (intent 0030 S10): a head
 # is held while a notice by the bot login names it (the marker opening the
 # comment), and released only when a cleared marker by that login names it and
 # no notice names it. A held or
@@ -75,7 +79,7 @@ eval_notice_hold() {
 [[ "$AUTO_MERGE" == true ]] || skip "REVIEWER_AUTO_MERGE is not true; a human merges"
 [[ -n "$BOT_LOGIN" ]] || resolve_bot_login || skip "gh cannot authenticate"
 
-info="$("$GH" pr view "$pr" --repo "$REPO" --json number,state,baseRefName,isDraft,isCrossRepository,headRefOid 2>/dev/null)" ||
+info="$("$GH" pr view "$pr" --repo "$REPO" --json number,state,baseRefName,headRefName,isDraft,isCrossRepository,headRefOid 2>/dev/null)" ||
   skip "could not read the PR"
 [[ "$(jq -r .state <<<"$info")" == OPEN ]] || skip "the PR is not open"
 pr_base="$(jq -r .baseRefName <<<"$info")"
@@ -106,18 +110,28 @@ verdict="$(latest_bot_verdict "$comments" "$head_date")" || skip "could not read
 files="$("$GH" api --paginate "repos/$REPO/pulls/$pr/files" 2>/dev/null | jq -r '.[].filename')" ||
   skip "could not read the PR files"
 [[ -n "$files" ]] || skip "could not read the PR files (empty list)"
+# Intent pour (intent 0032 S5, D6): the head is an <NNNN-slug> intent branch
+# with a folder on the integration branch, pouring into it. Human-only paths
+# were already approved on the task PRs, so they do not hold it again; the
+# eval hold below still applies.
+pour=false
+head_branch="$(jq -r .headRefName <<<"$info")"
+if [[ "$pr_base" == "$INTEGRATION_BRANCH" && "$head_branch" =~ ^[0-9]{4}-[A-Za-z0-9._-]+$ ]] &&
+  intent_dir_exists "$head_branch"; then
+  pour=true
+fi
 protected=""
 while IFS= read -r f; do
   is_human_only "$f" && protected+="$f"$'\n'
 done <<<"$files"
 hold="$(eval_notice_hold "$comments" "$sha")" || skip "could not read the eval markers"
-if [[ -n "$protected" || -n "$hold" ]]; then
+if [[ -n "$hold" || ( -n "$protected" && "$pour" == false ) ]]; then
   body="$(
     if [[ -n "$hold" ]]; then
       echo "Needs human merge: the review of \`$sha\` is clean, but an eval notice holds this head (intent 0030 S10), so gabo-reviewer does not merge it. A head is released only by a cleared marker from an eval run on that head at or above the threshold, and never while a notice names it."
       echo
     fi
-    if [[ -n "$protected" ]]; then
+    if [[ -n "$protected" && "$pour" == false ]]; then
       echo "Needs human merge: the review of \`$sha\` is clean, but this PR changes human-only paths, so gabo-reviewer does not merge it:"
       echo
       head -n 20 <<<"${protected%$'\n'}" | sed 's/^/- `/; s/$/`/'
