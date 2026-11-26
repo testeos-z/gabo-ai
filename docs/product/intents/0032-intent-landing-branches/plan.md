@@ -12,8 +12,10 @@ the same reviewer gate. No new `gabo.yaml` key.
 
 ## Phases
 
-- P1 — Land this plan on `dev` through the intent branch
-  (`0032-intent-landing-branches`), as a single-doc pour. No code.
+- P1 — Land the 0032 planning set on `dev` through the intent branch
+  (`0032-intent-landing-branches`): `intent.md` + `spec.md` (with
+  amendment A1) + this plan + the hard-rule-5 amendment in
+  `docs/cloud-agent-flow.md`. Docs only, no code.
 - P2 — Land the T2 local-workflow implementation (PR #913: contract and
   adapter skill edits, cycle pour step, reviewer base guard). It merges only
   after P1 is on `dev`.
