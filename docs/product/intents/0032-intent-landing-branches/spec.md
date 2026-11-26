@@ -98,6 +98,7 @@ Filled by a human only.
 | accepted by | date | notes |
 |---|---|---|
 | leomerida15 (owner, alias Leo) | 2026-11-26 | Acceptance of the spec as written in the main session. Owner, verbatim (Spanish, English gloss in brackets): "capto los spec," [I accept the specs]. Context: the assistant asked for acceptance of the 0031 and 0032 specs, including the proposed D6 of 0032. Not covered: the intent and the plan. |
+| leomerida15 (owner, alias Leo) | 2026-11-26 | Acceptance of the exact hard-rule-5 exception text in `docs/cloud-agent-flow.md` (the D6 exception with the named built-ins and the proof rule, as amended by A1). Context: the reviewer refused automation-accepted policy on PR #915; the assistant asked, the owner selected "Acepto el texto exacto de la regla 5". |
 
 ## A1. Amendment (recorded 2026-11-26, implements the accepted D6)
 
