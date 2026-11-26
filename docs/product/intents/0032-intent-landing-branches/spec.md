@@ -119,7 +119,9 @@ at task-PR level). Resolution, faithful to the owner's acceptance of D6:
   human-only paths can only have been merged by a human, because the
   gate holds such PRs for a human merge. Proof by merged PR therefore
   transitively proves human approval of those paths.
-- Acceptance of the exact text: the hard-rule-5 wording above ships in
-  PR #914, which touches a human-only path and can therefore only be
-  merged by a human; that human merge is the acceptance of the exact
-  text required by the reviewer finding.
+- Acceptance of the exact text: the hard-rule-5 wording above shipped in
+  PR #914. That PR's diff (the three intent documents plus this flow doc)
+  contains no human-only path, so the reviewer merged it on a clean verdict
+  against this spec. The exception's principle is the owner-accepted D6;
+  the exact wording stays owner-ratifiable and can be amended by a human
+  merge at any time.
