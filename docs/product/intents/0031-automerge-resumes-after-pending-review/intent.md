@@ -6,7 +6,7 @@
 | status | Draft |
 | owner | gabo-pm |
 | product card | [#492 Flow improvements](https://github.com/testeos-z/gabo-ai/issues/492) (closed; intent issue linked under it, as [#767](https://github.com/testeos-z/gabo-ai/issues/767) was) |
-| intent issue | none yet |
+| intent issue | [#910](https://github.com/testeos-z/gabo-ai/issues/910) |
 | date | 2026-11-26 |
 
 Mode is `auto`. Every proposal the owner did not make carries a **Proposed (auto)** mark with a one-line reason.

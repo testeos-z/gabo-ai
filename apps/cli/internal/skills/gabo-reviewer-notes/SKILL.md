@@ -25,10 +25,10 @@ Use when an agent needs to understand or explain a review result. Agents never r
 
 ### Reviewer-side gate (mandatory)
 
-- After every push the coder runs the scripts of the user-level `gbai-reviewer` skill itself (`~/.claude/skills/gbai-reviewer/scripts/`) through its shell, no relay agent in between (intent 0015 S3, S4, D5): it validates `PR #<n> head <40-hex sha>` (or `PR #<n> head <40-hex sha> engine <engine>`, see Review engine), runs the script and acts on its final `VERDICT` line (D20). It never reviews, edits, comments or merges as the reviewer.
+- After every push the coder runs the scripts of the user-level `gbai-reviewer` skill itself (`~/.claude/skills/gbai-reviewer/scripts/`) through its shell, no relay agent in between (intent 0015 S3, S4, D5): it validates `PR #<n> head <40-hex sha>` (or `PR #<n> head <40-hex sha> engine <engine>`, see Review engine), runs the script and acts on its final `VERDICT` line (D20). For a task PR it exports `REVIEWER_BASE_BRANCH=<intent-branch>` into the script's environment (the scripts test-merge and read policy against that base and refuse any other); for the intent PR it leaves the default (`repo.integration_branch`). It never reviews, edits, comments or merges as the reviewer.
 - The scripts live outside every repository, so PR code cannot modify the code that reviews it. They refuse to run when they are not under the user-level skills dir or are writable by others.
 - Each run has two parts: the repository checks (`review.checks` in `gabo.yaml`) and the code read of the diff. Both must pass for a clean verdict.
-- The code read follows the review policy in `REVIEW.md`, read from the integration branch (`dev`) at the base commit the comment names, never from the PR head, so a PR that edits it is judged by the `dev` copy. Without `REVIEW.md` on `dev` the review fails closed: the comment says review policy: not run: no policy file on `dev`, and no clean verdict is given.
+- The code read follows the review policy in `REVIEW.md`, read from the PR base (the intent branch for a task PR, the integration branch (`dev`) for the intent PR) at the base commit the comment names, never from the PR head, so a PR that edits it is judged by the base copy. Without `REVIEW.md` on the base the review fails closed: for an intent PR the comment says `review policy: not run: no policy file on `dev``, and no clean verdict is given.
 - The code read runs three passes in one review: `bugs`, `security` and `compliance` (the compliance pass compares the diff with spec.md, plan.md and the design principles). Each finding carries its pass tag, `[bugs]`, `[security]` or `[compliance]`, and is marked Important or Nit.
 - Only an Important finding caused by the pull request is blocking. Style and naming are nits; at most five nits are listed, with the count of the rest. A nit never blocks.
 - The comment opens with the `VERDICT` line, then the checks section, then the code read section, which ends with its `code read:` line: `code read: pass`, `code read: fail: <finding>` or `code read: not run: <reason>`.
@@ -37,20 +37,20 @@ Use when an agent needs to understand or explain a review result. Agents never r
 ### Review engine
 
 - Fixed engine: a fixed `runtimes.reviewer` reviews every wave on that engine; the request carries no `engine` field and one is refused.
-- Optional `engine` field (intent 0013 S11): only when `runtimes.reviewer` is `session`, the request is `PR #<n> head <40-hex sha> engine <engine>`, where `<engine>` is the engine of the wave that requests the review (the coder's `gabo-engine:` value). It is required under `session`. The coder passes it to the scripts as an argument; they accept it only when `runtimes.reviewer` on the integration branch is `session` and the engine is listed in `runtimes.assistant` there, else they print `PREFLIGHT-FAILED` with the reason.
+- Optional `engine` field (intent 0013 S11): only when `runtimes.reviewer` is `session`, the request is `PR #<n> head <40-hex sha> engine <engine>`, where `<engine>` is the engine of the wave that requests the review (the coder's `gabo-engine:` value). It is required under `session`. The coder passes it to the scripts as an argument; they accept it only when `runtimes.reviewer` on the PR base is `session` and the engine is listed in `runtimes.assistant` there, else they print `PREFLIGHT-FAILED` with the reason.
 - `codex` and `opencode`, fixed or resolved from `session`, need the isolation pass marker of that engine.
 
 ## Reviewer isolation
 
 - Own clone: the scripts work in their own state dir (`~/.local/state/gabo/reviewer`) with their own clone of the repository, never the coder's worktree; never edit or build inside it.
-- They re-read the PR and skip a head that moved; they test-merge the pinned head into a fresh `dev`. A merge conflict is blocking.
+- They re-read the PR and skip a head that moved; they test-merge the pinned head into a fresh copy of the PR base. A merge conflict is blocking.
 - Checks run with their own `HOME`, their own build and module cache and `CI=true`, in a clean environment (`env -i`) inside a credential-free copy of the merged tree. Only the variables named in `review.check_env` (from the base `gabo.yaml`) are added, with values from the reviewer's own environment; one unset or empty fails the checks. The agent review never gets them.
 - The agent review runs read-only in a clean environment with no `gh` or git credentials: with a model token configured it gets an empty `HOME` of its own and only that token; without one it uses the owner's model login.
 - This is trust-based, not an OS-user boundary.
 
 ## Modes and placement
 
-- Single-user mode (the local default): the scripts run as the owner with the owner's `gh` login; no extra users. The preflight refuses unless the scripts run from a clean checkout of the integration branch. The marker is trust-based in this mode.
+- Single-user mode (the local default): the scripts run as the owner with the owner's `gh` login; no extra users. The preflight refuses unless the scripts run from a clean checkout of the PR base (intent branch or integration branch). A base that is neither `dev` nor an existing intent folder is skipped without verdict or merge. The marker is trust-based in this mode.
 - Isolated mode: a separate reviewer user and identity, available only through the `reviewer_placement` or `agent_host` adapter; the bundled scripts refuse `REVIEWER_MODE=isolated`.
 - Placement: only `local` is implemented in the first release (D6). Separate server, GitHub Actions and GitLab CI placements are Later.
 

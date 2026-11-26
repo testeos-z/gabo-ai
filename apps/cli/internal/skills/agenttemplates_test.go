@@ -543,7 +543,7 @@ func TestCoderTemplateMergesDevOnAConflictingCleanPR(t *testing.T) {
 	for _, s := range []string{
 		"After a clean review that is not yet merged, end HANDED and stay resumable; never poll.",
 		"except `verdict=clean merge=skipped` with the PR `CONFLICTING`",
-		"merge `origin/dev` into the task branch (never a rebase, never a force-push), resolve the conflict, run the task's checks, push and request a new review for the new head, as one fix round",
+		"merge `origin/<intent-branch>` (the handoff names it; re-derive it through the parent intent task and stop on a mismatch) into the task branch (never a rebase, never a force-push), resolve the conflict, run the task's checks, push and request a new review for the new head, as one fix round",
 		"a conflict you cannot resolve ends BLOCKED with the question, never HANDED",
 	} {
 		if !strings.Contains(doc, s) {
