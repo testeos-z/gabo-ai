@@ -22,7 +22,7 @@ Load when writing, checking or using the adapter of the `repository_host` slot (
 
 ### open PR
 
-Open a pull request from the task branch into the intent branch (the intent PR goes into `repo.integration_branch`) with a title, a body that references the task, and the verification run. Return the PR number.
+Open a pull request from the task branch into `repo.integration_branch` with a title, a body that references the task, and the verification run. Return the PR number.
 
 ### comment on PR
 
@@ -34,18 +34,18 @@ Read state, base branch, head SHA, mergeability, check results and comments of a
 
 ### merge into integration branch
 
-Merge a pull request into its accepted base (the intent branch or `repo.integration_branch`) only, pinned to the head SHA that received a clean verdict; refuse `main` and any other base. Return the merged SHA.
+Merge a pull request into `repo.integration_branch` only, pinned to the head SHA that received a clean verdict; refuse any other base. Return the merged SHA.
 
 ### delete branch
 
-Delete a merged task branch, without force, only when the PR merged into its accepted base from that branch. Delete the local copy first, while the host copy still exists to check it against, then the host copy only if it still points at the merged head. Any refusal is reported as a leftover, never forced.
+Delete a merged task branch, without force, only when the PR merged into the integration branch from that branch. Delete the local copy first, while the host copy still exists to check it against, then the host copy only if it still points at the merged head. Any refusal is reported as a leftover, never forced.
 
 ### protect branches
 
-Set the branch rules on `repo.integration_branch`, on `main`, and on each intent branch, read them back from the host, and report one result per rule and branch. The rule list:
+Set the branch rules on `repo.integration_branch` and on `main`, read them back from the host, and report one result per rule and branch. The rule list:
 
-1. On every protected branch: a pull request before a merge, no force-push and no deletion.
-2. On `repo.integration_branch` and on each intent branch: the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
+1. On both branches: a pull request before a merge, no force-push and no deletion.
+2. On `repo.integration_branch` only: the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
 3. On each branch: the required approving reviews count, from `gabo.yaml`: `repo.protection.required_approvals.integration` for `repo.integration_branch` and `repo.protection.required_approvals.main` for `main`; zero when the key is absent.
 4. On both branches: a bypass for the host's administrator role. The bypass names the administrator role and no user.
 

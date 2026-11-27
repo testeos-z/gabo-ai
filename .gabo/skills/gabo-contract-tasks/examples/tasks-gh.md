@@ -5,7 +5,7 @@ Fills the `tasks` slot with GitHub Issues through the `gh` CLI. Copy it to `.gab
 Notes:
 
 - Sub-issue and dependency endpoints need the issue `id` (global integer), not its number: `gh api repos/$R/issues/<n> --jq .id`.
-- Task PRs target the intent branch and intent PRs target the integration branch, so closing keywords do not close issues; close them explicitly.
+- PRs target the integration branch, so closing keywords do not close issues; close them explicitly.
 - Status labels: `status:in-progress`, `status:blocked`, `needs-user`. Create a missing label with `gh label create "<name>" -R $R`.
 - Hierarchy: product card issue → intent sub-issue (`I####: <title>`, body links `docs/product/intents/<NNNN-slug>/`) → task sub-issues (`T###: <title>`). An issue has at most one parent, so a task has exactly one intent; `blocked_by` edges may cross intents. Create an intent once, when its folder is created:
 
