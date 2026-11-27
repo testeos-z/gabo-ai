@@ -1,0 +1,3 @@
+# intent folder -> sync branch (sync = folder + -sync)
+0032-intent-landing-branches 0032-intent-landing-branches-sync
+0031-backport-fix-908 0031-backport-fix-908-sync
