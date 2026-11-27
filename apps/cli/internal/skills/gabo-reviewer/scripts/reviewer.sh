@@ -2,6 +2,8 @@
 # gabo-reviewer entry point (single-user mode, the owner's own gh login):
 #   reviewer.sh preflight            config, trust, base checkout and login checks only
 #   reviewer.sh head <pr> <sha>      reviews that head (40-hex) if it is due
+#   reviewer.sh resume <pr> <sha>    reruns only the merge gate for that head:
+#                                    no new review, no new verdict comment
 #   reviewer.sh due <pr> <sha>       exit 0 when that head is due, else 1
 #   reviewer.sh list-due             prints "<pr> <sha>" for each due head
 #   reviewer.sh prune                removes the <owner>__<repo>__pr-<n> worktrees of PRs that are not open and
@@ -19,6 +21,12 @@
 # A head is due unless its newest reviewer/review status from the bot login is
 # final (success or failure, or error after REVIEWER_MAX_ATTEMPTS attempts)
 # or a verdict comment by the bot login already signs it.
+# `resume` is the continuation of a pending skip (intent 0031): a head that
+# already carries a final reviewer/review status and a signed clean verdict
+# is skipped by `head`, so `resume <pr> <sha>` runs only merge-head.sh for
+# that pinned head, with no model review and no new verdict comment. It
+# prints the gate's outcome line and the same VERDICT line `head` would print
+# for that gate outcome, so a scheduler parses both modes the same way.
 # `head` always ends with exactly one line:
 #   VERDICT PR #<n> head <sha> verdict=<clean|blocking|error|skipped> merge=<merged|needs-human-merge|skipped|none>
 # Never deletes branches, comments, or statuses; merges only through
@@ -29,12 +37,12 @@ source "$(dirname "$0")/common.sh"
 HEAD_SCRIPT="$reviewer_dir/review-head.sh"
 mode="${1:-}"
 usage() {
-  echo "usage: reviewer.sh preflight|prune|once|list-due|due <pr> <sha>|head <pr> <40-hex sha> [engine <engine>]" >&2
+  echo "usage: reviewer.sh preflight|prune|once|list-due|due <pr> <sha>|head <pr> <40-hex sha>|resume <pr> <40-hex sha> [engine <engine>]" >&2
   exit 2
 }
-[[ "$mode" =~ ^(once|preflight|list-due|due|head|prune)$ ]] || usage
+[[ "$mode" =~ ^(once|preflight|list-due|due|head|resume|prune)$ ]] || usage
 nargs=1
-if [[ "$mode" == due || "$mode" == head ]]; then
+if [[ "$mode" == due || "$mode" == head || "$mode" == resume ]]; then
   is_number "${2:-}" && [[ "${3:-}" =~ ^[0-9a-f]{40}$ ]] || usage
   nargs=3
 fi
@@ -176,9 +184,9 @@ review_head() {
 }
 
 # Best effort: a prune problem is logged and never changes a review or its verdict.
-[[ "$mode" != head && "$mode" != prune ]] || prune_worktrees "${2:-}" >/dev/null 2>&1 || true
+[[ "$mode" != head && "$mode" != resume && "$mode" != prune ]] || prune_worktrees "${2:-}" >/dev/null 2>&1 || true
 # Same for the caches: prints one `pruned:` line only when it trimmed something.
-[[ "$mode" != head && "$mode" != prune ]] || prune_caches 2>/dev/null || true
+[[ "$mode" != head && "$mode" != resume && "$mode" != prune ]] || prune_caches 2>/dev/null || true
 
 case "$mode" in
   prune) exit 0 ;;
@@ -205,6 +213,32 @@ case "$mode" in
     fi
     review_head "$2" "$3"
     exit
+    ;;
+  resume)
+    # Intent 0031 S1, S2, D1, D2: the continuation runs only the existing
+    # merge gate for the pinned head. The gate re-reads the PR, the two
+    # required statuses, the signed clean verdict, the human-only paths and
+    # the eval hold, and refuses exactly where it refuses today (S3), so there
+    # is no new merge path and no new state to trust. No model review runs
+    # and no verdict comment is posted here. `clean` is the head's standing
+    # verdict, re-verified by the gate for this exact head, which is why the
+    # VERDICT line matches the one `head` prints for the same gate outcome.
+    gate_out="$(bash "$reviewer_dir/merge-head.sh" "$2" "$3" 2>&1)" || true
+    grep -E '^[^ ]+ (MERGED|MERGE-SKIPPED|NEEDS-HUMAN-MERGE|MERGE-FAILED) #' <<<"$gate_out" || tail -n 1 <<<"$gate_out"
+    verdict=clean merge=skipped code=0
+    if grep -qE "^[^ ]+ MERGED #$2( |$)" <<<"$gate_out"; then
+      merge=merged
+    elif grep -qE "^[^ ]+ NEEDS-HUMAN-MERGE #$2( |$)" <<<"$gate_out"; then
+      merge=needs-human-merge
+    elif grep -qE "^[^ ]+ MERGE-(SKIPPED|FAILED) #$2( |$)" <<<"$gate_out"; then
+      merge=skipped
+    else
+      # The gate printed no outcome (its preflight refused): nothing was
+      # reviewed and nothing was merged.
+      verdict=error merge=none code=2
+    fi
+    echo "VERDICT PR #$2 head $3 verdict=$verdict merge=$merge"
+    exit "$code"
     ;;
   list-due)
     list_due || { echo "LIST-FAILED could not list the open PRs" >&2; exit 1; }
