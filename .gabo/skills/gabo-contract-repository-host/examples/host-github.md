@@ -2,17 +2,17 @@
 
 Fills the `repository_host` slot with GitHub through `gh` and `git`. Copy it to `.gabo/adapters/host-github.md` and point `slots.repository_host.adapter` at it. Repository `R=<owner>/<repo>`, integration branch `B=<repo.integration_branch>` (for example `dev`).
 
-The intent branch is cut once per wave from `$B`. Task branches are created in the task worktree from the intent branch with `git switch -c <type>/<issue>-<slug> origin/<NNNN-slug>` and pushed with `git push -u origin HEAD`.
+Branches are created in the task worktree with `git switch -c <type>/<issue>-<slug> origin/$B` and pushed with `git push -u origin HEAD`.
 
 ## Operations
 
 ### open PR
 
 ```bash
-gh pr create -R $R --base <base> --head <branch> --title "<conventional title>" --body-file <tmp>
+gh pr create -R $R --base $B --head <branch> --title "<conventional title>" --body-file <tmp>
 ```
 
-The body holds a summary, `Refs #<issue>` and the verification run. The base is the intent branch (`<NNNN-slug>`) for a task PR and `$B` for the intent PR; read the base back and return it with the number.
+The body holds a summary, `Refs #<issue>` and the verification run.
 
 ### comment on PR
 
@@ -28,7 +28,7 @@ gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateSt
 
 ### merge into integration branch
 
-The accepted bases are `$B` and any intent folder name existing under `docs/product/intents/` on `$B` (read from the repository, never from the tracker). Check the PR's `baseRefName` first; refuse `main`, `master` and any other base, then:
+Check `baseRefName` equals `$B` first and refuse otherwise, then:
 
 ```bash
 gh pr merge <pr> -R $R --merge --match-head-commit <sha>
@@ -48,17 +48,17 @@ git ls-remote --heads origin <branch>
 git push origin --delete <branch>
 ```
 
-1. The read must show `MERGED`, an accepted base (the intent branch or `$B`) and head `<branch>`; otherwise refuse.
+1. The read must show `MERGED`, base `$B` and head `<branch>`; otherwise refuse.
 2. Local first, with lower-case `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it): git checks the branch against that upstream ref; the merge commit keeps the pushed head reachable from `dev`, and unpushed commits still refuse. A refusal is a leftover; never force it.
 3. Remote only if `ls-remote` shows exactly `headRefOid`; no line means nothing to delete; any other SHA is a refusal and a leftover.
 
 ### protect branches
 
-Uses repository rulesets (not classic branch protection): one ruleset per branch, named `gabo-protect-<branch>`, so a rerun finds it by name. Branches: `$B` (`repo.integration_branch`), `main`, and each intent branch (`<NNNN-slug>`). The rule list, as the contract states it:
+Uses repository rulesets (not classic branch protection): one ruleset per branch, named `gabo-protect-<branch>`, so a rerun finds it by name. Branches: `<branch>` is `$B` and `main`. The rule list, as the contract states it:
 
-- On every protected branch: a pull request before a merge, no force-push and no deletion.
-- On `repo.integration_branch` (`$B`) and on each intent branch: the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
-- On each branch: the approving reviews count from `repo.protection.required_approvals.integration` (`$B` and intent branches) or `repo.protection.required_approvals.main`; zero when the key is absent.
+- On both branches: a pull request before a merge, no force-push and no deletion.
+- On `repo.integration_branch` only (`$B`): the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
+- On each branch: the approving reviews count from `repo.protection.required_approvals.integration` (`$B`) or `repo.protection.required_approvals.main`; zero when the key is absent.
 - On both branches: a bypass for the administrator role, which names that role and no user.
 
 1. Approving reviews per branch, from `gabo.yaml` with a YAML reader (for example `yq -r '.repo.protection.required_approvals.integration // 0' gabo.yaml` and the same with `.main`); a missing key reads as `0`.
@@ -86,7 +86,7 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
    }
    ```
 
-   On `$B` and on each intent branch, add this rule to `rules`; `main` has no `required_status_checks` rule, so it requires no status:
+   On `$B` only, add this rule to `rules`; `main` has no `required_status_checks` rule, so it requires no status:
 
    ```json
    {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": false, "required_status_checks": [{"context": "reviewer/tests"}, {"context": "reviewer/review"}]}}

@@ -52,3 +52,13 @@ the normal review. Never a rebase, never a force-push.
 
 - 0031 and 0032 each landed on their intent branch and poured into `dev`.
 - 0.6.0 tagged after both pours.
+- 0031 and 0032 each landed on their intent branch and poured into `dev`.
+- 0.6.0 tagged after both pours.
+
+## Tasks
+
+| id | title | spec refs | depends_on | unblocks | acceptance | size |
+| T1 | Land planning set on intent branch | S1,S2,S3,S4 | - | T2 | intent.md+spec.md+plan.md on 0032 branch | S |
+| T2 | T2 local-workflow implementation | S5,S6,S7,S10 | T1 | T3 | reviewer+cycle pour step green | M |
+| T3 | Open waves per intent branch | S2,S4,S8 | T2 | T4 | branches from dev, task PRs target intent | S |
+| T4 | Pour intents + reverse sync always | S7,S9 | T3 | - | intent PRs into dev, sync proof | M |
