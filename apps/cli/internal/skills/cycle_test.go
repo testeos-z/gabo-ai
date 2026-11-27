@@ -108,7 +108,7 @@ func TestReviewerDescribesTheOptionalEngineField(t *testing.T) {
 		"`PR #<n> head <40-hex sha> engine {{engine}}`",
 		"`^PR #([1-9][0-9]*) head ([0-9a-f]{40}) engine (claude|codex|pi|opencode)$`",
 		"only when `runtimes.reviewer` in `gabo.yaml` is `session`",
-		"`bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
+		"`REVIEWER_BASE_BRANCH=<the intent branch the handoff names> bash \"{{reviewer_script}}\" head <n> <sha> engine <engine>`",
 	})
 	notes := readCatalog(t, "gabo-reviewer-notes/SKILL.md")
 	requireIn(t, "gabo-reviewer-notes/SKILL.md", notes, []string{
@@ -205,7 +205,7 @@ func TestCycleKeepsAndCleansOnlyItsOwnWave(t *testing.T) {
 		"One line per resource: kind, name or path, creator, task, the session id of this wave, state (live, removed, leftover)",
 		// the worktree namespace.
 		"`<repo-parent>/<repo-name>-worktrees/<wave>/<task>`",
-		"`git worktree add <repo-parent>/<repo-name>-worktrees/<wave>/<task> -b <branch> origin/dev`",
+		"`git worktree add <repo-parent>/<repo-name>-worktrees/<wave>/<task> -b <branch> origin/<intent-branch>`",
 		// the sweep touches only this wave's ledger.
 		"only entries of this wave's ledger (`gabo/ledger/<run id>`)",
 		"A resource of another wave",
@@ -307,7 +307,7 @@ func TestCycleResumeLaunchesANewCoderForAnUnresumableOne(t *testing.T) {
 		"a coder handle that cannot be resumed (no transcript after a session close or restart)",
 		"launch a new `gabo-coder` on the ledger worktree and branch with the same input as a first launch (task, worktree path, branch, mode)",
 		"`PR #<n> merged` when `repository_host` shows the PR merged",
-		"when the PR is `CONFLICTING`, with the instruction to run the coder's `CONFLICTING` fix round (merge `origin/dev` into the task branch, never a rebase, never a force-push, resolve the conflict, run the task's checks, push, request a new review)",
+		"when the PR is `CONFLICTING`, with the instruction to run the coder's `CONFLICTING` fix round (merge `origin/<intent-branch>` into the task branch, never a rebase, never a force-push, resolve the conflict, run the task's checks, push, request a new review)",
 		"read the PR status and the latest reviewer comment and continue from them",
 		"When the worktree or the branch is already gone and the PR is merged, the new coder runs the Task Close from the main checkout (verify the merge through `repository_host`, close the issue with DONE via PR; nothing else to remove)",
 		"give it the main checkout path (your own working directory) in its input",

@@ -63,6 +63,7 @@ case "$args" in
   "pr merge "*) [[ -z "${MERGE_FAIL:-}" ]] || exit 1; echo merged ;;
   "issue view "*) n="$(awk '{print $3}' <<<"$args")"; answer "issue_$n.json" ;;
   *"/pulls/"*"/files"*) n="$(grep -Eo 'pulls/[0-9]+' <<<"$args" | cut -d/ -f2)"; answer "files_$n" ;;
+  *"/pulls/"*"/commits"*) n="$(grep -Eo 'pulls/[0-9]+' <<<"$args" | cut -d/ -f2)"; answer "commits_$n.json" ;;
   *"-X POST repos/"*"/statuses/"*)
     sha="$(grep -Eo 'statuses/[0-9a-f]+' <<<"$args" | cut -d/ -f2)"
     body="$(cat)"
@@ -82,8 +83,13 @@ case "$args" in
     mv "$FIXTURE/comments_$n.json.new" "$FIXTURE/comments_$n.json"
     echo '{}' ;;
   *"/issues/"*"/comments"*) n="$(grep -Eo 'issues/[0-9]+' <<<"$args" | cut -d/ -f2)"; answer "comments_$n.json" ;;
+  *"/commits/"*"/pulls"*) sha="$(grep -Eo 'commits/[0-9a-f]+' <<<"$args" | cut -d/ -f2)"; answer "commit_pulls_$sha.json" ;;
   *"/commits/"*"/statuses"*) sha="$(grep -Eo 'commits/[0-9a-f]+' <<<"$args" | cut -d/ -f2)"; answer "statuses_$sha.json" ;;
   *"/commits/"*) sha="$(grep -Eo 'commits/[0-9a-f]+' <<<"$args" | cut -d/ -f2)"; answer "commit_$sha.json" ;;
+  *"/contents/docs/product/intents/"*) p="${args##*/intents/}"; p="${p%%\?*}"
+    if [[ -n "${G_API_FAIL_CONTENTS:-}" ]]; then echo "error: failed to connect" >&2; exit 1; fi
+    if [[ -f "$FIXTURE/intent_dir_$p.json" ]]; then cat "$FIXTURE/intent_dir_$p.json"
+    else echo "Not Found (HTTP 404)" >&2; exit 1; fi ;;
   *) echo "unexpected gh call: $args" >&2; exit 1 ;;
 esac
 GH
