@@ -31,6 +31,7 @@ The owner also ordered (L2, S5) two intents in parallel — one for the #908 fix
 
 - Each intent has its own landing branch where its task PRs accumulate, and finished intents pour into the main development branch (`dev`).
 - Agents can auto-merge to the main landing branch, and the intent PR into `dev` is merged by the automatic reviewer under the same gate (L4).
+- Reverse merge contra `dev` siempre antes del intent PR: se corta `<NNNN-slug>-sync` desde la rama del intent, se fusiona `dev` en ella, se resuelven los conflictos ahí, se lleva a la rama del intent por la revisión normal, y de ahí el intent PR directo a `dev`.
 - No new `gabo.yaml` key is needed: the landing branch is named exactly like the intent folder (L4).
 
 ## Constraints

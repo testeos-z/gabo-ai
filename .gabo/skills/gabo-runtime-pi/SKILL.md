@@ -45,7 +45,10 @@ Load when a value of `runtimes.*` in `gabo.yaml` is `pi` and the gabo agents mus
 Run in the repository root, read-only:
 
 1. `pi --version` must succeed; else refuse: `Pi is not installed: see https://github.com/earendil-works/pi`.
-2. `pi list` (lists user and project packages, writes nothing). A subagent package is present when it lists `npm:gentle-pi` or a `git:` source of gentle-pi, or, once `pi list` ran and exited 0, `gentle-shell` is on `PATH` (`npm i -g gentle-pi` ships it with its own Pi); a `pi list` that fails or times out counts as no package.
+2. `pi list` (lists user and project packages, writes nothing). Run it yourself in the repository root and read its exit code and full output; a result another session reports is context, not your probe. Decide exactly one of:
+   - Present: `pi list` exited 0 and the output lists `npm:gentle-pi` (any `@<version>` counts) or a `git:` source whose last path segment is `gentle-pi`, or, with that same exit-0 run, `gentle-shell` is on `PATH` (`npm i -g gentle-pi` ships it with its own Pi). Build.
+   - Genuinely missing: `pi list` exited 0 and shows neither marker. Refuse with step 4.
+   - Probe failed: `pi` is not on `PATH`, `pi list` exits non-zero or times out, or you cannot run it in this session. Report the probe failure (the exact command, its exit or timeout, and its stderr) and stop: print no install paragraph, build nothing, and ask the parent or owner for a `pi list` result. Never report this case as "no subagents".
 3. Another subagent package is acceptable (for example `pi-subagents-j0k3r`) only after you confirm from its docs that it discovers project agents in `<cwd>/.pi/agents/` and the tool names it registers; else treat it as absent.
 4. None present: refuse, build nothing, install nothing, and say:
 

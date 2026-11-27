@@ -670,4 +670,116 @@ v="$(scenario qanoref CLAUDE_MODE=qa_pass)"
 check "a PR that links no task issue reads QA not run" grep -qxF 'not run: no task issue linked (no Refs #<n> in the PR body)' "$work/qanoref/posted_7.md"
 check "a PR that links no task issue builds nothing" bash -c "! grep -q 'build -o' '$work/qanoref/calls.log'"
 
+echo "# resume: the continuation of a pending skip (intent 0031 S1-S4)"
+
+origin resume O_AUTO_MERGE=true
+
+# resume_case <name> [VAR=value...]: resumes PR 7 at HEAD_SHA of ORIGIN from
+# CALLER on a head that already carries a final reviewer/review status and a
+# signed clean verdict comment (the pending-skip state of #908); prints the
+# VERDICT line. Knobs: R_HEAD (the PR head now), R_TESTS/R_REVIEW (the seeded
+# newest statuses), R_FILES (the PR file list), R_EXTRA (further comments).
+resume_case() {
+  local name="$1"
+  shift
+  local fx="$work/$name"
+  mkdir -p "$fx"
+  echo "owner" >"$fx/user_login"
+  jq -n --arg s "${R_HEAD:-$HEAD_SHA}" \
+    '{number:7, state:"OPEN", headRefOid:$s, baseRefName:"dev", isDraft:false, isCrossRepository:false, mergeable:"MERGEABLE", body:"", author:{login:"owner"}}' >"$fx/pr_7.json"
+  if [[ -n "${R_FILES:-}" ]]; then printf '%s\n' "$R_FILES" >"$fx/files_7"; else pr_files_json "$ORIGIN" >"$fx/files_7"; fi
+  jq -n --arg t "${R_TESTS:-success}" --arg r "${R_REVIEW:-success}" \
+    '[{context:"reviewer/tests",state:$t,creator:{login:"owner"}},{context:"reviewer/review",state:$r,creator:{login:"owner"}}]' >"$fx/statuses_$HEAD_SHA.json"
+  echo '{"commit":{"committer":{"date":"2026-10-20T11:00:00Z"}}}' >"$fx/commit_$HEAD_SHA.json"
+  jq -n --arg b $'No blocking issues found.\n\n<!-- gbai-reviewer-bot sha='"$HEAD_SHA"$' -->\n\U0001F916 gabo reviewer' \
+    --argjson x "${R_EXTRA:-[]}" \
+    '[{user:{login:"owner"}, created_at:"2026-10-20T12:00:00Z", body:$b}] + $x' >"$fx/comments_7.json"
+  (
+    cd "$CALLER" || exit 1
+    export HOME="$fake_home" PATH="$work/bin:$PATH" STUB_LOG="$fx/calls.log" FIXTURE="$fx" \
+      REVIEWER_GH="$work/bin/gh" REVIEWER_GABO_BIN="$work/bin/gabo" GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_REMOTE_URL="$ORIGIN" \
+      REVIEWER_NOW=2026-10-20T13:00:00Z REVIEWER_MERGE_DELAY=0 REVIEWER_MERGE_TRIES=2
+    for kv in "$@"; do export "${kv?}"; done
+    write_stub_context "$work/bin"
+    bash "$skill/reviewer.sh" resume 7 "$HEAD_SHA" >"$fx/out.log" 2>&1
+    echo "exit=$?" >>"$fx/out.log"
+    tail -n 2 "$fx/out.log" | head -n 1
+  )
+}
+
+# resume_again <name>: resumes PR 7 at HEAD_SHA on the existing fixture again;
+# prints the VERDICT line (for the S4 repeat after the merge).
+resume_again() {
+  local fx="$work/$1"
+  (
+    cd "$CALLER" || exit 1
+    export HOME="$fake_home" PATH="$work/bin:$PATH" STUB_LOG="$fx/calls.log" FIXTURE="$fx" \
+      REVIEWER_GH="$work/bin/gh" REVIEWER_GABO_BIN="$work/bin/gabo" GABO_REVIEWER_STATE_DIR="$fx/state" REVIEWER_REMOTE_URL="$ORIGIN" \
+      REVIEWER_NOW=2026-10-20T13:00:00Z REVIEWER_MERGE_DELAY=0 REVIEWER_MERGE_TRIES=2
+    write_stub_context "$work/bin"
+    bash "$skill/reviewer.sh" resume 7 "$HEAD_SHA" >"$fx/out2.log" 2>&1
+    echo "exit=$?" >>"$fx/out2.log"
+    tail -n 2 "$fx/out2.log" | head -n 1
+  )
+}
+
+merges_of() { grep -c '^gh pr merge' "$work/$1/calls.log"; }
+
+echo "## S1: a skipped-clean head resumes once both checks are success"
+v="$(resume_case resumed)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" "S1: the continuation merges only the pinned head"
+expect_eq 1 "$(merges_of resumed)" "S1: exactly one merge call"
+check "S1: the merge is pinned with --match-head-commit" grep -qF "gh pr merge 7 --repo example-org/example-repo --merge --match-head-commit $HEAD_SHA" "$work/resumed/calls.log"
+check "S1: the gate outcome precedes the VERDICT line" grep -qF "MERGED #7 $HEAD_SHA" "$work/resumed/out.log"
+# The normal path still skips the already-reviewed head: that dead end is why the continuation exists.
+resume_case deadend >/dev/null
+out="$(cd "$CALLER" && HOME="$fake_home" PATH="$work/bin:$PATH" STUB_LOG="$work/deadend/calls2.log" FIXTURE="$work/deadend" \
+  REVIEWER_GH="$work/bin/gh" REVIEWER_GABO_BIN="$work/bin/gabo" GABO_REVIEWER_STATE_DIR="$work/deadend/state2" REVIEWER_REMOTE_URL="$ORIGIN" \
+  REVIEWER_NOW=2026-10-20T13:00:00Z bash "$skill/reviewer.sh" head 7 "$HEAD_SHA" 2>&1 | tail -n 1)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=skipped merge=none" "$out" "S1: the normal path still skips the already-reviewed head"
+check "S1: the skipped head issues no merge" bash -c "! grep -q '^gh pr merge' '$work/deadend/calls2.log'"
+
+echo "## S2: the continuation never re-runs the model review"
+v="$(resume_case resumed_clean CLAUDE_MODE=error PI_MODE=error CODEX_MODE=error OPENCODE_MODE=error)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=merged" "$v" "S2: the continuation merges while every review engine would fail"
+check "S2: no model review runs" bash -c "! grep -qE '^(claude|pi|codex|opencode) ' '$work/resumed_clean/calls.log'"
+check "S2: no new verdict comment is posted" bash -c "! test -f '$work/resumed_clean/posted_7.md'"
+
+echo "## S3: the continuation refuses exactly where the gate refuses"
+other=fedcba9876543210fedcba9876543210fedcba98
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(R_HEAD=$other resume_case moved)" "S3: a moved head stays unmerged"
+check "S3: the gate names the moved head" grep -qF "MERGE-SKIPPED #7 $HEAD_SHA head moved since the review" "$work/moved/out.log"
+check "S3: no merge call for a moved head" bash -c "! grep -q '^gh pr merge' '$work/moved/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(R_TESTS=pending resume_case pending)" "S3: a still-pending tests status stays unmerged"
+check "S3: the gate names the pending check" grep -qF "reviewer/tests is pending" "$work/pending/out.log"
+check "S3: no merge call for a pending check" bash -c "! grep -q '^gh pr merge' '$work/pending/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(R_REVIEW=failure resume_case failed)" "S3: a failed review status stays unmerged"
+check "S3: the gate names the failed check" grep -qF "reviewer/review is failure" "$work/failed/out.log"
+check "S3: no merge call for a failed check" bash -c "! grep -q '^gh pr merge' '$work/failed/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$(resume_case off REVIEWER_AUTO_MERGE=false)" "S3: disabled automerge stays unmerged"
+check "S3: the gate names the disabled automerge" grep -qF "REVIEWER_AUTO_MERGE is not true" "$work/off/out.log"
+check "S3: no merge call when automerge is off" bash -c "! grep -q '^gh pr merge' '$work/off/calls.log'"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=needs-human-merge" "$(R_FILES='[{"filename":"AGENTS.md"}]' resume_case human)" "S3: human-only paths need a human merge"
+check "S3: no merge call for human-only paths" bash -c "! grep -q '^gh pr merge' '$work/human/calls.log'"
+notice="$(jq -cn --arg s "$HEAD_SHA" '[{user:{login:"owner"}, created_at:"2026-10-20T12:30:00Z", body:("<!-- gabo-eval-notice sha=" + $s + " -->\n\nEval run below the threshold.")}]')"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=needs-human-merge" "$(R_EXTRA="$notice" resume_case notice)" "S3: an eval notice holds the head"
+check "S3: no merge call for a held head" bash -c "! grep -q '^gh pr merge' '$work/notice/calls.log'"
+
+echo "## S4: resuming a merged PR changes nothing"
+resume_case repeat >/dev/null
+expect_eq 1 "$(merges_of repeat)" "S4: the first continuation merges once"
+jq '.state = "MERGED"' "$work/repeat/pr_7.json" >"$work/repeat/pr_7.json.new" && mv "$work/repeat/pr_7.json.new" "$work/repeat/pr_7.json"
+v="$(resume_again repeat)"
+expect_eq "VERDICT PR #7 head $HEAD_SHA verdict=clean merge=skipped" "$v" "S4: resuming a merged PR merges nothing more"
+expect_eq 1 "$(merges_of repeat)" "S4: still exactly one merge call"
+check "S4: no new comment after the merge" bash -c "! test -f '$work/repeat/posted_7.md'"
+check "S4: no new status after the merge" bash -c "! grep -q '^STATUS ' '$work/repeat/calls.log'"
+
+echo "## resume usage and docs"
+check "resume without arguments prints the usage" bash -c "bash '$skill/reviewer.sh' resume 2>&1 | grep -q '^usage: reviewer.sh'"
+check "resume with a short sha is refused" bash -c "! bash '$skill/reviewer.sh' resume 7 deadbeef >/dev/null 2>&1"
+check "resume with a non-numeric PR is refused" bash -c "! bash '$skill/reviewer.sh' resume seven '$HEAD_SHA' >/dev/null 2>&1"
+check "SKILL.md documents the resume continuation" grep -qF 'resume <n> <sha>' "$src/../SKILL.md"
+check "README.md documents the resume continuation" grep -qF 'resume <pr> <sha>' "$src/../README.md"
+
 finish
