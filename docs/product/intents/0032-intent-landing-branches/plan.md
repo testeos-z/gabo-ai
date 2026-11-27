@@ -52,8 +52,6 @@ the normal review. Never a rebase, never a force-push.
 
 - 0031 and 0032 each landed on their intent branch and poured into `dev`.
 - 0.6.0 tagged after both pours.
-- 0031 and 0032 each landed on their intent branch and poured into `dev`.
-- 0.6.0 tagged after both pours.
 
 ## Tasks
 
