@@ -59,6 +59,18 @@ Run when resumed with `PR #<n> merged`, or after `verdict=clean merge=merged`. L
 4. Delete the branch through `repository_host` (delete branch): the local branch always, and in `mode: auto`, after the merge, the remote branch of the merged task the workflow created. It never deletes any other remote branch nor a branch the workflow did not create. A refused branch goes under `leftovers:`. When the engine asks about deleting the merged remote branch or refuses it, do not retry it by another route (no API call, no force push, no other delete): list it under `leftovers:` as `merged remote branch left (<reason>)` with the exact command `git push origin --delete <branch>` for the owner, and the task still closes (step 2 unchanged). A delete that succeeds leaves no leftover.
 5. Containers stay: the cycle removes them from the ledger.
 
+### Cleanup gate (intent 0033 S1, S2, S3, S4)
+
+step 3 removes only a worktree whose PR merged into the integration branch or the intent branch (verified in step 1); an unmerged or open-PR worktree is never removed.
+
+Real unsaved work keeps the worktree regardless of author: unpushed commits, staged changes, tracked modifications, or any untracked or ignored content whose provenance or disposability is not proven. Doubt about real unsaved work keeps the worktree. A filename or glob match alone never proves disposability.
+
+the verifier integration names its scratch path outside the worktree (a `mktemp -d` dir, never inside the worktree); it does not block removal. Ignored `.atl/` content proven rebuildable — regenerable by re-running the verifier with no user input inside, provenance proven by that rebuild and never by the path alone — does not block removal. Ignored scratch that cannot be proven rebuildable keeps the worktree and the reason names it.
+
+Generated output, placeholders and empty folders (S3, S4): untracked generated output blocks removal unless reproducible by its build with no hand input inside, proven and never assumed from the path. A `*cwd-placeholder` file blocks removal unless its flow ownership and orphaned provenance are both proven, never by the filename alone. A wave folder blocks removal unless it is actually empty and owned by this same wave; a non-empty folder or a folder not owned by this wave keeps the worktree. Every kept item is named in the reason; doubt keeps the worktree.
+
+Missing path record (S5): a gone ledger path with no flow record is reported as missing with unknown provenance, kept as history, reported separately from flow cleanups and from proven external removals, and a missing path alone never names an actor. A removal proven external records the evidence cited; a flow-owned removal records the owner and the reason.
+
 ### Fresh-context verifier
 
 Fixed gabo rule (intent 0027 S28), no configuration. When the change alters behavior, run a fresh-context verifier before you open the PR, after your own checks pass and the head is committed. When the change alters no behavior (documentation or text only), skip it and report `verifier: not applicable: no behavior change`.
