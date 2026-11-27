@@ -85,7 +85,7 @@ func TestCoderMergesDevOnACleanVerdictWithAConflictingPR(t *testing.T) {
 	row := decisionGateRow(t, doc, "`verdict=clean merge=skipped`, PR `CONFLICTING`")
 	for _, s := range []string{
 		"read PR status", "`mergeable`", "`CONFLICTING`",
-		"merge `origin/dev` into the task branch in the worktree",
+		"merge `origin/<intent-branch>` (the handoff names it; re-derive it through the parent intent task and stop on a mismatch) into the task branch in the worktree",
 		"never a rebase, never a force-push",
 		"resolve the conflict", "run the task's checks", "push",
 		"request a new review for the new head",

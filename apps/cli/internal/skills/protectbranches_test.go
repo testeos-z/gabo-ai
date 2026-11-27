@@ -16,7 +16,7 @@ const protectOperation = "protect branches"
 // protectRuleList is what every copy of the operation must state (S2, D3, D6).
 var protectRuleList = []string{
 	"a pull request before a merge", "no force-push", "no deletion",
-	"`reviewer/tests`", "`reviewer/review`", "`repo.integration_branch` only",
+	"`reviewer/tests`", "`reviewer/review`", "on each intent branch",
 	"administrator role", "`main` requires no status",
 	"repo.protection.required_approvals.integration", "repo.protection.required_approvals.main",
 	"zero when the key is absent",

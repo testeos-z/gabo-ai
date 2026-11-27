@@ -1,6 +1,6 @@
 ---
 name: gabo-repository-host-github
-description: "Trigger: gabo repository host, open PR, PR status, PR checks, merge into dev, delete branch, protect branches, branch rules, rulesets. GitHub adapter for the gabo repository_host slot via gh and git."
+description: "Trigger: gabo repository host, open PR, PR status, PR checks, merge into intent branch or dev, delete branch, protect branches, branch rules, rulesets. GitHub adapter for the gabo repository_host slot via gh and git."
 license: Apache-2.0
 metadata:
   author: gabo-ai
@@ -12,8 +12,8 @@ Use whenever a gabo agent works with branches or pull requests. Fills the `repos
 
 ## Hard Rules
 
-- Every PR targets the integration branch `dev`. Never open a PR to `main`, never merge into `main`, never push to `main` or `dev` directly (TRD D13).
-- Merge only into `dev`, only pinned to the head SHA that received a clean verdict, and only when the merge is yours to do (reviewer gate or explicit owner request). Coders never merge.
+- Task PRs target their intent branch (`<NNNN-slug>`, the intent folder name); the intent PR targets the integration branch `dev`. Never open a PR to `main`, never merge into `main`, never push to `main`, `dev` or an intent branch directly (TRD D13).
+- Merge only into the PR's accepted base (the intent branch or `dev`), only pinned to the head SHA that received a clean verdict, and only when the merge is yours to do (reviewer gate or explicit owner request). Coders never merge.
 - Never force-push. Delete only branches the workflow created and that are merged (ledger, D15, D23). Never force-delete a branch (`-D`): delete the local branch with `-d` while the local `origin/<branch>` tracking ref still exists (no `fetch --prune` before it), so git checks it against that upstream ref (the merge commit keeps the pushed head reachable from `dev`), then the remote one. A `-d` refusal means unpushed work: leave it as a leftover.
 - Re-read after every write: `gh pr view` must show the expected state.
 - Never post the reviewer marker (`gbai-reviewer-bot`) in a PR body, comment or review.
@@ -24,22 +24,29 @@ Commands come from this adapter's former operation table and the `repository_hos
 
 ### branch
 
-Not a contract operation; kept for the coder. In the task worktree:
+Not a contract operation; kept for the coder. The intent branch is cut once per wave from `dev`:
 
 ```bash
-git switch -c <type>/<issue>-<slug> origin/dev
+git switch -c <NNNN-slug> origin/dev
+git push -u origin HEAD
+```
+
+In the task worktree, the task branch starts from the intent branch:
+
+```bash
+git switch -c <type>/<issue>-<slug> origin/<NNNN-slug>
 git push -u origin HEAD
 ```
 
 ### open PR
 
-Body: summary, `Refs #<issue>`, verification run.
+Body: summary, `Refs #<issue>`, verification run. Base is the intent branch for a task PR and `dev` for the intent PR.
 
 ```bash
-gh pr create -R $R --base dev --head <branch> --title "<conventional title>" --body-file <tmp>
+gh pr create -R $R --base <base> --head <branch> --title "<conventional title>" --body-file <tmp>
 ```
 
-Read back: `gh pr view <branch> -R $R --json number,state,baseRefName,headRefName,headRefOid` must show `OPEN`, base `dev`, head `<branch>`; return `number`.
+Read back: `gh pr view <branch> -R $R --json number,state,baseRefName,headRefName,headRefOid` must show `OPEN`, base `<base>`, head `<branch>`; return `number`.
 
 ### comment on PR
 
@@ -57,7 +64,7 @@ gh pr view <pr> -R $R --json state,baseRefName,headRefOid,mergeable,mergeStateSt
 
 ### merge into integration branch
 
-Check `baseRefName == "dev"` first (`gh pr view <pr> -R $R --json baseRefName --jq .baseRefName`); refuse on any other base. Then:
+The accepted bases are `dev` and any intent folder name existing under `docs/product/intents/` on `dev` (read from the repository, never from the tracker). Check the PR's `baseRefName` first (`gh pr view <pr> -R $R --json baseRefName --jq .baseRefName`); refuse `main`, `master` and any other base. Then:
 
 ```bash
 gh pr merge <pr> -R $R --merge --match-head-commit <sha>
@@ -65,9 +72,20 @@ gh pr merge <pr> -R $R --merge --match-head-commit <sha>
 
 Read back: `gh pr view <pr> -R $R --json state,mergeCommit --jq '[.state,.mergeCommit.oid]'` must show `MERGED`; return the merged SHA.
 
+### sync from the integration branch (reverse merge)
+
+Never merge `dev` directly into the intent branch and never touch `dev` from a task branch. When `dev` moved after the intent branch was cut, resolve the drift on a throwaway branch first (0032 S9):
+
+```bash
+git switch -c <NNNN-slug>-sync origin/<NNNN-slug>
+git merge origin/dev
+```
+
+Resolve conflicts here, run the task's checks, push, and open a PR with base `<NNNN-slug>` through `open PR`; it merges under the same reviewer gate. When the sync PR is merged, the intent PR into `dev` follows. Never rebase, never force-push. When the intent branch already contains `dev` (no divergence), skip this operation.
+
 ### delete branch
 
-After merge only: `gh pr view <pr> -R $R --json state,baseRefName,headRefName,headRefOid` must show `MERGED`, base `dev` and head `<branch>`; the worktree is already removed. In this order:
+After merge only: `gh pr view <pr> -R $R --json state,baseRefName,headRefName,headRefOid` must show `MERGED`, an accepted base (the intent branch or `dev`) and head `<branch>`; the worktree is already removed. This covers task branches and, at wave close, the intent branch itself. In this order:
 
 1. Local, while the local `origin/<branch>` tracking ref still exists (a refusal is a leftover; never `-D`):
 
@@ -85,12 +103,12 @@ Read back: `git branch --list <branch>` and `git ls-remote --heads origin <branc
 
 ### protect branches
 
-Uses repository rulesets (not classic branch protection): one ruleset per branch, named `gabo-protect-<branch>`, so a rerun finds it by name. Branches: `dev` (`repo.integration_branch`) and `main`. The rule list, as the contract states it:
+Uses repository rulesets (not classic branch protection): one ruleset per branch, named `gabo-protect-<branch>`, so a rerun finds it by name. Branches: `dev` (`repo.integration_branch`), `main`, and each intent branch (`<NNNN-slug>`). The rule list, as the contract states it:
 
-- On both branches: a pull request before a merge, no force-push and no deletion.
-- On `repo.integration_branch` only (`dev`): the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
-- On each branch: the approving reviews count from `repo.protection.required_approvals.integration` (dev) or `repo.protection.required_approvals.main`; zero when the key is absent.
-- On both branches: a bypass for the administrator role, which names that role and no user.
+- On every protected branch: a pull request before a merge, no force-push and no deletion.
+- On `repo.integration_branch` (`dev`) and on each intent branch: the statuses `reviewer/tests` and `reviewer/review` required. `main` requires no status.
+- On each branch: the approving reviews count from `repo.protection.required_approvals.integration` (`dev` and intent branches) or `repo.protection.required_approvals.main`; zero when the key is absent.
+- On every protected branch: a bypass for the administrator role, which names that role and no user.
 
 1. Approving reviews per branch, from `gabo.yaml` with a YAML reader (for example `yq -r '.repo.protection.required_approvals.integration // 0' gabo.yaml` and the same with `.main`); a missing key reads as `0`.
    The key is accepted by `gabo check` once intent 0029 T3 lands; until then a value set by hand is rejected, and an absent key reads as `0`.
@@ -117,7 +135,7 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
    }
    ```
 
-   On `dev` only, add this rule to `rules`; `main` has no `required_status_checks` rule, so it requires no status:
+   On `dev` and on each intent branch, add this rule to `rules`; `main` has no `required_status_checks` rule, so it requires no status:
 
    ```json
    {"type": "required_status_checks", "parameters": {"strict_required_status_checks_policy": false, "required_status_checks": [{"context": "reviewer/tests"}, {"context": "reviewer/review"}]}}
@@ -134,6 +152,8 @@ Uses repository rulesets (not classic branch protection): one ruleset per branch
    ```
 
 Running it again with the same config: the ruleset is found by name, the PUT replaces it with the same body, and the read-back is identical; no second ruleset is created.
+
+At wave close, before deleting the intent branch: PUT the intent branch ruleset without the `deletion` rule (same body otherwise), read it back, then delete the branch through `delete branch`. The `dev` and `main` rulesets are never released.
 
 ## Output Contract
 
